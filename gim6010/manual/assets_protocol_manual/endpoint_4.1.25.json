@@ -1,0 +1,3538 @@
+[
+  {
+    "name": "",
+    "id": 0,
+    "type": "json",
+    "access": "r"
+  },
+  {
+    "name": "error",
+    "id": 1,
+    "type": "uint8",
+    "access": "rw"
+  },
+  {
+    "name": "vbus_voltage",
+    "id": 2,
+    "type": "float",
+    "access": "r"
+  },
+  {
+    "name": "ibus",
+    "id": 3,
+    "type": "float",
+    "access": "r"
+  },
+  {
+    "name": "ibus_report_filter_k",
+    "id": 4,
+    "type": "float",
+    "access": "rw"
+  },
+  {
+    "name": "serial_number",
+    "id": 5,
+    "type": "uint64",
+    "access": "r"
+  },
+  {
+    "name": "hw_version_major",
+    "id": 6,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "hw_version_minor",
+    "id": 7,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "hw_version_variant",
+    "id": 8,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "fw_version_major",
+    "id": 9,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "fw_version_minor",
+    "id": 10,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "fw_version_revision",
+    "id": 11,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "fw_version_unreleased",
+    "id": 12,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "prot_version_major",
+    "id": 13,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "prot_version_minor",
+    "id": 14,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "prot_version_revision",
+    "id": 15,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "prot_version_unreleased",
+    "id": 16,
+    "type": "uint8",
+    "access": "r"
+  },
+  {
+    "name": "brake_resistor_armed",
+    "id": 17,
+    "type": "bool",
+    "access": "r"
+  },
+  {
+    "name": "brake_resistor_saturated",
+    "id": 18,
+    "type": "bool",
+    "access": "r"
+  },
+  {
+    "name": "brake_resistor_current",
+    "id": 19,
+    "type": "float",
+    "access": "r"
+  },
+  {
+    "name": "n_evt_sampling",
+    "id": 20,
+    "type": "uint32",
+    "access": "r"
+  },
+  {
+    "name": "n_evt_control_loop",
+    "id": 21,
+    "type": "uint32",
+    "access": "r"
+  },
+  {
+    "name": "task_timers_armed",
+    "id": 22,
+    "type": "bool",
+    "access": "rw"
+  },
+  {
+    "name": "task_times",
+    "type": "object",
+    "members": [
+      {
+        "name": "sampling",
+        "type": "object",
+        "members": [
+          {
+            "name": "start_time",
+            "id": 23,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "end_time",
+            "id": 24,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "length",
+            "id": 25,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "max_length",
+            "id": 26,
+            "type": "uint32",
+            "access": "rw"
+          }
+        ]
+      },
+      {
+        "name": "control_loop_misc",
+        "type": "object",
+        "members": [
+          {
+            "name": "start_time",
+            "id": 27,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "end_time",
+            "id": 28,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "length",
+            "id": 29,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "max_length",
+            "id": 30,
+            "type": "uint32",
+            "access": "rw"
+          }
+        ]
+      },
+      {
+        "name": "control_loop_checks",
+        "type": "object",
+        "members": [
+          {
+            "name": "start_time",
+            "id": 31,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "end_time",
+            "id": 32,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "length",
+            "id": 33,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "max_length",
+            "id": 34,
+            "type": "uint32",
+            "access": "rw"
+          }
+        ]
+      },
+      {
+        "name": "dc_calib_wait",
+        "type": "object",
+        "members": [
+          {
+            "name": "start_time",
+            "id": 35,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "end_time",
+            "id": 36,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "length",
+            "id": 37,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "max_length",
+            "id": 38,
+            "type": "uint32",
+            "access": "rw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "system_stats",
+    "type": "object",
+    "members": [
+      {
+        "name": "uptime",
+        "id": 39,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "min_heap_space",
+        "id": 40,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "max_stack_usage_axis",
+        "id": 41,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "max_stack_usage_usb",
+        "id": 42,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "max_stack_usage_uart",
+        "id": 43,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "max_stack_usage_can",
+        "id": 44,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "max_stack_usage_startup",
+        "id": 45,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "max_stack_usage_analog",
+        "id": 46,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "stack_size_axis",
+        "id": 47,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "stack_size_usb",
+        "id": 48,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "stack_size_uart",
+        "id": 49,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "stack_size_startup",
+        "id": 50,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "stack_size_can",
+        "id": 51,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "stack_size_analog",
+        "id": 52,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "prio_axis",
+        "id": 53,
+        "type": "int32",
+        "access": "r"
+      },
+      {
+        "name": "prio_usb",
+        "id": 54,
+        "type": "int32",
+        "access": "r"
+      },
+      {
+        "name": "prio_uart",
+        "id": 55,
+        "type": "int32",
+        "access": "r"
+      },
+      {
+        "name": "prio_startup",
+        "id": 56,
+        "type": "int32",
+        "access": "r"
+      },
+      {
+        "name": "prio_can",
+        "id": 57,
+        "type": "int32",
+        "access": "r"
+      },
+      {
+        "name": "prio_analog",
+        "id": 58,
+        "type": "int32",
+        "access": "r"
+      },
+      {
+        "name": "usb",
+        "type": "object",
+        "members": [
+          {
+            "name": "rx_cnt",
+            "id": 59,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "tx_cnt",
+            "id": 60,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "tx_overrun_cnt",
+            "id": 61,
+            "type": "uint32",
+            "access": "r"
+          }
+        ]
+      },
+      {
+        "name": "i2c",
+        "type": "object",
+        "members": [
+          {
+            "name": "addr",
+            "id": 62,
+            "type": "uint8",
+            "access": "r"
+          },
+          {
+            "name": "addr_match_cnt",
+            "id": 63,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "rx_cnt",
+            "id": 64,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "error_cnt",
+            "id": 65,
+            "type": "uint32",
+            "access": "r"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "user_config_loaded",
+    "id": 66,
+    "type": "uint32",
+    "access": "r"
+  },
+  {
+    "name": "misconfigured",
+    "id": 67,
+    "type": "bool",
+    "access": "r"
+  },
+  {
+    "name": "oscilloscope",
+    "type": "object",
+    "members": [
+      {
+        "name": "size",
+        "id": 68,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "get_val",
+        "id": 69,
+        "type": "function",
+        "inputs": [
+          {
+            "name": "index",
+            "id": 70,
+            "type": "uint32",
+            "access": "rw"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "val",
+            "id": 71,
+            "type": "float",
+            "access": "r"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "can",
+    "type": "object",
+    "members": [
+      {
+        "name": "error",
+        "id": 72,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "config",
+        "type": "object",
+        "members": [
+          {
+            "name": "baud_rate",
+            "id": 73,
+            "type": "uint32",
+            "access": "rw"
+          },
+          {
+            "name": "protocol",
+            "id": 74,
+            "type": "uint8",
+            "access": "rw"
+          },
+          {
+            "name": "r120_gpio_num",
+            "id": 75,
+            "type": "uint16",
+            "access": "rw"
+          },
+          {
+            "name": "enable_r120",
+            "id": 76,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "break_timeout",
+            "id": 77,
+            "type": "uint16",
+            "access": "rw"
+          },
+          {
+            "name": "auto_bus_off",
+            "id": 78,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "auto_retransmission",
+            "id": 79,
+            "type": "bool",
+            "access": "rw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "test_property",
+    "id": 80,
+    "type": "uint32",
+    "access": "rw"
+  },
+  {
+    "name": "otp_valid",
+    "id": 81,
+    "type": "bool",
+    "access": "r"
+  },
+  {
+    "name": "config",
+    "type": "object",
+    "members": [
+      {
+        "name": "enable_swd",
+        "id": 82,
+        "type": "bool",
+        "access": "rw"
+      },
+      {
+        "name": "enable_uart_a",
+        "id": 83,
+        "type": "bool",
+        "access": "rw"
+      },
+      {
+        "name": "enable_uart_b",
+        "id": 84,
+        "type": "bool",
+        "access": "rw"
+      },
+      {
+        "name": "enable_uart_c",
+        "id": 85,
+        "type": "bool",
+        "access": "rw"
+      },
+      {
+        "name": "uart_a_baudrate",
+        "id": 86,
+        "type": "uint32",
+        "access": "rw"
+      },
+      {
+        "name": "uart_b_baudrate",
+        "id": 87,
+        "type": "uint32",
+        "access": "rw"
+      },
+      {
+        "name": "uart_c_baudrate",
+        "id": 88,
+        "type": "uint32",
+        "access": "rw"
+      },
+      {
+        "name": "enable_can_a",
+        "id": 89,
+        "type": "bool",
+        "access": "rw"
+      },
+      {
+        "name": "comm_intf_mux",
+        "id": 90,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "enable_i2c_a",
+        "id": 91,
+        "type": "bool",
+        "access": "rw"
+      },
+      {
+        "name": "usb_cdc_protocol",
+        "id": 92,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "uart0_protocol",
+        "id": 93,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "uart1_protocol",
+        "id": 94,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "uart2_protocol",
+        "id": 95,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "max_regen_current",
+        "id": 96,
+        "type": "float",
+        "access": "rw"
+      },
+      {
+        "name": "brake_resistance",
+        "id": 97,
+        "type": "float",
+        "access": "rw"
+      },
+      {
+        "name": "enable_brake_resistor",
+        "id": 98,
+        "type": "bool",
+        "access": "rw"
+      },
+      {
+        "name": "dc_bus_undervoltage_trip_level",
+        "id": 99,
+        "type": "float",
+        "access": "rw"
+      },
+      {
+        "name": "dc_bus_overvoltage_trip_level",
+        "id": 100,
+        "type": "float",
+        "access": "rw"
+      },
+      {
+        "name": "enable_dc_bus_overvoltage_ramp",
+        "id": 101,
+        "type": "bool",
+        "access": "rw"
+      },
+      {
+        "name": "dc_bus_overvoltage_ramp_start",
+        "id": 102,
+        "type": "float",
+        "access": "rw"
+      },
+      {
+        "name": "dc_bus_overvoltage_ramp_end",
+        "id": 103,
+        "type": "float",
+        "access": "rw"
+      },
+      {
+        "name": "dc_max_positive_current",
+        "id": 104,
+        "type": "float",
+        "access": "rw"
+      },
+      {
+        "name": "dc_max_negative_current",
+        "id": 105,
+        "type": "float",
+        "access": "rw"
+      },
+      {
+        "name": "error_gpio_pin",
+        "id": 106,
+        "type": "uint32",
+        "access": "rw"
+      },
+      {
+        "name": "gpio3_analog_mapping",
+        "type": "object",
+        "members": [
+          {
+            "name": "endpoint",
+            "id": 107,
+            "type": "endpoint_ref",
+            "access": "rw"
+          },
+          {
+            "name": "min",
+            "id": 108,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "max",
+            "id": 109,
+            "type": "float",
+            "access": "rw"
+          }
+        ]
+      },
+      {
+        "name": "gpio4_analog_mapping",
+        "type": "object",
+        "members": [
+          {
+            "name": "endpoint",
+            "id": 110,
+            "type": "endpoint_ref",
+            "access": "rw"
+          },
+          {
+            "name": "min",
+            "id": 111,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "max",
+            "id": 112,
+            "type": "float",
+            "access": "rw"
+          }
+        ]
+      },
+      {
+        "name": "gpio1_mode",
+        "id": 113,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio2_mode",
+        "id": 114,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio3_mode",
+        "id": 115,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio4_mode",
+        "id": 116,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio5_mode",
+        "id": 117,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio6_mode",
+        "id": 118,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio7_mode",
+        "id": 119,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio8_mode",
+        "id": 120,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio9_mode",
+        "id": 121,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio10_mode",
+        "id": 122,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio11_mode",
+        "id": 123,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio12_mode",
+        "id": 124,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio13_mode",
+        "id": 125,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio14_mode",
+        "id": 126,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio15_mode",
+        "id": 127,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio16_mode",
+        "id": 128,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "gpio1_pwm_mapping",
+        "type": "object",
+        "members": [
+          {
+            "name": "endpoint",
+            "id": 129,
+            "type": "endpoint_ref",
+            "access": "rw"
+          },
+          {
+            "name": "min",
+            "id": 130,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "max",
+            "id": 131,
+            "type": "float",
+            "access": "rw"
+          }
+        ]
+      },
+      {
+        "name": "gpio2_pwm_mapping",
+        "type": "object",
+        "members": [
+          {
+            "name": "endpoint",
+            "id": 132,
+            "type": "endpoint_ref",
+            "access": "rw"
+          },
+          {
+            "name": "min",
+            "id": 133,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "max",
+            "id": 134,
+            "type": "float",
+            "access": "rw"
+          }
+        ]
+      },
+      {
+        "name": "gpio3_pwm_mapping",
+        "type": "object",
+        "members": [
+          {
+            "name": "endpoint",
+            "id": 135,
+            "type": "endpoint_ref",
+            "access": "rw"
+          },
+          {
+            "name": "min",
+            "id": 136,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "max",
+            "id": 137,
+            "type": "float",
+            "access": "rw"
+          }
+        ]
+      },
+      {
+        "name": "gpio4_pwm_mapping",
+        "type": "object",
+        "members": [
+          {
+            "name": "endpoint",
+            "id": 138,
+            "type": "endpoint_ref",
+            "access": "rw"
+          },
+          {
+            "name": "min",
+            "id": 139,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "max",
+            "id": 140,
+            "type": "float",
+            "access": "rw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "axis0",
+    "type": "object",
+    "members": [
+      {
+        "name": "error",
+        "id": 141,
+        "type": "uint32",
+        "access": "rw"
+      },
+      {
+        "name": "step_dir_active",
+        "id": 142,
+        "type": "bool",
+        "access": "r"
+      },
+      {
+        "name": "last_drv_fault",
+        "id": 143,
+        "type": "uint32",
+        "access": "r"
+      },
+      {
+        "name": "steps",
+        "id": 144,
+        "type": "int64",
+        "access": "r"
+      },
+      {
+        "name": "current_state",
+        "id": 145,
+        "type": "uint8",
+        "access": "r"
+      },
+      {
+        "name": "requested_state",
+        "id": 146,
+        "type": "uint8",
+        "access": "rw"
+      },
+      {
+        "name": "is_homed",
+        "id": 147,
+        "type": "bool",
+        "access": "rw"
+      },
+      {
+        "name": "config",
+        "type": "object",
+        "members": [
+          {
+            "name": "startup_motor_calibration",
+            "id": 148,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "startup_encoder_index_search",
+            "id": 149,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "startup_encoder_offset_calibration",
+            "id": 150,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "startup_closed_loop_control",
+            "id": 151,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "startup_homing",
+            "id": 152,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "enable_step_dir",
+            "id": 153,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "step_dir_always_on",
+            "id": 154,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "enable_sensorless_mode",
+            "id": 155,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "watchdog_timeout",
+            "id": 156,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "enable_watchdog",
+            "id": 157,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "step_gpio_pin",
+            "id": 158,
+            "type": "uint16",
+            "access": "rw"
+          },
+          {
+            "name": "dir_gpio_pin",
+            "id": 159,
+            "type": "uint16",
+            "access": "rw"
+          },
+          {
+            "name": "calibration_lockin",
+            "type": "object",
+            "members": [
+              {
+                "name": "current",
+                "id": 160,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "ramp_time",
+                "id": 161,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "ramp_distance",
+                "id": 162,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "accel",
+                "id": 163,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel",
+                "id": 164,
+                "type": "float",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "sensorless_ramp",
+            "type": "object",
+            "members": [
+              {
+                "name": "current",
+                "id": 165,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "ramp_time",
+                "id": 166,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "ramp_distance",
+                "id": 167,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "accel",
+                "id": 168,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel",
+                "id": 169,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "finish_distance",
+                "id": 170,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "finish_on_vel",
+                "id": 171,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "finish_on_distance",
+                "id": 172,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "finish_on_enc_idx",
+                "id": 173,
+                "type": "bool",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "general_lockin",
+            "type": "object",
+            "members": [
+              {
+                "name": "current",
+                "id": 174,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "ramp_time",
+                "id": 175,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "ramp_distance",
+                "id": 176,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "accel",
+                "id": 177,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel",
+                "id": 178,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "finish_distance",
+                "id": 179,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "finish_on_vel",
+                "id": 180,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "finish_on_distance",
+                "id": 181,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "finish_on_enc_idx",
+                "id": 182,
+                "type": "bool",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "can",
+            "type": "object",
+            "members": [
+              {
+                "name": "node_id",
+                "id": 183,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "is_extended",
+                "id": 184,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "heartbeat_rate_ms",
+                "id": 185,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "encoder_rate_ms",
+                "id": 186,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "motor_error_rate_ms",
+                "id": 187,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "encoder_error_rate_ms",
+                "id": 188,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "controller_error_rate_ms",
+                "id": 189,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "sensorless_error_rate_ms",
+                "id": 190,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "encoder_count_rate_ms",
+                "id": 191,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "iq_rate_ms",
+                "id": 192,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "sensorless_rate_ms",
+                "id": 193,
+                "type": "uint32",
+                "access": "rw"
+              },
+              {
+                "name": "bus_vi_rate_ms",
+                "id": 194,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "motor",
+        "type": "object",
+        "members": [
+          {
+            "name": "last_error_time",
+            "id": 195,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "error",
+            "id": 196,
+            "type": "uint64",
+            "access": "rw"
+          },
+          {
+            "name": "is_armed",
+            "id": 197,
+            "type": "bool",
+            "access": "r"
+          },
+          {
+            "name": "is_calibrated",
+            "id": 198,
+            "type": "bool",
+            "access": "r"
+          },
+          {
+            "name": "current_meas_phA",
+            "id": 199,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "current_meas_phB",
+            "id": 200,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "current_meas_phC",
+            "id": 201,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "DC_calib_phA",
+            "id": 202,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "DC_calib_phB",
+            "id": 203,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "DC_calib_phC",
+            "id": 204,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "I_bus",
+            "id": 205,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "phase_current_rev_gain",
+            "id": 206,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "effective_current_lim",
+            "id": 207,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "max_allowed_current",
+            "id": 208,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "max_dc_calib",
+            "id": 209,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "fet_thermistor",
+            "type": "object",
+            "members": [
+              {
+                "name": "temperature",
+                "id": 210,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "config",
+                "type": "object",
+                "members": [
+                  {
+                    "name": "temp_limit_lower",
+                    "id": 211,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "temp_limit_upper",
+                    "id": 212,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "enabled",
+                    "id": 213,
+                    "type": "bool",
+                    "access": "rw"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "motor_thermistor",
+            "type": "object",
+            "members": [
+              {
+                "name": "temperature",
+                "id": 214,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "config",
+                "type": "object",
+                "members": [
+                  {
+                    "name": "gpio_pin",
+                    "id": 215,
+                    "type": "uint16",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "poly_coefficient_0",
+                    "id": 216,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "poly_coefficient_1",
+                    "id": 217,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "poly_coefficient_2",
+                    "id": 218,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "poly_coefficient_3",
+                    "id": 219,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "temp_limit_lower",
+                    "id": 220,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "temp_limit_upper",
+                    "id": 221,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "enabled",
+                    "id": 222,
+                    "type": "bool",
+                    "access": "rw"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "current_control",
+            "type": "object",
+            "members": [
+              {
+                "name": "p_gain",
+                "id": 223,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "i_gain",
+                "id": 224,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "I_measured_report_filter_k",
+                "id": 225,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "Id_setpoint",
+                "id": 226,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "Iq_setpoint",
+                "id": 227,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "Vd_setpoint",
+                "id": 228,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "Vq_setpoint",
+                "id": 229,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "phase",
+                "id": 230,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "phase_vel",
+                "id": 231,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "Ialpha_measured",
+                "id": 232,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "Ibeta_measured",
+                "id": 233,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "Id_measured",
+                "id": 234,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "Iq_measured",
+                "id": 235,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "power",
+                "id": 236,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "v_current_control_integral_d",
+                "id": 237,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "v_current_control_integral_q",
+                "id": 238,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "final_v_alpha",
+                "id": 239,
+                "type": "float",
+                "access": "r"
+              },
+              {
+                "name": "final_v_beta",
+                "id": 240,
+                "type": "float",
+                "access": "r"
+              }
+            ]
+          },
+          {
+            "name": "n_evt_current_measurement",
+            "id": 241,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "n_evt_pwm_update",
+            "id": 242,
+            "type": "uint32",
+            "access": "r"
+          },
+          {
+            "name": "config",
+            "type": "object",
+            "members": [
+              {
+                "name": "pre_calibrated",
+                "id": 243,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "pole_pairs",
+                "id": 244,
+                "type": "int32",
+                "access": "rw"
+              },
+              {
+                "name": "gear_ratio",
+                "id": 245,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "calibration_current",
+                "id": 246,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "resistance_calib_max_voltage",
+                "id": 247,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "phase_inductance",
+                "id": 248,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "phase_resistance",
+                "id": 249,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "torque_constant",
+                "id": 250,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "motor_type",
+                "id": 251,
+                "type": "uint8",
+                "access": "rw"
+              },
+              {
+                "name": "current_lim",
+                "id": 252,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "current_lim_margin",
+                "id": 253,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "torque_lim",
+                "id": 254,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "inverter_temp_limit_lower",
+                "id": 255,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "inverter_temp_limit_upper",
+                "id": 256,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "requested_current_range",
+                "id": 257,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "current_control_bandwidth",
+                "id": 258,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "acim_gain_min_flux",
+                "id": 259,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "acim_autoflux_min_Id",
+                "id": 260,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "acim_autoflux_enable",
+                "id": 261,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "acim_autoflux_attack_gain",
+                "id": 262,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "acim_autoflux_decay_gain",
+                "id": 263,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "R_wL_FF_enable",
+                "id": 264,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "bEMF_FF_enable",
+                "id": 265,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "I_bus_hard_min",
+                "id": 266,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "I_bus_hard_max",
+                "id": 267,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "I_leak_max",
+                "id": 268,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "dc_calib_tau",
+                "id": 269,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "stall_protection_vel_threshold",
+                "id": 270,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "stall_protection_current_lim",
+                "id": 271,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "stall_protection_enabled",
+                "id": 272,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "overload_protection_enabled",
+                "id": 273,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "overload_protection_threshold",
+                "id": 274,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "overload_protection_time",
+                "id": 275,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "stall_protection_time_threshold",
+                "id": 276,
+                "type": "float",
+                "access": "rw"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "controller",
+        "type": "object",
+        "members": [
+          {
+            "name": "error",
+            "id": 277,
+            "type": "uint8",
+            "access": "rw"
+          },
+          {
+            "name": "last_error_time",
+            "id": 278,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "input_pos",
+            "id": 279,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "input_vel",
+            "id": 280,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "input_torque",
+            "id": 281,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "input_mit_kp",
+            "id": 282,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "input_mit_kd",
+            "id": 283,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "pos_setpoint",
+            "id": 284,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "vel_setpoint",
+            "id": 285,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "torque_setpoint",
+            "id": 286,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "trajectory_done",
+            "id": 287,
+            "type": "bool",
+            "access": "r"
+          },
+          {
+            "name": "vel_integrator_torque",
+            "id": 288,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "anticogging_valid",
+            "id": 289,
+            "type": "bool",
+            "access": "rw"
+          },
+          {
+            "name": "autotuning_phase",
+            "id": 290,
+            "type": "float",
+            "access": "rw"
+          },
+          {
+            "name": "config",
+            "type": "object",
+            "members": [
+              {
+                "name": "gain_scheduling_width",
+                "id": 291,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "enable_vel_limit",
+                "id": 292,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "enable_torque_mode_vel_limit",
+                "id": 293,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "enable_gain_scheduling",
+                "id": 294,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "enable_overspeed_error",
+                "id": 295,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "control_mode",
+                "id": 296,
+                "type": "uint8",
+                "access": "rw"
+              },
+              {
+                "name": "input_mode",
+                "id": 297,
+                "type": "uint8",
+                "access": "rw"
+              },
+              {
+                "name": "vel_loop_prescaler",
+                "id": 298,
+                "type": "uint16",
+                "access": "rw"
+              },
+              {
+                "name": "pos_loop_prescaler",
+                "id": 299,
+                "type": "uint16",
+                "access": "rw"
+              },
+              {
+                "name": "pos_gain",
+                "id": 300,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "pos_integrator_gain",
+                "id": 301,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "pos_integrator_limit",
+                "id": 302,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "pos_diff_gain",
+                "id": 303,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel_gain",
+                "id": 304,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel_integrator_gain",
+                "id": 305,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel_integrator_limit",
+                "id": 306,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel_diff_gain",
+                "id": 307,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel_limit",
+                "id": 308,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel_limit_tolerance",
+                "id": 309,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel_ramp_rate",
+                "id": 310,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "torque_ramp_rate",
+                "id": 311,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "circular_setpoints",
+                "id": 312,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "circular_setpoint_range",
+                "id": 313,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "steps_per_circular_range",
+                "id": 314,
+                "type": "int32",
+                "access": "rw"
+              },
+              {
+                "name": "homing_speed",
+                "id": 315,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "inertia",
+                "id": 316,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "axis_to_mirror",
+                "id": 317,
+                "type": "uint8",
+                "access": "rw"
+              },
+              {
+                "name": "mirror_ratio",
+                "id": 318,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "torque_mirror_ratio",
+                "id": 319,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "load_encoder_axis",
+                "id": 320,
+                "type": "uint8",
+                "access": "rw"
+              },
+              {
+                "name": "input_filter_bandwidth",
+                "id": 321,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "anticogging",
+                "type": "object",
+                "members": [
+                  {
+                    "name": "index",
+                    "id": 322,
+                    "type": "uint32",
+                    "access": "r"
+                  },
+                  {
+                    "name": "pre_calibrated",
+                    "id": 323,
+                    "type": "bool",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "calib_anticogging",
+                    "id": 324,
+                    "type": "bool",
+                    "access": "r"
+                  },
+                  {
+                    "name": "calib_pos_threshold",
+                    "id": 325,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "calib_vel_threshold",
+                    "id": 326,
+                    "type": "float",
+                    "access": "rw"
+                  },
+                  {
+                    "name": "cogging_ratio",
+                    "id": 327,
+                    "type": "float",
+                    "access": "r"
+                  },
+                  {
+                    "name": "anticogging_enabled",
+                    "id": 328,
+                    "type": "bool",
+                    "access": "rw"
+                  }
+                ]
+              },
+              {
+                "name": "mechanical_power_bandwidth",
+                "id": 329,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "electrical_power_bandwidth",
+                "id": 330,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "spinout_mechanical_power_threshold",
+                "id": 331,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "spinout_electrical_power_threshold",
+                "id": 332,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "pos_set_filter_constant",
+                "id": 333,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "torque_set_filter_constant",
+                "id": 334,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "mit_max_pos",
+                "id": 335,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "mit_max_vel",
+                "id": 336,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "mit_max_torque",
+                "id": 337,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "mit_max_current",
+                "id": 338,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "mit_max_kp",
+                "id": 339,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "mit_max_kd",
+                "id": 340,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "enable_location_mode_angle_limit",
+                "id": 341,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "location_mode_set_min_angle",
+                "id": 342,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "location_mode_set_max_angle",
+                "id": 343,
+                "type": "float",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "autotuning",
+            "type": "object",
+            "members": [
+              {
+                "name": "frequency",
+                "id": 344,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "pos_amplitude",
+                "id": 345,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "vel_amplitude",
+                "id": 346,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "torque_amplitude",
+                "id": 347,
+                "type": "float",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "mechanical_power",
+            "id": 348,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "electrical_power",
+            "id": 349,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "move_incremental",
+            "id": 350,
+            "type": "function",
+            "inputs": [
+              {
+                "name": "displacement",
+                "id": 351,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "from_input_pos",
+                "id": 352,
+                "type": "bool",
+                "access": "rw"
+              }
+            ],
+            "outputs": []
+          },
+          {
+            "name": "start_anticogging_calibration",
+            "id": 353,
+            "type": "function",
+            "inputs": [],
+            "outputs": []
+          },
+          {
+            "name": "remove_anticogging_bias",
+            "id": 354,
+            "type": "function",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "val",
+                "id": 355,
+                "type": "float",
+                "access": "r"
+              }
+            ]
+          },
+          {
+            "name": "get_anticogging_value",
+            "id": 356,
+            "type": "function",
+            "inputs": [
+              {
+                "name": "index",
+                "id": 357,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ],
+            "outputs": [
+              {
+                "name": "val",
+                "id": 358,
+                "type": "float",
+                "access": "r"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "encoder",
+        "type": "object",
+        "members": [
+          {
+            "name": "error",
+            "id": 359,
+            "type": "uint16",
+            "access": "rw"
+          },
+          {
+            "name": "is_ready",
+            "id": 360,
+            "type": "bool",
+            "access": "r"
+          },
+          {
+            "name": "index_found",
+            "id": 361,
+            "type": "bool",
+            "access": "r"
+          },
+          {
+            "name": "shadow_count",
+            "id": 362,
+            "type": "int32",
+            "access": "r"
+          },
+          {
+            "name": "count_in_cpr",
+            "id": 363,
+            "type": "int32",
+            "access": "r"
+          },
+          {
+            "name": "interpolation",
+            "id": 364,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "phase",
+            "id": 365,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "pos_estimate",
+            "id": 366,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "pos_estimate_counts",
+            "id": 367,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "pos_circular",
+            "id": 368,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "pos_cpr_counts",
+            "id": 369,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "delta_pos_cpr_counts",
+            "id": 370,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "hall_state",
+            "id": 371,
+            "type": "uint8",
+            "access": "r"
+          },
+          {
+            "name": "vel_estimate",
+            "id": 372,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "vel_estimate_counts",
+            "id": 373,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "calib_scan_response",
+            "id": 374,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "pos_abs",
+            "id": 375,
+            "type": "int32",
+            "access": "rw"
+          },
+          {
+            "name": "sec_enc_pos_abs",
+            "id": 376,
+            "type": "int32",
+            "access": "rw"
+          },
+          {
+            "name": "spi_error_rate",
+            "id": 377,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "config",
+            "type": "object",
+            "members": [
+              {
+                "name": "mode",
+                "id": 378,
+                "type": "uint16",
+                "access": "rw"
+              },
+              {
+                "name": "use_index",
+                "id": 379,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "index_offset",
+                "id": 380,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "use_index_offset",
+                "id": 381,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "find_idx_on_lockin_only",
+                "id": 382,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "abs_spi_cs_gpio_pin",
+                "id": 383,
+                "type": "uint16",
+                "access": "rw"
+              },
+              {
+                "name": "cpr",
+                "id": 384,
+                "type": "int32",
+                "access": "rw"
+              },
+              {
+                "name": "phase_offset",
+                "id": 385,
+                "type": "int32",
+                "access": "rw"
+              },
+              {
+                "name": "phase_offset_float",
+                "id": 386,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "direction",
+                "id": 387,
+                "type": "int32",
+                "access": "rw"
+              },
+              {
+                "name": "angle_filter_constant",
+                "id": 388,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "speed_filter_constant",
+                "id": 389,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "pre_calibrated",
+                "id": 390,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "enable_phase_interpolation",
+                "id": 391,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "bandwidth",
+                "id": 392,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "calib_range",
+                "id": 393,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "calib_scan_distance",
+                "id": 394,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "calib_scan_omega",
+                "id": 395,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "ignore_illegal_hall_state",
+                "id": 396,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "hall_polarity",
+                "id": 397,
+                "type": "uint8",
+                "access": "rw"
+              },
+              {
+                "name": "hall_polarity_calibrated",
+                "id": 398,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "sincos_gpio_pin_sin",
+                "id": 399,
+                "type": "uint16",
+                "access": "rw"
+              },
+              {
+                "name": "sincos_gpio_pin_cos",
+                "id": 400,
+                "type": "uint16",
+                "access": "rw"
+              },
+              {
+                "name": "sec_enc_cpr",
+                "id": 401,
+                "type": "int32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "set_linear_count",
+            "id": 402,
+            "type": "function",
+            "inputs": [
+              {
+                "name": "count",
+                "id": 403,
+                "type": "int32",
+                "access": "rw"
+              }
+            ],
+            "outputs": []
+          },
+          {
+            "name": "poll_sec_enc",
+            "id": 404,
+            "type": "function",
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "success",
+                "id": 405,
+                "type": "bool",
+                "access": "r"
+              }
+            ]
+          },
+          {
+            "name": "set_sec_zero_pos",
+            "id": 406,
+            "type": "function",
+            "inputs": [
+              {
+                "name": "pos_offset",
+                "id": 407,
+                "type": "float",
+                "access": "rw"
+              }
+            ],
+            "outputs": []
+          },
+          {
+            "name": "cali_sec_enc",
+            "id": 408,
+            "type": "function",
+            "inputs": [
+              {
+                "name": "cmd",
+                "id": 409,
+                "type": "uint8",
+                "access": "rw"
+              },
+              {
+                "name": "data",
+                "id": 410,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ],
+            "outputs": []
+          }
+        ]
+      },
+      {
+        "name": "acim_estimator",
+        "type": "object",
+        "members": [
+          {
+            "name": "rotor_flux",
+            "id": 411,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "slip_vel",
+            "id": 412,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "phase_offset",
+            "id": 413,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "stator_phase_vel",
+            "id": 414,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "stator_phase",
+            "id": 415,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "config",
+            "type": "object",
+            "members": [
+              {
+                "name": "slip_velocity",
+                "id": 416,
+                "type": "float",
+                "access": "rw"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "sensorless_estimator",
+        "type": "object",
+        "members": [
+          {
+            "name": "error",
+            "id": 417,
+            "type": "uint8",
+            "access": "rw"
+          },
+          {
+            "name": "phase",
+            "id": 418,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "pll_pos",
+            "id": 419,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "phase_vel",
+            "id": 420,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "vel_estimate",
+            "id": 421,
+            "type": "float",
+            "access": "r"
+          },
+          {
+            "name": "config",
+            "type": "object",
+            "members": [
+              {
+                "name": "observer_gain",
+                "id": 422,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "pll_bandwidth",
+                "id": 423,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "pm_flux_linkage",
+                "id": 424,
+                "type": "float",
+                "access": "rw"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "trap_traj",
+        "type": "object",
+        "members": [
+          {
+            "name": "config",
+            "type": "object",
+            "members": [
+              {
+                "name": "vel_limit",
+                "id": 425,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "accel_limit",
+                "id": 426,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "decel_limit",
+                "id": 427,
+                "type": "float",
+                "access": "rw"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "min_endstop",
+        "type": "object",
+        "members": [
+          {
+            "name": "endstop_state",
+            "id": 428,
+            "type": "bool",
+            "access": "r"
+          },
+          {
+            "name": "config",
+            "type": "object",
+            "members": [
+              {
+                "name": "gpio_num",
+                "id": 429,
+                "type": "uint16",
+                "access": "rw"
+              },
+              {
+                "name": "enabled",
+                "id": 430,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "offset",
+                "id": 431,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "is_active_high",
+                "id": 432,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "debounce_ms",
+                "id": 433,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "max_endstop",
+        "type": "object",
+        "members": [
+          {
+            "name": "endstop_state",
+            "id": 434,
+            "type": "bool",
+            "access": "r"
+          },
+          {
+            "name": "config",
+            "type": "object",
+            "members": [
+              {
+                "name": "gpio_num",
+                "id": 435,
+                "type": "uint16",
+                "access": "rw"
+              },
+              {
+                "name": "enabled",
+                "id": 436,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "offset",
+                "id": 437,
+                "type": "float",
+                "access": "rw"
+              },
+              {
+                "name": "is_active_high",
+                "id": 438,
+                "type": "bool",
+                "access": "rw"
+              },
+              {
+                "name": "debounce_ms",
+                "id": 439,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "mechanical_brake",
+        "type": "object",
+        "members": [
+          {
+            "name": "config",
+            "type": "object",
+            "members": [
+              {
+                "name": "gpio_num",
+                "id": 440,
+                "type": "uint16",
+                "access": "rw"
+              },
+              {
+                "name": "is_active_low",
+                "id": 441,
+                "type": "bool",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "engage",
+            "id": 442,
+            "type": "function",
+            "inputs": [],
+            "outputs": []
+          },
+          {
+            "name": "release",
+            "id": 443,
+            "type": "function",
+            "inputs": [],
+            "outputs": []
+          }
+        ]
+      },
+      {
+        "name": "task_times",
+        "type": "object",
+        "members": [
+          {
+            "name": "thermistor_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 444,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 445,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 446,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 447,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "encoder_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 448,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 449,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 450,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 451,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "sensorless_estimator_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 452,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 453,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 454,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 455,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "endstop_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 456,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 457,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 458,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 459,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "can_heartbeat",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 460,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 461,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 462,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 463,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "controller_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 464,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 465,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 466,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 467,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "open_loop_controller_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 468,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 469,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 470,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 471,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "acim_estimator_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 472,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 473,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 474,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 475,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "motor_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 476,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 477,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 478,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 479,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "current_controller_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 480,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 481,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 482,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 483,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "dc_calib",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 484,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 485,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 486,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 487,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "current_sense",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 488,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 489,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 490,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 491,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          },
+          {
+            "name": "pwm_update",
+            "type": "object",
+            "members": [
+              {
+                "name": "start_time",
+                "id": 492,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "end_time",
+                "id": 493,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "length",
+                "id": 494,
+                "type": "uint32",
+                "access": "r"
+              },
+              {
+                "name": "max_length",
+                "id": 495,
+                "type": "uint32",
+                "access": "rw"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "watchdog_feed",
+        "id": 496,
+        "type": "function",
+        "inputs": [],
+        "outputs": []
+      }
+    ]
+  },
+  {
+    "name": "test_function",
+    "id": 497,
+    "type": "function",
+    "inputs": [
+      {
+        "name": "delta",
+        "id": 498,
+        "type": "int32",
+        "access": "rw"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "cnt",
+        "id": 499,
+        "type": "int32",
+        "access": "r"
+      }
+    ]
+  },
+  {
+    "name": "get_adc_voltage",
+    "id": 500,
+    "type": "function",
+    "inputs": [
+      {
+        "name": "gpio",
+        "id": 501,
+        "type": "uint32",
+        "access": "rw"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "voltage",
+        "id": 502,
+        "type": "float",
+        "access": "r"
+      }
+    ]
+  },
+  {
+    "name": "save_configuration",
+    "id": 503,
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "success",
+        "id": 504,
+        "type": "bool",
+        "access": "r"
+      }
+    ]
+  },
+  {
+    "name": "erase_configuration",
+    "id": 505,
+    "type": "function",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "name": "reboot",
+    "id": 506,
+    "type": "function",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "name": "enter_dfu_mode",
+    "id": 507,
+    "type": "function",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "name": "get_interrupt_status",
+    "id": 508,
+    "type": "function",
+    "inputs": [
+      {
+        "name": "irqn",
+        "id": 509,
+        "type": "int32",
+        "access": "rw"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "status",
+        "id": 510,
+        "type": "uint32",
+        "access": "r"
+      }
+    ]
+  },
+  {
+    "name": "get_dma_status",
+    "id": 511,
+    "type": "function",
+    "inputs": [
+      {
+        "name": "stream_num",
+        "id": 512,
+        "type": "uint8",
+        "access": "rw"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "status",
+        "id": 513,
+        "type": "uint32",
+        "access": "r"
+      }
+    ]
+  },
+  {
+    "name": "get_gpio_states",
+    "id": 514,
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "status",
+        "id": 515,
+        "type": "uint32",
+        "access": "r"
+      }
+    ]
+  },
+  {
+    "name": "get_drv_fault",
+    "id": 516,
+    "type": "function",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "drv_fault",
+        "id": 517,
+        "type": "uint64",
+        "access": "r"
+      }
+    ]
+  },
+  {
+    "name": "clear_errors",
+    "id": 518,
+    "type": "function",
+    "inputs": [],
+    "outputs": []
+  }
+]

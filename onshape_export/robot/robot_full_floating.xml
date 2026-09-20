@@ -1,0 +1,347 @@
+<mujoco model="robot">
+  <compiler angle="radian" meshdir="assets/"/>
+
+  <option integrator="implicitfast"/>
+
+  <size nkey="2"/>
+
+  <default>
+    <default class="robot">
+      <joint armature="0.005" frictionloss="0.1"/>
+      <general biastype="affine" gainprm="50" biasprm="0 -50 1"/>
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+      </default>
+      <default class="collision">
+        <geom group="3"/>
+      </default>
+    </default>
+    <default class="right_main">
+      <default class="right_leg">
+        <joint armature="0.005" frictionloss="0.1"/>
+        <general biastype="affine" gainprm="50" biasprm="0 -50 1"/>
+        <default class="right_visual">
+          <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+        </default>
+        <default class="right_collision">
+          <geom group="3"/>
+        </default>
+      </default>
+    </default>
+    <default class="left_main">
+      <default class="left_leg_left">
+        <joint armature="0.005" frictionloss="0.1"/>
+        <general biastype="affine" gainprm="50" biasprm="0 -50 1"/>
+        <default class="left_visual">
+          <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+        </default>
+        <default class="left_collision">
+          <geom group="3"/>
+        </default>
+      </default>
+    </default>
+  </default>
+
+  <asset>
+    <material name="robot_roof_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="body_lower_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="bodymotorholder_material" rgba="0 0 1 1"/>
+    <material name="wheel_tire_holder_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="wheelmotorhub_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="motor_shaft_2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="bearing_5_2_4_0_7_material" rgba="0.34902 0.376471 0.4 1"/>
+    <material name="motor_2_material" rgba="0.207843 0.2 0.2 1"/>
+    <material name="biella_material" rgba="0.972549 0.529412 0.00392157 1"/>
+    <material name="tire_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="pernobiella_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="smallplate_manovella2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="wheelstickcover_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="manovella1_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="manovella2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="right_bodymotorholder_material" rgba="0 0 1 1"/>
+    <material name="right_motor_2_material" rgba="0.207843 0.2 0.2 1"/>
+    <material name="right_biella_material" rgba="0.972549 0.529412 0.00392157 1"/>
+    <material name="right_motor_shaft_2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="right_bearing_5_2_4_0_7_material" rgba="0.34902 0.376471 0.4 1"/>
+    <material name="right_pernobiella_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="right_manovella1_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="right_wheelmotorhub_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="right_smallplate_manovella2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="right_wheelstickcover_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="right_manovella2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="right_wheel_tire_holder_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="right_tire_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="left_bodymotorholder_material" rgba="0 0 1 1"/>
+    <material name="left_motor_2_material" rgba="0.207843 0.2 0.2 1"/>
+    <material name="left_biella_material" rgba="0.972549 0.529412 0.00392157 1"/>
+    <material name="left_motor_shaft_2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="left_wheelmotorhub_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="left_bearing_5_2_4_0_7_material" rgba="0.34902 0.376471 0.4 1"/>
+    <material name="left_smallplate_manovella2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="left_wheelstickcover_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="left_pernobiella_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="left_manovella2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="left_wheel_tire_holder_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="left_tire_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="left_manovella1_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <mesh name="wheelmotorhub" file="wheelmotorhub.stl"/>
+    <mesh name="bodymotorholder" file="bodymotorholder.stl"/>
+    <mesh name="bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl"/>
+    <mesh name="wheel_tire_holder" file="wheel_tire_holder.stl"/>
+    <mesh name="body_lower" file="body_lower.stl"/>
+    <mesh name="manovella1" file="manovella1.stl"/>
+    <mesh name="biella" file="biella.stl"/>
+    <mesh name="manovella2" file="manovella2.stl"/>
+    <mesh name="robot_roof" file="robot_roof.stl"/>
+    <mesh name="motor_2" file="motor_2.stl"/>
+    <mesh name="motor_shaft_2" file="motor_shaft_2.stl"/>
+    <mesh name="smallplate_manovella2" file="smallplate_manovella2.stl"/>
+    <mesh name="wheelstickcover" file="wheelstickcover.stl"/>
+    <mesh name="pernobiella" file="pernobiella.stl"/>
+    <mesh name="tire" file="tire.stl"/>
+    <mesh name="right_bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl"/>
+    <mesh name="right_bodymotorholder" file="bodymotorholder.stl"/>
+    <mesh name="right_manovella1" file="manovella1.stl"/>
+    <mesh name="right_motor_2" file="motor_2.stl"/>
+    <mesh name="right_motor_shaft_2" file="motor_shaft_2.stl"/>
+    <mesh name="right_wheel_tire_holder" file="wheel_tire_holder.stl"/>
+    <mesh name="right_tire" content_type="model/stl" file="tire.stl"/>
+    <mesh name="right_manovella2" file="manovella2.stl"/>
+    <mesh name="right_smallplate_manovella2" file="smallplate_manovella2.stl"/>
+    <mesh name="right_biella" file="biella.stl"/>
+    <mesh name="right_wheelmotorhub" file="wheelmotorhub.stl"/>
+    <mesh name="right_wheelstickcover" file="wheelstickcover.stl"/>
+    <mesh name="right_pernobiella" file="pernobiella.stl"/>
+    <mesh name="left_wheelmotorhub" file="wheelmotorhub.stl"/>
+    <mesh name="left_bodymotorholder" file="bodymotorholder.stl"/>
+    <mesh name="left_motor_shaft_2" file="motor_shaft_2.stl"/>
+    <mesh name="left_wheel_tire_holder" file="wheel_tire_holder.stl"/>
+    <mesh name="left_smallplate_manovella2" file="smallplate_manovella2.stl"/>
+    <mesh name="left_manovella2" file="manovella2.stl"/>
+    <mesh name="left_wheelstickcover" file="wheelstickcover.stl"/>
+    <mesh name="left_manovella1" file="manovella1.stl"/>
+    <mesh name="left_bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl"/>
+    <mesh name="left_biella" file="biella.stl"/>
+    <mesh name="left_pernobiella" file="pernobiella.stl"/>
+    <mesh name="left_tire" content_type="model/stl" file="tire.stl"/>
+    <mesh name="left_motor_2" file="motor_2.stl"/>
+  </asset>
+
+  <worldbody>
+    <body name="torso" childclass="robot">
+      <inertial pos="0.00732285 0.140014 -0.322029" quat="0.998727 6.67773e-05 5.54547e-05 -0.0504371" mass="0.148617" diaginertia="0.000414771 0.00036831 0.000236724"/>
+      <joint type="free"/>
+      <geom class="visual" pos="-0.0418686 0.14748 -0.374031" quat="0.630514 0 0 -0.776178" material="robot_roof_material" mesh="robot_roof"/>
+      <geom class="collision" pos="-0.0418686 0.14748 -0.374031" quat="0.630514 0 0 -0.776178" type="mesh" material="robot_roof_material" mesh="robot_roof"/>
+      <geom class="visual" pos="0.0107876 0.136457 -0.382031" quat="0.630514 0 0 -0.776178" material="body_lower_material" mesh="body_lower"/>
+      <geom class="collision" pos="0.0107876 0.136457 -0.382031" quat="0.630514 0 0 -0.776178" type="mesh" material="body_lower_material" mesh="body_lower"/>
+      <!-- The torso frame is inherited from the Onshape assembly, so its axes
+           mean nothing physically: torso z runs along the wheel axle. The IMU
+           therefore gets an explicit frame sitting on the roof plate's top
+           face, x forward, y left, z out of the roof, matching a BNO085 bolted
+           flat to the roof. Origin is 35 mm right of the centre of that
+           162 x 100 mm face, where the board is bolted down.
+           Regenerate with SandroControl/tools/imu_frame.py after a re-export;
+           imu_x/imu_y/imu_z are the drawn triad and carry no dynamics. -->
+      <frame name="imu_mount" pos="-0.052683638 0.1446357 -0.28703048" quat="0.548848255 -0.548848255 -0.445831351 0.445831351">
+        <site name="imu" size="0.005" group="2" rgba="1 0.85 0.1 1"/>
+        <site name="imu_x" type="cylinder" fromto="0 0 0 0.045 0 0" size="0.002" group="2" rgba="0.9 0.12 0.12 1"/>
+        <site name="imu_x_tip" type="ellipsoid" pos="0.0515 0 0" size="0.0075 0.0045 0.0045" group="2" rgba="0.9 0.12 0.12 1"/>
+        <site name="imu_y" type="cylinder" fromto="0 0 0 0 0.045 0" size="0.002" group="2" rgba="0.12 0.8 0.2 1"/>
+        <site name="imu_y_tip" type="ellipsoid" pos="0 0.0515 0" size="0.0045 0.0075 0.0045" group="2" rgba="0.12 0.8 0.2 1"/>
+        <site name="imu_z" type="cylinder" fromto="0 0 0 0 0 0.045" size="0.002" group="2" rgba="0.15 0.4 0.95 1"/>
+        <site name="imu_z_tip" type="ellipsoid" pos="0 0 0.0515" size="0.0045 0.0045 0.0075" group="2" rgba="0.15 0.4 0.95 1"/>
+      </frame>
+      <frame name="right_mount" childclass="robot">
+        <body name="right_bodymotorholder" childclass="right_leg" pos="-0.0233044 -0.00658978 -0.195119" quat="0.999057 0 0 0.0434255">
+          <inertial pos="0.058335 0.135685 0.0193059" quat="0.65109 0.703082 0.0742636 -0.276122" mass="0.808243" diaginertia="0.00208236 0.00198527 0.000485113"/>
+          <geom class="right_visual" pos="0.0460054 0.0924467 -0.0519126" quat="0 -0.802826 -0.596213 0" material="right_bodymotorholder_material" mesh="right_bodymotorholder"/>
+          <geom class="right_collision" pos="0.0460054 0.0924467 -0.0519126" quat="0 -0.802826 -0.596213 0" type="mesh" contype="0" conaffinity="0" material="right_bodymotorholder_material" mesh="right_bodymotorholder"/>
+          <geom class="right_visual" pos="0.0458557 0.0925686 0.0225874" quat="0.596213 0 0 -0.802826" material="right_motor_2_material" mesh="right_motor_2"/>
+          <geom class="right_collision" pos="0.0458557 0.0925686 0.0225874" quat="0.596213 0 0 -0.802826" type="mesh" contype="0" conaffinity="0" material="right_motor_2_material" mesh="right_motor_2"/>
+          <geom class="right_visual" pos="0.0720384 0.178412 0.0225874" quat="0.971133 0 0 0.238537" material="right_motor_2_material" mesh="right_motor_2"/>
+          <geom class="right_collision" pos="0.0720384 0.178412 0.0225874" quat="0.971133 0 0 0.238537" type="mesh" contype="0" conaffinity="0" material="right_motor_2_material" mesh="right_motor_2"/>
+          <body name="right_motor_shaft_2" pos="0.0460054 0.0924467 -0.0259126" quat="0 -0.689287 0.724489 0">
+            <inertial pos="0.0238056 -0.0378871 -0.0108017" quat="0.337264 0.628443 -0.34812 0.608379" mass="0.0210838" diaginertia="3.91846e-05 3.17349e-05 8.16783e-06"/>
+            <joint name="right_motor_inner" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+            <geom class="right_visual" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" material="right_biella_material" mesh="right_biella"/>
+            <geom class="right_collision" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" type="mesh" contype="0" conaffinity="0" material="right_biella_material" mesh="right_biella"/>
+            <geom class="right_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
+            <geom class="right_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
+            <body name="right_bearing_5_2_4_0_7" pos="0.0425666 -0.067881 -0.0035" quat="0.96821 0 0 -0.250137">
+              <inertial pos="0 -0.0405227 0.00117769" quat="0.54222 0.45387 -0.45387 0.54222" mass="0.176318" diaginertia="0.000719116 0.000686113 5.54955e-05"/>
+              <joint name="right_passive_biella_inner" pos="0 0 0" axis="0 0 1" armature="1e-05" damping="0.001" frictionloss="0.005"/>
+              <geom class="right_visual" quat="0 1 0 0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+              <geom class="right_collision" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+              <geom class="right_visual" pos="0 0 -0.011" quat="0 0.707107 -0.707107 0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+              <geom class="right_collision" pos="0 0 -0.011" quat="0 0.707107 -0.707107 0" type="mesh" contype="0" conaffinity="0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+              <geom class="right_visual" pos="0 -0.13 0.021" quat="0 0.707107 -0.707107 0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+              <geom class="right_collision" pos="0 -0.13 0.021" quat="0 0.707107 -0.707107 0" type="mesh" contype="0" conaffinity="0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+              <geom class="right_visual" pos="0 0 -0.018" quat="0 0.707107 -0.707107 0" material="right_pernobiella_material" mesh="right_pernobiella"/>
+              <geom class="right_collision" pos="0 0 -0.018" quat="0 0.707107 -0.707107 0" type="mesh" contype="0" conaffinity="0" material="right_pernobiella_material" mesh="right_pernobiella"/>
+              <geom class="right_visual" pos="0 0 0" quat="0.707107 0 0 -0.707107" material="right_manovella1_material" mesh="right_manovella1"/>
+              <geom class="right_collision" pos="0 0 0" quat="0.707107 0 0 -0.707107" type="mesh" contype="0" conaffinity="0" material="right_manovella1_material" mesh="right_manovella1"/>
+              <site name="right_closing_manovelle_meeting_r_1" pos="0 -0.13 0.0114" quat="0 0.707107 -0.707107 0" group="3"/>
+              <site name="right_closing_manovelle_meeting_r_1_z" pos="0 -0.13 -0.0886" quat="0 0.707107 -0.707107 0" group="3"/>
+            </body>
+          </body>
+          <body name="right_motor_shaft_2_2" pos="0.0720208 0.178605 -0.0259126" quat="0 0.756284 0.654243 0">
+            <inertial pos="0.0324126 0.0612196 -0.00816622" quat="0.601266 0.367095 -0.610795 0.361455" mass="0.0687299" diaginertia="8.30945e-05 6.32511e-05 2.14075e-05"/>
+            <joint name="right_motor_outer" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+            <geom class="right_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
+            <geom class="right_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
+            <geom class="right_visual" pos="0.0375033 0.0708042 -0.0105" quat="1 0 0 0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+            <geom class="right_collision" pos="0.0375033 0.0708042 -0.0105" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+            <geom class="right_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="right_biella_material" mesh="right_biella"/>
+            <geom class="right_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="right_biella_material" mesh="right_biella"/>
+            <body name="right_bearing_5_2_4_0_7_2" pos="0.0375033 0.0708042 -0.0215" quat="0 -0.942361 -0.334598 0">
+              <inertial pos="-0.00788446 -0.110314 0.0556437" quat="0.884961 0.46437 -0.017924 -0.0297108" mass="0.493267" diaginertia="0.00180902 0.00168048 0.000356521"/>
+              <joint name="right_passive_biella_outer" pos="0 0 0" axis="0 0 1" armature="1e-05" damping="0.001" frictionloss="0.005"/>
+              <geom class="right_visual" pos="-0.00936367 -0.129662 0.001" quat="0 0.707107 0.707107 0" material="right_wheelmotorhub_material" mesh="right_wheelmotorhub"/>
+              <geom class="right_collision" pos="-0.00936367 -0.129662 0.001" quat="0 0.707107 0.707107 0" type="mesh" contype="0" conaffinity="0" material="right_wheelmotorhub_material" mesh="right_wheelmotorhub"/>
+              <geom class="right_visual" quat="0 1 0 0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+              <geom class="right_collision" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
+              <geom class="right_visual" pos="0 0 -0.018" quat="0 -1 0 0" material="right_smallplate_manovella2_material" mesh="right_smallplate_manovella2"/>
+              <geom class="right_collision" pos="0 0 -0.018" quat="0 -1 0 0" type="mesh" contype="0" conaffinity="0" material="right_smallplate_manovella2_material" mesh="right_smallplate_manovella2"/>
+              <geom class="right_visual" pos="-0.00936367 -0.129662 -0.039" quat="0 -1 0 0" material="right_wheelstickcover_material" mesh="right_wheelstickcover"/>
+              <geom class="right_collision" pos="-0.00936367 -0.129662 -0.039" quat="0 -1 0 0" type="mesh" contype="0" conaffinity="0" material="right_wheelstickcover_material" mesh="right_wheelstickcover"/>
+              <geom class="right_visual" material="right_pernobiella_material" mesh="right_pernobiella"/>
+              <geom class="right_collision" type="mesh" contype="0" conaffinity="0" material="right_pernobiella_material" mesh="right_pernobiella"/>
+              <geom class="right_visual" pos="0 0 -0.018" quat="0 -1 0 0" material="right_manovella2_material" mesh="right_manovella2"/>
+              <geom class="right_collision" pos="0 0 -0.018" quat="0 -1 0 0" type="mesh" contype="0" conaffinity="0" material="right_manovella2_material" mesh="right_manovella2"/>
+              <geom class="right_visual" pos="-0.00929025 -0.129484 0.0742" quat="0 0 0 1" material="right_motor_2_material" mesh="right_motor_2"/>
+              <geom class="right_collision" pos="-0.00929025 -0.129484 0.0742" quat="0 0 0 1" type="mesh" contype="0" conaffinity="0" material="right_motor_2_material" mesh="right_motor_2"/>
+              <site name="right_closing_manovelle_meeting_r_2" pos="-0.00936367 -0.129662 -0.0294" group="3"/>
+              <site name="right_closing_manovelle_meeting_r_2_z" pos="-0.00936367 -0.129662 0.0706" group="3"/>
+              <body name="right_motor_shaft_2_3" pos="-0.00936367 -0.129662 0.0257" quat="0 0 1 0">
+                <inertial pos="9.066e-09 1.3242e-08 0.0082226" quat="0.653281 0.270598 -0.653281 0.270598" mass="0.0583748" diaginertia="0.000160953 8.58914e-05 8.58914e-05"/>
+                <joint name="right_wheel" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+                <geom class="right_visual" pos="0 0 -0.0035" quat="0 -0.899696 0.436517 0" material="right_wheel_tire_holder_material" mesh="right_wheel_tire_holder"/>
+                <geom class="right_collision" pos="0 0 -0.0035" quat="0 -0.899696 0.436517 0" type="mesh" contype="0" conaffinity="0" material="right_wheel_tire_holder_material" mesh="right_wheel_tire_holder"/>
+                <geom class="right_visual" pos="0 0 -0.0035" quat="0 -0.899696 0.436517 0" material="right_tire_material" mesh="right_tire"/>
+                <geom class="right_collision" pos="0 0 -0.0035" quat="0 -0.899696 0.436517 0" type="mesh" contype="0" conaffinity="0" material="right_tire_material" mesh="right_tire"/>
+                <geom class="right_visual" pos="9.48192e-05 0.000168186 -0.0485" quat="0 -0.899696 0.436517 0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
+                <geom class="right_collision" pos="9.48192e-05 0.000168186 -0.0485" quat="0 -0.899696 0.436517 0" type="mesh" contype="0" conaffinity="0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
+                <geom name="right_motor_shaft_2_3_tire_cyl" size="0.0742 0.0086" pos="0 0 0.0121" type="cylinder" group="3" rgba="0.8 0.2 0.2 0.4"/>
+              </body>
+            </body>
+          </body>
+        </body>
+      </frame>
+      <frame name="left_mount" childclass="robot">
+        <body name="left_bodymotorholder" childclass="left_leg_left" pos="0.0368956 0.280972 -0.448944" quat="0 0.968961 -0.247215 0">
+          <inertial pos="0.058335 0.135685 0.0193059" quat="0.65109 0.703082 0.0742636 -0.276122" mass="0.808243" diaginertia="0.00208236 0.00198527 0.000485113"/>
+          <geom class="left_visual" pos="0.0460054 0.0924467 -0.0519126" quat="0 -0.802826 -0.596213 0" material="left_bodymotorholder_material" mesh="left_bodymotorholder"/>
+          <geom class="left_collision" pos="0.0460054 0.0924467 -0.0519126" quat="0 -0.802826 -0.596213 0" type="mesh" contype="0" conaffinity="0" material="left_bodymotorholder_material" mesh="left_bodymotorholder"/>
+          <geom class="left_visual" pos="0.0458557 0.0925686 0.0225874" quat="0.596213 0 0 -0.802826" material="left_motor_2_material" mesh="left_motor_2"/>
+          <geom class="left_collision" pos="0.0458557 0.0925686 0.0225874" quat="0.596213 0 0 -0.802826" type="mesh" contype="0" conaffinity="0" material="left_motor_2_material" mesh="left_motor_2"/>
+          <geom class="left_visual" pos="0.0720384 0.178412 0.0225874" quat="0.971133 0 0 0.238537" material="left_motor_2_material" mesh="left_motor_2"/>
+          <geom class="left_collision" pos="0.0720384 0.178412 0.0225874" quat="0.971133 0 0 0.238537" type="mesh" contype="0" conaffinity="0" material="left_motor_2_material" mesh="left_motor_2"/>
+          <body name="left_motor_shaft_2" pos="0.0460054 0.0924467 -0.0259126" quat="0 0.488069 -0.872805 0">
+            <inertial pos="0.0238056 -0.0378871 -0.0108017" quat="0.337264 0.628443 -0.34812 0.608379" mass="0.0210838" diaginertia="3.91846e-05 3.17349e-05 8.16783e-06"/>
+            <joint name="left_motor_inner" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+            <geom class="left_visual" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" material="left_biella_material" mesh="left_biella"/>
+            <geom class="left_collision" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" type="mesh" contype="0" conaffinity="0" material="left_biella_material" mesh="left_biella"/>
+            <geom class="left_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
+            <geom class="left_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
+            <body name="left_bearing_5_2_4_0_7" pos="0.0425666 -0.067881 -0.0112" quat="0 0.997484 0.070887 0">
+              <inertial pos="-0.100597 0.00718996 0.0604651" quat="0.346492 0.643725 0.602235 0.320741" mass="0.540913" diaginertia="0.00256725 0.00244671 0.000374148"/>
+              <joint name="left_passive_biella_outer" pos="0 0 0" axis="0 0 1" armature="1e-05" damping="0.001" frictionloss="0.005"/>
+              <geom class="left_visual" pos="-0.129662 0.00936367 0.012" quat="0 -1 0 0" material="left_wheelmotorhub_material" mesh="left_wheelmotorhub"/>
+              <geom class="left_collision" pos="-0.129662 0.00936367 0.012" quat="0 -1 0 0" type="mesh" contype="0" conaffinity="0" material="left_wheelmotorhub_material" mesh="left_wheelmotorhub"/>
+              <geom class="left_visual" pos="0 0 0.011" quat="0 0.707107 -0.707107 0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_collision" pos="0 0 0.011" quat="0 0.707107 -0.707107 0" type="mesh" contype="0" conaffinity="0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_visual" quat="0 1 0 0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_collision" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_visual" pos="0 0 -0.007" quat="0 0.707107 -0.707107 0" material="left_smallplate_manovella2_material" mesh="left_smallplate_manovella2"/>
+              <geom class="left_collision" pos="0 0 -0.007" quat="0 0.707107 -0.707107 0" type="mesh" contype="0" conaffinity="0" material="left_smallplate_manovella2_material" mesh="left_smallplate_manovella2"/>
+              <geom class="left_visual" pos="-0.129662 0.00936367 -0.028" quat="0 0.707107 -0.707107 0" material="left_wheelstickcover_material" mesh="left_wheelstickcover"/>
+              <geom class="left_collision" pos="-0.129662 0.00936367 -0.028" quat="0 0.707107 -0.707107 0" type="mesh" contype="0" conaffinity="0" material="left_wheelstickcover_material" mesh="left_wheelstickcover"/>
+              <geom class="left_visual" pos="0 0 0.011" quat="0.707107 0 0 -0.707107" material="left_pernobiella_material" mesh="left_pernobiella"/>
+              <geom class="left_collision" pos="0 0 0.011" quat="0.707107 0 0 -0.707107" type="mesh" contype="0" conaffinity="0" material="left_pernobiella_material" mesh="left_pernobiella"/>
+              <geom class="left_visual" pos="0 0 -0.007" quat="0 0.707107 -0.707107 0" material="left_manovella2_material" mesh="left_manovella2"/>
+              <geom class="left_collision" pos="0 0 -0.007" quat="0 0.707107 -0.707107 0" type="mesh" contype="0" conaffinity="0" material="left_manovella2_material" mesh="left_manovella2"/>
+              <geom class="left_visual" pos="-0.129484 0.00929025 0.0852" quat="0.707107 0 0 0.707107" material="left_motor_2_material" mesh="left_motor_2"/>
+              <geom class="left_collision" pos="-0.129484 0.00929025 0.0852" quat="0.707107 0 0 0.707107" type="mesh" contype="0" conaffinity="0" material="left_motor_2_material" mesh="left_motor_2"/>
+              <site name="left_closing_manovelle_meeting_l_2" pos="-0.129662 0.00936367 -0.0184" quat="0.707107 0 0 -0.707107" group="3"/>
+              <site name="left_closing_manovelle_meeting_l_2_z" pos="-0.129662 0.00936367 0.0816" quat="0.707107 0 0 -0.707107" group="3"/>
+              <body name="left_motor_shaft_2_2" pos="-0.129662 0.00936367 0.0367" quat="0 -0.707107 -0.707107 0">
+                <inertial pos="1.455e-09 -1.5982e-08 0.0082226" quat="0.559572 0.432296 -0.559572 0.432296" mass="0.0583748" diaginertia="0.000160953 8.58915e-05 8.58914e-05"/>
+                <joint name="left_wheel" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+                <geom class="left_visual" pos="0 0 -0.0035" quat="0 -0.105959 -0.994371 0" material="left_wheel_tire_holder_material" mesh="left_wheel_tire_holder"/>
+                <geom class="left_collision" pos="0 0 -0.0035" quat="0 -0.105959 -0.994371 0" type="mesh" contype="0" conaffinity="0" material="left_wheel_tire_holder_material" mesh="left_wheel_tire_holder"/>
+                <geom class="left_visual" pos="0 0 -0.0035" quat="0 -0.105959 -0.994371 0" material="left_tire_material" mesh="left_tire"/>
+                <geom class="left_collision" pos="0 0 -0.0035" quat="0 -0.105959 -0.994371 0" type="mesh" contype="0" conaffinity="0" material="left_tire_material" mesh="left_tire"/>
+                <geom class="left_visual" pos="3.41428e-05 -0.00019003 -0.0485" quat="0 -0.105959 -0.994371 0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
+                <geom class="left_collision" pos="3.41428e-05 -0.00019003 -0.0485" quat="0 -0.105959 -0.994371 0" type="mesh" contype="0" conaffinity="0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
+                <geom name="left_motor_shaft_2_2_tire_cyl" size="0.0742 0.0086" pos="0 0 0.0121" type="cylinder" group="3" rgba="0.8 0.2 0.2 0.4"/>
+              </body>
+            </body>
+          </body>
+          <body name="left_motor_shaft_2_3" pos="0.0720208 0.178605 -0.0259126" quat="0 0.584286 0.811548 0">
+            <inertial pos="0.0209083 0.0395598 -0.0108017" quat="0.615702 0.35824 -0.596268 0.370188" mass="0.0210838" diaginertia="3.91846e-05 3.17349e-05 8.16788e-06"/>
+            <joint name="left_motor_outer" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+            <geom class="left_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
+            <geom class="left_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
+            <geom class="left_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="left_biella_material" mesh="left_biella"/>
+            <geom class="left_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="left_biella_material" mesh="left_biella"/>
+            <body name="left_bearing_5_2_4_0_7_2" pos="0.0375033 0.0708042 -0.0112" quat="0 0.698198 -0.715905 0">
+              <inertial pos="0 0.0405227 -0.00817769" quat="0.54222 0.45387 -0.45387 0.54222" mass="0.176318" diaginertia="0.000719116 0.000686113 5.54955e-05"/>
+              <joint name="left_passive_biella_inner" pos="0 0 0" axis="0 0 1" armature="1e-05" damping="0.001" frictionloss="0.005"/>
+              <geom class="left_visual" pos="0 0 -0.007" quat="1 0 0 0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_collision" pos="0 0 -0.007" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_visual" pos="0 0 0.004" quat="0.707107 0 0 0.707107" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_collision" pos="0 0 0.004" quat="0.707107 0 0 0.707107" type="mesh" contype="0" conaffinity="0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_visual" pos="0 0.13 -0.028" quat="0.707107 0 0 0.707107" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_collision" pos="0 0.13 -0.028" quat="0.707107 0 0 0.707107" type="mesh" contype="0" conaffinity="0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
+              <geom class="left_visual" pos="0 0 0.011" quat="0.707107 0 0 0.707107" material="left_pernobiella_material" mesh="left_pernobiella"/>
+              <geom class="left_collision" pos="0 0 0.011" quat="0.707107 0 0 0.707107" type="mesh" contype="0" conaffinity="0" material="left_pernobiella_material" mesh="left_pernobiella"/>
+              <geom class="left_visual" pos="0 0 -0.007" quat="0 -0.707107 -0.707107 0" material="left_manovella1_material" mesh="left_manovella1"/>
+              <geom class="left_collision" pos="0 0 -0.007" quat="0 -0.707107 -0.707107 0" type="mesh" contype="0" conaffinity="0" material="left_manovella1_material" mesh="left_manovella1"/>
+              <site name="left_closing_manovelle_meeting_l_1" pos="0 0.13 -0.0184" quat="0.707107 0 0 0.707107" group="3"/>
+              <site name="left_closing_manovelle_meeting_l_1_z" pos="0 0.13 0.0816" quat="0.707107 0 0 0.707107" group="3"/>
+            </body>
+          </body>
+        </body>
+      </frame>
+    </body>
+  </worldbody>
+
+  <equality>
+    <connect site1="right_closing_manovelle_meeting_r_1" site2="right_closing_manovelle_meeting_r_2"/>
+    <connect site1="right_closing_manovelle_meeting_r_1_z" site2="right_closing_manovelle_meeting_r_2_z"/>
+    <connect site1="left_closing_manovelle_meeting_l_1" site2="left_closing_manovelle_meeting_l_2"/>
+    <connect site1="left_closing_manovelle_meeting_l_1_z" site2="left_closing_manovelle_meeting_l_2_z"/>
+  </equality>
+
+  <actuator>
+    <general name="right_motor_inner" joint="right_motor_inner" forcerange="-11 11" biastype="affine" gainprm="20" biasprm="0 -20 -0.5"/>
+    <general name="right_motor_outer" joint="right_motor_outer" forcerange="-11 11" biastype="affine" gainprm="20" biasprm="0 -20 -0.5"/>
+    <general name="right_wheel" joint="right_wheel" ctrlrange="-44 44" forcerange="-11 11" biastype="affine" biasprm="0 0 -1"/>
+    <general name="left_motor_inner" joint="left_motor_inner" forcerange="-11 11" biastype="affine" gainprm="20" biasprm="0 -20 -0.5"/>
+    <general name="left_motor_outer" joint="left_motor_outer" forcerange="-11 11" biastype="affine" gainprm="20" biasprm="0 -20 -0.5"/>
+    <general name="left_wheel" joint="left_wheel" ctrlrange="-44 44" forcerange="-11 11" biastype="affine" biasprm="0 0 -1"/>
+  </actuator>
+
+  <sensor>
+    <framequat objtype="site" objname="imu" name="imu_quat" noise="0.017"/>
+    <gyro site="imu" name="imu_gyro" noise="0.002"/>
+    <accelerometer site="imu" name="imu_accel" noise="0.02"/>
+    <jointpos joint="right_motor_inner" name="right_motor_inner_pos"/>
+    <jointvel joint="right_motor_inner" name="right_motor_inner_vel"/>
+    <jointpos joint="right_motor_outer" name="right_motor_outer_pos"/>
+    <jointvel joint="right_motor_outer" name="right_motor_outer_vel"/>
+    <jointpos joint="right_wheel" name="right_wheel_pos"/>
+    <jointvel joint="right_wheel" name="right_wheel_vel"/>
+    <jointpos joint="left_motor_inner" name="left_motor_inner_pos"/>
+    <jointvel joint="left_motor_inner" name="left_motor_inner_vel"/>
+    <jointpos joint="left_motor_outer" name="left_motor_outer_pos"/>
+    <jointvel joint="left_motor_outer" name="left_motor_outer_vel"/>
+    <jointpos joint="left_wheel" name="left_wheel_pos"/>
+    <jointvel joint="left_wheel" name="left_wheel_vel"/>
+  </sensor>
+
+  <keyframe>
+    <key name="stand" qpos="-0.134593 -0.322381 0.249151 0.561392 0.561392 0.42993 -0.42993 0.094699 0.123066 0.41877 0.424165 -1.48937 -0.60266 -1.10098 -0.438598 0.690265 1.0894" ctrl="0.094699 0.41877 0 -0.60266 0.690265 0"/>
+  </keyframe>
+</mujoco>

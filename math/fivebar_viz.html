@@ -1,0 +1,672 @@
+<meta charset="utf-8">
+<title>Biella Five-Bar</title>
+<style>
+  :root {
+    --bg: #EEF1F4;
+    --panel: #FBFCFD;
+    --ink: #18222D;
+    --muted: #5B6B7B;
+    --line: #D5DCE3;
+    --grid: #E2E7EC;
+    --grid-strong: #CDD5DD;
+    --motor: #1E66C7;
+    --motor-soft: #1E66C71f;
+    --passive: #C2620A;
+    --passive-soft: #C2620A1f;
+    --bad: #C43D3D;
+    --bad-soft: #C43D3D18;
+    --ok: #2A7D4F;
+    --ok-soft: #2A7D4F16;
+    --ws: #1E66C70F;
+    --focus: #1E66C7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E1319;
+      --panel: #161D26;
+      --ink: #E8EDF2;
+      --muted: #8CA0B4;
+      --line: #2A3542;
+      --grid: #1B2330;
+      --grid-strong: #263140;
+      --motor: #6AA9F5;
+      --motor-soft: #6AA9F526;
+      --passive: #F09C4A;
+      --passive-soft: #F09C4A26;
+      --bad: #F27D7D;
+      --bad-soft: #F27D7D1e;
+      --ok: #63C08E;
+      --ok-soft: #63C08E1c;
+      --ws: #6AA9F51A;
+      --focus: #6AA9F5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1319;
+    --panel: #161D26;
+    --ink: #E8EDF2;
+    --muted: #8CA0B4;
+    --line: #2A3542;
+    --grid: #1B2330;
+    --grid-strong: #263140;
+    --motor: #6AA9F5;
+    --motor-soft: #6AA9F526;
+    --passive: #F09C4A;
+    --passive-soft: #F09C4A26;
+    --bad: #F27D7D;
+    --bad-soft: #F27D7D1e;
+    --ok: #63C08E;
+    --ok-soft: #63C08E1c;
+    --ws: #6AA9F51A;
+    --focus: #6AA9F5;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 system-ui, "Segoe UI", Avenir, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  .mono {
+    font-family: ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  header { max-width: 1200px; margin: 0 auto 14px; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 19px; font-weight: 650; letter-spacing: 0.01em; margin: 0; }
+  header p { margin: 0; color: var(--muted); font-size: 13.5px; }
+
+  .app {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .app { grid-template-columns: 1fr; } }
+
+  .viewport, .rail-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .viewport { padding: 10px; user-select: none; -webkit-user-select: none; }
+  .viewport svg { display: block; width: 100%; height: auto; max-height: 76vh; margin: 0 auto; cursor: crosshair; touch-action: none; }
+  .legend {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    padding: 8px 6px 2px; color: var(--muted); font-size: 12.5px;
+  }
+  .legend .hint { font-style: italic; }
+  .legend [class^="sw-"]::before {
+    content: ""; display: inline-block; width: 18px; height: 4px; border-radius: 2px;
+    margin-right: 7px; vertical-align: middle; background: var(--sw);
+  }
+  .legend .sw-motor { --sw: var(--motor); }
+  .legend .sw-passive { --sw: var(--passive); }
+
+  .rail { display: flex; flex-direction: column; gap: 12px; }
+  .rail-card { padding: 14px 16px; }
+  .rail-card h2 {
+    margin: 0 0 10px; font-size: 11.5px; font-weight: 650; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.09em;
+  }
+
+  .ctl { display: grid; grid-template-columns: 34px 1fr 76px; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .ctl:last-child { margin-bottom: 0; }
+  .ctl label { font-size: 15px; }
+  .ctl label b { font-weight: 650; }
+  .ctl input[type="range"] { width: 100%; accent-color: var(--motor); }
+  .ctl input[type="number"], .dim input[type="number"] {
+    width: 100%; padding: 4px 6px;
+    background: var(--bg); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px;
+    font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums; font-size: 13.5px;
+  }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+  .branch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .branch button {
+    padding: 7px 6px; border: 1px solid var(--line); border-radius: 7px;
+    background: var(--bg); color: var(--muted); font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .branch button[aria-pressed="true"] {
+    background: var(--motor-soft); border-color: var(--motor); color: var(--ink); font-weight: 600;
+  }
+
+  .hwbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button.hw {
+    padding: 7px 6px; border: 1px solid var(--line); border-radius: 7px;
+    background: var(--bg); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer;
+  }
+  button.hw.estop { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); font-weight: 700; }
+  .pill.idle { background: var(--motor-soft); color: var(--motor); }
+  .hwstat { color: var(--muted); font-size: 12.5px; line-height: 1.7; margin-top: 8px; }
+  #hwMsg { color: var(--bad); font-size: 12.5px; margin-top: 6px; min-height: 1em; }
+
+  .readout { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+  .readout .cell small { display: block; color: var(--muted); font-size: 11.5px; letter-spacing: 0.04em; }
+  .readout .cell .v { font-size: 19px; font-weight: 600; }
+  .readout .b .v { color: var(--passive); }
+  .readout .th .v { color: var(--motor); }
+
+  .pill {
+    display: inline-block; margin-top: 10px; padding: 4px 10px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600;
+  }
+  .pill.ok  { background: var(--ok-soft); color: var(--ok); }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); }
+
+  .dim { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .dim.two { grid-template-columns: 1fr 1fr; }
+  .dim label { font-size: 12.5px; color: var(--muted); display: block; margin-bottom: 3px; }
+
+  .internals { color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+  .internals b { color: var(--ink); font-weight: 600; }
+
+  footer { max-width: 1200px; margin: 14px auto 0; color: var(--muted); font-size: 12.5px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header>
+  <h1>Biella Five-Bar</h1>
+  <p>Closed-chain leg kinematics — +x right, +y down, per <span class="mono">ik.py</span></p>
+</header>
+
+<div class="app">
+  <div class="viewport">
+    <svg id="svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Five-bar linkage drawing"></svg>
+    <div class="legend">
+      <span class="sw-motor">θ — actuated (motors, from +y)</span>
+      <span class="sw-passive">b — passive (forearms, from horizontal)</span>
+      <span class="hint">drag the foot (or click in the shaded workspace) to run IK</span>
+      <span class="hint" id="ghostHint" hidden>solid = measured leg · dashed = commanded target</span>
+    </div>
+  </div>
+
+  <div class="rail">
+    <div class="rail-card" id="hwCard" hidden>
+      <h2>Hardware · <span class="pill idle" id="hwMode">idle</span></h2>
+      <div class="hwbtns">
+        <button class="hw" id="hwEnable">Enable torque</button>
+        <button class="hw" id="hwDisable">Disable</button>
+        <button class="hw estop" id="hwEstop">E-STOP</button>
+        <button class="hw" id="hwClear">Clear errors</button>
+      </div>
+      <div class="dim" style="margin-top: 10px">
+        <div><label for="hwKp">Kp Nm/rad</label><input type="number" id="hwKp" step="0.5" min="0"></div>
+        <div><label for="hwKd">Kd Nm·s/rad</label><input type="number" id="hwKd" step="0.05" min="0"></div>
+        <div><label for="hwTau">τ limit Nm</label><input type="number" id="hwTau" step="0.1" min="0"></div>
+      </div>
+      <div class="hwstat mono" id="hwStat">waiting for state…</div>
+      <div id="hwMsg"></div>
+      <button class="hw" id="hwZero" style="margin-top: 8px; width: 100%">Zero here — current pose becomes θ₁ = θ₂ = 0</button>
+    </div>
+
+    <div class="rail-card">
+      <h2>Motor angles</h2>
+      <div class="ctl">
+        <label for="th1r"><b>θ₁</b></label>
+        <input type="range" id="th1r" min="-180" max="180" step="0.5" value="20">
+        <input type="number" id="th1n" min="-180" max="180" step="0.5" value="20" aria-label="theta 1 degrees">
+      </div>
+      <div class="ctl">
+        <label for="th2r"><b>θ₂</b></label>
+        <input type="range" id="th2r" min="-180" max="180" step="0.5" value="20">
+        <input type="number" id="th2n" min="-180" max="180" step="0.5" value="20" aria-label="theta 2 degrees">
+      </div>
+    </div>
+
+    <div class="rail-card">
+      <h2>End effector (cm) — inverse kinematics</h2>
+      <div class="dim two">
+        <div><label for="fx">foot x</label><input type="number" id="fx" step="0.1" value="4.50"></div>
+        <div><label for="fy">foot y</label><input type="number" id="fy" step="0.1" value="18.32"></div>
+      </div>
+    </div>
+
+    <div class="rail-card">
+      <h2>Assembly branch σ</h2>
+      <div class="branch">
+        <button id="sigP" aria-pressed="true">σ = +1 · foot down</button>
+        <button id="sigM" aria-pressed="false">σ = −1 · flipped</button>
+      </div>
+    </div>
+
+    <div class="rail-card">
+      <h2>Solution</h2>
+      <div class="readout mono">
+        <div class="cell th"><small>θ₁</small><span class="v" id="oth1">–</span></div>
+        <div class="cell th"><small>θ₂</small><span class="v" id="oth2">–</span></div>
+        <div class="cell b"><small>b₁</small><span class="v" id="ob1">–</span></div>
+        <div class="cell b"><small>b₂</small><span class="v" id="ob2">–</span></div>
+        <div class="cell"><small>foot x</small><span class="v" id="ofx">–</span></div>
+        <div class="cell"><small>foot y</small><span class="v" id="ofy">–</span></div>
+      </div>
+      <span class="pill ok" id="status">closed</span>
+    </div>
+
+    <div class="rail-card">
+      <h2>Dimensions (cm)</h2>
+      <div class="dim">
+        <div><label for="da">a — motor spacing</label><input type="number" id="da" step="0.5" min="0.5" value="9"></div>
+        <div><label for="dl1">l₁ — upper arm</label><input type="number" id="dl1" step="0.5" min="0.5" value="8"></div>
+        <div><label for="dl2">l₂ — forearm</label><input type="number" id="dl2" step="0.5" min="0.5" value="13"></div>
+      </div>
+    </div>
+
+    <div class="rail-card">
+      <h2>Internals</h2>
+      <div class="internals mono" id="internals">–</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Conventions: θ₁ positive swings arm 1 clockwise from +y, θ₂ counter-clockwise from +y; b₁ is the forearm-1 angle
+  from +x at elbow 1, b₂ the forearm-2 angle from −x at elbow 2. Solved with the P–Q sum-to-product closed form
+  (d = atan2(P, Q), s = σ·acos(r / 2l₂), b₁ = s + d, b₂ = s − d).
+  Inverse kinematics treats each chain as an independent two-link problem (circle–circle intersection at the
+  elbow, elbows-out branch); the shaded region is the reachable workspace, the intersection of the two annuli
+  |l₁−l₂| ≤ rᵢ ≤ l₁+l₂ around the motors. σ is inferred automatically from the requested foot point.
+</footer>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const DEG = Math.PI / 180;
+const svg = $("svg");
+const NS = "http://www.w3.org/2000/svg";
+
+const state = { th1: 20 * DEG, th2: 20 * DEG, a: 9, l1: 8, l2: 13, sigma: +1 };
+
+/* --- math: mirrors ik.py exactly ------------------------------------- */
+function solve(s) {
+  const P = s.l1 * (Math.cos(s.th2) - Math.cos(s.th1));
+  const Q = s.a + s.l1 * (Math.sin(s.th1) + Math.sin(s.th2));
+  const r = Math.hypot(P, Q);
+  const d = Math.atan2(P, Q);
+  const out = { P, Q, r, d, ok: r <= 2 * s.l2 };
+  if (out.ok) {
+    const sv = s.sigma * Math.acos(Math.min(1, r / (2 * s.l2)));
+    out.s = sv; out.b1 = sv + d; out.b2 = sv - d;
+  }
+  return out;
+}
+function joints(s, sol) {
+  const M1 = [0, 0], M2 = [s.a, 0];
+  const E1 = [-s.l1 * Math.sin(s.th1), s.l1 * Math.cos(s.th1)];
+  const E2 = [s.a + s.l1 * Math.sin(s.th2), s.l1 * Math.cos(s.th2)];
+  let F = null;
+  if (sol.ok) F = [E1[0] + s.l2 * Math.cos(sol.b1), E1[1] + s.l2 * Math.sin(sol.b1)];
+  return { M1, M2, E1, E2, F };
+}
+const wrap = x => Math.atan2(Math.sin(x), Math.cos(x));
+
+/* --- inverse kinematics: each chain is a two-link circle intersection --
+   Chain 1: elbow E1 sits on circle(M1, l1) ∩ circle(F, l2); dir(M1→E1) = φ1 + α1
+   Chain 2: mirrored, dir(M2→E2) = φ2 − α2 (elbows-out branch).
+   θ1 = dir1 − 90°, θ2 = 90° − dir2 (from the E1/E2 parametrization).      */
+function ik(F, s) {
+  const r1 = Math.hypot(F[0], F[1]);
+  const r2 = Math.hypot(F[0] - s.a, F[1]);
+  const lo = Math.abs(s.l1 - s.l2), hi = s.l1 + s.l2;
+  const eps = 1e-9;
+  if (r1 < Math.max(lo, eps) || r1 > hi || r2 < Math.max(lo, eps) || r2 > hi) return null;
+  const clamp = x => Math.min(1, Math.max(-1, x));
+  const a1 = Math.acos(clamp((s.l1 * s.l1 + r1 * r1 - s.l2 * s.l2) / (2 * s.l1 * r1)));
+  const a2 = Math.acos(clamp((s.l1 * s.l1 + r2 * r2 - s.l2 * s.l2) / (2 * s.l1 * r2)));
+  const dir1 = Math.atan2(F[1], F[0]) + a1;
+  const dir2 = Math.atan2(F[1], F[0] - s.a) - a2;
+  return { th1: wrap(dir1 - Math.PI / 2), th2: wrap(Math.PI / 2 - dir2) };
+}
+
+/* --- svg helpers ------------------------------------------------------ */
+function el(name, attrs, parent) {
+  const n = document.createElementNS(NS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(n);
+  return n;
+}
+function line(p, q, attrs, parent) {
+  return el("line", { x1: p[0], y1: p[1], x2: q[0], y2: q[1], ...attrs }, parent);
+}
+function txt(p, str, attrs, parent) {
+  const t = el("text", { x: p[0], y: p[1], "font-size": 1.05,
+    "font-family": 'ui-monospace, "Cascadia Code", Menlo, Consolas, monospace', ...attrs }, parent);
+  t.textContent = str;
+  return t;
+}
+/* arc from screen angle phi0 sweeping by signed `sweep`, as a sampled polyline path */
+function arcPath(c, radius, phi0, sweep, attrs, parent) {
+  const n = Math.max(2, Math.ceil(Math.abs(sweep) / (6 * DEG)));
+  let dstr = "";
+  for (let i = 0; i <= n; i++) {
+    const phi = phi0 + sweep * i / n;
+    const x = c[0] + radius * Math.cos(phi), y = c[1] + radius * Math.sin(phi);
+    dstr += (i ? "L" : "M") + x.toFixed(3) + " " + y.toFixed(3);
+  }
+  return el("path", { d: dstr, fill: "none", ...attrs }, parent);
+}
+function angleGlyph(c, radius, phi0, sweep, label, color, refDir) {
+  const g = el("g", {});
+  const refEnd = [c[0] + refDir[0] * (radius + 1.1), c[1] + refDir[1] * (radius + 1.1)];
+  line(c, refEnd, { stroke: "var(--muted)", "stroke-width": 0.07, "stroke-dasharray": "0.35 0.35" }, g);
+  if (Math.abs(sweep) > 0.8 * DEG)
+    arcPath(c, radius, phi0, sweep, { stroke: color, "stroke-width": 0.14 }, g);
+  const mid = phi0 + sweep / 2;
+  const lp = [c[0] + (radius + 1.35) * Math.cos(mid), c[1] + (radius + 1.35) * Math.sin(mid)];
+  txt(lp, label, { fill: color, "text-anchor": "middle", "dominant-baseline": "middle" }, g);
+  return g;
+}
+
+/* --- render ----------------------------------------------------------- */
+const fmtDeg = x => (x / DEG).toFixed(1) + "°";
+const fmtCm = x => x.toFixed(2);
+
+function render() {
+  // hardware mode: draw the MEASURED leg as the main linkage,
+  // the GUI state (what the user commands) as a dashed ghost
+  const live = hw.on && hw.th && hw.th[0] != null;
+  const disp = live ? { ...state, th1: hw.th[0], th2: hw.th[1] } : state;
+  const sol = solve(disp);
+  const J = joints(disp, sol);
+  const { a, l1, l2 } = state;
+
+  svg.replaceChildren();
+
+  const xmin = -l1 - 5.5, xmax = a + l1 + 5.5;
+  const ymin = -(l2 + 4);
+  const ymax = l1 + l2 + 3;
+  const vw = xmax - xmin, vh = ymax - ymin;
+  svg.setAttribute("viewBox", `${xmin} ${ymin} ${vw} ${vh}`);
+
+  // grid, 1 cm
+  const grid = el("g", {});
+  for (let x = Math.ceil(xmin); x <= xmax; x++)
+    line([x, ymin], [x, ymax], { stroke: x % 5 ? "var(--grid)" : "var(--grid-strong)", "stroke-width": 0.045 }, grid);
+  for (let y = Math.ceil(ymin); y <= ymax; y++)
+    line([xmin, y], [xmax, y], { stroke: y % 5 ? "var(--grid)" : "var(--grid-strong)", "stroke-width": 0.045 }, grid);
+
+  // reachable workspace: circle(M1, l1+l2) ∩ circle(M2, l1+l2) minus the inner |l1−l2| disks
+  const hi = l1 + l2, lo = Math.abs(l1 - l2);
+  const defs = el("defs", {});
+  const clip = el("clipPath", { id: "wsClip" }, defs);
+  el("circle", { cx: a, cy: 0, r: hi }, clip);
+  const mask = el("mask", { id: "wsMask", maskUnits: "userSpaceOnUse",
+    x: xmin, y: ymin, width: vw, height: vh }, defs);
+  el("rect", { x: xmin, y: ymin, width: vw, height: vh, fill: "black" }, mask);
+  const mg = el("g", { "clip-path": "url(#wsClip)" }, mask);
+  el("circle", { cx: 0, cy: 0, r: hi, fill: "white" }, mg);
+  el("circle", { cx: 0, cy: 0, r: lo, fill: "black" }, mask);
+  el("circle", { cx: a, cy: 0, r: lo, fill: "black" }, mask);
+  el("rect", { x: xmin, y: ymin, width: vw, height: vh, fill: "var(--ws)", mask: "url(#wsMask)" });
+
+  // body slab between the motors
+  el("rect", { x: -1.6, y: -1.9, width: a + 3.2, height: 1.9, rx: 0.35,
+    fill: "var(--motor-soft)", stroke: "var(--line)", "stroke-width": 0.07 });
+  txt([a / 2, -2.6], `a = ${a} cm`, { fill: "var(--muted)", "text-anchor": "middle" });
+
+  // angle glyphs (under the links)
+  angleGlyph(J.M1, 2.3, Math.PI / 2, disp.th1, `θ₁ ${fmtDeg(disp.th1)}`, "var(--motor)", [0, 1]);
+  angleGlyph(J.M2, 2.3, Math.PI / 2, -disp.th2, `θ₂ ${fmtDeg(disp.th2)}`, "var(--motor)", [0, 1]);
+  if (sol.ok) {
+    angleGlyph(J.E1, 2.0, 0, wrap(sol.b1), `b₁ ${fmtDeg(wrap(sol.b1))}`, "var(--passive)", [1, 0]);
+    angleGlyph(J.E2, 2.0, Math.PI, -wrap(sol.b2), `b₂ ${fmtDeg(wrap(sol.b2))}`, "var(--passive)", [-1, 0]);
+  }
+
+  // target ghost (hardware mode)
+  let tsol = sol, Jt = J;
+  if (live) {
+    tsol = solve(state);
+    Jt = joints(state, tsol);
+    const gs = { stroke: "var(--muted)", "stroke-width": 0.22,
+                 "stroke-linecap": "round", "stroke-dasharray": "0.6 0.5", opacity: 0.75 };
+    line(Jt.M1, Jt.E1, gs);
+    line(Jt.M2, Jt.E2, gs);
+    if (tsol.ok) {
+      line(Jt.E1, Jt.F, gs);
+      line(Jt.E2, Jt.F, gs);
+      el("circle", { cx: Jt.F[0], cy: Jt.F[1], r: 0.4, fill: "none",
+        stroke: "var(--muted)", "stroke-width": 0.14, opacity: 0.9 });
+    }
+  }
+
+  // links
+  const lw = { "stroke-width": 0.4, "stroke-linecap": "round" };
+  line(J.M1, J.E1, { stroke: "var(--motor)", ...lw });
+  line(J.M2, J.E2, { stroke: "var(--motor)", ...lw });
+  if (sol.ok) {
+    line(J.E1, J.F, { stroke: "var(--passive)", ...lw });
+    line(J.E2, J.F, { stroke: "var(--passive)", ...lw });
+  } else {
+    // forearms can't meet: show each forearm's reach circle
+    for (const E of [J.E1, J.E2])
+      el("circle", { cx: E[0], cy: E[1], r: l2, fill: "none",
+        stroke: "var(--bad)", "stroke-width": 0.09, "stroke-dasharray": "0.5 0.4" });
+  }
+
+  // joints
+  for (const M of [J.M1, J.M2]) {
+    el("circle", { cx: M[0], cy: M[1], r: 0.62, fill: "var(--panel)", stroke: "var(--motor)", "stroke-width": 0.16 });
+    el("circle", { cx: M[0], cy: M[1], r: 0.22, fill: "var(--motor)" });
+  }
+  for (const E of [J.E1, J.E2])
+    el("circle", { cx: E[0], cy: E[1], r: 0.42, fill: "var(--panel)", stroke: "var(--passive)", "stroke-width": 0.14 });
+  if (sol.ok) {
+    el("circle", { cx: J.F[0], cy: J.F[1], r: 0.5, fill: "var(--ink)" });
+    el("circle", { cx: J.F[0], cy: J.F[1], r: 1.5, fill: "transparent", cursor: "grab" });
+    txt([J.F[0] + 1.0, J.F[1] + (state.sigma > 0 ? 1.3 : -1.0)],
+      `(${fmtCm(J.F[0])}, ${fmtCm(J.F[1])})`, { fill: "var(--ink)" });
+  }
+
+  // readouts (measured pose when hardware is live)
+  $("oth1").textContent = fmtDeg(disp.th1);
+  $("oth2").textContent = fmtDeg(disp.th2);
+  $("ob1").textContent = sol.ok ? fmtDeg(wrap(sol.b1)) : "–";
+  $("ob2").textContent = sol.ok ? fmtDeg(wrap(sol.b2)) : "–";
+  $("ofx").textContent = sol.ok ? fmtCm(J.F[0]) : "–";
+  $("ofy").textContent = sol.ok ? fmtCm(J.F[1]) : "–";
+  if (tsol.ok) {  // foot inputs edit the TARGET
+    if (document.activeElement !== $("fx")) $("fx").value = Jt.F[0].toFixed(2);
+    if (document.activeElement !== $("fy")) $("fy").value = Jt.F[1].toFixed(2);
+  }
+  const st = $("status");
+  st.className = "pill " + (sol.ok ? "ok" : "bad");
+  st.textContent = sol.ok
+    ? `chain closed · r = ${fmtCm(sol.r)} ≤ 2·l₂ = ${fmtCm(2 * l2)}`
+    : `cannot close · r = ${fmtCm(sol.r)} > 2·l₂ = ${fmtCm(2 * l2)}`;
+  $("internals").innerHTML =
+    `P = <b>${fmtCm(sol.P)}</b> · Q = <b>${fmtCm(sol.Q)}</b> · r = <b>${fmtCm(sol.r)}</b><br>` +
+    `d = <b>${fmtDeg(sol.d)}</b>` + (sol.ok ? ` · s = <b>${fmtDeg(sol.s)}</b>` : "");
+}
+
+/* --- wiring ------------------------------------------------------------ */
+function bindAngle(rangeId, numId, key) {
+  const r = $(rangeId), n = $(numId);
+  const set = v => {
+    state[key] = v * DEG; r.value = v; n.value = v; render();
+    sendTarget({ type: "target_joints", th1: state.th1, th2: state.th2 });
+  };
+  r.addEventListener("input", () => set(parseFloat(r.value)));
+  n.addEventListener("input", () => { const v = parseFloat(n.value); if (isFinite(v)) set(v); });
+}
+bindAngle("th1r", "th1n", "th1");
+bindAngle("th2r", "th2n", "th2");
+
+function bindDim(id, key) {
+  $(id).addEventListener("input", () => {
+    const v = parseFloat($(id).value);
+    if (isFinite(v) && v > 0) { state[key] = v; render(); }
+  });
+}
+bindDim("da", "a"); bindDim("dl1", "l1"); bindDim("dl2", "l2");
+
+function setSigma(v) {
+  state.sigma = v;
+  $("sigP").setAttribute("aria-pressed", v > 0);
+  $("sigM").setAttribute("aria-pressed", v < 0);
+}
+$("sigP").addEventListener("click", () => { setSigma(+1); render(); });
+$("sigM").addEventListener("click", () => { setSigma(-1); render(); });
+
+/* --- IK wiring: dragging the foot / editing foot x,y drives the motors -- */
+function syncMotorInputs() {
+  const d1 = (state.th1 / DEG).toFixed(1), d2 = (state.th2 / DEG).toFixed(1);
+  $("th1r").value = d1; $("th1n").value = d1;
+  $("th2r").value = d2; $("th2n").value = d2;
+}
+
+function moveFoot(F) {
+  const s = ik(F, state);
+  if (!s) return false;                       // outside workspace: ignore
+  state.th1 = s.th1; state.th2 = s.th2;
+  // pick the assembly branch that lands on the requested point (prefer current)
+  for (const sg of [state.sigma, -state.sigma]) {
+    const trial = { ...state, sigma: sg };
+    const sol = solve(trial);
+    if (!sol.ok) continue;
+    const J = joints(trial, sol);
+    if (Math.hypot(J.F[0] - F[0], J.F[1] - F[1]) < 1e-4) { setSigma(sg); break; }
+  }
+  syncMotorInputs();
+  render();
+  sendTarget({ type: "target_foot", x: F[0], y: F[1] });
+  return true;
+}
+
+function svgPoint(evt) {
+  const pt = new DOMPoint(evt.clientX, evt.clientY);
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return [p.x, p.y];
+}
+let dragging = false;
+svg.addEventListener("pointerdown", e => {
+  if (moveFoot(svgPoint(e))) {
+    dragging = true;
+    svg.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+});
+svg.addEventListener("pointermove", e => { if (dragging) moveFoot(svgPoint(e)); });
+svg.addEventListener("pointerup", () => { dragging = false; });
+svg.addEventListener("pointercancel", () => { dragging = false; });
+
+for (const id of ["fx", "fy"]) {
+  $(id).addEventListener("input", () => {
+    const x = parseFloat($("fx").value), y = parseFloat($("fy").value);
+    if (isFinite(x) && isFinite(y)) moveFoot([x, y]);
+  });
+}
+
+/* --- hardware link ------------------------------------------------------
+   Live only when this page is served by leg_control/leg_server.py (plain
+   http). ALL control — impedance loop, IK, safety — runs in the Python
+   server; this page only sends targets and draws the state it broadcasts. */
+const hw = { on: false, th: null };
+let ws = null, prevMode = "";
+let tgtTimer = null, pendingTgt = null, lastTgtSent = 0;
+
+function hwSend(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+function sendTarget(obj) {              // ~33 Hz with a trailing send
+  pendingTgt = obj;
+  if (tgtTimer) return;
+  const wait = Math.max(0, 30 - (performance.now() - lastTgtSent));
+  tgtTimer = setTimeout(() => {
+    tgtTimer = null; lastTgtSent = performance.now();
+    hwSend(pendingTgt); pendingTgt = null;
+  }, wait);
+}
+
+function hwMessage(text) {
+  $("hwMsg").textContent = text;
+  if (text) setTimeout(() => { if ($("hwMsg").textContent === text) $("hwMsg").textContent = ""; }, 5000);
+}
+
+function updateHwPanel(m) {
+  const pill = $("hwMode");
+  pill.textContent = m.mode + (m.reason ? " — " + m.reason : "");
+  pill.className = "pill " + (m.mode === "active" ? "ok" : m.mode === "fault" ? "bad" : "idle");
+  const rows = m.motors.map((mm, i) => {
+    if (mm.seen === false)
+      return `M${i + 1} n${mm.node}  ✕ NO LINK — no frames from drive (bus? power? bitrate?)`;
+    const th = m.th[i] == null ? "–" : (m.th[i] / DEG).toFixed(1) + "°";
+    return `M${i + 1} n${mm.node} ${mm.axis_state}  θ ${th}  τ ${m.tau[i].toFixed(2)} Nm` +
+           `  T ${mm.temp == null ? "–" : mm.temp + "°C"}${mm.error ? "  ⚠︎" : ""}`;
+  });
+  $("hwStat").innerHTML = rows.join("<br>") +
+    `<br>loop ${m.loop_hz.toFixed(0)} Hz · ${m.ctrl === "mit" ? "MIT (on-drive impedance)" : "software torque loop"}`;
+}
+
+function hwConnect() {
+  if (location.protocol !== "http:") return;   // artifact/file: sim-only
+  let sock;
+  try { sock = new WebSocket("ws://" + location.host + "/ws"); } catch { return; }
+  sock.onopen = () => { ws = sock; };
+  sock.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === "config") {
+      hw.on = true;
+      $("hwCard").hidden = false;
+      $("ghostHint").hidden = false;
+      $("hwKp").value = m.kp; $("hwKd").value = m.kd; $("hwTau").value = m.tau_max;
+      state.a = m.a; state.l1 = m.l1; state.l2 = m.l2;
+      for (const id of ["da", "dl1", "dl2"]) {   // dims come from the server now
+        $(id).value = { da: m.a, dl1: m.l1, dl2: m.l2 }[id];
+        $(id).disabled = true;
+      }
+      render();
+    } else if (m.type === "state") {
+      hw.th = m.th;
+      if (m.mode === "active" && prevMode !== "active" && m.th[0] != null) {
+        state.th1 = m.th[0]; state.th2 = m.th[1];   // align target with reality
+        syncMotorInputs();
+      }
+      prevMode = m.mode;
+      updateHwPanel(m);
+      render();
+    } else if (m.type === "err") {
+      hwMessage(m.msg);
+    } else if (m.type === "ack" && m.msg) {
+      hwMessage(m.msg);
+    }
+  };
+  sock.onclose = () => {
+    if (ws === sock) ws = null;
+    if (hw.on) {
+      hw.on = false; hw.th = null;
+      $("hwCard").hidden = true; $("ghostHint").hidden = true;
+      for (const id of ["da", "dl1", "dl2"]) $(id).disabled = false;
+      render();
+    }
+    setTimeout(hwConnect, 3000);
+  };
+}
+
+$("hwEnable").addEventListener("click", () => hwSend({ type: "enable" }));
+$("hwDisable").addEventListener("click", () => hwSend({ type: "disable" }));
+$("hwEstop").addEventListener("click", () => hwSend({ type: "estop" }));
+$("hwClear").addEventListener("click", () => hwSend({ type: "clear_errors" }));
+$("hwZero").addEventListener("click", () => {
+  if (confirm("Store the CURRENT physical pose as θ₁ = θ₂ = 0 (both upper arms straight down)?"))
+    hwSend({ type: "zero_here" });
+});
+let gainsTimer = null;
+for (const id of ["hwKp", "hwKd", "hwTau"]) {
+  $(id).addEventListener("input", () => {
+    clearTimeout(gainsTimer);
+    gainsTimer = setTimeout(() => hwSend({
+      type: "gains",
+      kp: parseFloat($("hwKp").value),
+      kd: parseFloat($("hwKd").value),
+      tau_max: parseFloat($("hwTau").value),
+    }), 300);
+  });
+}
+hwConnect();
+
+render();
+</script>

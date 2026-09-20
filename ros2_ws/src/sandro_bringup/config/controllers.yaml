@@ -1,0 +1,407 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 300
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    imu_broadcaster:
+      type: imu_sensor_broadcaster/IMUSensorBroadcaster
+    driving_balancer:
+      type: sandro_controllers/DrivingBalancerController
+    lqr_balancer:
+      type: sandro_controllers/LqrBalancerController
+    whole_body_controller:
+      type: sandro_controllers/WholeBodyController
+    commission_right_motor_inner:
+      type: sandro_controllers/TimedEffortController
+    commission_right_motor_outer:
+      type: sandro_controllers/TimedEffortController
+    commission_right_wheel:
+      type: sandro_controllers/TimedEffortController
+    commission_left_motor_inner:
+      type: sandro_controllers/TimedEffortController
+    commission_left_motor_outer:
+      type: sandro_controllers/TimedEffortController
+    commission_left_wheel:
+      type: sandro_controllers/TimedEffortController
+    commission_right_leg:
+      type: sandro_controllers/TimedEffortController
+    commission_left_leg:
+      type: sandro_controllers/TimedEffortController
+
+imu_broadcaster:
+  ros__parameters:
+    sensor_name: imu
+    frame_id: imu_link
+
+driving_balancer:
+  ros__parameters:
+    joints: [right_motor_inner, right_motor_outer, right_wheel,
+             left_motor_inner, left_motor_outer, left_wheel]
+    imu_name: imu
+    command_topic: /cmd_vel
+    diagnostics.publish_rate_hz: 10.0
+    legs:
+      right: {base_m: 0.09, upper_m: 0.08, lower_m: 0.13}
+      left: {base_m: 0.09, upper_m: 0.08, lower_m: 0.13}
+      height_m: 0.17
+      height_rate_m_s: 0.03
+      kp_nm_rad: 12.0
+      kd_nm_s_rad: 0.5
+      torque_limit_nm: 3.0
+      target_rate_rad_s: 6.0
+      joint_min_rad: -2.0943951024
+      joint_max_rad: 2.0943951024
+    balance:
+      pitch_target_rad: 0.0
+      pitch_kp_nm_rad: 15.0
+      pitch_kd_nm_s_rad: 0.65
+      wheel_damping_nm_s_rad: 0.1
+      torque_limit_nm: 6.0
+      torque_rate_nm_s: 100.0
+      torque_sign: 1.0
+      imu_timeout_s: 0.15
+      settle_s: 1.0
+      ramp_s: 0.5
+      fall_angle_rad: 1.0
+    wheels:
+      torque_limit_nm: 6.0
+    drive:
+      wheel_radius_m: 0.0742
+      track_width_m: 0.304
+      max_forward_velocity_m_s: 0.5
+      max_yaw_rate_rad_s: 1.5
+      forward_accel_limit_m_s2: 1.0
+      velocity_kp_pitch_s_m: 0.03
+      velocity_ki_pitch_per_m: 0.01
+      velocity_integral_limit_rad: 0.005
+      max_pitch_offset_rad: 0.15
+      velocity_to_pitch_sign: 1.0
+      position_hold_kp_s: 0.5
+      position_hold_velocity_limit_m_s: 0.15
+      command_deadband_m_s: 0.01
+      yaw_kp_nm_s_rad: 0.15
+      yaw_torque_limit_nm: 0.4
+      yaw_torque_rate_nm_s: 3.0
+      yaw_torque_sign: 1.0
+      command_timeout_s: 0.3
+
+# Full-state-feedback balancer. The driving_balancer above splits balancing and
+# driving into an inner pitch loop and an outer velocity loop, which needs the
+# inner loop to be much faster than the outer one. This plant leaves only about
+# 4x of separation where a cascade wants 5-10x, so its loops interact and each
+# gain change moves another loop's margin. This one feeds all four states to a
+# single coordinated gain vector instead, and has no wheel damping term because
+# lqr.velocity_nm_s_m already is the wheel velocity feedback.
+#
+# Switch to it with: controller:=lqr_balancer. Do not activate it together with
+# driving_balancer; both exclusively claim all six effort interfaces.
+#
+# Regenerate the gains after any mass or geometry change with:
+#   mujoco_sim/venv/bin/python \
+#     ros2_ws/src/sandro_controllers/tools/lqr_design.py --wheel-radius 0.0742
+lqr_balancer:
+  ros__parameters:
+    joints: [right_motor_inner, right_motor_outer, right_wheel,
+             left_motor_inner, left_motor_outer, left_wheel]
+    imu_name: imu
+    command_topic: /cmd_vel
+    diagnostics.publish_rate_hz: 10.0
+    legs:
+      right: {base_m: 0.09, upper_m: 0.08, lower_m: 0.13}
+      left: {base_m: 0.09, upper_m: 0.08, lower_m: 0.13}
+      height_m: 0.17
+      height_rate_m_s: 0.03
+      kp_nm_rad: 12.0
+      kd_nm_s_rad: 0.5
+      torque_limit_nm: 3.0
+      target_rate_rad_s: 6.0
+      joint_min_rad: -2.0943951024
+      joint_max_rad: 2.0943951024
+    balance:
+      pitch_target_rad: 0.0
+      torque_limit_nm: 6.0
+      torque_rate_nm_s: 100.0
+      torque_sign: 1.0
+      imu_timeout_s: 0.15
+      # The pendulum doubles its lean in 62 ms, so a long zero-torque settle is
+      # a free fall. Catch it immediately and ramp the gains in instead.
+      settle_s: 0.0
+      ramp_s: 0.25
+      fall_angle_rad: 1.0
+    wheels:
+      torque_limit_nm: 6.0
+    drive:
+      wheel_radius_m: 0.0742
+      track_width_m: 0.304
+      max_forward_velocity_m_s: 0.5
+      max_yaw_rate_rad_s: 1.5
+      forward_accel_limit_m_s2: 1.0
+      command_deadband_m_s: 0.01
+      yaw_kp_nm_s_rad: 0.15
+      yaw_torque_limit_nm: 0.4
+      yaw_torque_rate_nm_s: 3.0
+      yaw_torque_sign: 1.0
+      command_timeout_s: 0.3
+    lqr:
+      # Solved from the MJCF, as total wheel torque per unit of state error.
+      # The positive position gain is deliberate: moving backward requires
+      # first driving the wheels forward to tip the body that way.
+      position_nm_m: 0.8165
+      velocity_nm_s_m: 1.7642
+      pitch_nm_rad: 8.0343
+      pitch_rate_nm_s_rad: 1.0413
+      # Trim for what the rigid model misses, mostly centre-of-mass error and
+      # rolling resistance.
+      velocity_integral_nm_s_m: 0.8
+      velocity_integral_limit_nm: 1.5
+      # Take the wheels only once upright. The legs are unpowered until this
+      # controller activates, so on startup the robot is already down by then;
+      # driving straight away would spin the wheels out from under it. On
+      # hardware this is the natural bringup: lift it upright and it engages.
+      engage_angle_rad: 0.15
+
+# Whole-body controller. One height-scheduled LQR coordinates total wheel
+# torque with fore-aft wheel placement through both five-bar legs, the legs
+# run a stiff Cartesian impedance with gravity support and the wheel torque's
+# reaction fed forward, a model-based yaw loop turns the robot, the body leans
+# into turns by a differential leg height, and a slow posture trim puts the
+# axle under the centre of mass so the body stands level. Switch to it with:
+#   controller:=whole_body_controller
+# It claims all six effort interfaces, so activate exactly one balancer.
+#
+# The same /cmd_vel TwistStamped drives it: linear.x forward speed, angular.z
+# yaw rate, and linear.z as a body height rate (m/s, optional).
+#
+# Model defaults are the Onshape CAD values (sandro_description README, joint
+# convention section). Before the physical robot balances on this controller:
+# weigh it (model.body_mass_kg = total minus the two wheels), then stand it on
+# the legs with balancing engaged and read trim_m / pitch_reference_rad from
+# ~/diagnostics to see how far the real centre of mass sits from the model.
+whole_body_controller:
+  ros__parameters:
+    joints: [right_motor_inner, right_motor_outer, right_wheel,
+             left_motor_inner, left_motor_outer, left_wheel]
+    imu_name: imu
+    command_topic: /cmd_vel
+    diagnostics.publish_rate_hz: 50.0
+    model:
+      # Planar five-bar geometry (m) and the body-x direction of planar +x.
+      # The inner/outer motors are mirrored between the sides, hence the
+      # opposite forward signs.
+      # wheel_on_outer_link: which lower link carries the wheel motor's
+      # stator (its reaction to the wheel torque acts there). Both wheels
+      # hang from the front link: outer on the right, inner on the left.
+      right: {base_m: 0.09, upper_m: 0.08, lower_m: 0.13, forward_sign: 1.0,
+              wheel_on_outer_link: 1.0}
+      left: {base_m: 0.09, upper_m: 0.08, lower_m: 0.13, forward_sign: -1.0,
+             wheel_on_outer_link: 0.0}
+      body_mass_kg: 3.284             # CAD total 3.40 kg minus two 58 g wheels
+      wheel_mass_kg: 0.0584
+      wheel_inertia_kgm2: 0.00033     # tyre disc plus reflected rotor (armature)
+      wheel_radius_m: 0.0742
+      track_width_m: 0.304
+      # Whole robot about the vertical through its CoM, wheels' spin inertia
+      # reflected through the track included (identified MJCF, stand pose).
+      yaw_inertia_kgm2: 0.09
+      com_height_per_leg_height: 0.654  # CoM above axle = 0.654 * leg height
+      com_height_offset_m: 0.0
+      pitch_inertia_kgm2: 0.0295      # about the CoM at 0.1855 m leg height
+      pitch_inertia_reference_height_m: 0.1855
+      pitch_inertia_per_m: 0.15
+      gravity_m_s2: 9.81
+    balance:
+      # LQR weights, 1/(acceptable deviation)^2 in SI units. Raising a state
+      # weight tightens that state; raising an effort weight spares that
+      # actuator. leg_offset_rate decides how much the legs help balance.
+      # position/velocity 30/4 (was 10/1) for firmer speed tracking against
+      # the 0.4 Nm of drive friction; 60/8 made the slow loop hunt against
+      # Coulomb friction in simulation. Keep the resulting per-wheel velocity
+      # gain (diagnostics
+      # gain_wheel_velocity_nm_s_m / 2 * wheel radius) well below
+      # wheel_inertia_kgm2 * update_rate (about 0.1 Nm per rad/s): above it the
+      # wheels chatter against tyre or gearbox compliance at the sampling rate.
+      # wheel_torque also sets the balance loop's delay margin, printed at
+      # configure: 0.6 gave about 10 ms (falls in the latency-emulating
+      # simulation and oscillates on the robot), 2.0 about 17 ms, 5.0 about
+      # 23 ms but sluggish. Sets below required_delay_margin_s are rejected.
+      weights: {position: 30.0, velocity: 4.0, pitch: 150.0, pitch_rate: 1.0,
+                leg_offset: 1500.0}
+      effort_weights: {wheel_torque: 2.0, leg_offset_rate: 20.0}
+      gain_table: {min_height_m: 0.14, max_height_m: 0.19, points: 7}
+      required_delay_margin_s: 0.012
+      # The leg offset the LQR feeds back: 1 = the measured axle position
+      # (the physical lever; calmest stance in the latency simulation, pitch
+      # RMS 0.014 to 0.023 rad), 0 = the one it commanded (leg deflections
+      # under wheel torque never become balance action, but their sway goes
+      # undamped: 0.036 rad). The robot's 2 Hz hunting ran through the
+      # measured path, driven by the hot yaw loop and legs pinned near their
+      # singularity; if it persists with those fixed, try 0.5 then 0.
+      measured_offset_blend: 1.0
+      leg_offset_limit_m: 0.025
+      leg_offset_rate_limit_m_s: 0.25
+      # While driving this is the integral action of the speed loop: the
+      # reference runs ahead of a robot held back by friction by at most
+      # this distance. Releasing the stick anchors the hold at the current
+      # position, so the distance never turns into a catch-up creep.
+      position_error_limit_m: 0.3
+      # Coulomb friction per drive train compensated in the direction of the
+      # commanded torque (never keyed on wheel speed: that is negative damping);
+      # measured on the robot (config/sandro_real_overrides.yaml).
+      wheel_friction_ff_nm: 0.0
+      wheel_friction_ff_smoothing_nm: 0.1
+      # 1 s time constant: a centre of mass the model does not know about
+      # otherwise accelerates the robot for seconds before the legs catch up.
+      # Not faster: the trim then follows transients and sustains a slow
+      # position oscillation.
+      trim_rate_per_s: 1.0
+      trim_limit_m: 0.03
+      # The trim learns only at rest: command and measured speed inside the
+      # velocity deadband AND balance torque inside the torque deadband. A
+      # body leaning against wheel stiction is still and level-looking but
+      # holds about 0.4 Nm; learning that lean as a mass offset put the
+      # robot's neutral 30 mm off (third hardware run). Balanced at rest the
+      # wheel torque averages near zero.
+      trim_velocity_deadband_m_s: 0.05
+      trim_torque_deadband_nm: 0.15
+      wheel_torque_sign: 1.0
+      wheel_torque_rate_nm_s: 100.0
+      velocity_filter_hz: 15.0
+      # Balancing engages when the body is upright and still after settle_s;
+      # hold the physical robot upright and it starts by itself.
+      engage_pitch_rad: 0.15
+      engage_pitch_rate_rad_s: 0.5
+    tasks:
+      # The legs are the balance loop's inner actuator and should hold the
+      # axle where it was placed: at 300 N/m one newton-metre of wheel torque
+      # moved the axle 20 to 50 mm (ground force tau / r plus the stator
+      # moment on the wheel link), which is the 2 Hz leg swing the robot
+      # showed. Stiffness is bounded by loop delay: the stiffness term is
+      # negative damping k * delay, so kd must grow with kp (kd / kp about
+      # 0.04 s, the PID cascade's joint ratio that balances the robot). The
+      # latency-emulating simulation falls above about 400 N/m and also falls
+      # with the cascade's gains the robot balances on, so it cannot set this
+      # value: raise kp on the robot in steps of 200 N/m with kd = 0.04 * kp,
+      # watching the leg efforts for sample-rate chatter
+      # (compare_runs.py leg metrics), toward the cascade's 1500 to 2000 N/m.
+      # Damping acts on a low-passed Cartesian velocity
+      # (leg_velocity_filter_hz). The height integral learns the share of the
+      # weight the feed-forward misses.
+      height:
+        target_m: 0.17
+        min_m: 0.14
+        max_m: 0.19
+        rate_m_s: 0.05
+        kp_n_m: 400.0
+        kd_n_s_m: 20.0
+        ki_n_m_s: 150.0
+        integral_limit_n: 15.0
+      # neutral_offset_m: body-frame shift of the neutral axle, positive
+      # forward. Set it to minus the converged trim_m of the robot so the legs
+      # keep their full +-25 mm for balancing (config/sandro_real_overrides.yaml).
+      fore_aft: {neutral_m: 0.045, neutral_offset_m: 0.0, kp_n_m: 400.0, kd_n_s_m: 20.0}
+      leg_velocity_filter_hz: 30.0
+      # Optional feed-forward of the wheel torque's reaction on each leg,
+      # J^T [-tau / r, 0] + tau d(link)/d(q) through a low-pass, off by
+      # default: below the drive friction the torque never reaches the ground
+      # but the term still shifts the wheels under the body, a positive
+      # feedback that fell in the latency simulation with 400 N/m legs. Only
+      # for experiments on the robot with stiff legs.
+      leg_reaction_ground_gain: 0.0
+      leg_reaction_stator_gain: 0.0
+      leg_reaction_filter_hz: 4.0
+      roll:
+        lean_gain: 1.0              # 1 = full atan(v * yaw_rate / g) lean
+        # Height differential per rad of roll error. 0.05/0.1 needed tens of
+        # seconds to level a 3 degree IMU bias on the robot; the loop closes
+        # through the 400 N/m height impedance (20 rad/s), so this is still
+        # a loop gain of 0.3 per track width.
+        kp_m_rad: 0.1
+        ki_m_rad_s: 0.2
+        differential_limit_m: 0.04
+        imu_offset_rad: 0.0         # IMU roll when the body is level (mounting)
+      yaw:
+        # I_z psi_dd = (track / 2 r) dtau - scrub, so kp = I_z * bandwidth /
+        # (track / 2 r): 0.3 Nm per rad/s is about 7 rad/s. The earlier 1.0 to
+        # 1.5 closed a 30-plus rad/s loop through the IMU, the tyre scrub and
+        # the soft legs and rang at 3.6 Hz with +-0.8 Nm while the robot stood
+        # still. The proportional term acts on the wheel-differential rate
+        # (wheel_rate_blend 1; 0 would use the IMU), the integral on the IMU
+        # rate so the body really turns at the commanded rate against scrub
+        # and drive friction; the Coulomb-like scrub and the yaw inertia are
+        # fed forward from the lagged command. Differential torque is free
+        # for balance.
+        kp_nm_s_rad: 0.3
+        ki_nm_rad: 1.0                 # with kp 0.3: 4.8 rad/s, damping ratio 0.7
+        wheel_rate_blend: 1.0
+        scrub_ff_nm: 0.3
+        scrub_ff_smoothing_rad_s: 0.2
+        torque_limit_nm: 1.5
+        torque_rate_nm_s: 20.0
+        torque_sign: 1.0
+      leg_fallback_damping_nm_s_rad: 0.2
+    limits:
+      leg_torque_nm: 3.0
+      wheel_torque_nm: 6.0
+    drive:
+      max_forward_velocity_m_s: 0.5
+      max_yaw_rate_rad_s: 1.5
+      forward_accel_limit_m_s2: 1.0
+      yaw_command_time_constant_s: 0.15
+      max_height_rate_m_s: 0.05
+    safety:
+      command_timeout_s: 0.3
+      imu_timeout_s: 0.15
+      settle_s: 0.0
+      ramp_s: 0.5
+      fall_angle_rad: 1.0
+
+# Commissioning controllers claim only the selected resources. Commands are
+# direct Nm values and become zero 0.1 s after the last message.
+commission_right_motor_inner:
+  ros__parameters:
+    joints: [right_motor_inner]
+    command_topic: ~/commands
+    command_timeout_s: 0.1
+    effort_limit_nm: 0.5
+commission_right_motor_outer:
+  ros__parameters:
+    joints: [right_motor_outer]
+    command_topic: ~/commands
+    command_timeout_s: 0.1
+    effort_limit_nm: 0.5
+commission_right_wheel:
+  ros__parameters:
+    joints: [right_wheel]
+    command_topic: ~/commands
+    command_timeout_s: 0.1
+    effort_limit_nm: 0.5
+commission_left_motor_inner:
+  ros__parameters:
+    joints: [left_motor_inner]
+    command_topic: ~/commands
+    command_timeout_s: 0.1
+    effort_limit_nm: 0.5
+commission_left_motor_outer:
+  ros__parameters:
+    joints: [left_motor_outer]
+    command_topic: ~/commands
+    command_timeout_s: 0.1
+    effort_limit_nm: 0.5
+commission_left_wheel:
+  ros__parameters:
+    joints: [left_wheel]
+    command_topic: ~/commands
+    command_timeout_s: 0.1
+    effort_limit_nm: 0.5
+commission_right_leg:
+  ros__parameters:
+    joints: [right_motor_inner, right_motor_outer]
+    command_topic: ~/commands
+    command_timeout_s: 0.1
+    effort_limit_nm: 0.5
+commission_left_leg:
+  ros__parameters:
+    joints: [left_motor_inner, left_motor_outer]
+    command_topic: ~/commands
+    command_timeout_s: 0.1
+    effort_limit_nm: 0.5

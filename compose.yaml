@@ -1,0 +1,77 @@
+x-sandro: &sandro
+  build:
+    context: .
+    target: development
+  image: sandro:jazzy
+  network_mode: host
+  ipc: host
+  environment:
+    RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+    CYCLONEDDS_URI: file:///workspaces/sandro/ros2_ws/src/sandro_bringup/config/cyclonedds.xml
+    DISPLAY: ${DISPLAY:-}
+    QT_X11_NO_MITSHM: "1"
+    # The X socket alone is not enough: the server still demands a cookie, and
+    # the host one (GDM, per-user runtime dir) is unreadable here. `make xauth`
+    # writes a wildcard-family copy to this path.
+    XAUTHORITY: /tmp/.sandro.xauth
+  volumes:
+    # Keep image-built install/ visible; mount ROS sources for live development.
+    - ./ros2_ws/src:/workspaces/sandro/ros2_ws/src
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - ${SANDRO_XAUTH:-/tmp/.sandro.xauth}:/tmp/.sandro.xauth:ro
+    - /dev/input:/dev/input:rw
+  # The bind mount alone only makes the nodes visible; the device cgroup still
+  # denies open(). Major 13 is the input subsystem (js*, event*).
+  device_cgroup_rules:
+    - "c 13:* rmw"
+  working_dir: /workspaces/sandro
+
+services:
+  sim:
+    <<: *sandro
+    profiles: [sim]
+    command: >
+      bash -lc 'source /opt/ros/jazzy/setup.bash;
+      [ -f install/setup.bash ] && source install/setup.bash;
+      ros2 launch sandro_bringup sandro.launch.py hardware:=sim ${SANDRO_LAUNCH_ARGS:-}'
+
+  real:
+    <<: *sandro
+    profiles: [real]
+    devices:
+      - ${SANDRO_IMU_DEVICE:-/dev/ttyUSB0}:/dev/ttyUSB0
+    # SocketCAN uses the host network namespace; configure can0 on the host.
+    command: >
+      bash -lc 'source /opt/ros/jazzy/setup.bash;
+      [ -f install/setup.bash ] && source install/setup.bash;
+      ros2 launch sandro_bringup sandro.launch.py
+      hardware:=real controller:=none teleop:=false'
+
+  test:
+    <<: *sandro
+    profiles: [test]
+    command: >
+      bash -lc 'source /opt/ros/jazzy/setup.bash;
+      colcon build --base-paths ros2_ws/src --symlink-install &&
+      source install/setup.bash &&
+      colcon test --base-paths ros2_ws/src --event-handlers console_direct+ &&
+      colcon test-result --verbose'
+
+  shell:
+    <<: *sandro
+    profiles: [shell]
+    stdin_open: true
+    tty: true
+    command: bash
+
+  # Interactive shell with the IMU attached, for running hardware bringup by
+  # hand. `shell` deliberately omits the device so simulation work still starts
+  # when the robot is unplugged.
+  hardware-shell:
+    <<: *sandro
+    profiles: [hardware]
+    devices:
+      - ${SANDRO_IMU_DEVICE:-/dev/ttyUSB0}:/dev/ttyUSB0
+    stdin_open: true
+    tty: true
+    command: bash

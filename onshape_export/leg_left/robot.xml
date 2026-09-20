@@ -1,0 +1,168 @@
+<?xml version="1.0" ?>
+<!-- Generated using onshape-to-robot -->
+<!-- Onshape https://cad.onshape.com/documents/e5cda129f952f5ca0f29e636/w/e86f9480bd60bb90c537e907/e/d2004260c52fc592d7b53ca3 -->
+<mujoco model="leg_left">
+  <compiler angle="radian" meshdir="assets" autolimits="true"/>
+  <default>
+    <default class="leg_left">
+      <joint frictionloss="0.1" armature="0.005"/>
+      <position kp="50" dampratio="1"/>
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+      </default>
+      <default class="collision">
+        <geom group="3"/>
+      </default>
+    </default>
+  </default>
+  <worldbody>
+    <!-- Link bodymotorholder -->
+    <body name="bodymotorholder" pos="0 0 0" quat="1 0 0 0" childclass="leg_left">
+      <inertial pos="0.0436051 0.140374 -0.0596712" mass="0.0322432" fullinertia="5.30629e-05 3.64146e-05 8.82809e-05 -5.39555e-06 -1.80948e-07 3.9932e-08"/>
+      <!-- Part bodymotorholder -->
+      <geom type="mesh" class="visual" pos="0.0460054 0.0924467 -0.0519126" quat="-0 -0.802826 -0.596213 -0" mesh="bodymotorholder" material="bodymotorholder_material"/>
+      <geom type="mesh" class="collision" pos="0.0460054 0.0924467 -0.0519126" quat="-0 -0.802826 -0.596213 -0" mesh="bodymotorholder" material="bodymotorholder_material"/>
+      <!-- Part motor_2 -->
+      <geom type="mesh" class="visual" pos="0.0458557 0.0925686 0.0225874" quat="0.596213 0 0 -0.802826" mesh="motor_2" material="motor_2_material"/>
+      <geom type="mesh" class="collision" pos="0.0458557 0.0925686 0.0225874" quat="0.596213 0 0 -0.802826" mesh="motor_2" material="motor_2_material"/>
+      <!-- Part motor_2_2 -->
+      <geom type="mesh" class="visual" pos="0.0720384 0.178412 0.0225874" quat="0.971134 -0 0 0.238537" mesh="motor_2" material="motor_2_material"/>
+      <geom type="mesh" class="collision" pos="0.0720384 0.178412 0.0225874" quat="0.971134 -0 0 0.238537" mesh="motor_2" material="motor_2_material"/>
+      <!-- Link motor_shaft_2 -->
+      <body name="motor_shaft_2" pos="0.0460054 0.0924467 -0.0259126" quat="0 0.488069 -0.872805 -0">
+        <!-- Joint from bodymotorholder to motor_shaft_2 -->
+        <joint axis="0 0 1" name="motor_inner_l" type="hinge"/>
+        <inertial pos="0.0238056 -0.0378871 -0.0108017" mass="0.0210838" fullinertia="2.5121e-05 1.4814e-05 3.91523e-05 1.05789e-05 5.32156e-07 -8.46615e-07"/>
+        <!-- Part biella -->
+        <geom type="mesh" class="visual" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" mesh="biella" material="biella_material"/>
+        <geom type="mesh" class="collision" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" mesh="biella" material="biella_material"/>
+        <!-- Part motor_shaft_2 -->
+        <geom type="mesh" class="visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" mesh="motor_shaft_2" material="motor_shaft_2_material"/>
+        <geom type="mesh" class="collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" mesh="motor_shaft_2" material="motor_shaft_2_material"/>
+        <!-- Link bearing_5_2_4_0_7 -->
+        <body name="bearing_5_2_4_0_7" pos="0.0425666 -0.067881 -0.0112" quat="0 0.997484 0.070887 -0">
+          <!-- Joint from motor_shaft_2 to bearing_5_2_4_0_7 -->
+          <joint axis="0 0 1" name="passive_biella_outer_l" type="hinge"/>
+          <inertial pos="-0.0272985 0.00186071 -0.00229689" mass="0.152913" fullinertia="5.63683e-05 0.00045783 0.000484319 2.786e-05 -2.71645e-05 2.1296e-06"/>
+          <!-- Part wheelmotorhub -->
+          <geom type="mesh" class="visual" pos="-0.129662 0.00936367 0.012" quat="0 -1 0 0" mesh="wheelmotorhub" material="wheelmotorhub_material"/>
+          <geom type="mesh" class="collision" pos="-0.129662 0.00936367 0.012" quat="0 -1 0 0" mesh="wheelmotorhub" material="wheelmotorhub_material"/>
+          <!-- Part bearing_5_2_4_0_7 -->
+          <geom type="mesh" class="visual" pos="0 -0 0.011" quat="0 0.707107 -0.707107 -0" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <geom type="mesh" class="collision" pos="0 -0 0.011" quat="0 0.707107 -0.707107 -0" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <!-- Part bearing_5_2_4_0_7_2 -->
+          <geom type="mesh" class="visual" pos="-0 0 0" quat="0 1 0 0" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <geom type="mesh" class="collision" pos="-0 0 0" quat="0 1 0 0" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <!-- Part smallplate_manovella2 -->
+          <geom type="mesh" class="visual" pos="0 -0 -0.007" quat="0 0.707107 -0.707107 -0" mesh="smallplate_manovella2" material="smallplate_manovella2_material"/>
+          <geom type="mesh" class="collision" pos="0 -0 -0.007" quat="0 0.707107 -0.707107 -0" mesh="smallplate_manovella2" material="smallplate_manovella2_material"/>
+          <!-- Part wheelstickcover -->
+          <geom type="mesh" class="visual" pos="-0.129662 0.00936367 -0.028" quat="0 0.707107 -0.707107 -0" mesh="wheelstickcover" material="wheelstickcover_material"/>
+          <geom type="mesh" class="collision" pos="-0.129662 0.00936367 -0.028" quat="0 0.707107 -0.707107 -0" mesh="wheelstickcover" material="wheelstickcover_material"/>
+          <!-- Part pernobiella -->
+          <geom type="mesh" class="visual" pos="0 -0 0.011" quat="0.707107 -0 0 -0.707107" mesh="pernobiella" material="pernobiella_material"/>
+          <geom type="mesh" class="collision" pos="0 -0 0.011" quat="0.707107 -0 0 -0.707107" mesh="pernobiella" material="pernobiella_material"/>
+          <!-- Part manovella2 -->
+          <geom type="mesh" class="visual" pos="0 -0 -0.007" quat="0 0.707107 -0.707107 -0" mesh="manovella2" material="manovella2_material"/>
+          <geom type="mesh" class="collision" pos="0 -0 -0.007" quat="0 0.707107 -0.707107 -0" mesh="manovella2" material="manovella2_material"/>
+          <!-- Part motor_2_3 -->
+          <geom type="mesh" class="visual" pos="-0.129484 0.00929025 0.0852" quat="0.707107 0 0 0.707107" mesh="motor_2" material="motor_2_material"/>
+          <geom type="mesh" class="collision" pos="-0.129484 0.00929025 0.0852" quat="0.707107 0 0 0.707107" mesh="motor_2" material="motor_2_material"/>
+          <!-- Frame closing_manovelle_meeting_l_2 -->
+          <site group="3" name="closing_manovelle_meeting_l_2" pos="-0.129662 0.00936367 -0.0184" quat="0.707107 -0 0 -0.707107"/>
+          <!-- Frame closing_manovelle_meeting_l_2_z -->
+          <site group="3" name="closing_manovelle_meeting_l_2_z" pos="-0.129662 0.00936367 0.0816" quat="0.707107 -0 0 -0.707107"/>
+          <!-- Link motor_shaft_2_2 -->
+          <body name="motor_shaft_2_2" pos="-0.129662 0.00936367 0.0367" quat="0 -0.707107 -0.707107 0">
+            <!-- Joint from bearing_5_2_4_0_7 to motor_shaft_2_2 -->
+            <joint axis="0 0 1" name="wheel_l"/>
+            <inertial pos="1.455e-09 -1.5982e-08 0.0082226" mass="0.0583748" fullinertia="8.58915e-05 8.58914e-05 0.000160953 -2.8e-11 0 -1e-12"/>
+            <!-- Part wheel_tire_holder -->
+            <geom type="mesh" class="visual" pos="-0 -0 -0.0035" quat="0 -0.105959 -0.994371 -0" mesh="wheel_tire_holder" material="wheel_tire_holder_material"/>
+            <geom type="mesh" class="collision" pos="-0 -0 -0.0035" quat="0 -0.105959 -0.994371 -0" mesh="wheel_tire_holder" material="wheel_tire_holder_material"/>
+            <!-- Part tire -->
+            <geom type="mesh" class="visual" pos="-0 -0 -0.0035" quat="0 -0.105959 -0.994371 -0" mesh="tire" material="tire_material"/>
+            <geom type="mesh" class="collision" pos="-0 -0 -0.0035" quat="0 -0.105959 -0.994371 -0" mesh="tire" material="tire_material"/>
+            <!-- Part motor_shaft_2_2 -->
+            <geom type="mesh" class="visual" pos="3.41428e-05 -0.00019003 -0.0485" quat="0 -0.105959 -0.994371 -0" mesh="motor_shaft_2" material="motor_shaft_2_material"/>
+            <geom type="mesh" class="collision" pos="3.41428e-05 -0.00019003 -0.0485" quat="0 -0.105959 -0.994371 -0" mesh="motor_shaft_2" material="motor_shaft_2_material"/>
+          </body>
+        </body>
+      </body>
+      <!-- Link motor_shaft_2_3 -->
+      <body name="motor_shaft_2_3" pos="0.0720208 0.178605 -0.0259126" quat="0 0.584286 0.811548 0">
+        <!-- Joint from bodymotorholder to motor_shaft_2_3 -->
+        <joint axis="0 0 1" name="motor_outer_l" type="hinge"/>
+        <inertial pos="0.0209083 0.0395598 -0.0108017" mass="0.0210838" fullinertia="2.65524e-05 1.33827e-05 3.91523e-05 -9.75251e-06 4.67112e-07 8.84168e-07"/>
+        <!-- Part motor_shaft_2_3 -->
+        <geom type="mesh" class="visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" mesh="motor_shaft_2" material="motor_shaft_2_material"/>
+        <geom type="mesh" class="collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" mesh="motor_shaft_2" material="motor_shaft_2_material"/>
+        <!-- Part biella_2 -->
+        <geom type="mesh" class="visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 -0 0" mesh="biella" material="biella_material"/>
+        <geom type="mesh" class="collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 -0 0" mesh="biella" material="biella_material"/>
+        <!-- Link bearing_5_2_4_0_7_2 -->
+        <body name="bearing_5_2_4_0_7_2" pos="0.0375033 0.0708042 -0.0112" quat="0 0.698198 -0.715905 -0">
+          <!-- Joint from motor_shaft_2_3 to bearing_5_2_4_0_7_2 -->
+          <joint axis="0 0 1" name="passive_biella_inner_l" type="hinge"/>
+          <inertial pos="-0 0.0405227 -0.00817769" mass="0.176318" fullinertia="0.000686113 7.6054e-05 0.000698558 -0 -0 0.00011498"/>
+          <!-- Part bearing_5_2_4_0_7_3 -->
+          <geom type="mesh" class="visual" pos="0 0 -0.007" quat="1 0 0 0" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <geom type="mesh" class="collision" pos="0 0 -0.007" quat="1 0 0 0" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <!-- Part bearing_5_2_4_0_7_4 -->
+          <geom type="mesh" class="visual" pos="0 0 0.004" quat="0.707107 0 -0 0.707107" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <geom type="mesh" class="collision" pos="0 0 0.004" quat="0.707107 0 -0 0.707107" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <!-- Part bearing_5_2_4_0_7_5 -->
+          <geom type="mesh" class="visual" pos="-0 0.13 -0.028" quat="0.707107 0 0 0.707107" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <geom type="mesh" class="collision" pos="-0 0.13 -0.028" quat="0.707107 0 0 0.707107" mesh="bearing_5_2_4_0_7" material="bearing_5_2_4_0_7_material"/>
+          <!-- Part pernobiella_2 -->
+          <geom type="mesh" class="visual" pos="0 0 0.011" quat="0.707107 0 0 0.707107" mesh="pernobiella" material="pernobiella_material"/>
+          <geom type="mesh" class="collision" pos="0 0 0.011" quat="0.707107 0 0 0.707107" mesh="pernobiella" material="pernobiella_material"/>
+          <!-- Part manovella1 -->
+          <geom type="mesh" class="visual" pos="0 0 -0.007" quat="0 -0.707107 -0.707107 0" mesh="manovella1" material="manovella1_material"/>
+          <geom type="mesh" class="collision" pos="0 0 -0.007" quat="0 -0.707107 -0.707107 0" mesh="manovella1" material="manovella1_material"/>
+          <!-- Frame closing_manovelle_meeting_l_1 -->
+          <site group="3" name="closing_manovelle_meeting_l_1" pos="-0 0.13 -0.0184" quat="0.707107 0 0 0.707107"/>
+          <!-- Frame closing_manovelle_meeting_l_1_z -->
+          <site group="3" name="closing_manovelle_meeting_l_1_z" pos="-0 0.13 0.0816" quat="0.707107 0 0 0.707107"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <asset>
+    <mesh file="wheelmotorhub.stl"/>
+    <mesh file="bodymotorholder.stl"/>
+    <mesh file="motor_shaft_2.stl"/>
+    <mesh file="wheel_tire_holder.stl"/>
+    <mesh file="smallplate_manovella2.stl"/>
+    <mesh file="manovella2.stl"/>
+    <mesh file="wheelstickcover.stl"/>
+    <mesh file="manovella1.stl"/>
+    <mesh file="bearing_5_2_4_0_7.stl"/>
+    <mesh file="biella.stl"/>
+    <mesh file="pernobiella.stl"/>
+    <mesh file="tire.stl"/>
+    <mesh file="motor_2.stl"/>
+    <material name="bodymotorholder_material" rgba="0 0 1 1"/>
+    <material name="motor_2_material" rgba="0.207843 0.2 0.2 1"/>
+    <material name="biella_material" rgba="0.972549 0.529412 0.00392157 1"/>
+    <material name="motor_shaft_2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="wheelmotorhub_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="bearing_5_2_4_0_7_material" rgba="0.34902 0.376471 0.4 1"/>
+    <material name="smallplate_manovella2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="wheelstickcover_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="pernobiella_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="manovella2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="wheel_tire_holder_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="tire_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="manovella1_material" rgba="0.615686 0.811765 0.929412 1"/>
+  </asset>
+  <actuator>
+    <position class="leg_left" name="motor_inner_l" joint="motor_inner_l"/>
+    <position class="leg_left" name="wheel_l" joint="wheel_l"/>
+    <position class="leg_left" name="motor_outer_l" joint="motor_outer_l"/>
+  </actuator>
+  <equality>
+    <connect site1="closing_manovelle_meeting_l_1" site2="closing_manovelle_meeting_l_2"/>
+    <connect site1="closing_manovelle_meeting_l_1_z" site2="closing_manovelle_meeting_l_2_z"/>
+  </equality>
+</mujoco>

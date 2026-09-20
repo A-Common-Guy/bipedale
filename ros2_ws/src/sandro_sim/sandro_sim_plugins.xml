@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<library path="sandro_sim">
+  <class
+    name="sandro_sim/LatencySystem"
+    type="sandro_sim::LatencySystem"
+    base_class_type="hardware_interface::SystemInterface">
+    <description>Wraps another system interface (the MuJoCo backend) and delays, rate-limits and holds its state and command interfaces like the physical sensor and CAN paths do.</description>
+  </class>
+</library>

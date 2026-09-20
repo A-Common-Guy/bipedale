@@ -1,0 +1,14 @@
+.git
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+ros2_ws/build
+ros2_ws/install
+ros2_ws/log
+build
+install
+log
+sysid_runs
+*.bag
+*.db3

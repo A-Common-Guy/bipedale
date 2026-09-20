@@ -1,0 +1,147 @@
+# SandroControl defaults. Start in simulation; select "both" only after
+# validating every sign, zero and limit on the lifted physical robot.
+runtime:
+  mode: both          # simulation | physical | both
+  control_hz: 300
+  telemetry_hz: 30
+  render_hz: 30
+  state_source: physical    # "both" requires physical; sim mode falls back to sim
+
+can:
+  interface: socketcan
+  channel: can0
+  gim6010_path: ../gim6010/can_control
+  encoder_period_ms: 5
+  iq_period_ms: 5
+  heartbeat_period_ms: 100
+  deadman_ms: 300
+
+imu:
+  enabled: true
+  port: /dev/ttyUSB0
+  baudrate: 3000000
+  timeout_s: 0.05
+  report_interval_us: 5000  # 200 Hz game rotation vector, gyro and acceleration
+
+mujoco:
+  model: ../onshape_export/robot/scene_floating.xml
+  identified_params: identified_params.yaml
+  keyframe: stand
+  hanged: true
+  hang_height_m: 0.25
+  realtime: true
+  render_width: 720
+  render_height: 405
+
+sysid:
+  output_dir: sysid_runs
+  recorder_queue_size: 8192
+
+robot:
+  # Names are the stable controller API. node IDs follow the supplied wiring:
+  # right: front=2, back=1, wheel=3; left: front=5, back=4, wheel=6.
+  motors:
+    # Leg coordinates: zero = both upper links vertically down; positive
+    # opens each link away from the leg centre. offset_rev is the raw rotor
+    # reading in that zero-down pose and must be calibrated before enabling.
+    right_inner: {node: 1, kind: leg, sim_joint: right_motor_inner, sign: 1.0, ratio: 8.0, offset_rev: 0.0}
+    right_outer: {node: 2, kind: leg, sim_joint: right_motor_outer, sign: -1.0, ratio: 8.0, offset_rev: 0.0}
+    right_wheel: {node: 3, kind: wheel, sim_joint: right_wheel, sign: 1.0, ratio: 8.0, offset_rev: 0.0}
+    left_inner:  {node: 5, kind: leg, sim_joint: left_motor_inner, sign: 1.0, ratio: 8.0, offset_rev: 0.0}
+    left_outer:  {node: 4, kind: leg, sim_joint: left_motor_outer, sign: -1.0, ratio: 8.0, offset_rev: 0.0}
+    left_wheel:  {node: 6, kind: wheel, sim_joint: left_wheel, sign: -1.0, ratio: 8.0, offset_rev: 0.0}
+
+  # Five-bar geometry used by the Cartesian target interface (metres).
+  legs:
+    right: {base: 0.09, upper: 0.08, lower: 0.13}
+    left:  {base: 0.09, upper: 0.08, lower: 0.13}
+
+control:
+  leg_kp: 19.0
+  leg_kd: 0.5
+  leg_torque_limit: 3.0
+  wheel_kd: 0
+  wheel_torque_limit: 6.0
+  target_rate_rad_s: 6.0
+  joint_min_rad: -2.0943951024
+  joint_max_rad: 2.0943951024
+  velocity_kill_rad_s: 60.0
+  stale_state_s: 0.1
+  hard_torque_limit_nm: 10.0
+
+balance:
+  # Common Cartesian foot height in metres (+y points downward). Larger values
+  # extend both legs and raise the body relative to the wheels.
+  leg_height_m: 0.17
+  # Maximum rate at which the common foot-height target changes after Enable.
+  leg_height_rate_m_s: 0.03
+  # MIT position stiffness for all four leg joints. Higher values hold the
+  # requested height more firmly but increase impact and oscillation risk.
+  leg_kp: 12
+  # MIT joint damping for the legs. Higher values reduce leg oscillation but
+  # can make height motion sluggish.
+  leg_kd: 0.5
+  # Desired body pitch in radians. Zero means the IMU/roof frame is level;
+  # use a small trim only if the COM-over-axle equilibrium is not level.
+  pitch_target_rad: 0.0
+  # Proportional balance gain in Nm/rad. Raises wheel torque for a given tilt.
+  pitch_kp: 15
+  # Pitch-rate damping in Nm/(rad/s). Increase to reduce fore/aft oscillation;
+  # too much opposes rapid corrective motion and feels slow.
+  pitch_kd: 0.65
+  # MIT wheel velocity damping in Nm/(rad/s), active even while balance torque
+  # is settling or zero. It resists wheel rotation in either direction.
+  wheel_damping: 0.1
+  # Absolute clip on pitch-PD feed-forward torque per wheel. A low value causes
+  # sustained saturation and prevents stronger recovery from larger tilts.
+  # It cannot exceed control.wheel_torque_limit.
+  torque_limit_nm: 6.0
+  # Maximum feed-forward torque change per second. This controls reaction slew:
+  # at 2 Nm/s, reaching 1 Nm from zero takes 0.5 seconds.
+  torque_rate_nm_s: 100.0
+  # Global feedback polarity; only +1 or -1. Choose the sign that makes the
+  # wheels drive underneath the direction in which the body is falling.
+  torque_sign: 1.0
+  # Maximum accepted IMU sample age. Older data immediately commands zero
+  # balance torque; fresh data automatically resumes unless the fall latch set.
+  imu_max_age_s: 0.15
+  # Time after Enable during which pitch-PD feed-forward torque remains zero.
+  settle_s: 1.0
+  # Time after settling over which pitch gains ramp from zero to full strength.
+  ramp_s: 0.5
+  # Absolute pitch threshold in radians. Crossing it latches wheel torque at
+  # zero until Disable/Enable resets the controller.
+  fall_angle_rad: 1
+
+drive:
+  # Effective rolling radius and wheel-centre spacing from the current model.
+  wheel_radius_m: 0.0742
+  track_width_m: 0.304
+  # Operator command limits. The same SI interface will later accept PS5 axes.
+  max_forward_velocity_m_s: 0.5
+  max_yaw_rate_rad_s: 1.5
+  # Slew applied to forward velocity commands before the outer loop.
+  forward_accel_limit_m_s2: 1.0
+  # Convert forward speed error into a small pitch target offset. The integral
+  # removes floor-slope/drag bias; its state and output are both bounded.
+  velocity_kp_pitch: 0.12
+  velocity_ki_pitch: 0.02
+  velocity_integral_limit_rad: 0.05
+  max_pitch_offset_rad: 0.15
+  velocity_to_pitch_sign: 1.0
+  # At zero speed command, pull gently toward the last wheel position instead
+  # of allowing the pitch-only balancer to roll away indefinitely.
+  position_hold_kp_s: 1.0
+  position_hold_velocity_limit_m_s: 0.15
+  command_deadband_m_s: 0.01
+  # Differential wheel torque controls yaw while preserving balance authority.
+  yaw_kp_torque: 0.15
+  yaw_torque_limit_nm: 0.4
+  yaw_torque_rate_nm_s: 3.0
+  yaw_torque_sign: 1.0
+  # A GUI/gamepad must refresh nonzero motion commands before this timeout.
+  command_timeout_s: 0.3
+
+server:
+  host: 127.0.0.1
+  port: 8322

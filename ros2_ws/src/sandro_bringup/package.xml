@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>sandro_bringup</name>
+  <version>0.1.0</version>
+  <description>Deployment, launch, safety configuration, and commissioning for Sandro.</description>
+  <maintainer email="giuseppe.festa@example.com">Giuseppe Festa</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>controller_manager_msgs</exec_depend>
+  <exec_depend>mujoco_ros2_control_msgs</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>diagnostic_updater</exec_depend>
+  <exec_depend>imu_sensor_broadcaster</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>joy</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rmw_cyclonedds_cpp</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>ros2_control</exec_depend>
+  <exec_depend>ros2_controllers</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>sandro_controllers</exec_depend>
+  <exec_depend>sandro_description</exec_depend>
+  <exec_depend>sandro_hardware</exec_depend>
+  <exec_depend>sandro_sim</exec_depend>
+  <exec_depend>teleop_twist_joy</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>python3-yaml</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

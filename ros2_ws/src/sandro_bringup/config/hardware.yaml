@@ -1,0 +1,31 @@
+sandro:
+  ros__parameters:
+    can_interface: can0
+    imu_port: /dev/ttyUSB0
+    imu_baud: 3000000                  # bit/s
+    control_rate: 300.0                # Hz
+    feedback_timeout: 0.1              # s
+    drive_deadman_timeout: 0.3         # s
+    gear_ratio: 8.0                    # motor rev / output rev
+    wheel_radius: 0.0742               # m
+    track_width: 0.304                 # m
+    limits:
+      leg_position_min: -2.0943951024  # rad (-120 deg)
+      leg_position_max: 2.0943951024   # rad (+120 deg)
+      joint_velocity_kill: 60.0        # rad/s
+      leg_effort: 3.0                  # N m
+      wheel_effort: 6.0                # N m
+      hard_effort: 10.0                # N m, absolute final boundary
+      linear_velocity: 0.5             # m/s
+      linear_acceleration: 1.0         # m/s^2
+      angular_velocity: 1.5            # rad/s
+      command_timeout: 0.3             # s
+    motors:
+      # node IDs/signs match SandroControl/config.yaml. Zero offsets are
+      # deliberately 0 and MUST be commissioned before enabling physical power.
+      right_inner: {node_id: 1, sign: 1.0, zero_offset_rev: 0.0}
+      right_outer: {node_id: 2, sign: -1.0, zero_offset_rev: 0.0}
+      right_wheel: {node_id: 3, sign: 1.0, zero_offset_rev: 0.0}
+      left_inner: {node_id: 5, sign: 1.0, zero_offset_rev: 0.0}
+      left_outer: {node_id: 4, sign: -1.0, zero_offset_rev: 0.0}
+      left_wheel: {node_id: 6, sign: -1.0, zero_offset_rev: 0.0}

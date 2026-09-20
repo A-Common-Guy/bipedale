@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>sandro_hardware</name>
+  <version>0.1.0</version>
+  <description>ros2_control plugins for Sandro GIM6010 drives and BNO085 IMU.</description>
+  <maintainer email="giuseppe.festa@example.com">Giuseppe Festa</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>hardware_interface</depend>
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>std_srvs</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

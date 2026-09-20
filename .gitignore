@@ -1,0 +1,29 @@
+# ROS / colcon
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.venv/
+**/venv/
+
+# Local credentials and generated run data
+**/.env
+SandroControl/sysid_runs/
+
+# Editor / OS
+.vscode/
+.idea/
+*~
+
+# Drive-test recordings are tracked on purpose (hardware runs are not
+# reproducible); keep them in recordings/ with a dated name.
+
+# Sliced print files and exported demo data are derived artifacts
+3d_models/sliced/
+*.gcode
+*.bgcode
+*.npz

@@ -1,0 +1,60 @@
+# Per-robot values identified on the physical Sandro, applied on top of
+# controllers.yaml with:
+#
+#   ros2 launch sandro_bringup sandro.launch.py hardware:=real arm_hardware:=true \
+#     controller:=whole_body_controller teleop:=true \
+#     extra_params:=$(ros2 pkg prefix sandro_bringup)/share/sandro_bringup/config/sandro_real_overrides.yaml
+#
+# Use the same file for the simulation once sandro_description/config/
+# sim_identified.yaml carries the matching payload, so both backends describe
+# the same robot. Source of each value: the 2026-09-20 drive_test recording
+# (recordings/real_2026-09-20.csv) compared with the simulation, see
+# docs/SIM_TO_REAL.md. Replace the estimates with measurements as they come.
+whole_body_controller:
+  ros__parameters:
+    model:
+      # Estimate from the learnt leg support force (16.4 N per leg on the
+      # robot versus 10.4 N in the CAD simulation, whose body mass is
+      # 3.284 kg): about 1.2 kg more than CAD. Replace with the weighed total
+      # minus the two wheels (about 0.12 kg).
+      body_mass_kg: 4.5
+    balance:
+      # Second recording (real2_2026-09-20): 0.43 Nm of average wheel torque
+      # produced almost no acceleration, about 0.2 Nm of Coulomb friction per
+      # drive train and tyre. Compensate part of it; more is negative damping.
+      wheel_friction_ff_nm: 0.12
+    tasks:
+      roll:
+        # Both recordings: the leg kinematics report the right leg 14 mm
+        # shorter than the left while the IMU reads the body level, which on
+        # a flat floor means the IMU roll is biased by about 3 degrees of
+        # mounting. Without this the roll integral levels the IMU and tilts
+        # the body right-side-down. Check with a spirit level; set to 0 if the
+        # body is in fact level and the legs are what differ.
+        imu_offset_rad: -0.049
+      height:
+        # With the neutral 8 mm back the front pivot keeps its 3 % stretch
+        # margin up to 0.185 m over the +-25 mm leg offset range.
+        max_m: 0.185
+      fore_aft:
+        # Where the centre of mass is: in the calm standing phase of all
+        # three hardware runs the axle stood 33 to 40 mm ahead of the pivot
+        # centre, at body-forward 0.037 to 0.038 m with the body level, so
+        # the mass sits 7 to 8 mm behind the CAD neutral (0.045). The earlier
+        # -0.028 and -0.040 came from trim_m, which had learnt the forward
+        # lean the robot held against wheel stiction while it crept (0.4 Nm of
+        # wheel torque, no motion), not a mass offset. With -0.040 the legs
+        # stood pinned 28 mm off their neutral, the trim pinned at its limit,
+        # the body leaned back 2.6 degrees, and the balance loop hunted at
+        # 2 Hz between the leg offset limits as soon as it drove.
+        neutral_offset_m: -0.008
+      yaw:
+        # The turn needed 0.37 Nm on average and hit the 1 Nm limit for only
+        # 0.22 rad/s of 0.6 commanded: real tyre scrub is several times the
+        # simulated one. Balance keeps priority inside the per-wheel budget.
+        # The scrub is fed forward as a Coulomb-like term (real2: about
+        # 0.35 Nm of differential torque held 0.5 rad/s); do not raise
+        # kp_nm_s_rad to get the rate, the 1.5 tried in the third run rang
+        # at 3.6 Hz with +-0.8 Nm while standing (docs/SIM_TO_REAL.md).
+        torque_limit_nm: 2.0
+        scrub_ff_nm: 0.35

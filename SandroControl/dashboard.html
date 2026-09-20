@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SandroControl</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0a0f17;--panel:#121b28;--line:#24334a;--text:#e8edf5;--muted:#8ea0b7;--blue:#4ea1ff;--green:#39d98a;--red:#ff5263;--orange:#ffb454}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,sans-serif} header{height:58px;padding:0 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between} h1{font-size:18px;margin:0} h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 14px}.badge{border:1px solid var(--line);padding:5px 9px;border-radius:99px}.layout{display:grid;grid-template-columns:340px minmax(420px,1fr) 390px;gap:12px;padding:12px;min-height:calc(100vh - 58px)}.column{display:flex;flex-direction:column;gap:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{border:1px solid var(--line);background:#192538;color:var(--text);border-radius:6px;padding:9px;cursor:pointer}button:hover{border-color:var(--blue)}button.enable{background:#153a2d;border-color:#276a50}button.estop{background:#511d26;border-color:#9c3342;font-weight:700}button.active{background:#173a55;border-color:var(--blue)}button.zero{padding:4px 7px}.row{display:grid;grid-template-columns:95px 1fr 32px;gap:7px;align-items:center;margin:9px 0}.row output{grid-column:2/4;text-align:left;font-size:11px;font-variant-numeric:tabular-nums;color:var(--muted)}input[type=range]{width:100%}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}label.small{display:flex;flex-direction:column;gap:5px;color:var(--muted)}input[type=number],select{width:100%;background:#0d1520;color:var(--text);border:1px solid var(--line);border-radius:5px;padding:7px}.viewer{padding:0;overflow:hidden;position:relative;background:#05080d;min-height:405px}.viewer img{width:100%;height:100%;min-height:405px;object-fit:cover;display:block;cursor:grab;user-select:none;touch-action:none}.viewer img.dragging{cursor:grabbing}.viewer .overlay{position:absolute;left:12px;top:12px;background:#09111dcc;padding:7px 9px;border-radius:6px;color:var(--muted);pointer-events:none}.viewer .overlay button{pointer-events:auto;padding:3px 7px;margin-left:7px}canvas{width:100%;height:230px;background:#0b121d;border-radius:6px;cursor:grab;touch-action:none}canvas.dragging{cursor:grabbing}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}th,td{padding:7px 5px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:500}.error{text-align:left;max-width:170px;overflow-wrap:anywhere;font-size:11px}.ok{color:var(--green)}.bad{color:var(--red)}.metric{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.metric div{background:#0c1420;padding:9px;border-radius:6px}.metric span{display:block;color:var(--muted);font-size:11px}.metric b{font-size:16px;font-variant-numeric:tabular-nums}.message{min-height:22px;color:var(--muted);padding-top:8px;white-space:pre-wrap}.hint{color:var(--muted);font-size:12px;margin:-7px 0 10px}.fault{color:var(--red)}@media(max-width:1200px){.layout{grid-template-columns:330px 1fr}.column:last-child{grid-column:1/-1}}@media(max-width:760px){.layout{display:block}.column,.panel{margin-bottom:12px}.two{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>SandroControl <span id="runtimeMode" class="badge">connecting</span></h1>
+  <span id="connection" class="bad">offline</span>
+</header>
+<main class="layout">
+  <section class="column">
+    <div class="panel">
+      <h2>Safety</h2>
+      <div class="actions">
+        <button class="enable" onclick="send({type:'enable'})">Enable</button>
+        <button onclick="send({type:'disable'})">Disable</button>
+        <button id="hangedButton" onclick="toggleHanged()">Hanged: —</button>
+        <button class="estop" onclick="send({type:'estop'})">E-stop</button>
+      </div>
+      <div id="message" class="message">Waiting for controller…</div>
+    </div>
+    <div class="panel">
+      <h2>Actuator-space target (rad)</h2>
+      <div id="jointControls"></div>
+    </div>
+    <div class="panel">
+      <h2>Wheel MIT feed-forward torque (Nm)</h2>
+      <div id="wheelControls"></div>
+    </div>
+    <div class="panel">
+      <h2>MIT gains and limits</h2>
+      <div class="two">
+        <label class="small">Leg Kp<input id="leg_kp" type="number" step=".1"></label>
+        <label class="small">Leg Kd<input id="leg_kd" type="number" step=".05"></label>
+        <label class="small">Leg torque limit<input id="leg_torque_limit" type="number" step=".1"></label>
+        <label class="small">Wheel Kd<input id="wheel_kd" type="number" step=".05"></label>
+        <label class="small">Wheel torque limit<input id="wheel_torque_limit" type="number" step=".1"></label>
+      </div>
+      <button style="margin-top:10px;width:100%" onclick="sendGains()">Apply gains</button>
+    </div>
+    <div class="panel">
+      <h2>System identification · lifted robot</h2>
+      <div class="two">
+        <label class="small">Axis<select id="sysAxis" onchange="updateSysPresets()"></select></label>
+        <label class="small">Preset<select id="sysPreset" onchange="updateSysLimit()"></select></label>
+        <label class="small">Amplitude<input id="sysAmplitude" type="number" min="0" value="0" step=".01"></label>
+        <label class="small">Duration (s)<input id="sysDuration" type="number" min="2" max="60" value="12" step="1"></label>
+      </div>
+      <label class="message"><input id="sysLifted" type="checkbox"> Robot is lifted, secured, and E-stop is reachable</label>
+      <div id="sysLimit" class="hint"></div>
+      <div class="actions">
+        <button onclick="armSysid()">Arm</button>
+        <button class="enable" onclick="send({type:'sysid_start'})">Start</button>
+        <button class="estop" onclick="send({type:'sysid_abort'})">Abort trial</button>
+      </div>
+      <div class="message">Trial: <span id="sysState">idle</span> · <span id="sysProgress">0%</span></div>
+      <div id="sysPath" class="hint"></div>
+    </div>
+  </section>
+
+  <section class="column">
+    <div class="panel viewer">
+      <img id="modelFrame" draggable="false" alt="MuJoCo robot view">
+      <div class="overlay">Left drag: orbit · right/Shift drag: pan · wheel: zoom · <span id="renderStats">render —</span><button onclick="send({type:'camera_reset'})">Reset view</button></div>
+    </div>
+    <div class="panel">
+      <h2>Five-bar legs · measured solid / target dashed</h2>
+      <div class="hint">Drag either blue end-effector circle to command Cartesian position.</div>
+      <canvas id="legs"></canvas>
+    </div>
+  </section>
+
+  <section class="column">
+    <div class="panel">
+      <h2>Control loop</h2>
+      <div class="metric">
+        <div><span>State</span><b id="runState">idle</b></div>
+        <div><span>Rate</span><b id="hz">0 Hz</b></div>
+        <div><span>Mean cycle</span><b id="cycle">0 ms</b></div>
+        <div><span>Max cycle</span><b id="maxCycle">0 ms</b></div>
+      </div>
+      <div class="message">State source: <span id="stateSource">—</span> · overruns: <span id="overruns">0</span></div>
+    </div>
+    <div class="panel">
+      <h2>Drive command</h2>
+      <div class="row">
+        <label>Forward m/s</label>
+        <input id="driveForward" class="drive-input" type="range" value="0" step=".01">
+        <button class="zero" onclick="stopDrive()">0</button>
+        <output id="driveForwardValue">0.00</output>
+      </div>
+      <div class="row">
+        <label>Yaw rad/s</label>
+        <input id="driveYaw" class="drive-input" type="range" value="0" step=".05">
+        <button class="zero" onclick="stopDrive()">0</button>
+        <output id="driveYawValue">0.00</output>
+      </div>
+      <div class="actions">
+        <button class="estop" onclick="stopDrive()">Stop movement</button>
+        <button onclick="sendDrive()">Refresh command</button>
+      </div>
+      <div class="message">Measured: <span id="driveMeasured">—</span> m/s · yaw <span id="driveYawMeasured">—</span> rad/s</div>
+      <div class="message">Filtered command: <span id="driveFiltered">—</span> m/s · pitch offset <span id="drivePitchOffset">—</span> rad · yaw torque <span id="driveYawTorque">—</span> Nm</div>
+      <div class="hint">Nonzero commands use a network heartbeat and automatically return to zero if communication stops.</div>
+      <h2 style="margin-top:14px">Drive outer-loop tuning</h2>
+      <div class="two">
+        <label class="small">Velocity Kp → pitch<input class="drive-gain" id="velocity_kp_pitch" type="number" min="0" step=".01"></label>
+        <label class="small">Velocity Ki → pitch<input class="drive-gain" id="velocity_ki_pitch" type="number" min="0" step=".005"></label>
+        <label class="small">Max pitch offset<input class="drive-gain" id="max_pitch_offset_rad" type="number" min="0" step=".01"></label>
+        <label class="small">Position hold Kp<input class="drive-gain" id="position_hold_kp_s" type="number" min="0" step=".1"></label>
+        <label class="small">Yaw Kp torque<input class="drive-gain" id="yaw_kp_torque" type="number" min="0" step=".01"></label>
+        <label class="small">Yaw torque limit<input class="drive-gain" id="yaw_torque_limit_nm" type="number" min="0" step=".05"></label>
+      </div>
+      <button style="margin-top:10px;width:100%" onclick="sendDriveGains()">Apply drive gains</button>
+    </div>
+    <div class="panel">
+      <h2>Two-wheel balance tuning</h2>
+      <div class="two">
+        <label class="small">Pitch target (rad)<input class="balance-input" id="pitch_target_rad" type="number" step=".005"></label>
+        <label class="small">Pitch Kp (Nm/rad)<input class="balance-input" id="pitch_kp" type="number" min="0" step=".1"></label>
+        <label class="small">Pitch Kd (Nm/(rad/s))<input class="balance-input" id="pitch_kd" type="number" min="0" step=".05"></label>
+        <label class="small">Wheel damping<input class="balance-input" id="wheel_damping" type="number" min="0" step=".01"></label>
+        <label class="small">Torque limit (Nm)<input class="balance-input" id="torque_limit_nm" type="number" min="0" step=".1"></label>
+        <label class="small">Torque rate (Nm/s)<input class="balance-input" id="torque_rate_nm_s" type="number" min="0" step="1"></label>
+        <label class="small">Torque sign<input class="balance-input" id="torque_sign" type="number" min="-1" max="1" step="2"></label>
+        <label class="small">IMU max age (s)<input class="balance-input" id="imu_max_age_s" type="number" min="0" step=".01"></label>
+        <label class="small">Settle time (s)<input class="balance-input" id="settle_s" type="number" min="0" step=".1"></label>
+        <label class="small">Gain ramp (s)<input class="balance-input" id="ramp_s" type="number" min="0" step=".1"></label>
+        <label class="small">Fall angle (rad)<input class="balance-input" id="fall_angle_rad" type="number" min="0" step=".05"></label>
+        <label class="small">Leg height (m)<input class="balance-input" id="leg_height_m" type="number" min="0" step=".005"></label>
+        <label class="small">Leg height rate (m/s)<input class="balance-input" id="leg_height_rate_m_s" type="number" min="0" step=".005"></label>
+        <label class="small">Leg Kp<input class="balance-input" id="balance_leg_kp" data-key="leg_kp" type="number" min="0" step=".5"></label>
+        <label class="small">Leg Kd<input class="balance-input" id="balance_leg_kd" data-key="leg_kd" type="number" min="0" step=".05"></label>
+      </div>
+      <button style="margin-top:10px;width:100%" onclick="sendBalance()">Apply balance parameters</button>
+      <div class="message">Pitch: <span id="balancePitch">—</span> rad · rate: <span id="balancePitchRate">—</span> rad/s</div>
+      <div class="message">Raw: <span id="balanceRawTorque">—</span> Nm · command: <span id="balanceCommandTorque">—</span> Nm · ramp: <span id="balanceRamp">—</span></div>
+      <div id="balanceStatus" class="hint">Controller diagnostics unavailable</div>
+    </div>
+    <div class="panel">
+      <h2>Cartesian targets (metres, +y down)</h2>
+      <div class="two">
+        <div><b>Right</b><label class="small">x<input id="rightX" type="number" value=".045" step=".005"></label><label class="small">y<input id="rightY" type="number" value=".16" step=".005"></label><button style="width:100%;margin-top:7px" onclick="sendCartesian('right')">Set right</button></div>
+        <div><b>Left</b><label class="small">x<input id="leftX" type="number" value=".045" step=".005"></label><label class="small">y<input id="leftY" type="number" value=".16" step=".005"></label><button style="width:100%;margin-top:7px" onclick="sendCartesian('left')">Set left</button></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Motor state</h2>
+      <table><thead><tr><th>Motor</th><th>q</th><th>dq</th><th>τ</th><th>age</th><th class="error">Error</th></tr></thead><tbody id="motors"></tbody></table>
+    </div>
+    <div class="panel">
+      <h2>IMU</h2>
+      <table><tbody>
+        <tr><th>Quaternion wxyz</th><td id="quat">—</td></tr>
+        <tr><th>Gyro rad/s</th><td id="gyro">—</td></tr>
+        <tr><th>Accel m/s²</th><td id="accel">—</td></tr>
+        <tr><th>Status</th><td id="imuStatus">—</td></tr>
+      </tbody></table>
+    </div>
+  </section>
+</main>
+<script>
+let ws, config, lastState, controlsBuilt=false, driveBuilt=false, gainInit=false, balanceInit=false, driveGainInit=false, controlsLocked=null;
+let sendTimers={}, lastTargetSend={}, hanged=false, dragSide=null, dragPreview=null, frameStarted=false;
+let cameraDrag=null, cameraLast=null, cameraTimer=null, cameraMotion=null, lastCameraSend=-Infinity;
+let frameRequestStarted=0, renderFps=0;
+const targetSendMs=20;
+const $=id=>document.getElementById(id), f=(v,n=3)=>Number.isFinite(v)?v.toFixed(n):'—';
+function connect(){
+  ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`);
+  ws.onopen=()=>{$('connection').textContent='connected';$('connection').className='ok'};
+  ws.onclose=()=>{$('connection').textContent='offline';$('connection').className='bad';setTimeout(connect,1000)};
+  ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='config'){config=m;hanged=m.hanged;$('runtimeMode').textContent=m.runtime_mode;updateHanged();buildControls();buildDrive();buildSysid();if(!frameStarted){frameStarted=true;refreshFrame()}}else if(m.type==='state'){lastState=m;renderState(m)}else if(m.type==='error'){show(m.message,true)}else if(m.type==='ack'){show(m.message,false)}};
+}
+function send(value){if(ws?.readyState===1)ws.send(JSON.stringify(value))}
+function show(text,bad){$('message').textContent=text;$('message').className='message '+(bad?'fault':'')}
+function buildControls(){
+  if(controlsBuilt)return;controlsBuilt=true;
+  for(const [name,m] of Object.entries(config.motors)){
+    if(m.kind==='leg') $('jointControls').insertAdjacentHTML('beforeend',`<div class="row"><label>${name.replace('_',' ')}</label><input id="j_${name}" type="range" min="-2.094" max="2.094" step=".005" value="0"><button class="zero" onclick="setZero('joint','${name}')">0</button><output id="jo_${name}">goal — · MIT — · measured —</output></div>`);
+    else $('wheelControls').insertAdjacentHTML('beforeend',`<div class="row"><label>${name.replace('_',' ')}</label><input id="w_${name}" type="range" min="-1" max="1" step=".01" value="0"><button class="zero" onclick="setZero('wheel','${name}')">0</button><output id="wo_${name}">requested — · measured —</output></div>`);
+    $('motors').insertAdjacentHTML('beforeend',`<tr><td id="ms_${name}">${name}</td><td id="mp_${name}">—</td><td id="mv_${name}">—</td><td id="mt_${name}">—</td><td id="ma_${name}">—</td><td id="me_${name}" class="error">—</td></tr>`);
+  }
+  document.querySelectorAll('#jointControls input').forEach(el=>el.oninput=()=>scheduleTargets('joint'));
+  document.querySelectorAll('#wheelControls input').forEach(el=>el.oninput=()=>scheduleTargets('wheel'));
+}
+function buildSysid(){
+  $('sysAxis').innerHTML=Object.entries(config.motors).map(([name,m])=>`<option value="${name}">${name} (${m.kind})</option>`).join('');
+  updateSysPresets();
+}
+function buildDrive(){
+  if(driveBuilt)return;driveBuilt=true;
+  $('driveForward').min=-config.drive.max_forward_velocity_m_s;$('driveForward').max=config.drive.max_forward_velocity_m_s;
+  $('driveYaw').min=-config.drive.max_yaw_rate_rad_s;$('driveYaw').max=config.drive.max_yaw_rate_rad_s;
+  document.querySelectorAll('.drive-input').forEach(el=>el.oninput=()=>{updateDriveLabels();sendDrive()});
+  updateDriveLabels();
+  setInterval(()=>{if(Math.abs(+$('driveForward').value)>0||Math.abs(+$('driveYaw').value)>0)sendDrive()},100);
+}
+function updateSysPresets(){
+  const kind=config.motors[$('sysAxis').value]?.kind;
+  $('sysPreset').innerHTML=Object.entries(config.sysid_presets).filter(([,p])=>p.kinds.includes(kind)).map(([name,p])=>`<option value="${name}">${p.label}</option>`).join('');
+  updateSysLimit();
+}
+function updateSysLimit(){
+  const p=config.sysid_presets[$('sysPreset').value];if(!p)return;
+  $('sysAmplitude').max=p.max_amplitude;$('sysLimit').textContent=`Maximum ${p.max_amplitude} ${p.unit||''}`;
+  if(Number($('sysAmplitude').value)>p.max_amplitude)$('sysAmplitude').value=p.max_amplitude;
+}
+function armSysid(){send({type:'sysid_arm',values:{axis:$('sysAxis').value,preset:$('sysPreset').value,amplitude:Number($('sysAmplitude').value),duration_s:Number($('sysDuration').value),lifted_confirmed:$('sysLifted').checked}})}
+function flushTargets(kind){
+  clearTimeout(sendTimers[kind]);sendTimers[kind]=null;lastTargetSend[kind]=performance.now();
+  const values={},selector=kind==='joint'?'#jointControls input':'#wheelControls input';
+  document.querySelectorAll(selector).forEach(el=>values[el.id.slice(2)]=+el.value);
+  send({type:kind==='joint'?'joint_target':'wheel_torque',values});
+}
+function scheduleTargets(kind){
+  const wait=targetSendMs-(performance.now()-(lastTargetSend[kind]??-Infinity));
+  if(wait<=0)flushTargets(kind);
+  else if(!sendTimers[kind])sendTimers[kind]=setTimeout(()=>flushTargets(kind),wait);
+}
+function setZero(kind,name){const prefix=kind==='joint'?'j_':'w_';$(prefix+name).value=0;scheduleTargets(kind)}
+function toggleHanged(){hanged=!hanged;updateHanged();send({type:'hanged',enabled:hanged})}
+function updateHanged(){const b=$('hangedButton');b.textContent=hanged?'Hanged: on':'Hanged: off';b.className=hanged?'active':''}
+function sendCartesian(side){send({type:'cartesian_target',side,x:+$(side+'X').value,y:+$(side+'Y').value})}
+function sendGains(){const values={};['leg_kp','leg_kd','leg_torque_limit','wheel_kd','wheel_torque_limit'].forEach(k=>values[k]=+$(k).value);send({type:'gains',values})}
+function updateDriveLabels(){$('driveForwardValue').textContent=(+$('driveForward').value).toFixed(2);$('driveYawValue').textContent=(+$('driveYaw').value).toFixed(2)}
+function sendDrive(){send({type:'drive_target',forward_velocity_m_s:+$('driveForward').value,yaw_rate_rad_s:+$('driveYaw').value})}
+function stopDrive(){$('driveForward').value=0;$('driveYaw').value=0;updateDriveLabels();sendDrive()}
+function sendDriveGains(){const values={};document.querySelectorAll('.drive-gain').forEach(el=>values[el.id]=+el.value);send({type:'drive',values})}
+function sendBalance(){const values={};document.querySelectorAll('.balance-input').forEach(el=>values[el.dataset.key||el.id]=+el.value);send({type:'balance',values})}
+function renderState(s){
+  $('runState').textContent=s.mode;$('runState').className=s.mode==='active'?'ok':s.mode==='fault'?'bad':'';
+  if(s.fault)show(s.fault,true);$('stateSource').textContent=s.state_source;
+  $('hz').textContent=f(s.metrics.frequency_hz,1)+' Hz';$('cycle').textContent=f(s.metrics.cycle_ms,2)+' ms';$('maxCycle').textContent=f(s.metrics.max_cycle_ms,2)+' ms';$('overruns').textContent=s.metrics.overruns;
+  if(!gainInit){gainInit=true;Object.entries(s.control).forEach(([k,v])=>{if($(k))$(k).value=v})}
+  if(!balanceInit){balanceInit=true;Object.entries(s.balance||{}).forEach(([k,v])=>{const el=$('balance_'+k)||$(k);if(el)el.value=v})}
+  if(!driveGainInit){driveGainInit=true;Object.entries(s.drive||{}).forEach(([k,v])=>{if($(k))$(k).value=v})}
+  const controller=s.controller||{};$('balancePitch').textContent=f(controller.pitch_rad,4);$('balancePitchRate').textContent=f(controller.pitch_rate_rad_s,3);$('balanceRawTorque').textContent=f(controller.raw_torque_nm,3);$('balanceCommandTorque').textContent=f(controller.command_torque_nm,3);$('balanceRamp').textContent=f(controller.ramp,2);$('balanceStatus').textContent=controller.fallen?'FALL LATCHED — Disable/Enable to reset':(controller.inhibit_reason||'active');$('balanceStatus').className='hint '+(controller.fallen?'bad':'');
+  $('driveMeasured').textContent=f(controller.forward_velocity_m_s,3);$('driveYawMeasured').textContent=f(controller.yaw_rate_rad_s,3);$('driveFiltered').textContent=f(controller.velocity_command_m_s,3);$('drivePitchOffset').textContent=f(controller.pitch_offset_rad,3);$('driveYawTorque').textContent=f(controller.yaw_torque_nm,3);
+  const state=s.states[s.state_source];if(!state)return;
+  for(const [name,motor] of Object.entries(state.motors)){
+    if(config.motors[name].kind==='leg'){
+      const slider=$('j_'+name),goal=s.target.joint_positions[name]??motor.position,mit=s.commands[name]?.position;
+      if(document.activeElement!==slider)slider.value=goal;
+      $('jo_'+name).textContent=`goal ${f(goal)} · MIT ${f(mit)} · measured ${f(motor.position)}`;
+    }else{
+      const slider=$('w_'+name),requested=s.target.wheel_torques[name]??0;
+      if(document.activeElement!==slider)slider.value=requested;
+      $('wo_'+name).textContent=`requested ${f(requested,2)} · measured ${f(motor.torque,2)}`;
+    }
+    $('ms_'+name).className=motor.online&&!motor.error?'ok':'bad';$('mp_'+name).textContent=f(motor.position);$('mv_'+name).textContent=f(motor.velocity);$('mt_'+name).textContent=f(motor.torque);$('ma_'+name).textContent=motor.age_s==null?'—':f(motor.age_s*1000,1)+'ms';$('me_'+name).textContent=motor.error||'—';$('me_'+name).className='error '+(motor.error?'bad':'');
+  }
+  const trial=s.sysid||{},rec=s.recorder||{};$('sysState').textContent=trial.state||'idle';$('sysState').className=trial.state==='aborted'?'bad':trial.state==='completed'?'ok':'';$('sysProgress').textContent=`${Math.round(100*(trial.progress||0))}%`;$('sysPath').textContent=rec.path?(rec.path+(rec.dropped_rows?` · DROPPED ${rec.dropped_rows}`:'')):'';
+  const locked=!!trial.running;if(locked!==controlsLocked){controlsLocked=locked;document.querySelectorAll('#jointControls input,#wheelControls input,.drive-input,.drive-gain,.balance-input,.panel input[id^="leg_"],.panel input[id^="wheel_"]').forEach(el=>el.disabled=locked)}
+  const imu=state.imu;$('quat').textContent=imu.quaternion.map(x=>f(x)).join('  ');$('gyro').textContent=imu.gyro.map(x=>f(x)).join('  ');$('accel').textContent=imu.accel.map(x=>f(x)).join('  ');$('imuStatus').textContent=imu.online?'online':'offline';$('imuStatus').className=imu.online?'ok':'bad';
+  if(dragPreview&&Object.entries(dragPreview.angles).every(([name,value])=>Math.abs((s.target.joint_positions[name]??Infinity)-value)<.001))dragPreview=null;
+  drawLegs(state,{...s.target.joint_positions,...(dragPreview?.angles||{})});
+}
+function fk(t1,t2,g){const P=g.upper*(Math.cos(t2)-Math.cos(t1)),Q=g.base+g.upper*(Math.sin(t1)+Math.sin(t2)),r=Math.hypot(P,Q);if(r>2*g.lower)return null;const b=Math.acos(Math.min(1,r/(2*g.lower)))+Math.atan2(P,Q);return[-g.upper*Math.sin(t1)+g.lower*Math.cos(b),g.upper*Math.cos(t1)+g.lower*Math.sin(b)]}
+function ik(x,y,g){const r1=Math.hypot(x,y),r2=Math.hypot(x-g.base,y),lo=Math.abs(g.upper-g.lower),hi=g.upper+g.lower;if(r1<Math.max(lo,1e-9)||r1>hi||r2<Math.max(lo,1e-9)||r2>hi)return null;const clamp=v=>Math.max(-1,Math.min(1,v)),wrap=v=>Math.atan2(Math.sin(v),Math.cos(v));const a1=Math.acos(clamp((g.upper*g.upper+r1*r1-g.lower*g.lower)/(2*g.upper*r1))),a2=Math.acos(clamp((g.upper*g.upper+r2*r2-g.lower*g.lower)/(2*g.upper*r2))),d1=Math.atan2(y,x)+a1,d2=Math.atan2(y,x-g.base)-a2;return[wrap(d1-Math.PI/2),wrap(Math.PI/2-d2)]}
+function legLayout(side){const c=$('legs'),k=side==='left'?1:0;return{cx:c.clientWidth*(k?.75:.25),cy:25,scale:800}}
+function drawLegs(state,target){
+  const c=$('legs'),dpr=devicePixelRatio||1,w=Math.round(c.clientWidth*dpr),h=Math.round(c.clientHeight*dpr);if(c.width!==w||c.height!==h){c.width=w;c.height=h}const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,c.clientWidth,c.clientHeight);
+  ['right','left'].forEach(side=>{const g=config.legs[side],{cx,cy,scale}=legLayout(side);const draw=(a,b,color,dash,handle=false)=>{const foot=fk(a,b,g);if(!foot)return;const p1=[cx-g.upper*Math.sin(a)*scale,cy+g.upper*Math.cos(a)*scale],p2=[cx+g.base*scale+g.upper*Math.sin(b)*scale,cy+g.upper*Math.cos(b)*scale],pf=[cx+foot[0]*scale,cy+foot[1]*scale];x.strokeStyle=color;x.lineWidth=3;x.setLineDash(dash);x.beginPath();x.moveTo(cx,cy);x.lineTo(...p1);x.lineTo(...pf);x.lineTo(...p2);x.lineTo(cx+g.base*scale,cy);x.stroke();x.setLineDash([]);if(handle){x.fillStyle=color;x.beginPath();x.arc(...pf,8,0,Math.PI*2);x.fill()}};
+    draw(target[side+'_inner']??0,target[side+'_outer']??0,'#4ea1ff',[6,5],true);draw(state.motors[side+'_inner'].position,state.motors[side+'_outer'].position,'#e8edf5',[]);x.fillStyle='#8ea0b7';x.fillText(side,cx-15,15);
+  })}
+function canvasPoint(e){const r=$('legs').getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+function targetFoot(side){if(!lastState)return null;const t=lastState.target.joint_positions,g=config.legs[side],foot=fk(t[side+'_inner']??0,t[side+'_outer']??0,g);if(!foot)return null;const l=legLayout(side);return{x:l.cx+foot[0]*l.scale,y:l.cy+foot[1]*l.scale}}
+function dragCartesian(e,final=false){if(!dragSide)return;const p=canvasPoint(e),l=legLayout(dragSide),x=(p.x-l.cx)/l.scale,y=(p.y-l.cy)/l.scale,angles=ik(x,y,config.legs[dragSide]);$(dragSide+'X').value=x.toFixed(4);$(dragSide+'Y').value=y.toFixed(4);if(angles){dragPreview={angles:{[dragSide+'_inner']:angles[0],[dragSide+'_outer']:angles[1]}};if(lastState){const state=lastState.states[lastState.state_source];drawLegs(state,{...lastState.target.joint_positions,...dragPreview.angles})}}if(final)sendCartesian(dragSide);else scheduleCartesian(dragSide)}
+function scheduleCartesian(side){const kind='cartesian_'+side,wait=targetSendMs-(performance.now()-(lastTargetSend[kind]??-Infinity));if(wait<=0){lastTargetSend[kind]=performance.now();sendCartesian(side)}else if(!sendTimers[kind])sendTimers[kind]=setTimeout(()=>{sendTimers[kind]=null;lastTargetSend[kind]=performance.now();sendCartesian(side)},wait)}
+const legCanvas=$('legs');
+legCanvas.addEventListener('pointerdown',e=>{const p=canvasPoint(e);for(const side of ['right','left']){const foot=targetFoot(side);if(foot&&Math.hypot(p.x-foot.x,p.y-foot.y)<24){dragSide=side;legCanvas.classList.add('dragging');legCanvas.setPointerCapture(e.pointerId);e.preventDefault();break}}});
+legCanvas.addEventListener('pointermove',e=>{if(dragSide){dragCartesian(e);e.preventDefault()}});
+legCanvas.addEventListener('pointerup',e=>{if(dragSide){dragCartesian(e,true);dragSide=null;legCanvas.classList.remove('dragging')}});
+legCanvas.addEventListener('pointercancel',()=>{dragSide=null;dragPreview=null;legCanvas.classList.remove('dragging')});
+function flushCamera(){clearTimeout(cameraTimer);cameraTimer=null;if(!cameraMotion)return;send({type:'camera',...cameraMotion});cameraMotion=null;lastCameraSend=performance.now()}
+function queueCamera(action,dx,dy){
+  if(cameraMotion&&cameraMotion.action===action){cameraMotion.dx+=dx;cameraMotion.dy+=dy}
+  else{flushCamera();cameraMotion={action,dx,dy}}
+  const wait=targetSendMs-(performance.now()-lastCameraSend);
+  if(wait<=0)flushCamera();
+  else if(!cameraTimer)cameraTimer=setTimeout(flushCamera,wait);
+}
+const modelFrame=$('modelFrame');
+modelFrame.addEventListener('contextmenu',e=>e.preventDefault());
+modelFrame.addEventListener('pointerdown',e=>{cameraDrag=(e.button===2||e.shiftKey)?'pan':'orbit';cameraLast={x:e.clientX,y:e.clientY};modelFrame.classList.add('dragging');modelFrame.setPointerCapture(e.pointerId);e.preventDefault()});
+modelFrame.addEventListener('pointermove',e=>{if(!cameraDrag)return;const h=Math.max(modelFrame.clientHeight,1);queueCamera(cameraDrag,(e.clientX-cameraLast.x)/h,(e.clientY-cameraLast.y)/h);cameraLast={x:e.clientX,y:e.clientY};e.preventDefault()});
+modelFrame.addEventListener('pointerup',()=>{cameraDrag=null;cameraLast=null;flushCamera();modelFrame.classList.remove('dragging')});
+modelFrame.addEventListener('pointercancel',()=>{cameraDrag=null;cameraLast=null;modelFrame.classList.remove('dragging')});
+modelFrame.addEventListener('wheel',e=>{queueCamera('zoom',0,Math.sign(e.deltaY)*.08);e.preventDefault()},{passive:false});
+function refreshFrame(){const img=$('modelFrame'),period=1000/(config?.render_hz||10);frameRequestStarted=performance.now();img.onload=()=>{const elapsed=performance.now()-frameRequestStarted,instant=1000/Math.max(elapsed,1);renderFps=renderFps?renderFps*.8+instant*.2:instant;$('renderStats').textContent=`render ${renderFps.toFixed(1)} Hz / ${elapsed.toFixed(0)} ms`;setTimeout(refreshFrame,Math.max(0,period-elapsed))};img.onerror=()=>setTimeout(refreshFrame,1000);img.src='/api/frame.jpg?t='+Date.now()}
+connect();
+</script>
+</body>
+</html>

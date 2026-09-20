@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<library path="sandro_hardware">
+  <class name="sandro_hardware/GIM6010System"
+         type="sandro_hardware::GIM6010System"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>Six-axis GIM6010 MIT-mode SocketCAN system.</description>
+  </class>
+  <class name="sandro_hardware/BNO085Sensor"
+         type="sandro_hardware::BNO085Sensor"
+         base_class_type="hardware_interface::SensorInterface">
+    <description>BNO085 UART-SHTP IMU sensor.</description>
+  </class>
+</library>

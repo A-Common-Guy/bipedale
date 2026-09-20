@@ -1,0 +1,150 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="sandro">
+  <!--
+    This is deliberately a tree visualization of the closed-chain five-bar
+    legs. URDF cannot represent their loop constraints. The four lower bars
+    end at nominal, unconnected tips; mjcf/robot_full_floating.xml remains the
+    source of physics, mass properties, contacts, and loop constraints.
+
+    Consequently no inertial elements are provided here: inventing inertias
+    for a schematic tree would make it look simulation-ready when it is not.
+  -->
+  <xacro:arg name="control_backend" default="none"/>
+  <xacro:arg name="can_interface" default="can0"/>
+  <xacro:arg name="imu_port" default="/dev/ttyUSB0"/>
+  <xacro:arg name="state_source" default="encoder"/>
+  <xacro:arg name="encoder_period_ms" default="5"/>
+  <xacro:arg name="simulation_headless" default="false"/>
+  <xacro:arg name="simulation_latency" default="true"/>
+  <xacro:arg name="sim_imu_delay_s" default="0.010"/>
+  <xacro:arg name="sim_imu_rate_hz" default="200"/>
+  <xacro:arg name="sim_joint_delay_s" default="0.005"/>
+  <xacro:arg name="sim_joint_rate_hz" default="200"/>
+  <xacro:arg name="sim_command_delay_s" default="0.0033"/>
+  <xacro:property name="control_backend" value="$(arg control_backend)"/>
+
+  <material name="body_blue"><color rgba="0.18 0.45 0.85 1"/></material>
+  <material name="link_orange"><color rgba="0.97 0.53 0.00 1"/></material>
+  <material name="wheel_dark"><color rgba="0.12 0.12 0.12 1"/></material>
+  <material name="imu_yellow"><color rgba="1.0 0.85 0.1 1"/></material>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0"/>
+      <geometry><box size="0.18 0.22 0.10"/></geometry>
+      <material name="body_blue"/>
+    </visual>
+  </link>
+
+  <link name="imu_link">
+    <visual>
+      <geometry><box size="0.035 0.025 0.006"/></geometry>
+      <material name="imu_yellow"/>
+    </visual>
+  </link>
+  <joint name="imu_mount" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <!-- Physical board is 35 mm right of roof-centre; x forward/y left/z up. -->
+    <origin xyz="0 -0.035 0.053"/>
+  </joint>
+
+  <!--
+    dir is the body-x direction from the inner to the outer pivot: +1 on the
+    right, -1 on the left. The inner/outer motor names are mirrored between
+    the sides (right inner is the rear motor, left inner the front one), and
+    the logical joint convention of sandro_description/tools/sync_model.py
+    (zero hanging down, positive opening away from the leg centre) is what the
+    axes below represent for RViz.
+  -->
+  <xacro:macro name="five_bar_visual" params="side y dir">
+    <!-- Joint spacing and bar lengths come from SandroControl/config.yaml. -->
+    <link name="${side}_inner_link">
+      <visual>
+        <origin xyz="0 0 -0.04"/>
+        <geometry><cylinder radius="0.012" length="0.08"/></geometry>
+        <material name="link_orange"/>
+      </visual>
+    </link>
+    <joint name="${side}_motor_inner" type="revolute">
+      <parent link="base_link"/>
+      <child link="${side}_inner_link"/>
+      <origin xyz="${-0.045 * dir} ${y} -0.045"/>
+      <axis xyz="0 ${dir} 0"/>
+      <limit lower="-2.0943951024" upper="2.0943951024"
+             effort="10.0" velocity="60.0"/>
+    </joint>
+
+    <link name="${side}_inner_lower_visual">
+      <visual>
+        <origin xyz="0 0 -0.065"/>
+        <geometry><cylinder radius="0.009" length="0.13"/></geometry>
+        <material name="body_blue"/>
+      </visual>
+    </link>
+    <joint name="${side}_inner_lower_visual_joint" type="fixed">
+      <parent link="${side}_inner_link"/>
+      <child link="${side}_inner_lower_visual"/>
+      <origin xyz="0 0 -0.08" rpy="0 ${0.35 * dir} 0"/>
+    </joint>
+
+    <link name="${side}_outer_link">
+      <visual>
+        <origin xyz="0 0 -0.04"/>
+        <geometry><cylinder radius="0.012" length="0.08"/></geometry>
+        <material name="link_orange"/>
+      </visual>
+    </link>
+    <joint name="${side}_motor_outer" type="revolute">
+      <parent link="base_link"/>
+      <child link="${side}_outer_link"/>
+      <origin xyz="${0.045 * dir} ${y} -0.045"/>
+      <axis xyz="0 ${-dir} 0"/>
+      <limit lower="-2.0943951024" upper="2.0943951024"
+             effort="10.0" velocity="60.0"/>
+    </joint>
+
+    <link name="${side}_outer_lower_visual">
+      <visual>
+        <origin xyz="0 0 -0.065"/>
+        <geometry><cylinder radius="0.009" length="0.13"/></geometry>
+        <material name="body_blue"/>
+      </visual>
+    </link>
+    <joint name="${side}_outer_lower_visual_joint" type="fixed">
+      <parent link="${side}_outer_link"/>
+      <child link="${side}_outer_lower_visual"/>
+      <origin xyz="0 0 -0.08" rpy="0 ${-0.35 * dir} 0"/>
+    </joint>
+
+    <link name="${side}_wheel_link">
+      <visual>
+        <origin rpy="1.5707963267948966 0 0"/>
+        <geometry><cylinder radius="0.0742" length="0.025"/></geometry>
+        <material name="wheel_dark"/>
+      </visual>
+    </link>
+    <joint name="${side}_wheel" type="continuous">
+      <parent link="base_link"/>
+      <child link="${side}_wheel_link"/>
+      <origin xyz="0 ${y} -0.235"/>
+      <axis xyz="0 1 0"/>
+      <limit effort="10.0" velocity="60.0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:five_bar_visual side="right" y="-0.152" dir="1"/>
+  <xacro:five_bar_visual side="left" y="0.152" dir="-1"/>
+
+  <xacro:include filename="$(find sandro_description)/urdf/sandro.ros2_control.xacro"/>
+  <xacro:if value="${control_backend != 'none'}">
+    <xacro:sandro_ros2_control backend="${control_backend}"
+      can_interface="$(arg can_interface)" imu_port="$(arg imu_port)"
+      state_source="$(arg state_source)" encoder_period_ms="$(arg encoder_period_ms)"
+      simulation_headless="$(arg simulation_headless)"
+      simulation_latency="$(arg simulation_latency)"
+      sim_imu_delay_s="$(arg sim_imu_delay_s)" sim_imu_rate_hz="$(arg sim_imu_rate_hz)"
+      sim_joint_delay_s="$(arg sim_joint_delay_s)" sim_joint_rate_hz="$(arg sim_joint_rate_hz)"
+      sim_command_delay_s="$(arg sim_command_delay_s)"/>
+  </xacro:if>
+</robot>

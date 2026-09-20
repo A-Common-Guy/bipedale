@@ -1,0 +1,13 @@
+{
+    // Onshape URL of the assembly (Leg_left)
+    "url": "https://cad.onshape.com/documents/e5cda129f952f5ca0f29e636/w/e86f9480bd60bb90c537e907/e/d2004260c52fc592d7b53ca3",
+    // Output format
+    "output_format": "mujoco",
+    // Generated output name
+    "assembly_name": "robot",
+
+    "joint_properties": {
+        "passive_biella_inner_l": {"actuated": false},
+        "passive_biella_outer_l": {"actuated": false}
+    }
+}

@@ -1,0 +1,39 @@
+joy_node:
+  ros__parameters:
+    device_id: 0
+    deadzone: 0.08
+    autorepeat_rate: 20.0  # Hz; faster than the 0.3 s command timeout
+
+teleop_twist_joy_node:
+  ros__parameters:
+    require_enable_button: true
+    enable_button: 4             # PS5 L1 deadman (verify with `ros2 topic echo /joy`)
+    enable_turbo_button: -1
+    axis_linear:
+      x: 1                      # PS5 left stick vertical
+      z: 4                      # PS5 right stick vertical: body height rate
+    scale_linear:
+      x: 0.5                    # m/s, SandroControl drive limit
+      # m/s of leg height per full deflection, up = stand taller. Read by
+      # whole_body_controller (drive.max_height_rate_m_s); ignored by the
+      # wheel-only balancers.
+      z: 0.05
+    axis_angular:
+      yaw: 3                    # PS5 right stick horizontal
+    scale_angular:
+      yaw: 1.5                  # rad/s, SandroControl drive limit
+    publish_stamped_twist: true # geometry_msgs/msg/TwistStamped on /cmd_vel
+    frame: base_link
+
+# Gamepad E-stop: press both buttons together. PS5 L2 and R2 are joystick
+# buttons 6 and 7 (verify with `ros2 topic echo /joy`). It deactivates every
+# active controller that owns command interfaces (all efforts to zero, in
+# simulation and on hardware) and triggers /gim6010_estop/trigger when that
+# service exists. Nothing on the gamepad re-arms the robot.
+joy_estop:
+  ros__parameters:
+    buttons: [6, 7]
+    joy_topic: /joy
+    controller_manager: /controller_manager
+    hardware_estop_service: /gim6010_estop/trigger
+    service_timeout_s: 2.0

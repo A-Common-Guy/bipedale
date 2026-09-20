@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="sandro">
+  <xacro:include filename="$(find sandro_description)/urdf/sandro.urdf.xacro"/>
+  <xacro:sandro_ros2_control backend="mujoco"/>
+</robot>

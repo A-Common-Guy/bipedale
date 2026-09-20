@@ -1,0 +1,79 @@
+# Identified physical parameters folded into the generated ROS MuJoCo model
+# (mjcf/robot_ros2.xml) by tools/sync_model.py. The CAD export supplies
+# geometry, masses and loop closure; everything here is what the CAD cannot
+# know and what the measured robot showed. Regenerate after every change:
+#
+#     ros2_ws/src/sandro_description/tools/sync_model.py sync
+#
+# Values marked "CAD" or "default" have not been identified yet; the
+# procedure to measure each one is in sandro_bringup/docs/SIM_TO_REAL.md.
+
+# Tyre contact. The export's tyre cylinders used MuJoCo defaults: condim 3
+# (no torsional friction), sliding friction 1.0, contact time constant 20 ms.
+# A rubber tyre on a hard floor resists twisting about the contact normal, and
+# that scrub is what makes real turning slower than the frictionless-yaw
+# simulation. condim 4 adds torsional friction (unit: metres, roughly the
+# contact patch radius times the friction coefficient).
+tyre:
+  condim: 4
+  # Torsional friction from the turning comparison (recordings/*2026-09-20):
+  # the robot needed 0.37 Nm of differential torque for 0.22 rad/s of yaw;
+  # 0.004 gave 0.55 rad/s for 0.16 Nm in simulation and 0.02 still 0.55 rad/s
+  # for 0.28 Nm. Refine with the next turning comparison.
+  # Sliding 0.8: in the recorded turn the wheel-differential yaw (0.225 rad/s)
+  # matched the gyro (0.215), so the real tyres do not skid on that floor; a
+  # trial at 0.35 made the simulated wheels spin seven times faster than the
+  # body yawed. Torsional 0.07: the robot needed 0.37 Nm of differential
+  # torque per 0.22 rad/s of yaw (about 1.7 Nm per rad/s of scrub), 0.05 gave
+  # about 1.3 in simulation. Refine with the next turning comparison.
+  friction: [0.8, 0.07, 0.0001]    # sliding, torsional, rolling (rolling unused at condim 4)
+  solref: [0.01, 1.0]              # 10 ms contact time constant: stiffer than default
+
+# Drive dynamics per group, as seen at the joint (output side). The CAD export
+# carries armature 0.000168 (reflected rotor inertia from the legacy fit),
+# damping 0.01 and Coulomb frictionloss 0.1 Nm. Identify with the lifted-robot
+# excitation (SandroControl/fit_sysid.py) and copy the accepted fit here.
+joints:
+  legs:   {damping: 0.01, frictionloss: 0.1, armature: 0.000168}   # CAD / legacy fit
+  # Wheels 0.2 Nm: real2_2026-09-20 needed 0.43 Nm of average torque for
+  # almost no acceleration, i.e. about 0.4 Nm of friction across both drive
+  # trains and tyres. Refine with a coast-down or the lifted-robot fit.
+  wheels: {damping: 0.01, frictionloss: 0.2, armature: 0.000168}
+
+# Ratio of delivered joint torque to the torque the drive reports. 1.0 until
+# measured (a load cell on a lever, or the fit above).
+actuators:
+  legs:   {torque_scale: 1.0}
+  wheels: {torque_scale: 1.0}
+
+# Mass the CAD does not carry, in the IMU frame (x forward, y left, z up).
+# Set mass_kg to the weighed total minus the CAD's 3.40 kg, and position_m to
+# where the trim readout of the whole-body controller says the centre of mass
+# really is (see SIM_TO_REAL.md). Zero disables it.
+# Inferred from the 2026-09-20 recording, not yet weighed: the legs carry
+# about 1.2 kg more than CAD and the centre of mass sits about 28 mm behind
+# the CAD one, i.e. roughly 1.2 kg some 11 cm behind the CoM (battery and
+# electronics at the rear). Replace mass_kg with the weighed total minus 3.40
+# and re-place it once trim_m on the real robot reads about zero with the
+# controller's neutral_offset_m.
+payload:
+  mass_kg: 1.2
+  position_m: [-0.031, 0.035, -0.15]
+  half_size_m: [0.04, 0.06, 0.03]
+
+# IMU mounting. Both hardware recordings show the leg kinematics 14 mm
+# asymmetric while the IMU reads the body level, i.e. the IMU roll is biased
+# by about -0.049 rad (right-side-down positive). The simulated IMU is
+# rotated by the same amount so tasks.roll.imu_offset_rad in the per-robot
+# overrides means the same thing on both backends.
+imu_mount:
+  roll_offset_rad: -0.049
+
+# Sensor noise standard deviations for the simulated IMU (quaternion
+# components, rad/s, m/s^2). The export's 0.017 on the quaternion is about a
+# degree of attitude noise, pessimistic for a BNO085 game rotation vector;
+# measure it from a standing recording (compare_runs.py, phase with v=0).
+imu_noise:
+  orientation: 0.005
+  gyro: 0.002
+  accelerometer: 0.02

@@ -1,0 +1,140 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="controlled_joint" params="name node sign offset_rev backend">
+    <joint name="${name}">
+      <command_interface name="effort">
+        <!-- Absolute transport boundary; policy limits are 3 Nm legs / 6 Nm wheels. -->
+        <param name="min">-10.0</param>
+        <param name="max">10.0</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+      <xacro:if value="${backend == 'real'}">
+        <param name="node_id">${node}</param>
+        <param name="sign">${sign}</param>
+        <param name="ratio">8.0</param>
+        <param name="offset_rev">${offset_rev}</param>
+      </xacro:if>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="imu_interfaces" params="mujoco:=false">
+    <sensor name="imu">
+      <xacro:if value="${mujoco}">
+        <param name="mujoco_type">imu</param>
+        <param name="mujoco_sensor_name">imu</param>
+        <param name="orientation_mjcf_suffix">_quat</param>
+        <param name="angular_velocity_mjcf_suffix">_gyro</param>
+        <param name="linear_acceleration_mjcf_suffix">_accel</param>
+      </xacro:if>
+      <state_interface name="orientation.x"/>
+      <state_interface name="orientation.y"/>
+      <state_interface name="orientation.z"/>
+      <state_interface name="orientation.w"/>
+      <state_interface name="angular_velocity.x"/>
+      <state_interface name="angular_velocity.y"/>
+      <state_interface name="angular_velocity.z"/>
+      <state_interface name="linear_acceleration.x"/>
+      <state_interface name="linear_acceleration.y"/>
+      <state_interface name="linear_acceleration.z"/>
+    </sensor>
+  </xacro:macro>
+
+  <xacro:macro name="sandro_ros2_control"
+      params="backend can_interface:='can0' imu_port:='/dev/ttyUSB0'
+              state_source:='encoder' encoder_period_ms:='5'
+              simulation_headless:='false' simulation_latency:='true'
+              sim_imu_delay_s:='0.010' sim_imu_rate_hz:='200'
+              sim_joint_delay_s:='0.005' sim_joint_rate_hz:='200'
+              sim_command_delay_s:='0.0033'">
+    <ros2_control name="SandroSystem" type="system">
+      <hardware>
+        <xacro:if value="${backend == 'mujoco'}">
+          <!-- sandro_sim/LatencySystem wraps the MuJoCo backend and inserts
+               the sensor and command latency of the physical robot: BNO085
+               reports at 200 Hz with fusion lag, the drives broadcast encoder
+               estimates every 5 ms, and a command reaches the drive one cycle
+               after it is computed. simulation_latency:=false bypasses it. -->
+          <xacro:if value="${simulation_latency}">
+            <plugin>sandro_sim/LatencySystem</plugin>
+            <param name="inner_plugin">mujoco_ros2_control/MujocoSystemInterface</param>
+            <param name="imu_delay_s">${sim_imu_delay_s}</param>
+            <param name="imu_rate_hz">${sim_imu_rate_hz}</param>
+            <param name="joint_delay_s">${sim_joint_delay_s}</param>
+            <param name="joint_rate_hz">${sim_joint_rate_hz}</param>
+            <param name="command_delay_s">${sim_command_delay_s}</param>
+          </xacro:if>
+          <xacro:unless value="${simulation_latency}">
+            <plugin>mujoco_ros2_control/MujocoSystemInterface</plugin>
+          </xacro:unless>
+          <param name="mujoco_model">$(find sandro_description)/mjcf/scene_ros2.xml</param>
+          <param name="headless">${'true' if simulation_headless else 'false'}</param>
+          <!-- Without this the model starts at qpos0, which is the CAD pose:
+               torso frame at the origin with z along the wheel axle, so the
+               robot spawns 0.47 m inside the floor and is ejected on contact. -->
+          <param name="initial_keyframe">stand</param>
+        </xacro:if>
+        <xacro:if value="${backend == 'real'}">
+          <plugin>sandro_hardware/GIM6010System</plugin>
+          <param name="can_interface">${can_interface}</param>
+          <!-- state_source mit: joint velocity and leg position from the
+               synchronous MIT reply (one cycle old at most); the 0x09
+               broadcast then only carries the wheels' multi-turn position
+               and can run slower to free the bus. -->
+          <param name="state_source">${state_source}</param>
+          <param name="encoder_period_ms">${encoder_period_ms}</param>
+          <param name="iq_period_ms">5</param>
+          <param name="heartbeat_period_ms">100</param>
+          <param name="deadman_ms">300</param>
+          <param name="stale_state_s">0.1</param>
+          <param name="heartbeat_stale_s">1.0</param>
+          <param name="activation_timeout_s">1.5</param>
+          <param name="hard_effort_limit_nm">10.0</param>
+          <!-- Firmware endpoint IDs from endpoints_v3.json. -->
+          <param name="deadman_endpoint">73</param>
+          <param name="heartbeat_rate_endpoint">182</param>
+          <param name="encoder_rate_endpoint">183</param>
+          <param name="iq_rate_endpoint">189</param>
+          <param name="mit_max_position_endpoint">335</param>
+          <param name="mit_max_velocity_endpoint">336</param>
+          <param name="mit_max_torque_endpoint">337</param>
+          <param name="mit_max_kp_endpoint">338</param>
+          <param name="mit_max_kd_endpoint">339</param>
+        </xacro:if>
+      </hardware>
+
+      <xacro:controlled_joint name="right_motor_inner" node="1" sign="1.0"
+        offset_rev="0.0" backend="${backend}"/>
+      <xacro:controlled_joint name="right_motor_outer" node="2" sign="-1.0"
+        offset_rev="0.0" backend="${backend}"/>
+      <xacro:controlled_joint name="right_wheel" node="3" sign="1.0"
+        offset_rev="0.0" backend="${backend}"/>
+      <xacro:controlled_joint name="left_motor_inner" node="5" sign="1.0"
+        offset_rev="0.0" backend="${backend}"/>
+      <xacro:controlled_joint name="left_motor_outer" node="4" sign="-1.0"
+        offset_rev="0.0" backend="${backend}"/>
+      <xacro:controlled_joint name="left_wheel" node="6" sign="-1.0"
+        offset_rev="0.0" backend="${backend}"/>
+      <xacro:if value="${backend == 'mujoco'}">
+        <xacro:imu_interfaces mujoco="true"/>
+      </xacro:if>
+    </ros2_control>
+
+    <xacro:if value="${backend == 'real'}">
+      <ros2_control name="SandroImu" type="sensor">
+        <hardware>
+          <plugin>sandro_hardware/BNO085Sensor</plugin>
+          <param name="port">${imu_port}</param>
+          <param name="baudrate">3000000</param>
+          <param name="read_timeout_ms">5</param>
+          <param name="report_interval_us">5000</param>
+          <param name="online_timeout_s">0.15</param>
+          <param name="tx_byte_gap_us">1000</param>
+          <param name="max_backlog_bytes">8192</param>
+        </hardware>
+        <xacro:imu_interfaces/>
+      </ros2_control>
+    </xacro:if>
+  </xacro:macro>
+</robot>

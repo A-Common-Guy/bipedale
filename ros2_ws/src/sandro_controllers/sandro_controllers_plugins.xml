@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<library path="sandro_controllers">
+  <class
+    name="sandro_controllers/DrivingBalancerController"
+    type="sandro_controllers::DrivingBalancerController"
+    base_class_type="controller_interface::ControllerInterface">
+    <description>Five-bar leg impedance and two-wheel driving balance controller.</description>
+  </class>
+  <class
+    name="sandro_controllers/LqrBalancerController"
+    type="sandro_controllers::LqrBalancerController"
+    base_class_type="controller_interface::ControllerInterface">
+    <description>Full-state-feedback two-wheel balancer, an alternative to the cascade in DrivingBalancerController.</description>
+  </class>
+  <class
+    name="sandro_controllers/TimedEffortController"
+    type="sandro_controllers::TimedEffortController"
+    base_class_type="controller_interface::ControllerInterface">
+    <description>Watchdog-protected direct effort controller for commissioning.</description>
+  </class>
+  <class
+    name="sandro_controllers/WholeBodyController"
+    type="sandro_controllers::WholeBodyController"
+    base_class_type="controller_interface::ControllerInterface">
+    <description>Whole-body controller: height-scheduled LQR over wheels and fore-aft leg placement, Cartesian leg impedance with gravity support, lean-into-turn roll and yaw tasks.</description>
+  </class>
+</library>
