@@ -319,8 +319,28 @@ within 10 % in the turn, speed reaching 0.2 m/s in phase 1, the leg offset
 command off its limits, and both legs' fore-aft positions moving together
 (`right_leg_x_m` and `left_leg_x_m` standard deviations within a factor of
 1.5). Then raise the leg stiffness in steps as described in
-`WHOLE_BODY_CONTROLLER.md`, and if any 2 Hz hunting remains, set
-`balance.measured_offset_blend` to 0.5.
+`WHOLE_BODY_CONTROLLER.md`.
+
+### Sixth comparison (2026-09-20, fourth hardware run: the leg lag)
+
+`recordings/real4_2026-09-20.csv`, this build with the override, robot on a
+short tether. It balanced, drove and turned (0.55 of 0.6 rad/s with a
+0.13 s rise, yaw torque within ±0.05 Nm while standing: the yaw ringing is
+gone), but standing still both legs swung fore-aft in phase at 1.9 Hz with
+the leg offset command between its ±25 mm limits, ±1.5 Nm of wheel torque
+and ±0.06 rad of pitch. The data isolates the loop: the measured axle
+follows the leg offset command with 70 ms of lag in every phase
+(cross-correlation 0.97–0.99), and the LQR's leg-offset mode has a 72 ms
+time constant designed for an instantaneous leg. The 400/20 impedance on the
+light unloaded wheel is overdamped, so its response time is `kd / kp` =
+50 ms, plus stiction. The calm standing of the third run was the same
+channel pinned at its −25 mm limit by the wrong neutral, i.e. switched off.
+
+Setting `balance.measured_offset_blend` to 0 live stopped the oscillation
+outright, so it is now the shipped default. It removes the lagging
+measurement from the loop; the durable form is a leg-lag state in the LQR
+model (`model.leg_lag_s`), which lets the design account for what the legs
+can deliver.
 
 ## 3. Identify, in this order
 

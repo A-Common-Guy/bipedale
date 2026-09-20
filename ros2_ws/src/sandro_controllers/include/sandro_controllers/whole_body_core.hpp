@@ -74,17 +74,17 @@ struct WholeBodyParameters {
   // table height (computed by augmenting the plant with delayed inputs).
   // The physical sensor-plus-command path is 10-15 ms.
   double required_delay_margin_s{0.012};
-  // Which leg offset the LQR sees: 1 is the measured axle position (the
-  // physical gravity lever; in the latency-emulating simulation it gives
-  // the calmest stance, pitch RMS 0.014 to 0.023 rad, because the legs'
-  // deflection under wheel torque is damping information), 0 is the offset
-  // it commanded (the legs treated as a fast inner loop, so deflections under
-  // wheel torque or stiction never become balance action; pitch RMS 0.036
-  // in the same simulation). Values between blend the two. The robot's 2 Hz
-  // hunting ran through the measured path, driven by the over-hot yaw loop
-  // and legs pinned near their singularity; if it persists with those fixed,
-  // lower this toward 0.5.
-  double measured_offset_blend{1.0};
+  // Which leg offset the LQR sees: 0 is the offset it commanded (the legs
+  // treated as an inner loop, so deflections under wheel torque or stiction
+  // never become balance action), 1 is the measured axle position, values
+  // between blend the two. On the robot the measured axle follows its
+  // command with about 70 ms of lag (overdamped impedance on the light
+  // wheel plus stiction), the same time constant as the LQR's leg-offset
+  // mode, and with 1 the legs hunted in phase at 1.9 Hz with +-25 mm and
+  // +-1.5 Nm of wheel torque; 0 stopped it outright (fourth hardware run).
+  // In the latency-emulating simulation, whose legs lag only 30 ms, 1 is
+  // calmer (pitch RMS 0.015 against 0.036), but the robot decides.
+  double measured_offset_blend{0.0};
   // Fore-aft wheel placement the legs may use for balance, about neutral.
   double leg_offset_limit_m{0.025};
   double leg_offset_rate_limit_m_s{0.25};

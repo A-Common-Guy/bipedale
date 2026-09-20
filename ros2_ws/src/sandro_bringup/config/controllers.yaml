@@ -229,14 +229,15 @@ whole_body_controller:
       effort_weights: {wheel_torque: 2.0, leg_offset_rate: 20.0}
       gain_table: {min_height_m: 0.14, max_height_m: 0.19, points: 7}
       required_delay_margin_s: 0.012
-      # The leg offset the LQR feeds back: 1 = the measured axle position
-      # (the physical lever; calmest stance in the latency simulation, pitch
-      # RMS 0.014 to 0.023 rad), 0 = the one it commanded (leg deflections
-      # under wheel torque never become balance action, but their sway goes
-      # undamped: 0.036 rad). The robot's 2 Hz hunting ran through the
-      # measured path, driven by the hot yaw loop and legs pinned near their
-      # singularity; if it persists with those fixed, try 0.5 then 0.
-      measured_offset_blend: 1.0
+      # The leg offset the LQR feeds back: 0 = the one it commanded, 1 = the
+      # measured axle position. On the robot the axle follows its command
+      # with about 70 ms of lag (overdamped impedance on the light wheel plus
+      # stiction), as slow as the LQR's leg-offset mode, and with 1 both legs
+      # hunted in phase at 1.9 Hz (+-25 mm, +-1.5 Nm); 0 stopped it outright
+      # (fourth hardware run, docs/SIM_TO_REAL.md). The latency simulation,
+      # whose legs lag only 30 ms, is calmer with 1 (pitch RMS 0.015 against
+      # 0.036), but the robot decides.
+      measured_offset_blend: 0.0
       leg_offset_limit_m: 0.025
       leg_offset_rate_limit_m_s: 0.25
       # While driving this is the integral action of the speed loop: the
