@@ -79,10 +79,13 @@ b x_dd + c pitch_dd = M g (L pitch + d) - tau  b = M L,  c = I + M L^2
 ```
 
 `d` enters exactly like `pitch` scaled by `1/L`; that identity is the whole
-reason wheel placement works as a balance actuator. State is
-`[x, x_dot, pitch, pitch_rate, d]`, inputs are `[tau, d_dot]`, and the Riccati
-equation is solved at several leg heights (`balance.gain_table`) because `L`
-and the pendulum's unstable pole (about 12 rad/s here) change with height. The
+reason wheel placement works as a balance actuator. The legs are not
+instantaneous: the achieved `d` follows the commanded `d_c` with the lag
+`model.leg_lag_s` (70 ms on the robot). State is
+`[x, x_dot, pitch, pitch_rate, d_c, d]`, inputs are `[tau, d_c_dot]`, and the
+Riccati equation is solved at several leg heights (`balance.gain_table`)
+because `L` and the pendulum's unstable pole (about 12 rad/s here) change with
+height. The
 gains are interpolated on the measured leg height at run time and re-solved in
 the parameter callback whenever a model or weight changes, never in the
 realtime loop.
@@ -203,14 +206,20 @@ reports why. In order:
    drive friction without overshoot; 10 / 1 (the first set) is calmer at the
    wheels if the robot's stick-slip at standstill is a nuisance, 60 / 8 hunted
    against Coulomb friction in simulation.
-3. `balance.measured_offset_blend`: 1 (shipped) feeds the LQR the measured
-   axle position, the physical gravity lever; in simulation this is the
-   calmest stance (pitch RMS 0.015 against 0.036 with 0) because the legs'
-   deflection under wheel torque is damping information. 0 feeds it the
-   commanded offset, so no leg deflection can become balance action. The
-   robot's 2 Hz hunting ran through the measured path, driven by an over-hot
-   yaw loop and legs pinned near their singularity (`SIM_TO_REAL.md`, fifth
-   comparison); if it persists with those fixed, try 0.5, then 0.
+3. `model.leg_lag_s`: the time constant with which the measured axle follows
+   its command. Read it from a recording as the lag at which
+   `leg_offset_command_m` and `leg_offset_m` correlate best (70 ms on the
+   robot, run 4); re-identify after changing the leg impedance, since the
+   overdamped leg responds in about `kd / kp`. With it in the model the LQR
+   knows what the legs can deliver.
+   `balance.measured_offset_blend`: 0 (shipped) feeds the LQR the lag
+   model's prediction of the achieved offset, 1 the measured axle position.
+   On the robot the measured path, through the lag-blind design, made both
+   legs hunt in phase at 1.9 Hz and 0 stopped it outright (`SIM_TO_REAL.md`,
+   sixth comparison). With the lag model the gain on the measurement is a
+   third of before and in simulation 1 stands calmer (pitch RMS 0.025
+   against 0.030); try 1 on the robot once standing is clean with 0, and go
+   back if the legs start swinging in phase.
 4. `tasks.height.kp_n_m` / `kd_n_s_m` and `tasks.fore_aft.*`: the legs are the
    balance loop's inner actuator and should be as stiff as the loop delay
    allows. At the shipped 400 N/m one newton-metre of wheel torque still moves

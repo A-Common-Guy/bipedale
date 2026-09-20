@@ -2,6 +2,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <vector>
 
 #include "gtest/gtest.h"
 
@@ -43,7 +44,7 @@ struct PlanarPlant {
   double pitch_rate{};
   double leg_offset{};
   double leg_height{0.17};
-  double leg_lag_s{0.03};
+  double leg_lag_s{0.07};  // the robot's, from the fourth hardware run
   double rolling_resistance_nm{}; // Coulomb drag at the contact, as wheel torque
   // Axle deflection per newton-metre of total wheel torque, the way soft
   // legs let the ground force and the stator reaction move the wheels
@@ -165,10 +166,15 @@ TEST(Lqr, DiscretisationReducesToEulerForSmallSteps) {
   const LinearModel model = linearize(WholeBodyModel{}, 0.17);
   const double dt = 1e-4;
   const auto discrete = lqr::discretize(model.A, model.B, dt);
-  const lqr::StateMatrix euler_a = lqr::StateMatrix::Identity() + model.A * dt;
-  const lqr::InputMatrix euler_b = model.B * dt;
-  EXPECT_LT((discrete.A - euler_a).cwiseAbs().maxCoeff(), 1e-5);
-  EXPECT_LT((discrete.B - euler_b).cwiseAbs().maxCoeff(), 1e-5);
+  // Second-order Taylor: the leg-lag state makes A stiff enough (1 / 70 ms
+  // against 1500 for the gravity coupling) that the first-order term alone
+  // is off by 1e-4 at this step.
+  const lqr::StateMatrix taylor_a = lqr::StateMatrix::Identity() +
+                                    model.A * dt +
+                                    0.5 * model.A * model.A * dt * dt;
+  const lqr::InputMatrix taylor_b = model.B * dt + 0.5 * model.A * model.B * dt * dt;
+  EXPECT_LT((discrete.A - taylor_a).cwiseAbs().maxCoeff(), 1e-6);
+  EXPECT_LT((discrete.B - taylor_b).cwiseAbs().maxCoeff(), 1e-6);
 }
 
 TEST(Lqr, RiccatiSolutionIsStabilisingAndSelfConsistent) {
@@ -177,7 +183,7 @@ TEST(Lqr, RiccatiSolutionIsStabilisingAndSelfConsistent) {
   const auto discrete = lqr::discretize(model.A, model.B, kPeriod);
   lqr::StateMatrix Q = lqr::StateMatrix::Zero();
   lqr::InputWeight R = lqr::InputWeight::Zero();
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < kWholeBodyStates; ++i) {
     Q(i, i) = p.state_weights[static_cast<std::size_t>(i)];
   }
   for (int i = 0; i < 2; ++i) {
@@ -210,7 +216,14 @@ TEST(WholeBodyModel, LinearisationMatchesInvertedPendulumIntuition) {
   // Gravity destabilises pitch and a leg offset acts like pitch scaled by the
   // centre-of-mass height.
   EXPECT_GT(lin.A(3, 2), 100.0);
-  EXPECT_NEAR(lin.A(3, 4) * com_height(m, 0.1855), lin.A(3, 2), 1e-9);
+  EXPECT_NEAR(lin.A(3, 5) * com_height(m, 0.1855), lin.A(3, 2), 1e-9);
+  // The achieved offset follows the command through the leg lag; the
+  // command itself is a pure integrator of the second input.
+  EXPECT_NEAR(lin.A(5, 4), 1.0 / m.leg_lag_s, 1e-9);
+  EXPECT_NEAR(lin.A(5, 5), -1.0 / m.leg_lag_s, 1e-9);
+  EXPECT_DOUBLE_EQ(lin.B(4, 1), 1.0);
+  EXPECT_DOUBLE_EQ(lin.B(5, 1), 0.0);
+  EXPECT_DOUBLE_EQ(lin.A(3, 4), 0.0);
   // Forward torque accelerates the wheels forward and pitches the body back.
   EXPECT_GT(lin.B(1, 0), 0.0);
   EXPECT_LT(lin.B(3, 0), 0.0);
@@ -335,7 +348,9 @@ TEST(WholeBodyCore, ReleasingTheStickHoldsHereInsteadOfCatchingUp) {
   EXPECT_NEAR(plant.v, 0.0, 0.05);
   EXPECT_LT(std::abs(plant.x - x_at_release), 0.2);
   EXPECT_EQ(hold.status & WBC_POSITION_ERROR_LIMIT, 0U);
-  EXPECT_NEAR(hold.position_m - hold.position_reference_m, 0.0, 0.05);
+  // Within the friction dead band of the position gain (0.4 Nm / 1.3 Nm/m
+  // at most; the legs take the rest through gravity once they may move).
+  EXPECT_NEAR(hold.position_m - hold.position_reference_m, 0.0, 0.08);
 }
 
 TEST(WholeBodyCore, LegRangeRestoresSpeedTrackingAgainstRollingResistance) {
@@ -783,7 +798,8 @@ TEST(WholeBodyCore, LqrFeedsBackTheCommandedLegOffsetNotTheDeflectedOne) {
   core.reset(plant.observe(p, kPeriod), commanded);
   const auto settled = run(plant, core, commanded, 2.0, still);
   ASSERT_TRUE(settled.engaged);
-  EXPECT_DOUBLE_EQ(settled.leg_offset_state_m, settled.leg_offset_command_m);
+  EXPECT_DOUBLE_EQ(settled.leg_offset_state_m, settled.leg_offset_model_m);
+  EXPECT_NEAR(settled.leg_offset_model_m, settled.leg_offset_command_m, 2e-3);
   // The axle is pushed 10 mm forward under the body (wheels ahead of where
   // the legs placed them) while nothing else changes.
   plant.leg_offset = settled.leg_offset_command_m - 0.01;
@@ -797,15 +813,16 @@ TEST(WholeBodyCore, LqrFeedsBackTheCommandedLegOffsetNotTheDeflectedOne) {
     out_command = with_command.update(deflected, still(0.0), commanded, kPeriod);
     out_measured = with_measurement.update(deflected, still(0.0), measured, kPeriod);
   }
-  // The state is the command at the start of the cycle, the report the
-  // command after this cycle's integration.
-  EXPECT_NEAR(out_command.leg_offset_state_m, out_command.leg_offset_command_m,
+  // The state is the model's prediction as it stood at the start of the
+  // cycle; the report carries this cycle's update of it.
+  EXPECT_NEAR(out_command.leg_offset_state_m, out_command.leg_offset_model_m,
               p.leg_offset_rate_limit_m_s * kPeriod);
   EXPECT_NEAR(out_measured.leg_offset_state_m, out_measured.leg_offset_m, 1e-9);
   EXPECT_NEAR(out_measured.leg_offset_m, settled.leg_offset_command_m - 0.01, 1e-6);
   // Fed the measurement, the LQR fights the deflection with wheel torque
-  // (about 22 Nm/m of offset gain); fed the command it does not.
-  EXPECT_GT(std::abs(out_measured.balance_torque_nm), 0.15);
+  // (about 21 Nm/m of gain on the achieved offset, partly cancelled by the
+  // leg channel moving the command); fed the model it does not.
+  EXPECT_GT(std::abs(out_measured.balance_torque_nm), 0.1);
   EXPECT_LT(std::abs(out_command.balance_torque_nm), 0.03);
   // Soft legs modelled as compliance do not destabilise the commanded-state
   // loop either.
@@ -817,6 +834,42 @@ TEST(WholeBodyCore, LqrFeedsBackTheCommandedLegOffsetNotTheDeflectedOne) {
   const auto recovered = run(soft, soft_core, commanded, 3.0, still);
   EXPECT_FALSE(recovered.fallen);
   EXPECT_NEAR(soft.pitch, 0.0, 0.02);
+}
+
+TEST(WholeBodyCore, LegLagModelKeepsTheDesignPatientWithSlowLegs) {
+  // The robot's legs follow their command with 70 ms of lag; the fourth
+  // hardware run hunted at 1.9 Hz when the LQR, designed for instantaneous
+  // legs, fed back the measured offset with 13.8 (m/s)/m. With the lag in
+  // the model the regulator leans on the command it knows and puts far less
+  // gain on the measurement. (The linear test plant does not reproduce the
+  // hunting itself: on the robot stiction and sensor delay added the phase.)
+  WholeBodyParameters p = test_parameters();
+  p.model.leg_lag_s = 0.07;
+  const WholeBodySettings aware = test_settings(p);
+  p.model.leg_lag_s = 0.005;  // effectively the old instantaneous-leg model
+  const WholeBodySettings blind = test_settings(p);
+  const auto aware_gains = aware.gains.at(0.17);
+  const auto blind_gains = blind.gains.at(0.17);
+  const double aware_measured = aware_gains[1][5];
+  const double blind_measured = blind_gains[1][4] + blind_gains[1][5];
+  EXPECT_LT(aware_measured, 0.5 * blind_measured);
+  EXPECT_GT(aware_gains[1][4], 2.0 * aware_measured);
+  EXPECT_GE(aware.delay_margin_s, blind.delay_margin_s - 1e-9);
+  // Closed loop on a plant with the robot's lag and compliance, measured
+  // offset fed back: stable and quiet.
+  p.model.leg_lag_s = 0.07;
+  p.measured_offset_blend = 1.0;
+  const WholeBodySettings settings = test_settings(p);
+  PlanarPlant plant;
+  plant.leg_lag_s = 0.07;
+  plant.leg_compliance_m_per_nm = 0.015;
+  plant.pitch = 0.08;
+  WholeBodyCore core;
+  core.reset(plant.observe(p, kPeriod), settings);
+  const auto out = run(plant, core, settings, 4.0, still);
+  EXPECT_FALSE(out.fallen);
+  EXPECT_NEAR(plant.pitch, 0.0, 0.01);
+  EXPECT_LT(std::abs(out.leg_offset_command_m - out.leg_offset_m), 0.005);
 }
 
 TEST(WholeBodyCore, YawDampsOnTheWheelsAndIntegratesOnTheImu) {

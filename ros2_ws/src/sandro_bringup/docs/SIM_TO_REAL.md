@@ -338,9 +338,34 @@ channel pinned at its −25 mm limit by the wrong neutral, i.e. switched off.
 
 Setting `balance.measured_offset_blend` to 0 live stopped the oscillation
 outright, so it is now the shipped default. It removes the lagging
-measurement from the loop; the durable form is a leg-lag state in the LQR
-model (`model.leg_lag_s`), which lets the design account for what the legs
-can deliver.
+measurement from the loop.
+
+The durable form is the leg lag in the LQR model: the state gained the
+commanded offset, the achieved offset follows it with `model.leg_lag_s`
+(70 ms), and the regulator now takes 11.3 (m/s)/m from the command it knows
+and 4.7 from the achieved offset, against 13.8 from a single measured offset
+before (`MODELLING_AND_CONTROL.md` 3.2). In the identified latency simulation
+(`recordings/sim_wbc3_leglag_2026-09-20.csv`, blend 0 as shipped, against
+`sim_wbc2_latency` with blend 0 and no lag model):
+
+| Phase | Metric | no lag model | lag model |
+| --- | --- | --- | --- |
+| standing (0, 2) | pitch RMS, rad | 0.036 / 0.037 | 0.033 / 0.030 |
+| driving 0.2 m/s (1) | pitch RMS, rad | 0.028 | 0.012 |
+| driving 0.2 m/s (1) | speed reached, m/s | 0.170 | 0.191 |
+| turn 0.6 rad/s (3) | pitch RMS, rad | 0.013 | 0.015 |
+| standing (0, 2) | leg offset command std, mm | 12.4 / 11.5 | 11.1 / 9.5 |
+
+With the measured offset fed back (`sim_wbc3_leglag_measured`, blend 1) the
+same design stands at 0.025 rad and drives at 0.012, so on the robot blend 1
+is worth one more try once standing is clean with 0.
+
+Next robot recording: the same command as above with this build. Expect
+standing pitch within about ±0.03 rad without the 1.9 Hz leg swing, the leg
+offset command moving by a few millimetres rather than between its limits,
+and the diagnostics' `leg_offset_model_m` tracking `leg_offset_m` within a
+few millimetres (if it does not, the identified lag is off: re-read it from
+the recording).
 
 ## 3. Identify, in this order
 

@@ -393,6 +393,7 @@ void WholeBodyCore::reset(const WholeBodyState &state,
       count ? std::clamp(offset_sum / count, -p.leg_offset_limit_m,
                          p.leg_offset_limit_m)
             : 0.0;
+  leg_offset_model_m_ = leg_offset_command_m_;
 }
 
 WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
@@ -602,6 +603,7 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
                          highest_offset_bound(p));
           leg_offset_command_m_ = std::clamp(leg_offset, -p.leg_offset_limit_m,
                                              p.leg_offset_limit_m);
+          leg_offset_model_m_ = leg_offset_command_m_;
         }
       }
     } else {
@@ -671,14 +673,16 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
 
   // ---- balance: LQR over wheels and leg placement ------------------------
   double leg_offset_rate = 0.0;
-  // The offset state the regulator sees: what it commanded the legs to do,
-  // blended with the measured axle position if asked. The legs are a stiff
-  // inner loop; their residual error (stiction, torque reaction) then acts
-  // on the pendulum like any small centre-of-mass error, which the pitch
-  // loop and the trim absorb, instead of being re-injected as balance action.
+  // The achieved-offset state the regulator sees: the leg-lag model's
+  // prediction of where the legs are, blended with the measured axle
+  // position if asked. With the prediction, the legs' residual error
+  // (stiction, torque reaction) acts on the pendulum like any small
+  // centre-of-mass error, which the pitch loop and the trim absorb, instead
+  // of being re-injected as balance action through a lagging measurement.
   const double leg_offset_state =
       p.measured_offset_blend * leg_offset +
-      (1.0 - p.measured_offset_blend) * leg_offset_command_m_;
+      (1.0 - p.measured_offset_blend) * leg_offset_model_m_;
+  out.leg_offset_model_m = leg_offset_model_m_;
   out.leg_offset_state_m = leg_offset_state;
   if (balance_active) {
     // The reference integrates the commanded speed while driving; the
@@ -725,6 +729,7 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
     const std::array<double, kWholeBodyStates> error{
         position - position_reference_m_, velocity - velocity_command_m_s_,
         pitch - pitch_reference, pitch_rate,
+        leg_offset_command_m_ - offset_reference,
         leg_offset_state - offset_reference};
     std::array<double, kWholeBodyInputs> input{};
     for (int i = 0; i < kWholeBodyInputs; ++i) {
@@ -763,6 +768,10 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
     leg_offset_command_m_ =
         slew(leg_offset_command_m_, 0.0, 0.2 * p.leg_offset_rate_limit_m_s, dt);
   }
+  // The legs follow the command with the model's lag; this prediction is the
+  // achieved-offset state of the next cycle.
+  leg_offset_model_m_ += (leg_offset_command_m_ - leg_offset_model_m_) *
+                         std::min(1.0, dt / m.leg_lag_s);
   out.leg_offset_command_m = leg_offset_command_m_;
 
   // ---- yaw: differential wheel torque ------------------------------------

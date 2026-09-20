@@ -35,7 +35,8 @@ bool valid_model(const WholeBodyModel &m) {
                            m.left_forward_sign,
                            m.right_wheel_on_outer_link,
                            m.left_wheel_on_outer_link,
-                           m.yaw_inertia_kgm2};
+                           m.yaw_inertia_kgm2,
+                           m.leg_lag_s};
   if (!std::all_of(std::begin(values), std::end(values),
                    [](const double v) { return std::isfinite(v); })) {
     return false;
@@ -45,7 +46,7 @@ bool valid_model(const WholeBodyModel &m) {
          unit_sign(m.right_forward_sign) && unit_sign(m.left_forward_sign) &&
          (m.right_wheel_on_outer_link == 0.0 || m.right_wheel_on_outer_link == 1.0) &&
          (m.left_wheel_on_outer_link == 0.0 || m.left_wheel_on_outer_link == 1.0) &&
-         m.yaw_inertia_kgm2 > 0.0 &&
+         m.yaw_inertia_kgm2 > 0.0 && m.leg_lag_s >= 0.002 &&
          m.body_mass_kg > 0.0 && m.wheel_mass_kg >= 0.0 &&
          m.wheel_inertia_kgm2 >= 0.0 && m.wheel_radius_m > 0.0 &&
          m.track_width_m > 0.0 && m.pitch_inertia_kgm2 > 0.0 &&
@@ -71,7 +72,11 @@ LinearModel linearize(const WholeBodyModel &m, const double leg_height_m) {
   //   b x_dd + c pitch_dd = M g (L pitch + d) - tau
   // with a = M + m_w + I_w / r^2, b = M L, c = I + M L^2. The leg offset d
   // enters exactly like pitch scaled by 1/L, which is why moving the wheels
-  // under the body is as effective as leaning it, and much faster.
+  // under the body is as effective as leaning it. The legs are not
+  // instantaneous, though: the achieved d follows the commanded d_c with
+  //   d_dot = (d_c - d) / leg_lag_s,   d_c_dot = u_2,
+  // so the regulator knows what the legs can deliver and does not ask them
+  // for modes faster than their own.
   const double M = m.body_mass_kg;
   const double L = com_height(m, leg_height_m);
   const double I = pitch_inertia(m, leg_height_m);
@@ -89,9 +94,11 @@ LinearModel linearize(const WholeBodyModel &m, const double leg_height_m) {
   A(0, 1) = 1.0;
   A(2, 3) = 1.0;
   A(1, 2) = -b * M * g * L / determinant;
-  A(1, 4) = -b * M * g / determinant;
+  A(1, 5) = -b * M * g / determinant;
   A(3, 2) = a * M * g * L / determinant;
-  A(3, 4) = a * M * g / determinant;
+  A(3, 5) = a * M * g / determinant;
+  A(5, 4) = 1.0 / m.leg_lag_s;
+  A(5, 5) = -1.0 / m.leg_lag_s;
   B(1, 0) = (c / r + b) / determinant;
   B(3, 0) = -(b / r + a) / determinant;
   B(4, 1) = 1.0;

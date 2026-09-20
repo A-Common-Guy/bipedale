@@ -73,6 +73,8 @@ const std::vector<DoubleParameter> &double_parameters() {
        "Tyre contact spacing in metres."},
       {"model.yaw_inertia_kgm2", SANDRO_WBC_FIELD(model.yaw_inertia_kgm2),
        "Yaw inertia of the robot about the vertical through its CoM, kg m^2."},
+      {"model.leg_lag_s", SANDRO_WBC_FIELD(model.leg_lag_s),
+       "Time constant with which the measured leg offset follows its command, s."},
       {"model.com_height_per_leg_height",
        SANDRO_WBC_FIELD(model.com_height_per_leg_height),
        "Centre-of-mass height above the axle per metre of leg height."},
@@ -95,8 +97,10 @@ const std::vector<DoubleParameter> &double_parameters() {
        "LQR weight on pitch error (1/rad^2)."},
       {"balance.weights.pitch_rate", SANDRO_WBC_FIELD(state_weights[3]),
        "LQR weight on pitch rate (s^2/rad^2)."},
-      {"balance.weights.leg_offset", SANDRO_WBC_FIELD(state_weights[4]),
-       "LQR weight on fore-aft leg offset from its reference (1/m^2)."},
+      {"balance.weights.leg_offset_command", SANDRO_WBC_FIELD(state_weights[4]),
+       "LQR weight on the commanded fore-aft leg offset from its reference (1/m^2)."},
+      {"balance.weights.leg_offset", SANDRO_WBC_FIELD(state_weights[5]),
+       "LQR weight on the achieved fore-aft leg offset from its reference (1/m^2)."},
       {"balance.effort_weights.wheel_torque",
        SANDRO_WBC_FIELD(effort_weights[0]),
        "LQR weight on total wheel torque (1/Nm^2)."},
@@ -380,23 +384,19 @@ WholeBodyController::on_configure(const rclcpp_lifecycle::State &) {
                  "Invalid whole-body parameters: %s", reason.c_str());
     return controller_interface::CallbackReturn::ERROR;
   }
+  const WholeBodyGains gains =
+      settings.gains.at(accepted_parameters_.height_target_m);
   RCLCPP_INFO(get_node()->get_logger(),
-              "Whole-body LQR at %.3f m leg height: wheel gains [x %.2f, v "
-              "%.2f, pitch %.2f, rate %.2f, offset %.2f] Nm; leg gains [x "
-              "%.2f, v %.2f, pitch %.2f, rate %.2f, offset %.2f] m/s; "
-              "input-delay margin %.1f ms over the gain table",
+              "Whole-body LQR at %.3f m leg height (leg lag %.0f ms): wheel "
+              "gains [x %.2f, v %.2f, pitch %.2f, rate %.2f, offset cmd %.2f, "
+              "offset %.2f] Nm; leg gains [x %.2f, v %.2f, pitch %.2f, rate "
+              "%.2f, offset cmd %.2f, offset %.2f] m/s; input-delay margin "
+              "%.1f ms over the gain table",
               accepted_parameters_.height_target_m,
-              settings.gains.at(accepted_parameters_.height_target_m)[0][0],
-              settings.gains.at(accepted_parameters_.height_target_m)[0][1],
-              settings.gains.at(accepted_parameters_.height_target_m)[0][2],
-              settings.gains.at(accepted_parameters_.height_target_m)[0][3],
-              settings.gains.at(accepted_parameters_.height_target_m)[0][4],
-              settings.gains.at(accepted_parameters_.height_target_m)[1][0],
-              settings.gains.at(accepted_parameters_.height_target_m)[1][1],
-              settings.gains.at(accepted_parameters_.height_target_m)[1][2],
-              settings.gains.at(accepted_parameters_.height_target_m)[1][3],
-              settings.gains.at(accepted_parameters_.height_target_m)[1][4],
-              1000.0 * settings.delay_margin_s);
+              1000.0 * accepted_parameters_.model.leg_lag_s, gains[0][0],
+              gains[0][1], gains[0][2], gains[0][3], gains[0][4], gains[0][5],
+              gains[1][0], gains[1][1], gains[1][2], gains[1][3], gains[1][4],
+              gains[1][5], 1000.0 * settings.delay_margin_s);
   settings_.writeFromNonRT(settings);
   command_.writeFromNonRT(StampedCommand{});
 
@@ -593,6 +593,7 @@ void WholeBodyController::publish_diagnostics(const rclcpp::Time &time,
   add("leg_offset_m", output.leg_offset_m);
   add("leg_offset_reference_m", output.leg_offset_reference_m);
   add("leg_offset_command_m", output.leg_offset_command_m);
+  add("leg_offset_model_m", output.leg_offset_model_m);
   add("leg_offset_state_m", output.leg_offset_state_m);
   add("leg_offset_rate_m_s", output.leg_offset_rate_m_s);
   add("trim_m", output.trim_m);
@@ -610,6 +611,8 @@ void WholeBodyController::publish_diagnostics(const rclcpp::Time &time,
   add("gain_wheel_pitch_nm_rad", output.gains[0][2]);
   add("gain_wheel_velocity_nm_s_m", output.gains[0][1]);
   add("gain_leg_pitch_m_s_rad", output.gains[1][2]);
+  add("gain_leg_offset_command_per_s", output.gains[1][4]);
+  add("gain_leg_offset_per_s", output.gains[1][5]);
   for (std::size_t i = 0; i < output.effort_nm.size(); ++i) {
     add("effort_" + joint_names_[i] + "_nm", output.effort_nm[i]);
   }

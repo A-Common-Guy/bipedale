@@ -203,6 +203,13 @@ whole_body_controller:
       # Whole robot about the vertical through its CoM, wheels' spin inertia
       # reflected through the track included (identified MJCF, stand pose).
       yaw_inertia_kgm2: 0.09
+      # Time constant with which the measured axle follows its commanded
+      # fore-aft offset: 70 ms on the robot (fourth run, cross-correlation of
+      # leg_offset_command_m and leg_offset_m in the diagnostics), about
+      # 30 ms in MuJoCo. The LQR designed without it asked the legs for a
+      # 72 ms mode and hunted at 1.9 Hz. Re-identify after changing the leg
+      # impedance (the overdamped leg responds in about kd / kp).
+      leg_lag_s: 0.07
       com_height_per_leg_height: 0.654  # CoM above axle = 0.654 * leg height
       com_height_offset_m: 0.0
       pitch_inertia_kgm2: 0.0295      # about the CoM at 0.1855 m leg height
@@ -224,19 +231,20 @@ whole_body_controller:
       # configure: 0.6 gave about 10 ms (falls in the latency-emulating
       # simulation and oscillates on the robot), 2.0 about 17 ms, 5.0 about
       # 23 ms but sluggish. Sets below required_delay_margin_s are rejected.
+      # leg_offset weights the achieved offset (the physical lever);
+      # leg_offset_command the commanded one, none by default.
       weights: {position: 30.0, velocity: 4.0, pitch: 150.0, pitch_rate: 1.0,
-                leg_offset: 1500.0}
+                leg_offset_command: 0.0, leg_offset: 1500.0}
       effort_weights: {wheel_torque: 2.0, leg_offset_rate: 20.0}
       gain_table: {min_height_m: 0.14, max_height_m: 0.19, points: 7}
       required_delay_margin_s: 0.012
-      # The leg offset the LQR feeds back: 0 = the one it commanded, 1 = the
-      # measured axle position. On the robot the axle follows its command
-      # with about 70 ms of lag (overdamped impedance on the light wheel plus
-      # stiction), as slow as the LQR's leg-offset mode, and with 1 both legs
-      # hunted in phase at 1.9 Hz (+-25 mm, +-1.5 Nm); 0 stopped it outright
-      # (fourth hardware run, docs/SIM_TO_REAL.md). The latency simulation,
-      # whose legs lag only 30 ms, is calmer with 1 (pitch RMS 0.015 against
-      # 0.036), but the robot decides.
+      # The achieved leg offset the LQR feeds back: 0 = the leg-lag model's
+      # prediction, 1 = the measured axle position. Before the lag was
+      # modelled, 1 made both legs hunt in phase at 1.9 Hz on the robot
+      # (+-25 mm, +-1.5 Nm) and 0 stopped it outright (fourth hardware run,
+      # docs/SIM_TO_REAL.md). With the lag in the model the gain on the
+      # measurement is a third of what it was; 0 stays the default, the robot
+      # decides whether 1 adds anything.
       measured_offset_blend: 0.0
       leg_offset_limit_m: 0.025
       leg_offset_rate_limit_m_s: 0.25

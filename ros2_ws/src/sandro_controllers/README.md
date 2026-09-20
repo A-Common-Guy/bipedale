@@ -32,11 +32,12 @@ height are rejected.
 
 `sandro_controllers/WholeBodyController` preserves the same six effort, joint
 state, IMU, and `TwistStamped` interfaces and additionally reads `linear.z` as
-a body height rate. One LQR over `[x, x_dot, pitch, pitch_rate, leg_offset]`
-commands total wheel torque and the rate at which the five-bar legs shift the
-wheels fore-aft under the body; its gains are solved from the reduced planar
-model at several leg heights, checked for their input-delay margin, and
-interpolated on the measured height. The legs run a Cartesian impedance with
+a body height rate. One LQR over `[x, x_dot, pitch, pitch_rate,
+leg_offset_command, leg_offset]` commands total wheel torque and the rate of
+the commanded fore-aft wheel placement, with the legs modelled as a
+first-order lag (`model.leg_lag_s`); its gains are solved from the reduced
+planar model at several leg heights, checked for their input-delay margin,
+and interpolated on the measured height. The legs run a Cartesian impedance with
 gravity support through `J^T` (support protected from saturation, damping on
 low-passed velocities, optional feed-forward of the wheel torque's reaction),
 a model-based yaw loop on the wheel-differential and IMU rates turns the

@@ -9,9 +9,10 @@
 
 namespace sandro_controllers::lqr {
 
-// State: [x, x_dot, pitch, pitch_rate, leg_offset]; input: [total wheel
-// torque, leg_offset_rate]. See whole_body_model.hpp for the derivation.
-constexpr int kStates = 5;
+// State: [x, x_dot, pitch, pitch_rate, leg_offset_command, leg_offset];
+// input: [total wheel torque, leg_offset_command_rate]. See
+// whole_body_model.hpp for the derivation.
+constexpr int kStates = 6;
 constexpr int kInputs = 2;
 
 using StateMatrix = Eigen::Matrix<double, kStates, kStates>;

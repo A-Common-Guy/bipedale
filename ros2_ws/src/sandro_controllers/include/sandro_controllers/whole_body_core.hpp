@@ -11,16 +11,15 @@
 //   references speed/position, height, lean-into-turn roll, a lagged yaw
 //              rate, and the slow posture trim that puts the axle under the
 //              centre of mass
-//   balance    one LQR over [x, x_dot, pitch, pitch_rate, leg_offset] whose
-//              two inputs are total wheel torque and the rate at which the
-//              legs shift the wheels fore-aft under the body; its gains are
-//              scheduled on the measured leg height because the pendulum
-//              length changes with it. The leg offset it feeds back is the
-//              measured axle position by default (the physical lever, and
-//              in simulation the deflection of the legs under wheel torque
-//              is damping information); measured_offset_blend can move it
-//              toward the commanded offset if the robot hunts through its
-//              leg compliance.
+//   balance    one LQR over [x, x_dot, pitch, pitch_rate, leg_offset_command,
+//              leg_offset] whose two inputs are total wheel torque and the
+//              rate of the commanded fore-aft wheel placement; the achieved
+//              offset follows the command with the model's leg lag, so the
+//              design knows the legs are slow. Gains are scheduled on the
+//              measured leg height because the pendulum length changes with
+//              it. The achieved offset fed back is the model's prediction by
+//              default; measured_offset_blend mixes in the measured axle
+//              position.
 //   tasks      Cartesian impedance per leg (height with gravity support,
 //              fore-aft placement), damping on low-passed velocities, an
 //              optional feed-forward of the wheel torque's reaction on the
@@ -42,7 +41,7 @@
 
 namespace sandro_controllers {
 
-constexpr int kWholeBodyStates = 5;
+constexpr int kWholeBodyStates = 6;
 constexpr int kWholeBodyInputs = 2;
 constexpr int kMaxGainPoints = 32;
 constexpr int kMaxDelayMarginSamples = 16;
@@ -63,9 +62,11 @@ struct WholeBodyParameters {
   // compliance, which chatters at the sampling rate when the gain is higher.
   // The leg offset rate is cheap so the legs carry a real share of the
   // balance work. The wheel torque weight sets the loop-delay margin of the
-  // balance loop; the set is rejected below required_delay_margin_s.
+  // balance loop; the set is rejected below required_delay_margin_s. The
+  // offset weight is on the achieved offset (index 5); the commanded offset
+  // (index 4) carries none by default.
   std::array<double, kWholeBodyStates> state_weights{30.0, 4.0, 150.0, 1.0,
-                                                     1500.0};
+                                                     0.0, 1500.0};
   std::array<double, kWholeBodyInputs> effort_weights{2.0, 20.0};
   double gain_table_min_height_m{0.14};
   double gain_table_max_height_m{0.19};
@@ -74,16 +75,14 @@ struct WholeBodyParameters {
   // table height (computed by augmenting the plant with delayed inputs).
   // The physical sensor-plus-command path is 10-15 ms.
   double required_delay_margin_s{0.012};
-  // Which leg offset the LQR sees: 0 is the offset it commanded (the legs
-  // treated as an inner loop, so deflections under wheel torque or stiction
-  // never become balance action), 1 is the measured axle position, values
-  // between blend the two. On the robot the measured axle follows its
-  // command with about 70 ms of lag (overdamped impedance on the light
-  // wheel plus stiction), the same time constant as the LQR's leg-offset
-  // mode, and with 1 the legs hunted in phase at 1.9 Hz with +-25 mm and
-  // +-1.5 Nm of wheel torque; 0 stopped it outright (fourth hardware run).
-  // In the latency-emulating simulation, whose legs lag only 30 ms, 1 is
-  // calmer (pitch RMS 0.015 against 0.036), but the robot decides.
+  // Which achieved leg offset the LQR sees: 0 is the model's prediction
+  // (the command through the leg lag, so deflections under wheel torque or
+  // stiction never become balance action), 1 is the measured axle position,
+  // values between blend the two. Before the lag was modelled, feeding back
+  // the measurement made the legs hunt in phase at 1.9 Hz on the robot
+  // (+-25 mm, +-1.5 Nm; fourth hardware run) and 0 stopped it outright. With
+  // the lag in the model the gain on the measured offset is a third of what
+  // it was, so 1 may be usable again; the robot decides.
   double measured_offset_blend{0.0};
   // Fore-aft wheel placement the legs may use for balance, about neutral.
   double leg_offset_limit_m{0.025};
@@ -327,7 +326,9 @@ struct WholeBodyOutput {
   double pitch_reference_rad{};
   double leg_offset_reference_m{};
   double leg_offset_command_m{};
-  // The leg offset the LQR fed back this cycle (see measured_offset_blend).
+  // Achieved offset predicted by the leg-lag model, and the one the LQR fed
+  // back this cycle (see measured_offset_blend).
+  double leg_offset_model_m{};
   double leg_offset_state_m{};
   double height_reference_m{};
   double height_differential_m{};
@@ -373,6 +374,7 @@ private:
   double height_differential_m_{};
   double roll_integral_m_{};
   double leg_offset_command_m_{};
+  double leg_offset_model_m_{};
   double trim_m_{};
   double balance_torque_nm_{};
   double yaw_torque_nm_{};

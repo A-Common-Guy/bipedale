@@ -12,7 +12,9 @@
 //   leg_offset  forward distance from the axle midpoint to where the body's
 //               centre of mass would be with the legs at their neutral
 //               fore-aft position; positive when the wheels are shifted
-//               backward under the body
+//               backward under the body. The legs follow their commanded
+//               offset with a first-order lag (leg_lag_s), so the command
+//               and the achieved offset are separate states.
 // Planar five-bar coordinates per leg (kinematics.hpp): +x from the inner
 // toward the outer pivot, +y down toward the wheel. The inner/outer motor
 // names are mirrored between the sides, so planar +x is body-forward on the
@@ -49,6 +51,13 @@ struct WholeBodyModel {
   // mass, including the wheels' spin inertia reflected through the track
   // (0.086 + 0.002 kg m^2 from the identified MJCF at the stand keyframe).
   double yaw_inertia_kgm2{0.09};
+  // Time constant with which the measured axle follows its commanded
+  // fore-aft offset: the overdamped leg impedance on the light unloaded wheel
+  // responds in about kd / kp, plus stiction. 70 ms on the robot (fourth
+  // hardware run, cross-correlation of leg_offset_command_m and
+  // leg_offset_m); about 30 ms in the MuJoCo model. The regulator designed
+  // without it asked the legs for a 72 ms mode and hunted at 1.9 Hz.
+  double leg_lag_s{0.07};
   // Height of the body centre of mass above the axle as an affine function
   // of the planar leg height (pivot to axle): com = k * height + offset.
   double com_height_per_leg_height{0.654};
@@ -71,8 +80,9 @@ struct LinearModel {
 };
 
 // Continuous-time linearisation about the upright equilibrium at a given leg
-// height. State [x, x_dot, pitch, pitch_rate, leg_offset], input [total wheel
-// torque, leg_offset_rate].
+// height. State [x, x_dot, pitch, pitch_rate, leg_offset_command,
+// leg_offset], input [total wheel torque, leg_offset_command_rate]; the
+// achieved offset follows the command with the model's leg_lag_s.
 LinearModel linearize(const WholeBodyModel &model, double leg_height_m);
 
 struct Attitude {

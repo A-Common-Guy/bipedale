@@ -97,8 +97,14 @@ The leg offset `d` enters exactly like `pitch` scaled by `1/L`: a 10 mm wheel
 shift equals a 10 mm / 0.11 m ≈ 5° lean, obtained at leg speed instead of by
 accelerating the whole body. The open-loop pendulum pole is about 12.8 rad/s
 (78 ms), which is why the cascade in the wheel-only controller has little loop
-separation to work with, and why the legs help. The state is
-`[x, x_dot, pitch, pitch_rate, d]`, the inputs `[tau, d_dot]`.
+separation to work with, and why the legs help. "Leg speed" is finite,
+though: the measured axle follows its commanded offset `d_c` with a
+first-order lag, `d_dot = (d_c − d) / T_leg`, 70 ms on the robot (the
+overdamped 400/20 impedance on the light unloaded wheel responds in about
+`kd / kp` = 50 ms, plus stiction) and about 30 ms in MuJoCo. The state is
+therefore `[x, x_dot, pitch, pitch_rate, d_c, d]` with inputs `[tau, d_c_dot]`
+(`model.leg_lag_s`). Designed without the lag, the regulator asked the legs
+for a 72 ms mode and the robot's legs hunted in phase at 1.9 Hz (fourth run).
 
 The same model is written nonlinearly in `test_whole_body.cpp` (with leg lag
 and an unmodelled CoM offset) as the plant the controller is unit-tested on.
@@ -174,33 +180,40 @@ friction in simulation).
   but is sluggish (leg offset and position limits hit). 2.0 is shipped.
 - The leg offset rate is cheap so the legs carry a real share of the balance.
 
-Resulting gains at 0.17 m and 4.5 kg (total wheel torque, leg offset rate):
+Resulting gains at 0.17 m, 4.5 kg and a 70 ms leg lag (total wheel torque,
+leg offset command rate); `Q = diag(30, 4, 150, 1, 0, 1500)`, the offset
+weight on the achieved offset:
 
 | State | Wheel gain | Leg gain |
 | --- | --- | --- |
-| position | −0.70 Nm/m | 1.16 (m/s)/m |
-| velocity | −0.66 Nm/(m/s) | 0.88 (m/s)/(m/s) |
-| pitch | −10.4 Nm/rad | 0.89 (m/s)/rad |
-| pitch rate | −0.91 Nm/(rad/s) | 0.15 (m/s)/(rad/s) |
-| leg offset | −21.9 Nm/m | 13.8 (m/s)/m |
+| position | −1.27 Nm/m | 1.11 (m/s)/m |
+| velocity | −1.10 Nm/(m/s) | 0.89 (m/s)/(m/s) |
+| pitch | −10.8 Nm/rad | 0.69 (m/s)/rad |
+| pitch rate | −0.98 Nm/(rad/s) | 0.14 (m/s)/(rad/s) |
+| leg offset command | −8.2 Nm/m | 11.3 (m/s)/m |
+| leg offset achieved | −20.8 Nm/m | 4.7 (m/s)/m |
 
-Per-wheel velocity feedback is 0.024 Nm per rad/s. The fastest closed-loop
-pole (pitch-rate damping on a low-inertia body) sits near −60 rad/s; with
+Per-wheel velocity feedback is 0.041 Nm per rad/s. The fastest closed-loop
+pole (pitch-rate damping on a low-inertia body) sits near −61 rad/s; with
 0.6 it was −86 rad/s, which the measured latency could not support. The
-input-delay margin is now computed at configure time for every table height
-(the discrete closed loop augmented with delayed inputs) and a set below
+input-delay margin is computed at configure time for every table height (the
+discrete closed loop augmented with delayed inputs) and a set below
 `balance.required_delay_margin_s` is rejected; the shipped set has 5 samples
 (16.7 ms) at every height.
 
-The offset state the regulator feeds back is the measured axle position by
-default (`balance.measured_offset_blend` 1). It is the physical gravity
-lever, and in the latency-emulating simulation the legs' deflection under
-wheel torque is damping information: pitch RMS while standing is 0.015 rad
-against 0.036 with the commanded offset fed back (blend 0). The robot's 2 Hz
-hunting ran through this path, but it was driven by the yaw loop and by legs
-pinned near their singularity (`SIM_TO_REAL.md`, fifth comparison); the blend
-exists so that the path can be opened if hunting persists once those are
-fixed.
+What the lag model changes is where the leg channel takes its information
+from: 11.3 (m/s)/m on the commanded offset, which the regulator knows
+exactly, and 4.7 on the achieved one, against 13.8 on a single measured
+offset before. The achieved-offset state fed back is the model's own
+prediction by default (`balance.measured_offset_blend` 0): on the robot,
+feeding back the measured axle position through the lag-blind design made
+both legs hunt in phase at 1.9 Hz, and switching to the command stopped it
+outright (`SIM_TO_REAL.md`, sixth comparison). In the latency-emulating
+simulation, whose legs lag only 30 ms, the measurement is damping
+information and blend 1 stands calmer (pitch RMS 0.025 against 0.030 with
+the lag model; 0.015 against 0.036 without it); with a third of the gain on
+the measurement it may be usable on the robot again, and the parameter
+exists to find out.
 
 ### 3.3 Legs as Cartesian impedances
 
