@@ -46,6 +46,9 @@ constexpr int kWholeBodyInputs = 2;
 constexpr int kMaxGainPoints = 32;
 constexpr int kMaxDelayMarginSamples = 16;
 constexpr double kLegJointLimitRad = 2.0943951024;
+// The GIM6010 MIT frame carries kp and kd in these ranges.
+constexpr double kMitKpLimitNmRad = 500.0;
+constexpr double kMitKdLimitNmSRad = 5.0;
 
 struct WholeBodyParameters {
   WholeBodyModel model{};
@@ -163,6 +166,19 @@ struct WholeBodyParameters {
   double fore_aft_kd_n_s_m{20.0};
   // Low-pass on the Cartesian leg velocities used by the damping terms.
   double leg_velocity_filter_hz{30.0};
+  // Where the leg PD runs. 1: in the drives (the GIM6010 MIT loop): the
+  // controller sends each leg joint its inverse-kinematics reference with
+  // these joint-space gains and only the gravity support (and the optional
+  // reaction term) as feed-forward torque; the drive closes the loop in its
+  // own cycle, synchronous with the frame and free of bus latency, so the
+  // stiffness is no longer bounded by the sensor and command delay that
+  // capped the Cartesian impedance at 400 N/m. The Cartesian kp/kd above are
+  // then unused. 0: the controller computes the impedance torque itself
+  // (the previous behaviour). The gains are SandroControl's, which balance
+  // the robot with the PID cascade.
+  double leg_pd_in_drive{1.0};
+  double leg_drive_kp_nm_rad{12.0};
+  double leg_drive_kd_nm_s_rad{0.5};
   // Optional feed-forward of the wheel torque's reaction on the leg, off by
   // default. Rolling without slip, the wheel torque tau works on the leg
   // through the ground force tau / r at the axle and through the stator
@@ -307,7 +323,14 @@ bool build_whole_body_settings(const WholeBodyParameters &parameters,
                                std::string *reason = nullptr);
 
 struct WholeBodyOutput {
+  // MIT frame per joint: the drive computes kp (position - q) + kd (velocity
+  // - qd) + effort. With the leg PD in the controller the gains are zero and
+  // effort carries everything; wheels are always torque only.
   std::array<double, 6> effort_nm{};
+  std::array<double, 6> position_command_rad{};
+  std::array<double, 6> velocity_command_rad_s{};
+  std::array<double, 6> kp_nm_rad{};
+  std::array<double, 6> kd_nm_s_rad{};
   // Estimate.
   double pitch_rad{};
   double roll_rad{};

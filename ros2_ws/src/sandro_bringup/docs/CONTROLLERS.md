@@ -6,6 +6,12 @@ protocol and no required Sandro base class.
 1. Derive from `controller_interface::ControllerInterface` and export with
    pluginlib.
 2. Claim the six effort commands and only the standard state interfaces needed.
+   Each joint also offers `position`, `velocity`, `kp` and `kd` command
+   interfaces, the other fields of the drives' MIT frame: a controller that
+   claims them makes the drive compute `kp (q_ref - q) + kd (v_ref - v)` on
+   top of the effort in its own loop (the whole-body controller does this for
+   the legs). Unset or zero, the drive is a torque source. A controller that
+   claims `kp`/`kd` must zero them on deactivation.
 3. Receive `geometry_msgs/TwistStamped` through a realtime buffer when needed.
 4. Declare gains, limits, timeouts, and units as ROS parameters. Validate a
    complete update before applying it; never silently replace a requested value.

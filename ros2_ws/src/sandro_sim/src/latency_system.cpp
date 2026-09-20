@@ -1,5 +1,6 @@
 #include "sandro_sim/latency_system.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <utility>
@@ -9,7 +10,16 @@
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "sandro_sim/mit_drive.hpp"
+
 namespace sandro_sim {
+
+namespace {
+constexpr std::array<const char *, 5> kMitFields{
+    hardware_interface::HW_IF_POSITION, hardware_interface::HW_IF_VELOCITY,
+    "kp", "kd", hardware_interface::HW_IF_EFFORT};
+constexpr std::size_t kEffortField = 4;
+} // namespace
 
 using hardware_interface::CallbackReturn;
 using hardware_interface::return_type;
@@ -55,6 +65,7 @@ CallbackReturn LatencySystem::on_init(
     joint_delay_s_ = parameter("joint_delay_s", 0.0);
     joint_rate_hz_ = parameter("joint_rate_hz", 0.0);
     command_delay_s_ = parameter("command_delay_s", 0.0);
+    mit_torque_limit_nm_ = parameter("mit_torque_limit_nm", 10.0);
 
     loader_ = std::make_unique<
         pluginlib::ClassLoader<hardware_interface::SystemInterface>>(
@@ -68,6 +79,18 @@ CallbackReturn LatencySystem::on_init(
     inner_params.hardware_info = get_hardware_info();
     inner_params.hardware_info.name += "_inner";
     inner_params.hardware_info.hardware_plugin_name = plugin->second;
+    // The backend is a torque source: it only gets the effort command of
+    // each joint. Position, velocity, kp and kd are the emulated drive's
+    // business (see write()).
+    for (auto &joint : inner_params.hardware_info.joints) {
+      std::vector<hardware_interface::InterfaceInfo> effort_only;
+      for (const auto &command : joint.command_interfaces) {
+        if (command.name == hardware_interface::HW_IF_EFFORT) {
+          effort_only.push_back(command);
+        }
+      }
+      joint.command_interfaces = effort_only;
+    }
     inner_params.logger = get_logger().get_child("inner");
     inner_params.clock = get_clock();
     inner_params.executor = params.executor;
@@ -127,16 +150,51 @@ CallbackReturn LatencySystem::on_init(
         channel.line.configure(joint_delay_s_, joint_rate_hz_);
         states_.push_back(std::move(channel));
       }
+      // A joint whose description declares any of position, velocity, kp
+      // or kd is driven through the emulated MIT loop; an effort-only joint
+      // is a plain delayed torque command.
+      MitChannel mit;
+      mit.joint = joint.name;
+      bool mit_mode = false;
       for (const auto &command : joint.command_interfaces) {
-        const std::string name = joint.name + "/" + command.name;
-        const auto it = inner_commands.find(name);
-        if (it == inner_commands.end()) {
-          throw std::invalid_argument("inner system does not export command '" + name + "'");
+        std::size_t field = kMitFields.size();
+        for (std::size_t i = 0; i < kMitFields.size(); ++i) {
+          if (command.name == kMitFields[i]) {
+            field = i;
+          }
         }
-        CommandChannel channel{name, it->second, DelayLine{}};
+        if (field == kMitFields.size()) {
+          throw std::invalid_argument(joint.name + ": unsupported command interface '" +
+                                      command.name + "' (position, velocity, kp, kd, effort)");
+        }
+        mit.names[field] = joint.name + "/" + command.name;
+        mit.present[field] = true;
+        mit.lines[field].configure(command_delay_s_, 0.0);
+        mit_mode = mit_mode || field != kEffortField;
+      }
+      if (!mit.present[kEffortField]) {
+        throw std::invalid_argument(joint.name + " must declare an effort command interface");
+      }
+      const std::string effort_name = mit.names[kEffortField];
+      const auto effort_it = inner_commands.find(effort_name);
+      if (effort_it == inner_commands.end()) {
+        throw std::invalid_argument("inner system does not export command '" + effort_name + "'");
+      }
+      if (!mit_mode) {
+        CommandChannel channel{effort_name, effort_it->second, DelayLine{}};
         channel.line.configure(command_delay_s_, 0.0);
         commands_.push_back(std::move(channel));
+        continue;
       }
+      mit.inner_effort = effort_it->second;
+      const auto position_it = inner_states.find(joint.name + "/" + hardware_interface::HW_IF_POSITION);
+      const auto velocity_it = inner_states.find(joint.name + "/" + hardware_interface::HW_IF_VELOCITY);
+      if (position_it == inner_states.end() || velocity_it == inner_states.end()) {
+        throw std::invalid_argument(joint.name + ": the emulated drive needs the inner position and velocity states");
+      }
+      mit.inner_position = position_it->second;
+      mit.inner_velocity = velocity_it->second;
+      mit_channels_.push_back(std::move(mit));
     }
     for (const auto &sensor : info.sensors) {
       for (const auto &state : sensor.state_interfaces) {
@@ -151,11 +209,13 @@ CallbackReturn LatencySystem::on_init(
       }
     }
     RCLCPP_INFO(get_logger(),
-                "wrapping '%s': %zu state and %zu command interfaces; IMU %.1f ms "
-                "at %.0f Hz, joints %.1f ms at %.0f Hz, commands %.1f ms",
+                "wrapping '%s': %zu state interfaces, %zu torque-only and %zu "
+                "MIT-mode joints; IMU %.1f ms at %.0f Hz, joints %.1f ms at "
+                "%.0f Hz, commands %.1f ms, emulated drive torque limit %.1f Nm",
                 plugin->second.c_str(), states_.size(), commands_.size(),
-                1e3 * imu_delay_s_, imu_rate_hz_, 1e3 * joint_delay_s_,
-                joint_rate_hz_, 1e3 * command_delay_s_);
+                mit_channels_.size(), 1e3 * imu_delay_s_, imu_rate_hz_,
+                1e3 * joint_delay_s_, joint_rate_hz_, 1e3 * command_delay_s_,
+                mit_torque_limit_nm_);
   } catch (const std::exception &error) {
     RCLCPP_ERROR(get_logger(), "configuration invalid: %s", error.what());
     return CallbackReturn::ERROR;
@@ -191,6 +251,11 @@ CallbackReturn LatencySystem::on_activate(const rclcpp_lifecycle::State &previou
   }
   for (auto &channel : commands_) {
     channel.line.reset();
+  }
+  for (auto &channel : mit_channels_) {
+    for (auto &line : channel.lines) {
+      line.reset();
+    }
   }
   const auto result = inner_->on_activate(previous);
   if (result == CallbackReturn::SUCCESS) {
@@ -240,6 +305,28 @@ return_type LatencySystem::write(const rclcpp::Time &time,
   for (auto &channel : commands_) {
     const double value = get_command<double>(channel.name);
     if (!channel.inner->set_value(channel.line.update(now, value))) {
+      return return_type::ERROR;
+    }
+  }
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  for (auto &channel : mit_channels_) {
+    // The frame the drive receives: every field delayed like the CAN
+    // command, unset fields NaN. The drive law then runs on the drive's own
+    // undelayed state.
+    std::array<double, 5> fields{};
+    for (std::size_t i = 0; i < fields.size(); ++i) {
+      fields[i] = channel.present[i]
+                      ? channel.lines[i].update(now, get_command<double>(channel.names[i]))
+                      : nan;
+    }
+    const auto position = channel.inner_position->get_optional<double>();
+    const auto velocity = channel.inner_velocity->get_optional<double>();
+    if (!position || !velocity) {
+      return return_type::ERROR;
+    }
+    const MitCommand command{fields[0], fields[1], fields[2], fields[3], fields[4]};
+    if (!channel.inner_effort->set_value(
+            mit_torque(command, *position, *velocity, mit_torque_limit_nm_))) {
       return return_type::ERROR;
     }
   }

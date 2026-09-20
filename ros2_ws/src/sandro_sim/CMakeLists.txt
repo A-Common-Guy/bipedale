@@ -36,6 +36,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_delay_line test/test_delay_line.cpp)
   target_include_directories(test_delay_line PRIVATE include)
+  ament_add_gtest(test_mit_drive test/test_mit_drive.cpp)
+  target_include_directories(test_mit_drive PRIVATE include)
 endif()
 
 ament_export_include_directories(include)

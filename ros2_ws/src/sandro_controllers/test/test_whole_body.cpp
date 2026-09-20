@@ -21,6 +21,9 @@ WholeBodyParameters test_parameters() {
   p.settle_s = 0.0;
   p.ramp_s = 0.2;
   p.gain_table_points = 4;
+  // The impedance tests below exercise the controller-side leg PD; the
+  // drive-side mode has its own tests.
+  p.leg_pd_in_drive = 0.0;
   return p;
 }
 
@@ -1029,6 +1032,135 @@ TEST(Kinematics, LowerLinkAnglesFollowTheAxle) {
   const auto minus = lower_link_angles((*ik)[0] - eps, (*ik)[1], g);
   ASSERT_TRUE(plus && minus);
   EXPECT_NEAR((*jac)[0], (plus->outer - minus->outer) / (2.0 * eps), 1e-5);
+}
+
+TEST(WholeBodyCore, DrivePdSendsJointReferencesAndGainsWithFeedForwardOnly) {
+  WholeBodyParameters p = test_parameters();
+  p.leg_pd_in_drive = 1.0;
+  p.leg_drive_kp_nm_rad = 12.0;
+  p.leg_drive_kd_nm_s_rad = 0.5;
+  const WholeBodySettings settings = test_settings(p);
+  PlanarPlant plant;
+  plant.leg_height = p.height_target_m;
+  WholeBodyCore core;
+  const WholeBodyState state = plant.observe(p, kPeriod);
+  core.reset(state, settings);
+  const auto out = core.update(state, WholeBodyCommand{}, settings, kPeriod);
+  ASSERT_TRUE(out.leg_valid[0] && out.leg_valid[1]);
+  for (std::size_t side = 0; side < 2; ++side) {
+    const std::size_t inner = side == 0 ? 0 : 3;
+    const auto &geometry = side == 0 ? p.model.right_geometry : p.model.left_geometry;
+    // Joint references are the inverse kinematics of the Cartesian
+    // reference, gains are the drive gains, velocity reference zero.
+    const auto ik = inverse_kinematics(out.leg_reference_m[side].x,
+                                       out.leg_reference_m[side].y, geometry);
+    ASSERT_TRUE(ik);
+    EXPECT_NEAR(out.position_command_rad[inner], (*ik)[0], 1e-9);
+    EXPECT_NEAR(out.position_command_rad[inner + 1], (*ik)[1], 1e-9);
+    EXPECT_DOUBLE_EQ(out.kp_nm_rad[inner], 12.0);
+    EXPECT_DOUBLE_EQ(out.kd_nm_s_rad[inner + 1], 0.5);
+    EXPECT_DOUBLE_EQ(out.velocity_command_rad_s[inner], 0.0);
+    // Effort carries only the gravity support: the impedance moved into the
+    // drive.
+    const auto j = jacobian(state.position[inner], state.position[inner + 1], geometry);
+    ASSERT_TRUE(j);
+    const double support = 0.5 * p.model.body_mass_kg * p.model.gravity_m_s2;
+    EXPECT_NEAR(out.effort_nm[inner], (*j)[1][0] * support, 1e-6);
+    EXPECT_NEAR(out.effort_nm[inner + 1], (*j)[1][1] * support, 1e-6);
+  }
+  // Wheels stay torque sources.
+  for (const std::size_t wheel : {2U, 5U}) {
+    EXPECT_DOUBLE_EQ(out.kp_nm_rad[wheel], 0.0);
+    EXPECT_DOUBLE_EQ(out.kd_nm_s_rad[wheel], 0.0);
+    EXPECT_DOUBLE_EQ(out.position_command_rad[wheel], state.position[wheel]);
+  }
+  // With the PD in the controller the same state yields zero gains and the
+  // effort includes the (here zero-error) impedance.
+  WholeBodyParameters q = p;
+  q.leg_pd_in_drive = 0.0;
+  const WholeBodySettings controller_side = test_settings(q);
+  WholeBodyCore other;
+  other.reset(state, controller_side);
+  const auto classic = other.update(state, WholeBodyCommand{}, controller_side, kPeriod);
+  EXPECT_DOUBLE_EQ(classic.kp_nm_rad[0], 0.0);
+  EXPECT_DOUBLE_EQ(classic.kd_nm_s_rad[0], 0.0);
+  EXPECT_NEAR(classic.effort_nm[0], out.effort_nm[0], 1e-6);
+  // Invalid settings: gains outside the MIT frame, or a drive PD with no
+  // stiffness to hold the stance.
+  q = p;
+  q.leg_drive_kp_nm_rad = 600.0;
+  EXPECT_FALSE(valid_whole_body_parameters(q));
+  q = p;
+  q.leg_drive_kp_nm_rad = 0.0;
+  EXPECT_FALSE(valid_whole_body_parameters(q));
+  q = p;
+  q.leg_pd_in_drive = 0.5;
+  EXPECT_FALSE(valid_whole_body_parameters(q));
+}
+
+TEST(WholeBodyCore, DrivePdReferenceIsPulledBackToRespectTheTorqueLimit) {
+  // A stiff drive PD far from its reference would exceed the leg torque
+  // limit inside the drive; the reference is pulled toward the measured
+  // position so that the torque the drive computes from the latest state is
+  // bounded, as SandroControl did.
+  WholeBodyParameters p = test_parameters();
+  p.leg_pd_in_drive = 1.0;
+  p.leg_drive_kp_nm_rad = 200.0;
+  p.leg_drive_kd_nm_s_rad = 0.5;
+  const WholeBodySettings settings = test_settings(p);
+  PlanarPlant plant;
+  plant.leg_height = 0.15;  // 20 mm below the 0.17 target
+  WholeBodyCore core;
+  WholeBodyState state = plant.observe(p, kPeriod);
+  core.reset(state, settings);
+  for (int i = 0; i < 300; ++i) {  // let the height reference slew away
+    core.update(state, WholeBodyCommand{}, settings, kPeriod);
+  }
+  state.velocity[0] = 1.0;  // some joint velocity for the damping term
+  const auto out = core.update(state, WholeBodyCommand{}, settings, kPeriod);
+  EXPECT_NE(out.status & WBC_LEG_TORQUE_LIMIT, 0U);
+  for (const std::size_t joint : {0U, 1U, 3U, 4U}) {
+    const double predicted =
+        out.kp_nm_rad[joint] * (out.position_command_rad[joint] - state.position[joint]) -
+        out.kd_nm_s_rad[joint] * state.velocity[joint] + out.effort_nm[joint];
+    EXPECT_LE(std::abs(predicted), p.leg_torque_limit_nm + 1e-9);
+  }
+  EXPECT_NEAR(std::abs(200.0 * (out.position_command_rad[0] - state.position[0]) -
+                       0.5 * state.velocity[0] + out.effort_nm[0]),
+              p.leg_torque_limit_nm, 1e-9);
+}
+
+TEST(WholeBodyCore, DrivePdFallsBackToDampingAndZeroesOnAFall) {
+  WholeBodyParameters p = test_parameters();
+  p.leg_pd_in_drive = 1.0;
+  const WholeBodySettings settings = test_settings(p);
+  PlanarPlant plant;
+  WholeBodyCore core;
+  WholeBodyState state = plant.observe(p, kPeriod);
+  state.position[0] += 2.0 * 3.14159265358979323846;  // wrapped encoder
+  core.reset(state, settings);
+  const auto damped = core.update(state, WholeBodyCommand{}, settings, kPeriod);
+  EXPECT_DOUBLE_EQ(damped.kp_nm_rad[0], 0.0);
+  EXPECT_DOUBLE_EQ(damped.kd_nm_s_rad[0], p.leg_fallback_damping_nm_s_rad);
+  EXPECT_DOUBLE_EQ(damped.effort_nm[0], 0.0);
+  EXPECT_GT(damped.kp_nm_rad[3], 0.0);  // the readable leg holds its stance
+  // Fallen: nothing is commanded, in particular no stiffness.
+  PlanarPlant upright;
+  WholeBodyCore balancing;
+  balancing.reset(upright.observe(p, kPeriod), settings);
+  run(upright, balancing, settings, 1.0, still);
+  WholeBodyState over = upright.observe(p, kPeriod);
+  over.quaternion_w = std::cos(0.5 * 1.2);
+  over.quaternion_y = std::sin(0.5 * 1.2);
+  balancing.update(over, WholeBodyCommand{}, settings, kPeriod);
+  const auto fallen = balancing.update(upright.observe(p, kPeriod), WholeBodyCommand{},
+                                       settings, kPeriod);
+  EXPECT_TRUE(fallen.fallen);
+  for (std::size_t i = 0; i < 6; ++i) {
+    EXPECT_DOUBLE_EQ(fallen.kp_nm_rad[i], 0.0);
+    EXPECT_DOUBLE_EQ(fallen.kd_nm_s_rad[i], 0.0);
+    EXPECT_DOUBLE_EQ(fallen.effort_nm[i], 0.0);
+  }
 }
 
 TEST(WholeBodyCore, GravitySupportIsFedForwardThroughTheJacobian) {

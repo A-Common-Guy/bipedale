@@ -37,9 +37,11 @@ leg_offset_command, leg_offset]` commands total wheel torque and the rate of
 the commanded fore-aft wheel placement, with the legs modelled as a
 first-order lag (`model.leg_lag_s`); its gains are solved from the reduced
 planar model at several leg heights, checked for their input-delay margin,
-and interpolated on the measured height. The legs run a Cartesian impedance with
-gravity support through `J^T` (support protected from saturation, damping on
-low-passed velocities, optional feed-forward of the wheel torque's reaction),
+and interpolated on the measured height. The legs are held by the drives' MIT
+loop (joint references with kp/kd, the controller sends gravity support
+through `J^T` as torque; a controller-side Cartesian impedance remains
+selectable), with the support protected from saturation and an optional
+feed-forward of the wheel torque's reaction,
 a model-based yaw loop on the wheel-differential and IMU rates turns the
 robot, the body leans into turns by a differential leg height, and a slow
 posture trim puts the axle under the centre of mass. Balancing engages only

@@ -2,11 +2,19 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:macro name="controlled_joint" params="name node sign offset_rev backend">
     <joint name="${name}">
+      <!-- One MIT frame per cycle: the drive computes
+           kp (position - q) + kd (velocity - qd) + effort in its own loop.
+           effort is the torque field; position, velocity, kp and kd are
+           optional for a controller (unset or zero = pure torque source). -->
       <command_interface name="effort">
         <!-- Absolute transport boundary; policy limits are 3 Nm legs / 6 Nm wheels. -->
         <param name="min">-10.0</param>
         <param name="max">10.0</param>
       </command_interface>
+      <command_interface name="position"/>
+      <command_interface name="velocity"/>
+      <command_interface name="kp"/>
+      <command_interface name="kd"/>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -51,14 +59,17 @@
     <ros2_control name="SandroSystem" type="system">
       <hardware>
         <xacro:if value="${backend == 'mujoco'}">
-          <!-- sandro_sim/LatencySystem wraps the MuJoCo backend and inserts
-               the sensor and command latency of the physical robot: BNO085
-               reports at 200 Hz with fusion lag, the drives broadcast encoder
-               estimates every 5 ms, and a command reaches the drive one cycle
-               after it is computed. simulation_latency:=false bypasses it. -->
+          <!-- sandro_sim/LatencySystem wraps the MuJoCo backend. It emulates
+               the drives' MIT loop (the backend itself only takes torque) and
+               inserts the sensor and command latency of the physical robot:
+               BNO085 reports at 200 Hz with fusion lag, the drives broadcast
+               encoder estimates every 5 ms, and a command reaches the drive
+               one cycle after it is computed. simulation_latency:=false keeps
+               the drive emulation and sets every delay to zero. -->
+          <plugin>sandro_sim/LatencySystem</plugin>
+          <param name="inner_plugin">mujoco_ros2_control/MujocoSystemInterface</param>
+          <param name="mit_torque_limit_nm">10.0</param>
           <xacro:if value="${simulation_latency}">
-            <plugin>sandro_sim/LatencySystem</plugin>
-            <param name="inner_plugin">mujoco_ros2_control/MujocoSystemInterface</param>
             <param name="imu_delay_s">${sim_imu_delay_s}</param>
             <param name="imu_rate_hz">${sim_imu_rate_hz}</param>
             <param name="joint_delay_s">${sim_joint_delay_s}</param>
@@ -66,7 +77,11 @@
             <param name="command_delay_s">${sim_command_delay_s}</param>
           </xacro:if>
           <xacro:unless value="${simulation_latency}">
-            <plugin>mujoco_ros2_control/MujocoSystemInterface</plugin>
+            <param name="imu_delay_s">0.0</param>
+            <param name="imu_rate_hz">0.0</param>
+            <param name="joint_delay_s">0.0</param>
+            <param name="joint_rate_hz">0.0</param>
+            <param name="command_delay_s">0.0</param>
           </xacro:unless>
           <param name="mujoco_model">$(find sandro_description)/mjcf/scene_ros2.xml</param>
           <param name="headless">${'true' if simulation_headless else 'false'}</param>

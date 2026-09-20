@@ -29,6 +29,25 @@ TEST(CanProtocol, MitPackingMatchesReferenceLayout)
   EXPECT_NEAR(torque, 0.0, 2.0 * limits.torque / 4095.0);
 }
 
+TEST(CanProtocol, MitGainsOccupyTheirTwelveBitFields)
+{
+  // kp is bits 4-15 of bytes 3-4, kd bits 4-15 of bytes 5-6 (each 12 bits,
+  // 0..limit). Full-scale gains set every bit of their field and nothing
+  // else; the zero position/velocity/torque fields stay at mid-scale.
+  const p::MitLimits limits{};
+  const auto packed = p::pack_mit(0.0, 0.0, limits.kp, limits.kd, 0.0, limits);
+  const std::array<uint8_t, 8> expected{0x80, 0x00, 0x80, 0x0f, 0xff, 0xff, 0xf8, 0x00};
+  EXPECT_EQ(packed, expected);
+  // Half-scale stiffness, no damping: kp field 0x800.
+  const auto half = p::pack_mit(0.0, 0.0, 0.5 * limits.kp, 0.0, 0.0, limits);
+  EXPECT_EQ(half[3], 0x08);
+  EXPECT_EQ(half[4], 0x00);
+  EXPECT_EQ(half[5], 0x00);
+  EXPECT_EQ(half[6], 0x08);
+  // Gains above the limit are clipped, never wrapped.
+  EXPECT_EQ(p::pack_mit(0.0, 0.0, 2.0 * limits.kp, 2.0 * limits.kd, 0.0, limits), expected);
+}
+
 TEST(CanProtocol, JointConversionsPreserveMapping)
 {
   EXPECT_NEAR(p::logical_position(4.0, -1.0, 8.0, 0.0), -M_PI, 1e-12);

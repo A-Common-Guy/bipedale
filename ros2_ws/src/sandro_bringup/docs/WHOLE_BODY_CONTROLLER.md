@@ -105,15 +105,23 @@ lists the joint convention and the derivation tools): `M = 3.284 kg`, CoM
   commanded offset (see *Tuning*). Every parameter set is checked for its
   input-delay margin at configure time (`balance.required_delay_margin_s`) and
   the margin is printed with the gains.
-- **Legs** run a Cartesian impedance per side in the planar five-bar frame,
-  `F = Kp (p_ref - p) - Kd p_dot_filtered + [0, M g / 2]`, mapped through `J^T`.
-  The damping acts on a low-passed velocity (`tasks.leg_velocity_filter_hz`).
-  Gravity support is fed forward and protected: when a joint would exceed
-  `limits.leg_torque_nm`, only the corrective part (impedance plus the optional
-  reaction feed-forward) of that leg is scaled, as a whole so the force keeps
-  its direction, and the body is never dropped to make room for a correction.
-  `tasks.leg_reaction_{ground,stator}_gain` optionally feed forward the wheel
-  torque's reaction on the leg (off by default, see *Tuning*).
+- **Legs** hold a Cartesian reference per side (fore-aft placement from the
+  balance LQR, height from the height task). By default
+  (`tasks.legs.pd_in_drive` 1) the PD runs inside the GIM6010 drives: each leg
+  joint receives its inverse-kinematics reference with the joint gains
+  `tasks.legs.drive_kp_nm_rad` / `drive_kd_nm_s_rad` in the MIT frame and the
+  controller only sends the gravity support (`J^T [0, M g / 2]`, plus the
+  optional reaction feed-forward) as torque. The drive closes the loop in its
+  own cycle, synchronous with the frame and free of the bus and sensor
+  latency, which is what lets the legs be stiff (kp 12 Nm/rad is about
+  1800 N/m at the axle). The policy limit is kept by pulling the reference
+  toward the measured position when the torque the drive will compute from
+  the latest state would exceed `limits.leg_torque_nm`. With
+  `pd_in_drive` 0 the controller computes a Cartesian impedance itself,
+  `F = Kp (p_ref - p) - Kd p_dot_filtered`, on a low-passed velocity
+  (`tasks.leg_velocity_filter_hz`); gravity support is protected from
+  saturation either way. `tasks.leg_reaction_{ground,stator}_gain` optionally
+  feed forward the wheel torque's reaction on the leg (off by default).
 - **Yaw** is model based: `I_z psi_dd = (track / 2 r) dtau - scrub`. A
   proportional term on the wheel-differential yaw rate (`tasks.yaw.
   wheel_rate_blend` 1; 0 uses the IMU) damps the loop at about 7 rad/s with
@@ -220,24 +228,20 @@ reports why. In order:
    third of before and in simulation 1 stands calmer (pitch RMS 0.025
    against 0.030); try 1 on the robot once standing is clean with 0, and go
    back if the legs start swinging in phase.
-4. `tasks.height.kp_n_m` / `kd_n_s_m` and `tasks.fore_aft.*`: the legs are the
-   balance loop's inner actuator and should be as stiff as the loop delay
-   allows. At the shipped 400 N/m one newton-metre of wheel torque still moves
-   the axle about 15 mm (the ground force `tau / r` through the leg spring plus
-   the stator moment on the wheel link), which is what swung the robot's legs
-   at 2 Hz. Stiffness is bounded by delay: the stiffness term is negative
-   damping (`k * delay`), so the damping must grow with it, `kd / kp` about
-   0.04 s, the ratio of the PID cascade's joint gains (12 Nm/rad, 0.5 Nm s/rad,
-   about 1850 N/m and 77 N s/m at the axle) that balance the robot. The
-   latency-emulating simulation cannot set this value: it falls above about
-   400 N/m at any ratio and also falls with the cascade's own gains, which the
-   robot balances on, so it is pessimistic for leg loops (`SIM_TO_REAL.md`).
-   On the robot, raise `kp` in steps of 200 N/m with `kd = 0.04 kp`, drive the
-   short sequence, and stop when the leg efforts in the recording start to
-   alternate sign at the sample rate (chatter). `tasks.leg_velocity_filter_hz`
-   (30 Hz) low-passes the velocity the damping acts on. `tasks.height.ki_n_m_s`
-   learns the weight share the feed-forward misses (`height_support_n` in
-   diagnostics).
+4. `tasks.legs.drive_kp_nm_rad` / `drive_kd_nm_s_rad`: the joint gains the
+   drives apply (MIT frame, kp up to 500, kd up to 5). 12 / 0.5 are
+   SandroControl's leg gains, which balance the robot with the PID cascade,
+   and give the axle about 1800 N/m; the drive's response time is about
+   `kd / kp` plus stiction, 72 ms in simulation and 70 ms on the robot, which
+   is `model.leg_lag_s`. Faster legs need less damping per stiffness: 19 / 0.5
+   gives 48 ms and 20 / 0.3 gives 24 ms in simulation, both stable in the
+   latency emulation (`recordings/sim_wbc4_drivepd_*`); set `model.leg_lag_s`
+   to the identified value after any change. Watch the leg efforts in a
+   recording for sample-rate chatter when lowering `kd`. The controller-side
+   impedance (`tasks.height.kp_n_m` etc., `pd_in_drive` 0) is bounded by the
+   bus and sensor delay to about 400 N/m and is kept for comparison only.
+   `tasks.height.ki_n_m_s` learns the weight share the feed-forward misses
+   (`height_support_n` in diagnostics) in both modes.
 5. `tasks.leg_reaction_ground_gain` / `stator_gain` (off): feed forward the
    wheel torque's reaction on the leg, `J^T [-tau / r, 0] + tau d(link)/d(q)`,
    through `leg_reaction_filter_hz`. The ground term assumes the torque reaches
@@ -266,7 +270,10 @@ Do not activate on the physical robot before:
   left because the inner/outer motor names are mirrored); with a yaw command
   the wheel-differential rate in diagnostics (`wheel_yaw_rate_rad_s`) and the
   IMU rate (`yaw_rate_rad_s`) must carry the same sign;
-- `model.body_mass_kg` is the weighed value.
+- `model.body_mass_kg` is the weighed value;
+- the drives report `mit_max_kp` >= 12 and `mit_max_kd` >= 0.5 at activation
+  (the plugin logs the limits); the controller's drive gains are clipped to
+  them.
 
 Then, with the robot tethered: activate, hold it upright, and it engages when
 `|pitch| < balance.engage_pitch_rad`, the pitch rate is below

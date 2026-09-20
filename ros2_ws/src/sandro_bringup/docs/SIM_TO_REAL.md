@@ -12,6 +12,7 @@ tuning done in MuJoCo transfers. Model background is in
 | --- | --- | --- | --- |
 | Sensor latency | BNO085 reports at 200 Hz plus fusion lag; drive encoder broadcasts every 5 ms | fresh every 3.3 ms, zero delay | `sandro_sim/LatencySystem` decorator: delay + sample-and-hold per interface |
 | Command latency | a command reaches the drive one control cycle later | applied at the next physics step | same decorator, command path |
+| Drive-side MIT loop | the drive computes `kp (q_ref - q) + kd (v_ref - v) + tau` in its own cycle from its own encoder | backend takes torque only | same decorator: the frame's fields are delayed like the CAN command, the law runs on the undelayed joint state, only the torque reaches the backend |
 | Tyre scrub | rubber tyre resists twisting about the contact normal | condim 3, no torsional friction | condim 4, torsional friction 0.004 m, 10 ms contact |
 | CoM / mass | robot not weighed; CAD only | CAD | `payload` in `config/sim_identified.yaml` |
 | Drive friction, torque constant | unmeasured | legacy fit / CAD | `joints`, `actuators` in the same file |
@@ -278,20 +279,15 @@ Three results from the same campaign bound what the simulation can decide:
 - **Leg stiffness.** Every fore-aft/height stiffness above about 400 N/m
   fell in the latency emulation at 12 Hz within half a second, at `kd / kp`
   of 0.008 and 0.02 s alike, while the ideal simulation balanced with 1500/30.
-  The PID cascade (`driving_balancer`, joint gains 12 Nm/rad and 0.5 Nm s/rad,
-  about 1850 N/m and 77 N s/m at the axle) **also falls in the latency
-  emulation**, and it balances the physical robot. The emulated leg loop is
-  therefore pessimistic. Two candidate reasons, both checkable: the encoder
-  velocity the drives report is filtered (the reported velocity is 0.85 of
-  the position derivative in every recording, part of which may be
-  attenuation bias of the regression), whereas the emulation samples and
-  holds MuJoCo's raw velocity; and the joint `armature` of 0.000168 kg m² in
-  the MJCF is a rotor inertia reflected by the gear ratio once rather than
-  squared (a 60 mm frameless rotor is about 2e-5 kg m², times 64 is
-  1.3e-3), which would make the simulated leg and wheel eight times lighter
-  on the motor side than the real ones. Either makes the real leg loop far
-  more tolerant of damping than the emulation. Until one is confirmed, tune
-  the leg stiffness on the robot as described in `WHOLE_BODY_CONTROLLER.md`.
+  The PID cascade's leg gains (12 Nm/rad and 0.5 Nm s/rad, about 1850 N/m and
+  77 N s/m at the axle) also fell when closed in the controller through the
+  emulated delays. This was resolved, not tuned around: the physical robot
+  has always run these gains **inside the drives** (SandroControl commands
+  them in the MIT frame), where the loop sees no bus or sensor latency, and
+  the ROS plugin had been sending kp = kd = 0. The seventh comparison below
+  records the port. The two hypotheses on the emulation's fidelity (filtered
+  drive velocity, joint `armature` reflected by the gear ratio once instead
+  of squared) remain worth checking for the wheel and torque paths.
 - **Reaction feed-forward.** Feeding the wheel torque's reaction forward to
   the legs (`tasks.leg_reaction_ground_gain`) fell in the emulation even
   through a 4 Hz low-pass and at half gain, while the stator term alone was
@@ -360,12 +356,45 @@ With the measured offset fed back (`sim_wbc3_leglag_measured`, blend 1) the
 same design stands at 0.025 rad and drives at 0.012, so on the robot blend 1
 is worth one more try once standing is clean with 0.
 
-Next robot recording: the same command as above with this build. Expect
-standing pitch within about ±0.03 rad without the 1.9 Hz leg swing, the leg
-offset command moving by a few millimetres rather than between its limits,
-and the diagnostics' `leg_offset_model_m` tracking `leg_offset_m` within a
-few millimetres (if it does not, the identified lag is off: re-read it from
-the recording).
+### Seventh comparison (2026-09-20, the leg PD moved into the drives)
+
+The GIM6010 drives run in MIT mode: one frame per cycle with position and
+velocity references, kp, kd and a torque, and the drive computes
+`kp (q_ref - q) + kd (v_ref - v) + tau` in its own loop. SandroControl always
+used this for the legs; the ROS hardware plugin packed kp = kd = 0, so every
+leg loop closed over the bus and the sensor delay, which is what capped the
+Cartesian impedance at 400 N/m and produced the 70 ms leg lag. The plugin now
+exports `position`, `velocity`, `kp` and `kd` command interfaces next to
+`effort`, the simulation wrapper emulates the same loop (fields delayed like
+the CAN frame, law on the undelayed joint state), and the whole-body
+controller sends the legs their joint references with SandroControl's gains
+and only the gravity support as torque (`tasks.legs.pd_in_drive`).
+
+Identified latency simulation, `recordings/sim_wbc4_drivepd_*` against
+`sim_wbc3_leglag` (controller-side 400/20):
+
+| | 400/20 in the controller | kp 12 / kd 0.5 in the drive | 19 / 0.5 | 20 / 0.3 |
+| --- | --- | --- | --- | --- |
+| leg response time (command to measured offset) | 144 ms | 72 ms | 48 ms | 24 ms |
+| offset command minus measured, std | 3.8 mm | 1.7 mm | 1.9 mm | 1.9 mm |
+| standing pitch RMS (phases 0, 2) | 0.033 / 0.030 | 0.025 / 0.027 | 0.022 / 0.025 | 0.022 / 0.023 |
+| driving 0.2 m/s pitch RMS | 0.012 | 0.011 | 0.011 | 0.011 |
+| standing wheel torque std | 0.31 / 0.26 | 0.23 / 0.25 | 0.21 / 0.22 | 0.20 / 0.23 |
+| fall | no | no | no | no |
+
+The 72 ms of the shipped gains matches the 70 ms the robot showed in the
+fourth run with the same joint stiffness, so `model.leg_lag_s` stays 0.07;
+after changing the drive gains re-identify it as the lag at which
+`leg_offset_command_m` and `leg_offset_m` correlate best.
+
+Next robot recording: the same command as above with this build. Before
+activating, confirm in the plugin's activation log that every drive reports
+`mit_max_kp` >= 12 and `mit_max_kd` >= 0.5. Expect standing pitch within
+about ±0.03 rad without the 1.9 Hz leg swing, the leg offset command moving
+by a few millimetres rather than between its limits, `leg_offset_model_m`
+tracking `leg_offset_m` within a few millimetres, and the legs following
+their command with about 70 ms of lag (if it differs, set `model.leg_lag_s`
+to the measured value).
 
 ## 3. Identify, in this order
 
@@ -438,3 +467,4 @@ much latency remains.
 | `~/diagnostics` of the whole-body controller | now also `wheel_yaw_rate_rad_s`, `yaw_feedforward_nm`, `leg_offset_state_m` and the per-joint `*_leg_reaction_*_nm`; the configure log prints the LQR gains with the input-delay margin |
 | `sandro_bringup/config/sandro_real_overrides.yaml` | the identified per-robot values (mass, neutral offset, yaw limit, friction, IMU roll bias); apply on both backends |
 | `state_source:=mit encoder_period_ms:=20` launch arguments | hardware joint state from the synchronous MIT reply instead of the 5 ms broadcast |
+| `position`/`velocity`/`kp`/`kd` command interfaces | the full MIT frame per joint on both backends; a controller that leaves them unset drives a torque source |

@@ -92,7 +92,19 @@ struct GIM6010System::Impl
     double raw_position_rev{};
     double raw_velocity_rev_s{};
     double effort{};
+    // MIT command fields. Only effort is mandatory; the others are exported
+    // when the description declares them and read as "unset" while NaN, so
+    // a controller that claims effort alone runs the drive as a torque
+    // source exactly as before.
     double command{};
+    double command_position{std::numeric_limits<double>::quiet_NaN()};
+    double command_velocity{std::numeric_limits<double>::quiet_NaN()};
+    double command_kp{std::numeric_limits<double>::quiet_NaN()};
+    double command_kd{std::numeric_limits<double>::quiet_NaN()};
+    bool has_position_command{false};
+    bool has_velocity_command{false};
+    bool has_kp_command{false};
+    bool has_kd_command{false};
     double age{std::numeric_limits<double>::infinity()};
     double online{};
     double iq{};
@@ -338,6 +350,13 @@ struct GIM6010System::Impl
     return value;
   }
 
+  // One MIT frame: the drive computes kp (q_ref - q) + kd (v_ref - v) + tau
+  // in its own loop, synchronous and free of bus latency. The feed-forward
+  // torque is clipped to the limit, and when a stiffness is commanded the
+  // position reference is pulled toward the measured position so that the
+  // torque the drive will compute from the latest known state also stays
+  // within the limit (the same bound SandroControl applied); the drive's own
+  // MIT torque limit is the last line.
   void mit(Joint & joint, double torque)
   {
     joint.requested_effort = torque;
@@ -346,9 +365,29 @@ struct GIM6010System::Impl
     if (joint.applied_effort != torque) {
       joint.saturation_count += 1.0;
     }
+    const auto gain = [](const double value, const double ceiling) {
+      return std::isfinite(value) && value > 0.0 ? std::min(value, ceiling) : 0.0;
+    };
+    const double kp = gain(joint.command_kp, joint.limits.kp);
+    const double kd = gain(joint.command_kd, joint.limits.kd);
+    const double velocity_reference =
+      std::isfinite(joint.command_velocity) ? joint.command_velocity : 0.0;
+    double position_reference =
+      kp > 0.0 && std::isfinite(joint.command_position) ? joint.command_position : joint.position;
+    if (kp > 0.0) {
+      const double damping = kd * (velocity_reference - joint.velocity);
+      const double predicted =
+        kp * (position_reference - joint.position) + damping + joint.applied_effort;
+      const double bounded = std::clamp(predicted, -limit, limit);
+      if (bounded != predicted) {
+        position_reference =
+          joint.position + (bounded - damping - joint.applied_effort) / kp;
+        joint.saturation_count += 1.0;
+      }
+    }
     const auto bytes = protocol::pack_mit(
-      protocol::wire_position(joint.position, joint.sign, joint.ratio, joint.offset),
-      0.0, 0.0, 0.0, joint.sign * joint.applied_effort,
+      protocol::wire_position(position_reference, joint.sign, joint.ratio, joint.offset),
+      joint.sign * velocity_reference, kp, kd, joint.sign * joint.applied_effort,
       joint.limits);
     send(joint.node, CanCommand::mit_control, bytes.data(), bytes.size());
   }
@@ -408,12 +447,28 @@ CallbackReturn GIM6010System::on_init(const hardware_interface::HardwareInfo & i
       throw std::invalid_argument("period, deadman, stale_state and activation_timeout parameters must be > 0");
     }
     for (const auto & description : info.joints) {
-      if (description.command_interfaces.size() != 1 ||
-        description.command_interfaces[0].name != hardware_interface::HW_IF_EFFORT)
-      {
-        throw std::invalid_argument(description.name + " must expose one effort command interface");
-      }
       Impl::Joint joint;
+      bool has_effort = false;
+      for (const auto & command : description.command_interfaces) {
+        if (command.name == hardware_interface::HW_IF_EFFORT) {
+          has_effort = true;
+        } else if (command.name == hardware_interface::HW_IF_POSITION) {
+          joint.has_position_command = true;
+        } else if (command.name == hardware_interface::HW_IF_VELOCITY) {
+          joint.has_velocity_command = true;
+        } else if (command.name == "kp") {
+          joint.has_kp_command = true;
+        } else if (command.name == "kd") {
+          joint.has_kd_command = true;
+        } else {
+          throw std::invalid_argument(
+                  description.name + ": unsupported command interface '" + command.name +
+                  "' (effort, position, velocity, kp, kd)");
+        }
+      }
+      if (!has_effort) {
+        throw std::invalid_argument(description.name + " must expose an effort command interface");
+      }
       joint.name = description.name;
       joint.node = required_number<uint8_t>(description.parameters, "node_id");
       joint.sign = required_number<double>(description.parameters, "sign");
@@ -463,6 +518,20 @@ std::vector<hardware_interface::CommandInterface> GIM6010System::export_command_
   std::vector<hardware_interface::CommandInterface> interfaces;
   for (auto & joint : impl_->joints) {
     interfaces.emplace_back(joint.name, hardware_interface::HW_IF_EFFORT, &joint.command);
+    if (joint.has_position_command) {
+      interfaces.emplace_back(
+        joint.name, hardware_interface::HW_IF_POSITION, &joint.command_position);
+    }
+    if (joint.has_velocity_command) {
+      interfaces.emplace_back(
+        joint.name, hardware_interface::HW_IF_VELOCITY, &joint.command_velocity);
+    }
+    if (joint.has_kp_command) {
+      interfaces.emplace_back(joint.name, "kp", &joint.command_kp);
+    }
+    if (joint.has_kd_command) {
+      interfaces.emplace_back(joint.name, "kd", &joint.command_kd);
+    }
   }
   return interfaces;
 }

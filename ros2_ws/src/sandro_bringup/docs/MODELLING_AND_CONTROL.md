@@ -114,7 +114,7 @@ and an unmodelled CoM offset) as the plant the controller is unit-tested on.
 | Omitted | Consequence seen | Covered by |
 | --- | --- | --- |
 | Tyre contact compliance, gearbox backlash | wheels chatter at the sampling rate when the velocity gain is high | gain limit on wheel velocity feedback, 15 Hz velocity filter |
-| Leg compliance under wheel torque: the ground force `tau / r` at the axle and the stator moment `-tau` on the lower link that carries the wheel motor deflect the leg impedance (about 50 mm per Nm per wheel at the first 300 N/m, 15 mm at 400 N/m) | the axle moved centimetres with every torque swing on the robot; the yaw differential twisted the two legs in opposite directions | stiffer legs, tuned on the robot (the delay emulation forbids it in simulation, section 4); optional reaction feed-forward (off); `measured_offset_blend` to take the deflection out of the LQR if it hunts |
+| Leg compliance under wheel torque: the ground force `tau / r` at the axle and the stator moment `-tau` on the lower link that carries the wheel motor deflect the leg impedance (about 50 mm per Nm per wheel at the first 300 N/m, 15 mm at 400 N/m) | the axle moved centimetres with every torque swing on the robot; the yaw differential twisted the two legs in opposite directions | the leg PD in the drives' MIT loop (about 1800 N/m at the axle, 3.3), the leg lag in the LQR model, optional reaction feed-forward (off), `measured_offset_blend` |
 | Yaw dynamics: body twisting on the legs and on the tyre scrub | the 1.0–1.5 Nm per rad/s yaw gain on the IMU rate rang at 3.6 Hz with ±0.8 Nm while the robot stood still | model-based yaw loop: proportional on the wheel-differential rate at about 7 rad/s, integral on the IMU rate, scrub and inertia feed-forward (3.5) |
 | Sensor and command latency (IMU 200 Hz plus fusion, encoders 200 Hz, one cycle of command delay) | oscillation on hardware; the ideal-sim tuning falls in the latency-emulating simulation | `sandro_sim/LatencySystem` in simulation, gains chosen for 17–30 ms of delay margin (`SIM_TO_REAL.md`) |
 | Leg tracking lag (~40 rad/s loaded) | LQR assumes ideal placement | leg-offset weights keep that mode below the leg bandwidth |
@@ -229,25 +229,36 @@ as a whole so the force keeps its direction, and the body is never dropped
 to make room for a correction. Every commanded target is clamped to the
 validated workspace.
 
-The legs are the balance loop's inner actuator and their stiffness is the
-open tuning question of this design. Rolling without slip, a wheel torque
-`tau` does work on the leg through the ground force `tau / r` at the axle and
-through the stator moment `-tau` on the lower link that carries the wheel
-motor (virtual work: `Q = tau (J_x / r - d(phi)/dq)`), about 15 N-equivalent
-per newton-metre per wheel at the standing pose. At the first 300 N/m that
-was 50 mm of axle travel per newton-metre, and the robot's legs swung 7 cm
-peak to peak with the 2 Hz torque swings; at 400 N/m it is still 15 mm.
-Stiffness is bounded by loop delay in a specific way: with about 13 ms of
-sensor-plus-command delay the stiffness term is negative damping,
-`k sin(wT)/w` about `k T`, so the damping must grow with the stiffness
-(`kd / kp` about 0.04 s) while `kd / m_leg` times the delay stays small.
-The PID cascade's joint gains (12 Nm/rad, 0.5 Nm s/rad, about 1850 N/m and
-77 N s/m at the axle through `J^-1`) satisfy this and balance the robot. The
-latency-emulating simulation, however, falls above about 400 N/m at either
-ratio, and it also falls with the cascade's gains; the emulated leg loop is
-therefore pessimistic (section 4), and the stiffness is tuned on the robot
-(`WHOLE_BODY_CONTROLLER.md`). Height and fore-aft ship at 400/20, the values
-the emulation accepts.
+The legs are the balance loop's inner actuator. Rolling without slip, a
+wheel torque `tau` does work on the leg through the ground force `tau / r` at
+the axle and through the stator moment `-tau` on the lower link that carries
+the wheel motor (virtual work: `Q = tau (J_x / r - d(phi)/dq)`), about
+15 N-equivalent per newton-metre per wheel at the standing pose. At the first
+300 N/m that was 50 mm of axle travel per newton-metre, and the robot's legs
+swung 7 cm peak to peak with the 2 Hz torque swings; at 400 N/m it is still
+15 mm. A leg loop closed in the controller is bounded by the bus and sensor
+delay: with about 13 ms of it the stiffness term is negative damping,
+`k sin(wT)/w` about `k T`, so the damping must grow with the stiffness while
+`kd / m_leg` times the delay stays small, and the latency-emulating
+simulation fell above about 400 N/m at any ratio.
+
+The drives remove that bound. The GIM6010 MIT frame carries a position and
+velocity reference, kp, kd and a torque, and the drive computes
+`kp (q_ref - q) + kd (v_ref - v) + tau` in its own loop, synchronous with the
+frame and from its own encoder, so the leg PD sees no bus or sensor latency.
+By default the controller therefore sends each leg joint the inverse
+kinematics of its Cartesian reference with SandroControl's gains (12 Nm/rad,
+0.5 Nm s/rad, about 1800 N/m at the axle through `J^-1`) and only the gravity
+support as torque (`tasks.legs.pd_in_drive`); the policy limit is kept by
+pulling the reference toward the measured position when the torque the
+drive will compute from the latest state would exceed it. The simulation
+emulates the same loop (`sandro_sim/LatencySystem`: command fields delayed
+like the CAN frame, the law computed on the undelayed joint state) and with
+it accepts these gains and stiffer ones: kp 12 / kd 0.5 gives a 72 ms leg
+response (the robot's 70 ms), 19 / 0.5 gives 48 ms, 20 / 0.3 gives 24 ms,
+all stable (`recordings/sim_wbc4_drivepd_*`). The response time is what
+`model.leg_lag_s` carries into the LQR. The controller-side Cartesian
+impedance remains available (`pd_in_drive` 0) for comparison.
 
 The reaction can also be fed forward (`tasks.leg_reaction_{ground,stator}_
 gain`, `J^T [-tau / r, 0] + tau d(phi)/dq` through a low-pass). It is off:
@@ -391,10 +402,15 @@ the identified latency-emulating simulation with the per-robot override
 0.4 m/s, yaw error while turning 0.18 against 0.20 rad/s, at the price of more
 wheel activity at standstill (torque RMS 0.44 against 0.20 Nm, the firmer
 slow loop against the simulated Coulomb friction). Two negative results from
-the same campaign are recorded in `SIM_TO_REAL.md`: leg stiffness above about
-400 N/m and the reaction feed-forward both fall in the emulation, and so does
-the PID cascade that balances the robot, which is why the leg stiffness is a
-hardware tuning step.
+the same campaign are recorded in `SIM_TO_REAL.md`: a controller-side leg
+impedance above about 400 N/m and the reaction feed-forward both fell in the
+emulation, and so did the PID cascade's leg gains when closed in the
+controller. Moving the leg PD into the drives' MIT loop (3.3), with the same
+loop emulated in simulation, resolved the first: kp 12 / kd 0.5 in the drives
+stands at pitch RMS 0.022–0.027 rad in the latency emulation with the legs
+tracking their command to 1.7 mm, against 0.030–0.033 rad and 3.8 mm for the
+400/20 impedance (`recordings/sim_wbc4_drivepd_kp12` against
+`sim_wbc3_leglag`).
 
 Not yet done: robot weighing, identification of the real CoM position,
 latencies, tyre scrub and actuator friction, the leg stiffness on the robot,

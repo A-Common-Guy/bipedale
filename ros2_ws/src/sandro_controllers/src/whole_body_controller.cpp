@@ -180,6 +180,12 @@ const std::vector<DoubleParameter> &double_parameters() {
        "Fore-aft leg damping in N s/m."},
       {"tasks.leg_velocity_filter_hz", SANDRO_WBC_FIELD(leg_velocity_filter_hz),
        "Low-pass cutoff on the Cartesian leg velocities used for damping, Hz."},
+      {"tasks.legs.pd_in_drive", SANDRO_WBC_FIELD(leg_pd_in_drive),
+       "1: the leg PD runs in the drives' MIT loop (joint references + drive_kp/kd, feed-forward torque only); 0: in the controller."},
+      {"tasks.legs.drive_kp_nm_rad", SANDRO_WBC_FIELD(leg_drive_kp_nm_rad),
+       "Joint stiffness the drives apply to the leg references, Nm/rad (MIT kp)."},
+      {"tasks.legs.drive_kd_nm_s_rad", SANDRO_WBC_FIELD(leg_drive_kd_nm_s_rad),
+       "Joint damping the drives apply to the leg references, Nm s/rad (MIT kd)."},
       {"tasks.leg_reaction_ground_gain",
        SANDRO_WBC_FIELD(leg_reaction_ground_gain),
        "Fraction of the ground force tau / r at the axle fed forward to the leg motors (0..1)."},
@@ -322,11 +328,17 @@ WholeBodyParameters WholeBodyController::read_parameters() const {
 
 controller_interface::InterfaceConfiguration
 WholeBodyController::command_interface_configuration() const {
+  // The full MIT frame of every joint: effort first (indices 0..5, as
+  // before), then position, velocity, kp and kd blocks of six.
   controller_interface::InterfaceConfiguration config;
   config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
   const auto joints = get_node()->get_parameter("joints").as_string_array();
-  for (const auto &joint : joints) {
-    config.names.push_back(joint + "/" + hardware_interface::HW_IF_EFFORT);
+  for (const char *interface :
+       {hardware_interface::HW_IF_EFFORT, hardware_interface::HW_IF_POSITION,
+        hardware_interface::HW_IF_VELOCITY, "kp", "kd"}) {
+    for (const auto &joint : joints) {
+      config.names.push_back(joint + "/" + interface);
+    }
   }
   return config;
 }
@@ -485,9 +497,10 @@ bool WholeBodyController::read_state(WholeBodyState &state) const {
 
 controller_interface::CallbackReturn
 WholeBodyController::on_activate(const rclcpp_lifecycle::State &) {
-  if (command_interfaces_.size() != 6 || state_interfaces_.size() != 22) {
+  if (command_interfaces_.size() != 30 || state_interfaces_.size() != 22) {
     RCLCPP_ERROR(get_node()->get_logger(),
-                 "Expected 6 command and 22 state interfaces");
+                 "Expected 30 command (effort, position, velocity, kp, kd per "
+                 "joint) and 22 state interfaces");
     return controller_interface::CallbackReturn::ERROR;
   }
   WholeBodyState state;
@@ -527,11 +540,17 @@ WholeBodyController::update(const rclcpp::Time &time,
                       : std::max(0.0, time.seconds() - received.receipt_time_s);
   const WholeBodyOutput output =
       core_.update(state, command, *settings_.readFromRT(), period.seconds());
-  for (std::size_t i = 0; i < output.effort_nm.size(); ++i) {
-    if (!std::isfinite(output.effort_nm[i]) ||
-        !command_interfaces_[i].set_value(output.effort_nm[i])) {
-      zero_commands();
-      return controller_interface::return_type::ERROR;
+  const std::array<const std::array<double, 6> *, 5> frame{
+      &output.effort_nm, &output.position_command_rad,
+      &output.velocity_command_rad_s, &output.kp_nm_rad, &output.kd_nm_s_rad};
+  for (std::size_t block = 0; block < frame.size(); ++block) {
+    for (std::size_t i = 0; i < 6; ++i) {
+      const double value = (*frame[block])[i];
+      if (!std::isfinite(value) ||
+          !command_interfaces_[6 * block + i].set_value(value)) {
+        zero_commands();
+        return controller_interface::return_type::ERROR;
+      }
     }
   }
   publish_diagnostics(time, output, command.age_s, state.imu_age_s);
@@ -594,6 +613,10 @@ void WholeBodyController::publish_diagnostics(const rclcpp::Time &time,
   add("leg_offset_reference_m", output.leg_offset_reference_m);
   add("leg_offset_command_m", output.leg_offset_command_m);
   add("leg_offset_model_m", output.leg_offset_model_m);
+  add("leg_pd_in_drive", output.kp_nm_rad[0] > 0.0 || output.kp_nm_rad[3] > 0.0 ? 1 : 0);
+  for (const std::size_t i : {0U, 1U, 3U, 4U}) {
+    add("position_command_" + joint_names_[i] + "_rad", output.position_command_rad[i]);
+  }
   add("leg_offset_state_m", output.leg_offset_state_m);
   add("leg_offset_rate_m_s", output.leg_offset_rate_m_s);
   add("trim_m", output.trim_m);

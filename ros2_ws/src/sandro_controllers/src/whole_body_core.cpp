@@ -49,6 +49,8 @@ bool finite_all(const WholeBodyParameters &p) {
       p.fore_aft_kp_n_m,          p.fore_aft_kd_n_s_m,
       p.leg_velocity_filter_hz,   p.leg_reaction_ground_gain,
       p.leg_reaction_stator_gain, p.leg_reaction_filter_hz,
+      p.leg_pd_in_drive,          p.leg_drive_kp_nm_rad,
+      p.leg_drive_kd_nm_s_rad,
       p.roll_lean_gain,           p.roll_kp_m_rad,
       p.roll_ki_m_rad_s,          p.roll_differential_limit_m,
       p.yaw_kp_nm_s_rad,          p.yaw_ki_nm_rad,
@@ -224,6 +226,14 @@ bool valid_whole_body_parameters(const WholeBodyParameters &p,
       p.leg_reaction_ground_gain > 1.0 || p.leg_reaction_stator_gain < 0.0 ||
       p.leg_reaction_stator_gain > 1.0 || p.leg_reaction_filter_hz <= 0.0) {
     return fail(reason, "fore-aft gains must be >= 0, the leg filters > 0 and the reaction gains within [0, 1]");
+  }
+  if ((p.leg_pd_in_drive != 0.0 && p.leg_pd_in_drive != 1.0) ||
+      p.leg_drive_kp_nm_rad < 0.0 || p.leg_drive_kp_nm_rad > kMitKpLimitNmRad ||
+      p.leg_drive_kd_nm_s_rad < 0.0 || p.leg_drive_kd_nm_s_rad > kMitKdLimitNmSRad) {
+    return fail(reason, "legs.pd_in_drive must be 0 or 1 and the drive gains within the MIT ranges (kp 0..500, kd 0..5)");
+  }
+  if (p.leg_pd_in_drive != 0.0 && p.leg_drive_kp_nm_rad <= 0.0) {
+    return fail(reason, "legs.pd_in_drive needs a positive drive_kp_nm_rad, otherwise nothing holds the stance");
   }
   if (p.roll_lean_gain < 0.0 || p.roll_kp_m_rad < 0.0 ||
       p.roll_ki_m_rad_s < 0.0 || p.roll_differential_limit_m < 0.0) {
@@ -867,9 +877,16 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
   const double support_share =
       0.5 * m.body_mass_kg * m.gravity_m_s2 + height_integral_n_;
   out.height_support_n = support_share;
+  // Wheels are torque only: no stiffness, no damping in the drive.
+  for (const std::size_t wheel : kWheelIndex) {
+    out.position_command_rad[wheel] = state.position[wheel];
+  }
+  const bool pd_in_drive = p.leg_pd_in_drive != 0.0;
   for (std::size_t side = 0; side < 2; ++side) {
     const std::size_t inner = kInnerIndex[side];
     const std::size_t outer = inner + 1;
+    out.position_command_rad[inner] = state.position[inner];
+    out.position_command_rad[outer] = state.position[outer];
     const double neutral =
         p.fore_aft_neutral_m + forward_sign[side] * p.fore_aft_neutral_offset_m;
     const double x_reference =
@@ -878,7 +895,13 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
     out.leg_reference_m[side] = Point2{x_reference, height_reference[side]};
     const LegState &leg = legs[side];
     if (!leg.valid) {
-      // Cannot evaluate the linkage: damp the joints rather than push blind.
+      // Cannot evaluate the linkage: damp the joints rather than push blind,
+      // in the drive when it runs the PD (its own encoder is what it damps).
+      if (pd_in_drive) {
+        out.kd_nm_s_rad[inner] = std::min(p.leg_fallback_damping_nm_s_rad, kMitKdLimitNmSRad);
+        out.kd_nm_s_rad[outer] = out.kd_nm_s_rad[inner];
+        continue;
+      }
       out.effort_nm[inner] = std::clamp(
           -p.leg_fallback_damping_nm_s_rad * state.velocity[inner],
           -p.leg_torque_limit_nm, p.leg_torque_limit_nm);
@@ -912,18 +935,30 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
     reaction_torque[1] +=
         p.leg_reaction_stator_gain * tau_planar * leg.wheel_link_jacobian[1];
     out.leg_reaction_torque_nm[side] = reaction_torque;
-    // Impedance on the axle, planar (+x toward the outer pivot, +y down),
-    // damping on the filtered Cartesian velocity.
-    const Point2 &velocity_filtered = filtered_leg_velocity_m_s_[side];
-    const double force_x =
-        p.fore_aft_kp_n_m * (x_reference - leg.position.x) -
-        p.fore_aft_kd_n_s_m * velocity_filtered.x;
-    const double force_y =
-        p.height_kp_n_m * (height_reference[side] - leg.position.y) -
-        p.height_kd_n_s_m * velocity_filtered.y;
-    std::array<double, 2> corrective = map(force_x, force_y);
-    corrective[0] += reaction_torque[0];
-    corrective[1] += reaction_torque[1];
+    // The PD in the drive: send the joint references of the Cartesian
+    // target with the joint-space gains and only feed-forward torque. If the
+    // target has no inverse kinematics this cycle (it is validated at the
+    // workspace extremes, so this is a numerical corner) fall back to the
+    // controller-side impedance below.
+    const auto joint_reference =
+        pd_in_drive ? inverse_kinematics(x_reference, height_reference[side],
+                                         *geometry[side])
+                    : std::nullopt;
+    std::array<double, 2> corrective = reaction_torque;
+    if (!joint_reference) {
+      // Impedance on the axle, planar (+x toward the outer pivot, +y down),
+      // damping on the filtered Cartesian velocity.
+      const Point2 &velocity_filtered = filtered_leg_velocity_m_s_[side];
+      const double force_x =
+          p.fore_aft_kp_n_m * (x_reference - leg.position.x) -
+          p.fore_aft_kd_n_s_m * velocity_filtered.x;
+      const double force_y =
+          p.height_kp_n_m * (height_reference[side] - leg.position.y) -
+          p.height_kd_n_s_m * velocity_filtered.y;
+      const std::array<double, 2> impedance = map(force_x, force_y);
+      corrective[0] += impedance[0];
+      corrective[1] += impedance[1];
+    }
     // Torque budget: the support keeps its full value unless it alone
     // exceeds the limit; the corrective part (impedance plus reaction
     // compensation) is scaled as a whole so its direction is kept.
@@ -947,6 +982,32 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
     out.effort_nm[outer] = std::clamp(support_torque[1] + scale * corrective[1],
                                       -p.leg_torque_limit_nm,
                                       p.leg_torque_limit_nm);
+    if (joint_reference) {
+      // The drive adds kp (q_ref - q) + kd (0 - qd) to the feed-forward. Bound
+      // what it will compute from the latest known state by pulling the
+      // reference toward the measured position (SandroControl's bound), so
+      // the policy limit holds for the whole torque, not just our part.
+      const std::array<std::size_t, 2> index{inner, outer};
+      for (std::size_t k = 0; k < 2; ++k) {
+        const std::size_t joint = index[k];
+        double reference = std::clamp((*joint_reference)[k], -kLegJointLimitRad,
+                                      kLegJointLimitRad);
+        const double damping = -p.leg_drive_kd_nm_s_rad * state.velocity[joint];
+        const double predicted = p.leg_drive_kp_nm_rad * (reference - state.position[joint]) +
+                                 damping + out.effort_nm[joint];
+        const double bounded =
+            std::clamp(predicted, -p.leg_torque_limit_nm, p.leg_torque_limit_nm);
+        if (bounded != predicted) {
+          reference = state.position[joint] +
+                      (bounded - damping - out.effort_nm[joint]) / p.leg_drive_kp_nm_rad;
+          out.status |= WBC_LEG_TORQUE_LIMIT;
+        }
+        out.position_command_rad[joint] = reference;
+        out.velocity_command_rad_s[joint] = 0.0;
+        out.kp_nm_rad[joint] = p.leg_drive_kp_nm_rad;
+        out.kd_nm_s_rad[joint] = p.leg_drive_kd_nm_s_rad;
+      }
+    }
   }
   return out;
 }

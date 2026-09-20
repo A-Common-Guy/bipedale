@@ -12,6 +12,20 @@ The CAN plugin requires exactly six joints. Each joint requires `node_id`, `sign
 and optional `feedback_age`, `online`, `iq`, `temperature`, and `error` states.
 Declare each wanted interface in the `<ros2_control>` description.
 
+The drives run in MIT mode: every cycle each receives one frame with
+`position`, `velocity`, `kp`, `kd` and `torque`, and computes
+`kp (q_ref - q) + kd (v_ref - v) + torque` in its own loop, synchronous with
+the frame and free of bus latency. The `effort` command interface is the
+torque field and is mandatory. `position`, `velocity`, `kp` and `kd` are
+optional command interfaces (declare them per joint); while a controller
+leaves them unset (NaN) or at zero the drive is a pure torque source, as
+before. When a stiffness is commanded the plugin pulls the position reference
+toward the measured position so that the torque the drive will compute from
+the latest state stays within `hard_effort_limit_nm` and the drive's MIT torque
+limit (the bound SandroControl applied); gains are clipped to the drive's
+`mit_max_kp` / `mit_max_kd`. A controller that claims `kp`/`kd` must zero them
+on deactivation, which the whole-body controller does.
+
 System parameters are `can_interface`, `encoder_period_ms`, `iq_period_ms`,
 `heartbeat_period_ms`, `deadman_ms`, `stale_state_s`, `activation_timeout_s`,
 and the numeric firmware endpoint IDs `encoder_rate_endpoint`,

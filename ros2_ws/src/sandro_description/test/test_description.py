@@ -168,11 +168,17 @@ def test_xacro_expands_for_visualization_and_both_backends():
     assert mujoco.find(".//param[@name='headless']").text == "true"
     assert mujoco.find(".//param[@name='initial_keyframe']").text == "stand"
 
+    # Without latency emulation the wrapper stays (it also emulates the
+    # drives' MIT loop, which the bare backend cannot) with every delay zero.
     direct = _expand("mujoco", "simulation_latency:=false")
-    assert (
-        direct.find("./ros2_control/hardware/plugin").text
-        == "mujoco_ros2_control/MujocoSystemInterface"
-    )
+    assert direct.find("./ros2_control/hardware/plugin").text == "sandro_sim/LatencySystem"
+    for key in ("imu_delay_s", "imu_rate_hz", "joint_delay_s", "joint_rate_hz", "command_delay_s"):
+        assert float(direct.find(f".//param[@name='{key}']").text) == 0.0
+    # Every joint exposes the full MIT frame to the controllers.
+    for backend in (mujoco, _expand("real")):
+        for joint in backend.findall("./ros2_control/joint"):
+            names = {node.get("name") for node in joint.findall("command_interface")}
+            assert names == {"effort", "position", "velocity", "kp", "kd"}, joint.get("name")
 
     real = _expand("real")
     assert len(real.findall("./ros2_control")) == 2

@@ -309,6 +309,20 @@ whole_body_controller:
       # keep their full +-25 mm for balancing (config/sandro_real_overrides.yaml).
       fore_aft: {neutral_m: 0.045, neutral_offset_m: 0.0, kp_n_m: 400.0, kd_n_s_m: 20.0}
       leg_velocity_filter_hz: 30.0
+      # Where the leg PD runs. 1: in the drives' MIT loop: each leg joint
+      # gets its inverse-kinematics reference with these joint gains and only
+      # the gravity support as feed-forward torque; the drive closes the loop
+      # in its own cycle, synchronous with the frame and free of the bus and
+      # sensor latency that capped the controller-side Cartesian impedance at
+      # 400 N/m (with kp 12 the joints hold about 1800 N/m at the axle). The
+      # Cartesian kp/kd above are unused then. 0: the controller computes the
+      # impedance itself. kp/kd are SandroControl's leg gains, which balance
+      # the robot with the PID cascade; the drive's response time is about
+      # kd / kp, so re-identify model.leg_lag_s after changing them.
+      legs:
+        pd_in_drive: 1.0
+        drive_kp_nm_rad: 12.0
+        drive_kd_nm_s_rad: 0.5
       # Optional feed-forward of the wheel torque's reaction on each leg,
       # J^T [-tau / r, 0] + tau d(link)/d(q) through a low-pass, off by
       # default: below the drive friction the torque never reaches the ground
