@@ -159,8 +159,13 @@ struct GIM6010System::Impl
   // most. The broadcast then only keeps the wheels' multi-turn position.
   bool mit_state{false};
   int socket{-1};
+  std::string interface_name;
   std::atomic_bool stop{false};
   std::atomic_bool active{false};
+  // Every CAN frame seen on the socket, ours or not: zero after a second of
+  // listening means nobody is transmitting, i.e. the drives are off or the
+  // cable is out, as opposed to one drive missing.
+  std::atomic<unsigned long> frames_received{0};
   std::thread receiver;
   std::mutex mutex;
   std::condition_variable reply_cv;
@@ -217,6 +222,7 @@ struct GIM6010System::Impl
     }
     ifreq request{};
     std::strncpy(request.ifr_name, interface.c_str(), IFNAMSIZ - 1);
+    interface_name = interface;
     if (::ioctl(socket, SIOCGIFINDEX, &request) < 0) {
       const auto message = std::string(std::strerror(errno));
       close_socket();
@@ -261,6 +267,7 @@ struct GIM6010System::Impl
       {
         continue;
       }
+      ++frames_received;
       const auto node = static_cast<uint8_t>((frame.can_id >> 5) & 0x3f);
       const auto command = static_cast<uint8_t>(frame.can_id & 0x1f);
       const auto found = by_node.find(node);
@@ -620,7 +627,31 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
       }
       if (ready) {break;}
       if (std::chrono::steady_clock::now() >= deadline) {
-        throw std::runtime_error("CAN nodes did not provide fresh encoder and heartbeat feedback");
+        // Name the culprits: which drives never spoke, and whether the bus
+        // carried anything at all (a silent bus is power or wiring, not a
+        // drive).
+        std::string silent;
+        {
+          std::lock_guard<std::mutex> lock(impl_->mutex);
+          const auto now = std::chrono::steady_clock::now();
+          for (const auto & joint : impl_->joints) {
+            const bool heartbeat = joint.heartbeat_stamp.time_since_epoch().count() != 0;
+            const bool encoder = joint.encoder_stamp.time_since_epoch().count() != 0 &&
+              now - joint.encoder_stamp <= std::chrono::duration<double>(impl_->stale_state_s);
+            if (!heartbeat || !encoder) {
+              silent += (silent.empty() ? "" : ", ") + joint.name + " (node " +
+                std::to_string(joint.node) + (!heartbeat ? ": no heartbeat" : ": no encoder broadcast") + ")";
+            }
+          }
+        }
+        const unsigned long frames = impl_->frames_received.load();
+        throw std::runtime_error(
+                frames == 0 ?
+                "no CAN frame at all in " + std::to_string(impl_->activation_timeout_s) +
+                " s on '" + impl_->interface_name + "': the bus is silent (drives unpowered, "
+                "cut-off engaged, or the adapter-to-drive cable is off); silent: " + silent :
+                "drives without fresh feedback: " + silent + " (" + std::to_string(frames) +
+                " frames seen on the bus)");
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -759,20 +790,33 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
 CallbackReturn GIM6010System::on_deactivate(const rclcpp_lifecycle::State &)
 {
   impl_->active = false;
-  try {
-    for (auto & joint : impl_->joints) {
+  bool ok = true;
+  // Zero torque and idle first, every drive, whatever happens to the rest.
+  for (auto & joint : impl_->joints) {
+    try {
       impl_->mit(joint, 0.0);
       impl_->send_u32(joint.node, CanCommand::set_axis_state, 1);
+    } catch (const std::exception & error) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("GIM6010System"), "%s node %u: idle failed: %s",
+        joint.name.c_str(), joint.node, error.what());
+      ok = false;
     }
-    for (auto & joint : impl_->joints) {
+  }
+  // Then disable the deadman, per drive, without letting one unreachable
+  // node (a dead bus during a failed activation) stall the others.
+  for (auto & joint : impl_->joints) {
+    try {
       impl_->sdo_write_verified(joint.node, impl_->deadman_endpoint, 0);
       for (auto & keepalive : impl_->joints) {impl_->mit(keepalive, 0.0);}
+    } catch (const std::exception & error) {
+      RCLCPP_WARN(
+        rclcpp::get_logger("GIM6010System"), "%s node %u: deadman not disabled (%s); "
+        "it will trip by itself without frames", joint.name.c_str(), joint.node, error.what());
+      ok = false;
     }
-  } catch (const std::exception & error) {
-    RCLCPP_ERROR(rclcpp::get_logger("GIM6010System"), "deactivation failed: %s", error.what());
-    return CallbackReturn::ERROR;
   }
-  return CallbackReturn::SUCCESS;
+  return ok ? CallbackReturn::SUCCESS : CallbackReturn::ERROR;
 }
 
 CallbackReturn GIM6010System::on_cleanup(const rclcpp_lifecycle::State &)
