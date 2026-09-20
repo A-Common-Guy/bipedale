@@ -73,7 +73,23 @@ ros2 control set_hardware_component_state SandroSystem inactive
    the values used to encode frames; do not reduce them as a tuning mechanism.
    The independent host boundary is 10 N·m, while the initial controller policy
    boundaries are 3 N·m per leg joint and 6 N·m per wheel. Verify the firmware
-   300 ms communication deadman.
+   300 ms communication deadman. The leg PD runs inside the drives (MIT kp/kd),
+   so `mit_max_kp` must be at least the controller's `tasks.legs.drive_kp_nm_rad`
+   (12) and `mit_max_kd` at least `drive_kd_nm_s_rad` (0.5); the plugin clips
+   to the drive's values and logs them at activation.
+   At every activation the plugin also prints, per leg drive, `MIT position
+   ... encoder frame ... bias ... rad`: the drive's own MIT position against
+   the encoder broadcast, measured with zero gains. A few hundredths of a
+   radian is normal and is corrected; beyond `mit_frame_bias_tolerance_rad`
+   (0.2) activation fails, because a stiffness acting in a frame with a
+   different zero would hold that joint at the wrong angle (the fifth
+   hardware run showed exactly this on one leg: a stiff, asymmetric stance
+   that did not follow height commands). Re-zero the drive and repeat.
+   Stop the launch with a single Ctrl-C and wait: the controller manager
+   deactivates the drives (zero torque, idle, deadman off) before exiting,
+   and a second Ctrl-C kills it mid-way and leaves the drives to the deadman.
+   rviz2 is given 2 s before SIGTERM so the whole launch is down in a few
+   seconds.
 7. Test one motor, then one paired leg, with the physical cut-off in reach.
    Preview first, then explicitly activate:
 

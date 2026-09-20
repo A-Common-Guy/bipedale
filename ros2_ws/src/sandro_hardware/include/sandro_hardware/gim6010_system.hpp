@@ -23,6 +23,10 @@ public:
     const rclcpp_lifecycle::State &) override;
   hardware_interface::CallbackReturn on_cleanup(
     const rclcpp_lifecycle::State &) override;
+  hardware_interface::CallbackReturn on_shutdown(
+    const rclcpp_lifecycle::State &) override;
+  hardware_interface::CallbackReturn on_error(
+    const rclcpp_lifecycle::State &) override;
   hardware_interface::return_type read(
     const rclcpp::Time &, const rclcpp::Duration &) override;
   hardware_interface::return_type write(

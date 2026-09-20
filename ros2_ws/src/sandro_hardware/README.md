@@ -26,6 +26,23 @@ limit (the bound SandroControl applied); gains are clipped to the drive's
 `mit_max_kp` / `mit_max_kd`. A controller that claims `kp`/`kd` must zero them
 on deactivation, which the whole-body controller does.
 
+The drive-side PD acts in the drive's own MIT position frame. At activation,
+after closed-loop entry and while the gains are still zero, the plugin
+compares each stiffenable joint's MIT reply position with the encoder
+broadcast converted to the wire frame, logs the bias per drive, adds a small
+bias to every position reference, and refuses to arm beyond
+`mit_frame_bias_tolerance_rad` (default 0.2): a wrong drive zero would
+otherwise pull the joint against the torque limit while the controller sees a
+small error. A saturated reply (multi-turn wheel) is skipped.
+
+Faults are reported in one throttled line per second, `DRIVE FAULT: <joint>
+(node N): no encoder feedback | no heartbeat | axis error 0xCODE ...`, with an
+`all drives healthy again` line on recovery; the IMU plugin does the same with
+`IMU FAULT`. A shutdown from the active state (Ctrl-C on the controller
+manager) runs the deactivation sequence (zero torque, idle, deadman off); if
+the process is killed before that, the drives' communication deadman stops
+them within `deadman_ms`.
+
 System parameters are `can_interface`, `encoder_period_ms`, `iq_period_ms`,
 `heartbeat_period_ms`, `deadman_ms`, `stale_state_s`, `activation_timeout_s`,
 and the numeric firmware endpoint IDs `encoder_rate_endpoint`,

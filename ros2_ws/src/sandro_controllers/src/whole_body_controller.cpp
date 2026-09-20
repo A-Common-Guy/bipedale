@@ -511,6 +511,7 @@ WholeBodyController::on_activate(const rclcpp_lifecycle::State &) {
   core_.reset(state, *settings_.readFromRT());
   command_.writeFromNonRT(StampedCommand{});
   last_diagnostics_time_s_ = 0.0;
+  last_reported_status_ = 0U;
   zero_commands();
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -552,6 +553,25 @@ WholeBodyController::update(const rclcpp::Time &time,
         return controller_interface::return_type::ERROR;
       }
     }
+  }
+  // Say once, in words, when something that stops the robot changes:
+  // which sensor or leg went bad, and when it came back.
+  constexpr std::uint32_t kReported =
+      WBC_IMU_STALE | WBC_FALL_LATCH | WBC_LEG_KINEMATICS | WBC_INVALID_SETTINGS;
+  const std::uint32_t reported = output.status & kReported;
+  if (reported != last_reported_status_) {
+    if (reported != 0U) {
+      RCLCPP_WARN(get_node()->get_logger(),
+                  "whole-body controller: %s (legs valid right=%d left=%d, "
+                  "IMU age %.3f s, pitch %.2f rad)",
+                  whole_body_status_text(reported).c_str(),
+                  output.leg_valid[0] ? 1 : 0, output.leg_valid[1] ? 1 : 0,
+                  state.imu_age_s, output.pitch_rad);
+    } else {
+      RCLCPP_INFO(get_node()->get_logger(),
+                  "whole-body controller: sensors and legs healthy again");
+    }
+    last_reported_status_ = reported;
   }
   publish_diagnostics(time, output, command.age_s, state.imu_age_s);
   return controller_interface::return_type::OK;

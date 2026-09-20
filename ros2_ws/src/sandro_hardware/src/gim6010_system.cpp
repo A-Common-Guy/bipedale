@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
+#include <cstdio>
 #include <cstring>
 #include <linux/can.h>
 #include <linux/can/raw.h>
@@ -105,6 +106,13 @@ struct GIM6010System::Impl
     bool has_velocity_command{false};
     bool has_kp_command{false};
     bool has_kd_command{false};
+    // Position the drive reports in its MIT reply (its own frame, output
+    // radians) and the bias of that frame against the encoder broadcast,
+    // measured at activation with zero gains and added to every position
+    // reference so the drive-side PD acts on the logical reference.
+    double mit_reply_position{std::numeric_limits<double>::quiet_NaN()};
+    std::chrono::steady_clock::time_point mit_reply_stamp{};
+    double mit_frame_bias{};
     double age{std::numeric_limits<double>::infinity()};
     double online{};
     double iq{};
@@ -124,6 +132,10 @@ struct GIM6010System::Impl
   std::unordered_map<uint8_t, std::size_t> by_node;
   std::string interface;
   int encoder_period_ms{};
+  // Largest MIT-frame bias accepted at activation; beyond it arming fails.
+  double mit_frame_bias_tolerance_rad{0.2};
+  rclcpp::Clock steady_clock{RCL_STEADY_TIME};
+  bool fault_reported{false};
   int iq_period_ms{};
   int heartbeat_period_ms{};
   int deadman_ms{};
@@ -155,7 +167,23 @@ struct GIM6010System::Impl
   std::vector<uint8_t> sdo_reply;
   uint16_t awaited_endpoint{std::numeric_limits<uint16_t>::max()};
 
-  ~Impl() {close_socket();}
+  ~Impl()
+  {
+    // Best effort if the component is torn down while still active (a
+    // shutdown that skipped deactivation): zero torque and idle every drive
+    // before the socket goes; the CAN deadman covers whatever this misses.
+    if (active && socket >= 0) {
+      active = false;
+      for (auto & joint : joints) {
+        try {
+          mit(joint, 0.0);
+          send_u32(joint.node, CanCommand::set_axis_state, 1);
+        } catch (...) {
+        }
+      }
+    }
+    close_socket();
+  }
 
   void send(uint8_t node, CanCommand command, const uint8_t * data, uint8_t length)
   {
@@ -267,6 +295,8 @@ struct GIM6010System::Impl
           protocol::unpack_mit(frame.data, frame.can_dlc, joint.limits);
         (void)reply_node;
         joint.effort = joint.sign * torque;
+        joint.mit_reply_position = position;
+        joint.mit_reply_stamp = now;
         if (mit_state) {
           // Output-shaft radians and rad/s straight from the reply. The
           // position field saturates at +-mit_max_position, so a wheel that
@@ -386,10 +416,28 @@ struct GIM6010System::Impl
       }
     }
     const auto bytes = protocol::pack_mit(
-      protocol::wire_position(position_reference, joint.sign, joint.ratio, joint.offset),
+      protocol::wire_position(position_reference, joint.sign, joint.ratio, joint.offset) +
+      joint.mit_frame_bias,
       joint.sign * velocity_reference, kp, kd, joint.sign * joint.applied_effort,
       joint.limits);
     send(joint.node, CanCommand::mit_control, bytes.data(), bytes.size());
+  }
+
+  // One line naming every drive that is not healthy, at most once a second,
+  // so a disconnected motor is visible in the log among everything else.
+  void report_faults(const std::string & offenders)
+  {
+    if (offenders.empty()) {
+      if (fault_reported) {
+        RCLCPP_INFO(rclcpp::get_logger("GIM6010System"), "all drives healthy again");
+        fault_reported = false;
+      }
+      return;
+    }
+    fault_reported = true;
+    RCLCPP_ERROR_THROTTLE(
+      rclcpp::get_logger("GIM6010System"), steady_clock, 1000,
+      "DRIVE FAULT: %s", offenders.c_str());
   }
 };
 
@@ -430,6 +478,13 @@ CallbackReturn GIM6010System::on_init(const hardware_interface::HardwareInfo & i
       info.hardware_parameters, "mit_max_kd_endpoint");
     impl_->hard_effort_limit_nm = required_number<double>(
       info.hardware_parameters, "hard_effort_limit_nm");
+    const auto bias_tolerance = info.hardware_parameters.find("mit_frame_bias_tolerance_rad");
+    if (bias_tolerance != info.hardware_parameters.end()) {
+      impl_->mit_frame_bias_tolerance_rad = std::stod(bias_tolerance->second);
+      if (!(impl_->mit_frame_bias_tolerance_rad >= 0.0)) {
+        throw std::invalid_argument("mit_frame_bias_tolerance_rad must be >= 0");
+      }
+    }
     const auto state_source = info.hardware_parameters.find("state_source");
     if (state_source != info.hardware_parameters.end()) {
       if (state_source->second == "mit") {
@@ -646,6 +701,47 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
     {
       throw std::runtime_error("not all drives entered closed-loop control");
     }
+    // The drive-side PD acts in the drive's own MIT position frame. The
+    // zero-gain frames above were answered with that position; compare it
+    // with the encoder broadcast for every joint a controller may stiffen,
+    // correct a small bias, refuse a large one (a wrong zero would pin the
+    // joint against the torque limit while the controller sees a small
+    // error). Saturated replies (multi-turn wheels) are skipped.
+    for (auto & joint : impl_->joints) {
+      joint.mit_frame_bias = 0.0;
+      if (!joint.has_kp_command) {
+        continue;
+      }
+      double reply{}, logical{};
+      {
+        std::lock_guard<std::mutex> lock(impl_->mutex);
+        reply = joint.mit_reply_position;
+        logical = joint.position;
+      }
+      if (!std::isfinite(reply) || std::abs(reply) >= 0.9 * joint.limits.position) {
+        RCLCPP_WARN(
+          rclcpp::get_logger("GIM6010System"),
+          "%s node %u: no usable MIT position reply, stiffness will act in the drive's own frame",
+          joint.name.c_str(), joint.node);
+        continue;
+      }
+      const double expected = protocol::wire_position(logical, joint.sign, joint.ratio, joint.offset);
+      const double bias = reply - expected;
+      RCLCPP_INFO(
+        rclcpp::get_logger("GIM6010System"),
+        "%s node %u: MIT position %.4f rad, encoder frame %.4f rad, bias %.4f rad",
+        joint.name.c_str(), joint.node, reply, expected, bias);
+      if (std::abs(bias) > impl_->mit_frame_bias_tolerance_rad) {
+        throw std::runtime_error(
+                joint.name + " node " + std::to_string(joint.node) +
+                ": MIT position frame differs from the encoder broadcast by " +
+                std::to_string(bias) + " rad (tolerance " +
+                std::to_string(impl_->mit_frame_bias_tolerance_rad) +
+                "); a drive-side stiffness would pull the joint to the wrong place. Check the "
+                "drive's zero (zero_load_encoder.py) and sign before arming");
+      }
+      joint.mit_frame_bias = bias;
+    }
     // The communication watchdog is intentionally the final activation write.
     for (auto & joint : impl_->joints) {
       impl_->sdo_write_verified(joint.node, impl_->deadman_endpoint, impl_->deadman_ms);
@@ -685,11 +781,31 @@ CallbackReturn GIM6010System::on_cleanup(const rclcpp_lifecycle::State &)
   return CallbackReturn::SUCCESS;
 }
 
+CallbackReturn GIM6010System::on_shutdown(const rclcpp_lifecycle::State & previous)
+{
+  // A shutdown from the active state (Ctrl-C on the controller manager)
+  // must leave the drives idle, not holding their last command.
+  if (impl_->active) {
+    on_deactivate(previous);
+  }
+  impl_->close_socket();
+  return CallbackReturn::SUCCESS;
+}
+
+CallbackReturn GIM6010System::on_error(const rclcpp_lifecycle::State & previous)
+{
+  if (impl_->active) {
+    on_deactivate(previous);
+  }
+  return CallbackReturn::SUCCESS;
+}
+
 hardware_interface::return_type GIM6010System::read(
   const rclcpp::Time &, const rclcpp::Duration &)
 {
   const auto now = std::chrono::steady_clock::now();
   std::lock_guard<std::mutex> lock(impl_->mutex);
+  std::string offenders;
   for (auto & joint : impl_->joints) {
     joint.age = joint.encoder_stamp.time_since_epoch().count() ?
       std::chrono::duration<double>(now - joint.encoder_stamp).count() :
@@ -703,10 +819,28 @@ hardware_interface::return_type GIM6010System::read(
         joint.age >= impl_->stale_state_s ||
         heartbeat_age >= impl_->heartbeat_stale_s || joint.error != 0.0))
     {
-      return hardware_interface::return_type::ERROR;
+      char detail[192];
+      std::snprintf(
+        detail, sizeof(detail), "%s (node %u): %s%s%s",
+        joint.name.c_str(), joint.node,
+        joint.age >= impl_->stale_state_s ? "no encoder feedback " : "",
+        heartbeat_age >= impl_->heartbeat_stale_s ? "no heartbeat " : "",
+        joint.error != 0.0 ? "axis error " : "");
+      if (joint.error != 0.0) {
+        char code[64];
+        std::snprintf(
+          code, sizeof(code), "0x%X%s%s flags=%u", joint.axis_error,
+          (joint.axis_error & protocol::kAxisErrorEstopRequested) ? " estop_requested" : "",
+          (joint.axis_error & protocol::kAxisErrorCanBusFailed) ? " can_watchdog" : "",
+          joint.fault_flags);
+        std::strncat(detail, code, sizeof(detail) - std::strlen(detail) - 1);
+      }
+      offenders += (offenders.empty() ? "" : " | ") + std::string(detail);
     }
   }
-  return hardware_interface::return_type::OK;
+  impl_->report_faults(offenders);
+  return offenders.empty() ? hardware_interface::return_type::OK :
+         hardware_interface::return_type::ERROR;
 }
 
 hardware_interface::return_type GIM6010System::write(

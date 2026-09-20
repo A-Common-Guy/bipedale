@@ -87,6 +87,7 @@ struct BNO085Sensor::Impl
   int read_timeout_ms{};
   uint32_t report_interval_us{};
   double online_timeout_s{};
+  bool fault_reported{false};
   int tx_byte_gap_us{};
   int max_backlog_bytes{};
   int descriptor{-1};
@@ -342,6 +343,15 @@ hardware_interface::return_type BNO085Sensor::read(
     // component remains alive and can recover when samples resume.
     std::fill_n(
       impl_->exported.begin(), 4, std::numeric_limits<double>::quiet_NaN());
+    static rclcpp::Clock steady_clock{RCL_STEADY_TIME};
+    RCLCPP_ERROR_THROTTLE(
+      rclcpp::get_logger("BNO085Sensor"), steady_clock, 1000,
+      "IMU FAULT: no BNO085 report for %.0f ms (balancers stop the wheels on NaN attitude)",
+      1e3 * impl_->exported[10]);
+    impl_->fault_reported = true;
+  } else if (impl_->fault_reported) {
+    RCLCPP_INFO(rclcpp::get_logger("BNO085Sensor"), "BNO085 reports again");
+    impl_->fault_reported = false;
   }
   return hardware_interface::return_type::OK;
 }

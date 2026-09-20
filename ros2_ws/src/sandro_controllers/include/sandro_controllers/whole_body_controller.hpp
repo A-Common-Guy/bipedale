@@ -62,6 +62,7 @@ private:
   std::string command_topic_;
   double diagnostics_rate_hz_{10.0};
   double last_diagnostics_time_s_{};
+  std::uint32_t last_reported_status_{};
   double control_period_s_{1.0 / 300.0};
   // Non-realtime copy of the accepted parameter set.
   WholeBodyParameters accepted_parameters_{};

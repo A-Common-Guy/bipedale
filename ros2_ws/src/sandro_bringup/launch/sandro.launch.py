@@ -191,7 +191,11 @@ def _setup(context):
 
     if rviz and not headless:
         if _package("rviz2"):
-            actions.append(Node(package="rviz2", executable="rviz2", output="screen"))
+            # rviz2 routinely ignores SIGINT for the default 5 + 10 s, which
+            # is what tempts a second Ctrl-C that then kills the controller
+            # manager mid-shutdown (exit code -2, drives left to the deadman).
+            actions.append(Node(package="rviz2", executable="rviz2", output="screen",
+                                sigterm_timeout="2", sigkill_timeout="3"))
         else:
             actions.append(LogInfo(msg="rviz2 unavailable; visualization skipped."))
     return actions

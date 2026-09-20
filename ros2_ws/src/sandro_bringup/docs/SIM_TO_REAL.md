@@ -387,14 +387,32 @@ fourth run with the same joint stiffness, so `model.leg_lag_s` stays 0.07;
 after changing the drive gains re-identify it as the lag at which
 `leg_offset_command_m` and `leg_offset_m` correlate best.
 
-Next robot recording: the same command as above with this build. Before
-activating, confirm in the plugin's activation log that every drive reports
-`mit_max_kp` >= 12 and `mit_max_kd` >= 0.5. Expect standing pitch within
-about ±0.03 rad without the 1.9 Hz leg swing, the leg offset command moving
-by a few millimetres rather than between its limits, `leg_offset_model_m`
-tracking `leg_offset_m` within a few millimetres, and the legs following
-their command with about 70 ms of lag (if it differs, set `model.leg_lag_s`
-to the measured value).
+First hardware run with the drive-side PD (fifth run, not recorded): the
+robot balanced well, but the stance was not symmetric (the right front link
+stood at the angle of the left rear link, i.e. the two axles were displaced
+in opposite body directions) and only the right leg followed height
+commands. The plugin converts positions to the wire frame exactly as
+SandroControl does (`sign * q + offset_rev / ratio * 2 pi`, all offsets 0),
+so the reference is not the difference; what neither project checked is
+whether each drive's own MIT position frame agrees with the encoder
+broadcast. A left drive whose MIT zero differs would hold its joint against
+the torque limit at a wrong angle while the controller, comparing the
+broadcast, sees a small error and never moves it: a stiff, wrong, unmoving
+leg, which is what was seen. The plugin now measures this bias per drive at
+activation (zero gains, MIT reply against broadcast), logs it, corrects a
+small one and refuses to arm beyond `mit_frame_bias_tolerance_rad`.
+
+Next robot recording, this build. At activation read the six `MIT position
+... bias ... rad` lines: the biases should be within a few hundredths of a
+radian; a large one on the left drives confirms the diagnosis and is
+corrected automatically below the tolerance. Also confirm every drive
+reports `mit_max_kp` >= 12 and `mit_max_kd` >= 0.5. Then record the usual
+sequence with a height phase (`--phase 3,0,0,-0.05 --phase 3,0,0,0.05`) and
+check in the diagnostics that `position_command_<joint>_rad` and the joint
+states agree within a few degrees on all four leg joints, that the right and
+left legs move together in height, and that standing pitch stays within
+about ±0.03 rad without the 1.9 Hz leg swing. The legs should follow their
+command with about 70 ms of lag (if it differs, set `model.leg_lag_s`).
 
 ## 3. Identify, in this order
 
