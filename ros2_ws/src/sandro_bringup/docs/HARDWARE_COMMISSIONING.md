@@ -14,7 +14,10 @@ It is software over the same CAN bus and is not a safety-rated substitute for
 the physical power cut-off. With teleop running, pressing L2 and R2 together on
 the gamepad (`joy_estop`, configured in `config/teleop.yaml`) deactivates every
 command-owning controller and calls this same service; it is equally software
-only, and nothing on the gamepad re-arms the drives.
+only. Re-arming from the gamepad takes two deliberate holds of Create +
+Options (2 s each): the first arms the drives at zero torque with no
+controller, the second starts the whole-body controller (hold the robot
+upright first). Both run the same activation as below.
 
 After either E-stop the drives latch `ESTOP_REQUESTED` (axis error `0x4000`,
 reported together with the CAN watchdog code as `0x104000` = 1064960).

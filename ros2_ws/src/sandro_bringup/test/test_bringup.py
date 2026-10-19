@@ -45,21 +45,39 @@ def test_teleop_maps_height_and_estop_chord():
     assert teleop["axis_linear"]["z"] != teleop["axis_angular"]["yaw"]
     assert 0.0 < teleop["scale_linear"]["z"] <= 0.05
     estop = config["joy_estop"]["ros__parameters"]
-    assert len(estop["buttons"]) >= 2
-    assert estop["buttons"][0] != estop["buttons"][1]
-    assert teleop["enable_button"] not in estop["buttons"]
+    assert len(estop["axes"]) >= 2
+    assert estop["axes"][0] != estop["axes"][1]
+    assert -1.0 < estop["axis_pressed_below"] < 0.0
+    motion_axes = {teleop["axis_linear"]["x"], teleop["axis_linear"]["z"],
+                   teleop["axis_angular"]["yaw"]}
+    assert not motion_axes & set(estop["axes"])
+    assert len(estop["rearm_buttons"]) >= 2
+    assert teleop["enable_button"] not in estop["rearm_buttons"]
+    assert estop["rearm_hold_s"] >= 1.0
     launch = (ROOT / "launch" / "sandro.launch.py").read_text()
     assert 'executable="joy_estop"' in launch
 
 
 def test_joy_estop_chord_and_controller_selection():
     from types import SimpleNamespace
-    from sandro_bringup.joy_estop import chord_pressed, controllers_to_stop
+    from sandro_bringup.joy_estop import (
+        buttons_held, chord_pressed, controllers_to_stop, rearm_step)
 
-    assert chord_pressed([0, 0, 0, 0, 0, 0, 1, 1], [6, 7])
-    assert not chord_pressed([0, 0, 0, 0, 0, 0, 1, 0], [6, 7])
-    assert not chord_pressed([1, 1], [6, 7])  # short message never triggers
-    assert not chord_pressed([1, 1], [])
+    assert buttons_held([0, 0, 0, 0, 1, 0, 1], [4, 6])
+    assert not buttons_held([0, 0, 0, 0, 1, 0, 0], [4, 6])
+    assert not buttons_held([1, 1], [4, 6])
+    # Two separate holds: never from disarmed drives straight into a balancer.
+    assert rearm_step(False, [], True) == "arm_hardware"
+    assert rearm_step(True, [], True) == "activate"
+    assert rearm_step(True, [], False) == "load_and_activate"
+    assert rearm_step(True, ["whole_body_controller"], True) == "nothing"
+    assert rearm_step(None, [], True) == "activate"
+
+    assert chord_pressed([0, 0, 0, 0, -1.0, -0.9], [4, 5], -0.5)
+    assert not chord_pressed([0, 0, 0, 0, -1.0, 1.0], [4, 5], -0.5)  # one trigger only
+    assert not chord_pressed([0, 0, 0, 0, 0, 0], [4, 5], -0.5)  # no event yet reads 0
+    assert not chord_pressed([-1, -1], [4, 5], -0.5)  # short message never triggers
+    assert not chord_pressed([-1, -1], [], -0.5)
     states = [
         SimpleNamespace(name="joint_state_broadcaster", state="active", claimed_interfaces=[]),
         SimpleNamespace(name="whole_body_controller", state="active",

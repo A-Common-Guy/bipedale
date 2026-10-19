@@ -7,11 +7,15 @@ joy_node:
 teleop_twist_joy_node:
   ros__parameters:
     require_enable_button: true
-    enable_button: 4             # PS5 L1 deadman (verify with `ros2 topic echo /joy`)
+    # Indices are SDL's gamepad layout, which joy reports for a DualSense over
+    # Bluetooth (verified on the robot's Pi): buttons 0-3 cross, circle, square,
+    # triangle, 9/10 L1/R1; axes 0/1 left stick, 2/3 right stick, 4/5 L2/R2
+    # (+1 released, -1 pressed). Check another pad with `ros2 topic echo /joy`.
+    enable_button: 9             # PS5 L1 deadman
     enable_turbo_button: -1
     axis_linear:
       x: 1                      # PS5 left stick vertical
-      z: 4                      # PS5 right stick vertical: body height rate
+      z: 3                      # PS5 right stick vertical: body height rate
     scale_linear:
       x: 0.5                    # m/s, SandroControl drive limit
       # m/s of leg height per full deflection, up = stand taller. Read by
@@ -19,20 +23,29 @@ teleop_twist_joy_node:
       # wheel-only balancers.
       z: 0.05
     axis_angular:
-      yaw: 3                    # PS5 right stick horizontal
+      yaw: 2                    # PS5 right stick horizontal
     scale_angular:
       yaw: 1.5                  # rad/s, SandroControl drive limit
     publish_stamped_twist: true # geometry_msgs/msg/TwistStamped on /cmd_vel
     frame: base_link
 
-# Gamepad E-stop: press both buttons together. PS5 L2 and R2 are joystick
-# buttons 6 and 7 (verify with `ros2 topic echo /joy`). It deactivates every
+# Gamepad E-stop: squeeze both triggers together. PS5 L2 and R2 are axes 4 and
+# 5; a trigger counts as pressed at or below axis_pressed_below. It deactivates every
 # active controller that owns command interfaces (all efforts to zero, in
 # simulation and on hardware) and triggers /gim6010_estop/trigger when that
-# service exists. Nothing on the gamepad re-arms the robot.
+# service exists.
+# Re-arm: hold Create + Options (buttons 4 and 6) for rearm_hold_s. The first
+# hold arms the drives at zero torque with no controller, a second hold starts
+# rearm_controller; hold the robot upright before the second.
 joy_estop:
   ros__parameters:
-    buttons: [6, 7]
+    axes: [4, 5]
+    axis_pressed_below: -0.5
+    rearm_buttons: [4, 6]
+    rearm_hold_s: 2.0
+    rearm_controller: whole_body_controller
+    hardware_component: SandroSystem
+    rearm_broadcasters: [joint_state_broadcaster]
     joy_topic: /joy
     controller_manager: /controller_manager
     hardware_estop_service: /gim6010_estop/trigger
