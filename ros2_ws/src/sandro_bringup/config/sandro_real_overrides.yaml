@@ -25,13 +25,14 @@ whole_body_controller:
       wheel_friction_ff_nm: 0.12
     tasks:
       roll:
-        # Both recordings: the leg kinematics report the right leg 14 mm
-        # shorter than the left while the IMU reads the body level, which on
-        # a flat floor means the IMU roll is biased by about 3 degrees of
-        # mounting. Without this the roll integral levels the IMU and tilts
-        # the body right-side-down. Check with a spirit level; set to 0 if the
-        # body is in fact level and the legs are what differ.
-        imu_offset_rad: -0.049
+        # IMU roll when the body is level. The -0.049 identified on the UART
+        # IMU (2026-09-20) no longer fits the SPI6 mounting on the Pi: with it
+        # the roll integral stood the right leg 21 mm taller than the left at
+        # every height (pi_whole_body_controller_2026-10-19, differential
+        # -19.4 mm), a 0.064 rad body tilt on a flat floor, so the mounting
+        # bias is about +0.016. Confirm with a spirit level on the body: if it
+        # reads level while the legs still differ, the leg zeros differ instead.
+        imu_offset_rad: 0.016
       height:
         # With the neutral 8 mm back the front pivot keeps its 3 % stretch
         # margin up to 0.185 m over the +-25 mm leg offset range.
