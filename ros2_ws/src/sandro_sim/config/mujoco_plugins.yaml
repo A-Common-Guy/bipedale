@@ -1,0 +1,7 @@
+# mujoco_ros2_control plugins, read from the parameters of its own node inside
+# ros2_control_node. sandro.launch.py passes this file with the MuJoCo backend.
+/**:
+  ros__parameters:
+    mujoco_plugins:
+      sandro_drives:
+        type: sandro_sim/MitDrivePlugin

@@ -5,7 +5,8 @@
 // GIM6010 drives between the two. Everything the inner component does
 // (physics, its own node, services, plugins) is untouched.
 //
-//   controllers <-> [LatencySystem: delay lines + MIT drive law] <-> MujocoSystemInterface
+//   controllers <-> [LatencySystem: delay lines, MIT frames] <-> MujocoSystemInterface
+//                                       MIT law every physics step: MitDrivePlugin
 //
 // Two things the physical path has that the bare backend does not:
 // - latency and sample rates of the sensor and command paths (delay lines on
@@ -17,12 +18,20 @@
 //   and only that torque reaches the backend's effort interface. The inner
 //   system therefore only ever sees an effort command per joint.
 //
+// The drive law runs on every physics step when the sandro_sim/MitDrivePlugin
+// mujoco_ros2_control plugin is loaded (config/mujoco_plugins.yaml): frames go
+// to it through drive_bus(). Without it the law runs here once per control
+// cycle and the backend holds the torque in between.
+//
 // Hardware parameters (all optional, seconds and hertz; 0 = pass-through):
 //   inner_plugin        pluginlib name of the wrapped system (required)
-//   imu_delay_s         latency of every sensor state interface
-//   imu_rate_hz         refresh rate of the sensor state interfaces
-//   joint_delay_s       latency of every joint state interface
-//   joint_rate_hz       refresh rate of the joint state interfaces
+//   imu_delay_s         transport latency of every sensor state interface
+//   imu_rate_hz         sample rate of the sensor state interfaces
+//   joint_delay_s       transport latency of every joint state interface
+//   joint_rate_hz       sample rate of the joint state interfaces
+//   joint_stagger       true (default): the joints sample at evenly spread
+//                       phases, like six free-running drive broadcasts;
+//                       false: all at once, like replies to one command burst
 //   command_delay_s     latency of every command interface
 //   mit_torque_limit_nm clip of the emulated drive's torque (default 10)
 
@@ -90,6 +99,7 @@ private:
   };
 
   double parameter(const std::string &key, double fallback) const;
+  bool flag(const std::string &key, bool fallback) const;
   void mirror_inner_state(std::uint8_t primary_state, const char *label);
 
   std::unique_ptr<pluginlib::ClassLoader<hardware_interface::SystemInterface>>
@@ -103,6 +113,7 @@ private:
   double imu_rate_hz_{};
   double joint_delay_s_{};
   double joint_rate_hz_{};
+  bool joint_stagger_{true};
   double command_delay_s_{};
 };
 

@@ -10,6 +10,7 @@
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "sandro_sim/drive_bus.hpp"
 #include "sandro_sim/mit_drive.hpp"
 
 namespace sandro_sim {
@@ -48,6 +49,21 @@ double LatencySystem::parameter(const std::string &key,
   return value;
 }
 
+bool LatencySystem::flag(const std::string &key, const bool fallback) const {
+  const auto &parameters = get_hardware_info().hardware_parameters;
+  const auto it = parameters.find(key);
+  if (it == parameters.end() || it->second.empty()) {
+    return fallback;
+  }
+  if (it->second == "true" || it->second == "1") {
+    return true;
+  }
+  if (it->second == "false" || it->second == "0") {
+    return false;
+  }
+  throw std::invalid_argument("hardware parameter '" + key + "' must be true or false");
+}
+
 CallbackReturn LatencySystem::on_init(
     const hardware_interface::HardwareComponentInterfaceParams &params) {
   if (hardware_interface::SystemInterface::on_init(params) !=
@@ -64,6 +80,7 @@ CallbackReturn LatencySystem::on_init(
     imu_rate_hz_ = parameter("imu_rate_hz", 0.0);
     joint_delay_s_ = parameter("joint_delay_s", 0.0);
     joint_rate_hz_ = parameter("joint_rate_hz", 0.0);
+    joint_stagger_ = flag("joint_stagger", true);
     command_delay_s_ = parameter("command_delay_s", 0.0);
     mit_torque_limit_nm_ = parameter("mit_torque_limit_nm", 10.0);
 
@@ -139,7 +156,15 @@ CallbackReturn LatencySystem::on_init(
       }
     }
     const auto &info = get_hardware_info();
-    for (const auto &joint : info.joints) {
+    const double joint_period_s = joint_rate_hz_ > 0.0 ? 1.0 / joint_rate_hz_ : 0.0;
+    for (std::size_t index = 0; index < info.joints.size(); ++index) {
+      const auto &joint = info.joints[index];
+      // One broadcast carries all of a joint's states; free-running drives
+      // broadcast at unrelated phases.
+      const double phase_s =
+          joint_stagger_ ? joint_period_s * static_cast<double>(index) /
+                               static_cast<double>(info.joints.size())
+                         : 0.0;
       for (const auto &state : joint.state_interfaces) {
         const std::string name = joint.name + "/" + state.name;
         const auto it = inner_states.find(name);
@@ -147,7 +172,7 @@ CallbackReturn LatencySystem::on_init(
           throw std::invalid_argument("inner system does not export state '" + name + "'");
         }
         StateChannel channel{name, it->second, DelayLine{}};
-        channel.line.configure(joint_delay_s_, joint_rate_hz_);
+        channel.line.configure(joint_delay_s_, joint_rate_hz_, phase_s, true);
         states_.push_back(std::move(channel));
       }
       // A joint whose description declares any of position, velocity, kp
@@ -204,18 +229,30 @@ CallbackReturn LatencySystem::on_init(
           throw std::invalid_argument("inner system does not export state '" + name + "'");
         }
         StateChannel channel{name, it->second, DelayLine{}};
-        channel.line.configure(imu_delay_s_, imu_rate_hz_);
+        channel.line.configure(imu_delay_s_, imu_rate_hz_, 0.0, true);
         states_.push_back(std::move(channel));
       }
     }
+    std::vector<std::string> mit_joints;
+    for (const auto &channel : mit_channels_) {
+      mit_joints.push_back(channel.joint);
+    }
+    drive_bus().configure(mit_joints, command_delay_s_, mit_torque_limit_nm_);
     RCLCPP_INFO(get_logger(),
                 "wrapping '%s': %zu state interfaces, %zu torque-only and %zu "
                 "MIT-mode joints; IMU %.1f ms at %.0f Hz, joints %.1f ms at "
-                "%.0f Hz, commands %.1f ms, emulated drive torque limit %.1f Nm",
+                "%.0f Hz (%s), commands %.1f ms, emulated drive torque limit %.1f Nm",
                 plugin->second.c_str(), states_.size(), commands_.size(),
                 mit_channels_.size(), 1e3 * imu_delay_s_, imu_rate_hz_,
-                1e3 * joint_delay_s_, joint_rate_hz_, 1e3 * command_delay_s_,
+                1e3 * joint_delay_s_, joint_rate_hz_,
+                joint_stagger_ ? "staggered" : "simultaneous", 1e3 * command_delay_s_,
                 mit_torque_limit_nm_);
+    if (!mit_channels_.empty() && !drive_bus().attached()) {
+      RCLCPP_WARN(get_logger(),
+                  "sandro_sim/MitDrivePlugin is not loaded: the MIT drive law runs once "
+                  "per control cycle from the cycle's state instead of on every physics "
+                  "step (load sandro_sim/config/mujoco_plugins.yaml into ros2_control_node)");
+    }
   } catch (const std::exception &error) {
     RCLCPP_ERROR(get_logger(), "configuration invalid: %s", error.what());
     return CallbackReturn::ERROR;
@@ -257,6 +294,7 @@ CallbackReturn LatencySystem::on_activate(const rclcpp_lifecycle::State &previou
       line.reset();
     }
   }
+  drive_bus().clear();
   const auto result = inner_->on_activate(previous);
   if (result == CallbackReturn::SUCCESS) {
     mirror_inner_state(lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE, "active");
@@ -265,6 +303,7 @@ CallbackReturn LatencySystem::on_activate(const rclcpp_lifecycle::State &previou
 }
 
 CallbackReturn LatencySystem::on_deactivate(const rclcpp_lifecycle::State &previous) {
+  drive_bus().clear();
   const auto result = inner_->on_deactivate(previous);
   if (result == CallbackReturn::SUCCESS) {
     mirror_inner_state(lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE, "inactive");
@@ -309,16 +348,20 @@ return_type LatencySystem::write(const rclcpp::Time &time,
     }
   }
   const double nan = std::numeric_limits<double>::quiet_NaN();
-  for (auto &channel : mit_channels_) {
-    // The frame the drive receives: every field delayed like the CAN
-    // command, unset fields NaN. The drive law then runs on the drive's own
-    // undelayed state.
+  auto &bus = drive_bus();
+  for (std::size_t joint = 0; joint < mit_channels_.size(); ++joint) {
+    auto &channel = mit_channels_[joint];
+    // The frame the drive receives, unset fields NaN. The physics-side
+    // plugin delays it by the command latency and runs the drive law on
+    // every step; the torque computed below from the same frame delayed
+    // here is what the backend applies when that plugin is absent.
+    std::array<double, 5> raw{};
     std::array<double, 5> fields{};
     for (std::size_t i = 0; i < fields.size(); ++i) {
-      fields[i] = channel.present[i]
-                      ? channel.lines[i].update(now, get_command<double>(channel.names[i]))
-                      : nan;
+      raw[i] = channel.present[i] ? get_command<double>(channel.names[i]) : nan;
+      fields[i] = channel.present[i] ? channel.lines[i].update(now, raw[i]) : nan;
     }
+    bus.push(joint, now, MitCommand{raw[0], raw[1], raw[2], raw[3], raw[4]});
     const auto position = channel.inner_position->get_optional<double>();
     const auto velocity = channel.inner_velocity->get_optional<double>();
     if (!position || !velocity) {

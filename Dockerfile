@@ -45,7 +45,10 @@ RUN apt-get update \
 
 FROM base AS development
 COPY . .
+# install/ already holds mujoco_ros2_control from the base stage; sandro_sim
+# builds a plugin against it, so it has to be on the prefix path.
 RUN . /opt/ros/jazzy/setup.sh \
+    && . install/setup.sh \
     && colcon build --base-paths ros2_ws/src --symlink-install
 
 RUN printf '%s\n' \

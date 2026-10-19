@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<library path="sandro_sim">
+  <class
+    name="sandro_sim/MitDrivePlugin"
+    type="sandro_sim::MitDrivePlugin"
+    base_class_type="mujoco_ros2_control_plugins::MuJoCoROS2ControlPluginBase">
+    <description>Runs the GIM6010 MIT drive law on every physics step from the live joint state, on the command frames sandro_sim/LatencySystem hands over with their CAN latency.</description>
+  </class>
+</library>
