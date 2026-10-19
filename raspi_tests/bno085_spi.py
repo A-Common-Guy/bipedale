@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BNO085 over SPI1 on a Raspberry Pi 4 (spidev1.0, CS0=GPIO18, INT=GPIO25, RST=GPIO24).
+"""BNO085 over hardware SPI6 on a Raspberry Pi 4 (spidev6.0, CE0=GPIO18, INT=GPIO25, RST=GPIO24).
 
 Needs `dtoverlay=spi6-1cs` in /boot/firmware/config.txt. Prints the game/rotation
 vector as quaternion + roll/pitch/yaw. Minimal SHTP implementation, no vendor library.

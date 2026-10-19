@@ -38,20 +38,25 @@ services:
   real:
     <<: *sandro
     profiles: [real]
+    # BNO085 on the Raspberry Pi's SPI plus the GPIO chip for its INT/RST
+    # lines. For the FTDI UART instead: SANDRO_IMU_DEVICE=/dev/ttyUSB0
+    # SANDRO_LAUNCH_ARGS=imu_transport:=uart.
     devices:
-      - ${SANDRO_IMU_DEVICE:-/dev/ttyUSB0}:/dev/ttyUSB0
+      - ${SANDRO_IMU_DEVICE:-/dev/spidev6.0}
+      - ${SANDRO_GPIO_CHIP:-/dev/gpiochip0}
     # SocketCAN uses the host network namespace; configure can0 on the host.
     command: >
       bash -lc 'source /opt/ros/jazzy/setup.bash;
       [ -f install/setup.bash ] && source install/setup.bash;
       ros2 launch sandro_bringup sandro.launch.py
-      hardware:=real controller:=none teleop:=false'
+      hardware:=real controller:=none teleop:=false ${SANDRO_LAUNCH_ARGS:-}'
 
   test:
     <<: *sandro
     profiles: [test]
     command: >
       bash -lc 'source /opt/ros/jazzy/setup.bash;
+      source install/setup.bash &&
       colcon build --base-paths ros2_ws/src --symlink-install &&
       source install/setup.bash &&
       colcon test --base-paths ros2_ws/src --event-handlers console_direct+ &&
@@ -71,7 +76,8 @@ services:
     <<: *sandro
     profiles: [hardware]
     devices:
-      - ${SANDRO_IMU_DEVICE:-/dev/ttyUSB0}:/dev/ttyUSB0
+      - ${SANDRO_IMU_DEVICE:-/dev/spidev6.0}
+      - ${SANDRO_GPIO_CHIP:-/dev/gpiochip0}
     stdin_open: true
     tty: true
     command: bash

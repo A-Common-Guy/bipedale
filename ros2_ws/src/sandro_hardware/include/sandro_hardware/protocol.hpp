@@ -128,14 +128,44 @@ inline std::vector<uint8_t> escape(const std::vector<uint8_t> & input)
   return output;
 }
 
-inline std::vector<uint8_t> uart_frame(
+constexpr uint8_t kShtpControlChannel = 2;
+constexpr uint8_t kShtpReportChannel = 3;
+
+// SHTP packet as sent over SPI: 4-byte header (length including the header,
+// channel, sequence) followed by the payload. The UART framing wraps it.
+inline std::vector<uint8_t> shtp_packet(
   uint8_t channel, uint8_t sequence, const std::vector<uint8_t> & payload)
 {
   const uint16_t length = static_cast<uint16_t>(4 + payload.size());
   std::vector<uint8_t> packet{
     static_cast<uint8_t>(length), static_cast<uint8_t>(length >> 8), channel, sequence};
   packet.insert(packet.end(), payload.begin(), payload.end());
-  packet = escape(packet);
+  return packet;
+}
+
+// Packet length from an SHTP header; bit 15 is the continuation flag.
+inline std::size_t shtp_length(const uint8_t * header)
+{
+  return static_cast<std::size_t>((header[0] | (header[1] << 8)) & 0x7fff);
+}
+
+// Set Feature command (0xfd) enabling a sensor report at a fixed interval;
+// an interval of zero disables it.
+inline std::vector<uint8_t> set_feature_command(uint8_t report, uint32_t interval_us)
+{
+  std::vector<uint8_t> command(17);
+  command[0] = 0xfd;
+  command[1] = report;
+  for (int i = 0; i < 4; ++i) {
+    command[5 + i] = static_cast<uint8_t>(interval_us >> (8 * i));
+  }
+  return command;
+}
+
+inline std::vector<uint8_t> uart_frame(
+  uint8_t channel, uint8_t sequence, const std::vector<uint8_t> & payload)
+{
+  auto packet = escape(shtp_packet(channel, sequence, payload));
   packet.insert(packet.begin(), {kDelimiter, 0x01});
   packet.push_back(kDelimiter);
   return packet;
@@ -175,8 +205,7 @@ public:
       }
       if (decoded.size() > 5 && decoded.front() == 0x01) {
         decoded.erase(decoded.begin());
-        const auto length = static_cast<std::size_t>(
-          (decoded[0] | (decoded[1] << 8)) & 0x7fff);
+        const auto length = shtp_length(decoded.data());
         if (length >= 4 && length <= decoded.size()) {
           decoded.resize(length);
           packets.push_back(std::move(decoded));

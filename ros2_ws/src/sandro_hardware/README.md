@@ -3,7 +3,8 @@
 ROS 2 Jazzy `ros2_control` plugins:
 
 - `sandro_hardware/GIM6010System`: six GIM6010 drives on raw SocketCAN.
-- `sandro_hardware/BNO085Sensor`: BNO085 UART-SHTP orientation, gyro and acceleration.
+- `sandro_hardware/BNO085Sensor`: BNO085 orientation, gyro and acceleration over
+  SHTP on SPI (Raspberry Pi) or UART.
 
 The CAN plugin requires exactly six joints. Each joint requires `node_id`, `sign`
 (`-1` or `1`), `ratio`, `offset_rev`, and the positive parameters
@@ -52,12 +53,25 @@ deliberately not guessed. The original wiring is nodes 1/2/3 for right
 inner/outer/wheel and 5/4/6 for left inner/outer/wheel, with signs
 `+/-/+`, `+/-/-` respectively.
 
-The BNO plugin requires one sensor and parameters `port`, `baudrate`,
-`read_timeout_ms`, `report_interval_us`, `online_timeout_s`, `tx_byte_gap_us`,
+The BNO plugin requires one sensor and the parameters `transport` (`spi` or
+`uart`, default `uart`), `read_timeout_ms`, `report_interval_us` and
+`online_timeout_s`. SPI adds `spi_device`, `spi_speed_hz`, `gpio_chip`,
+`int_gpio` and `reset_gpio`; UART adds `port`, `baudrate`, `tx_byte_gap_us`
 and `max_backlog_bytes`. Its ten standard state interfaces are
 `orientation.{x,y,z,w}`, `angular_velocity.{x,y,z}`, and
 `linear_acceleration.{x,y,z}`. Optional diagnostics are `age` and `online`.
 Quaternion ordering is ROS `x,y,z,w`.
+
+Over SPI the plugin follows `raspi_tests/bno085_spi.py`: SPI mode 3, the
+chip's WAKE pin tied high, so it only accepts a write while it asserts INT.
+Activation pulses RST, reads one boot packet, then enables the game rotation
+vector, calibrated gyro and accelerometer while INT is still asserted;
+deactivation holds the chip in reset. A receiver thread reads every packet
+INT announces (header, then the whole packet). The SPI path has not yet run
+on the robot; check `imu_update_hz` in `compare_runs.py` on the first
+recording. Over the FTDI adapter the samples reached the controller in bursts
+about 33 ms apart (30 Hz, all four 2026-09-20 recordings) despite the 5 ms
+report interval.
 
 All limits are explicit parameters and are validated. Commands are clipped only
 at the configured MIT torque limit. Activation first verifies fresh feedback,

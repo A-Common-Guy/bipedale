@@ -78,6 +78,26 @@ TEST(ShtpProtocol, EscapingAndChunkedFraming)
   EXPECT_EQ(std::vector<uint8_t>(packets[0].begin() + 4, packets[0].end()), payload);
 }
 
+TEST(ShtpProtocol, SpiPacketAndSetFeatureLayout)
+{
+  // Matches raspi_tests/bno085_spi.py: struct.pack("<BBBHIII", 0xFD, id, 0, 0, period, 0, 0).
+  const auto command = p::set_feature_command(0x08, 5000);
+  const std::vector<uint8_t> expected{
+    0xfd, 0x08, 0, 0, 0, 0x88, 0x13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  EXPECT_EQ(command, expected);
+
+  const auto packet = p::shtp_packet(p::kShtpControlChannel, 5, command);
+  ASSERT_EQ(packet.size(), 21u);
+  EXPECT_EQ(packet[0], 21);
+  EXPECT_EQ(packet[1], 0);
+  EXPECT_EQ(packet[2], p::kShtpControlChannel);
+  EXPECT_EQ(packet[3], 5);
+  EXPECT_EQ(p::shtp_length(packet.data()), 21u);
+
+  const uint8_t continued[]{0x15, 0x80, 3, 0};
+  EXPECT_EQ(p::shtp_length(continued), 21u);
+}
+
 TEST(Protocol, OnlyOperatorInducedAxisErrorsAreClearable)
 {
   // 0x104000 is what the drives report after the gamepad E-stop: the
