@@ -1,0 +1,61 @@
+[
+ {
+  "backend": "CPU MuJoCo (1 thread)",
+  "batch": 1,
+  "physics_steps_per_s": 90826.27839860838
+ },
+ {
+  "backend": "MJX-Warp (graph mode warp)",
+  "batch": 1024,
+  "physics_steps_per_s": 2239109.426352726,
+  "compile_s": 0.8720130889996653
+ },
+ {
+  "backend": "MJX-Warp (graph mode warp)",
+  "batch": 4096,
+  "physics_steps_per_s": 4575335.606695975,
+  "compile_s": 0.5483573749988864
+ },
+ {
+  "backend": "MJX-Warp (graph mode warp)",
+  "batch": 8192,
+  "physics_steps_per_s": 5180245.540648363,
+  "compile_s": 0.7169346769987897
+ },
+ {
+  "backend": "MJX-Warp (graph mode warp_staged)",
+  "batch": 1024,
+  "physics_steps_per_s": 1108320.5469277883,
+  "compile_s": 0.6787497929981328
+ },
+ {
+  "backend": "MJX-Warp (graph mode warp_staged)",
+  "batch": 4096,
+  "physics_steps_per_s": 2317656.8928324506,
+  "compile_s": 0.7542096040015167
+ },
+ {
+  "backend": "MJX-Warp (graph mode warp_staged)",
+  "batch": 8192,
+  "physics_steps_per_s": 2604502.972738542,
+  "compile_s": 1.1209399620020122
+ },
+ {
+  "backend": "MJX-JAX (body meshes not colliding)",
+  "batch": 1024,
+  "physics_steps_per_s": 297626.6346766796,
+  "compile_s": 9.469151600998885
+ },
+ {
+  "backend": "MJX-JAX (body meshes not colliding)",
+  "batch": 4096,
+  "physics_steps_per_s": 618430.0722317839,
+  "compile_s": 10.501553581001644
+ },
+ {
+  "backend": "MJX-JAX (body meshes not colliding)",
+  "batch": 8192,
+  "physics_steps_per_s": 738289.0837381185,
+  "compile_s": 14.856837662002363
+ }
+]

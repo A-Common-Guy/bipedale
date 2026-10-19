@@ -1,0 +1,56 @@
+# Second task: the same command tracking over a wider envelope than the
+# whole-body controller's, on flat ground strewn with low planks, so the
+# policy has to use what the five-bar legs can do: lean into fast turns
+# (roll from the leg height difference), crouch and stretch over the full
+# kinematic height range, and soak up plank edges with the legs instead of
+# the body.
+#
+# Envelope: 1.0 m/s and 3 rad/s are twice the drive.* limits of
+# controllers.yaml; the drives' speed limit is not documented in the repo
+# (the MIT frame encodes +-65 rad/s, the wheels need 13.5 rad/s at 1 m/s).
+# Height 0.11-0.19 m: the five-bar reaches 0.022-0.199 m at the neutral
+# fore-aft offset within the 0.97 stretch limit, and the static leg torque
+# stays under 1.1 Nm (3 Nm limit) over that range (docs/DESIGN.md).
+inherit: base.yaml
+name: agile_obstacles
+
+env:
+  naconmax_per_env: 24            # tyre and body contacts with planks
+  njmax_per_env: 192              # 6 rows per pyramidal condim-4 contact
+  terrain:
+    type: obstacles
+    obstacles:
+      count: 16
+      radius_m: [0.4, 4.0]        # ring around the start, random yaw
+      height_m: [0.005, 0.025]    # "slight": a third of the 74 mm wheel radius at most
+      depth_m: [0.04, 0.3]
+      width_m: [0.2, 1.0]
+      friction: 0.8
+  action:
+    wheels: {mode: velocity, scale_rad_s: 25.0, kd_nm_s_rad: 0.4}
+  commands:
+    forward_m_s: 1.0
+    yaw_rad_s: 3.0
+    height_m: [0.11, 0.19]
+    forward_accel_m_s2: 2.0
+    height_rate_m_s: 0.15
+  rewards:
+    sigma: {forward: 0.2, yaw: 0.5, height: 0.015}
+    weights:
+      pitch: -10.0                # the flat policy leaned up to 0.15 rad standing
+  constraints:
+    # Clearance is measured above the floor plane, so a wheel on a plank
+    # reads as lifted by the plank height.
+    wheel_lift: {limit_m: 0.035, slack: 0.02}
+
+curriculum:
+  stages:
+    - iteration: 0
+      set: {env.commands.sample_fraction: 0.4, env.terrain.obstacles.height_m: [0.002, 0.008]}
+    - iteration: 300
+      set: {env.commands.sample_fraction: 0.7, env.terrain.obstacles.height_m: [0.004, 0.016]}
+    - iteration: 700
+      set: {env.commands.sample_fraction: 1.0, env.terrain.obstacles.height_m: [0.005, 0.025]}
+
+train:
+  iterations: 1500

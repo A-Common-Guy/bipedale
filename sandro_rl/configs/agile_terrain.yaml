@@ -1,0 +1,86 @@
+# Agile driving over planks and hills, with pushes and torque kicks, and the
+# body's roll and height as commanded degrees of freedom (for animation).
+# Replaces agile_obstacles, whose planks did not collide (docs/DESIGN.md 8).
+# Obstacles are mocap bodies placed anew every episode (terrain.py); their
+# height is set by sinking them into the floor, so the curriculum below
+# lowers them rather than changing their shapes.
+inherit: base.yaml
+
+env:
+  naconmax_per_env: 24
+  njmax_per_env: 192
+
+  terrain:
+    type: obstacles
+    friction: 0.8
+    planks: {count: 12, height_m: [0.005, 0.03], depth_m: [0.04, 0.3], width_m: [0.2, 1.0], radius_m: [0.4, 4.0]}
+    hills: {count: 4, height_m: [0.02, 0.10], slope_deg: [5.0, 15.0], plateau_m: [0.2, 0.8],
+            width_m: [0.8, 1.6], radius_m: [0.3, 4.0]}
+
+  action:
+    wheels: {scale_rad_s: 25.0}
+
+  commands:
+    forward_m_s: 1.0
+    yaw_rad_s: 3.0
+    height_m: [0.09, 0.19]
+    forward_accel_m_s2: 2.0
+    height_rate_m_s: 0.15
+    roll_rad: 0.3                       # body roll target, clipped so both legs stay reachable
+    roll_rate_rad_s: 0.6
+    roll_zero_probability: 0.4
+    leg_height_limits_m: [0.07, 0.195]  # per leg; static leg torque <= 1.07 Nm in 0.08-0.2 m (DESIGN.md 4)
+
+  rewards:
+    # The height kernel is wide: at 0.015 m it was flat beyond ~4 cm of error,
+    # and the policy stopped following low height commands (DESIGN.md 8).
+    sigma: {forward: 0.2, yaw: 0.5, height: 0.03, roll: 0.06}
+    weights:
+      track_height: 2.0
+      pitch: -10.0
+      roll: -5.0                         # (roll - target)^2; soft, like the tracking terms
+      track_roll: 1.0
+
+  constraints:
+    wheel_lift: {limit_m: 0.035, slack: 0.02}   # clearance above the terrain under the wheel
+
+  pushes:
+    interval_s: [2.0, 6.0]
+    duration_s: [0.05, 0.25]
+    force_n: 25.0
+    lateral_force_n: 12.0
+    vertical_force_n: 15.0
+    torque_nm: [1.0, 1.0]               # roll, yaw
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.commands.sample_fraction: 0.4
+        env.terrain.planks.height_m: [0.002, 0.01]
+        env.terrain.hills.height_m: [0.0, 0.03]
+        env.pushes.force_n: 12.0
+        env.pushes.lateral_force_n: 5.0
+        env.pushes.vertical_force_n: 0.0
+        env.pushes.torque_nm: [0.0, 0.0]
+    - iteration: 400
+      set:
+        env.commands.sample_fraction: 0.7
+        env.terrain.planks.height_m: [0.004, 0.02]
+        env.terrain.hills.height_m: [0.01, 0.06]
+        env.pushes.force_n: 18.0
+        env.pushes.lateral_force_n: 8.0
+        env.pushes.vertical_force_n: 8.0
+        env.pushes.torque_nm: [0.5, 0.5]
+    - iteration: 900                    # stages accumulate: restate the full values
+      set:
+        env.commands.sample_fraction: 1.0
+        env.terrain.planks.height_m: [0.005, 0.03]
+        env.terrain.hills.height_m: [0.02, 0.10]
+        env.pushes.force_n: 25.0
+        env.pushes.lateral_force_n: 12.0
+        env.pushes.vertical_force_n: 15.0
+        env.pushes.torque_nm: [1.0, 1.0]
+
+train:
+  iterations: 2000

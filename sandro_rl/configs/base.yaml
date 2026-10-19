@@ -1,0 +1,157 @@
+# Defaults for every Sandro task. Task files inherit this and state only what
+# differs. Values marked "ros" are read from the ROS stack at run time
+# (controllers.yaml, sandro_real_overrides.yaml, sandro.launch.py,
+# sim_identified.yaml through the generated MJCF), never copied here.
+# The source of every randomisation range is in docs/DESIGN.md.
+
+seed: 0
+
+env:
+  impl: warp                    # MJX backend: warp (MuJoCo Warp) or jax
+  # CUDA graph capture of the Warp calls. "warp" caches a graph per buffer
+  # address set and ran out of GPU memory after ~10 PPO iterations at 8192
+  # environments; "jax" fails (unsupported child graph node); "warp_staged"
+  # copies through fixed staging buffers and runs at ~65% of "warp".
+  graph_mode: warp_staged
+  policy_rate_hz: 100           # policy runs every 3rd 300 Hz control cycle
+  episode_s: 20.0
+  naconmax_per_env: 12          # contact buffer per world (tyres 2-4, body 1-4)
+  njmax_per_env: 96
+
+  terrain:
+    type: flat                  # flat | obstacles
+    obstacles: {}
+
+  action:
+    legs:
+      mode: position            # MIT position target around the stand pose
+      scale_rad: 0.5
+      kp: ros                   # tasks.legs.drive_kp_nm_rad (12)
+      kd: ros                   # tasks.legs.drive_kd_nm_s_rad (0.5)
+    wheels:
+      mode: velocity            # velocity: MIT v_ref with kd in the drive; torque: feed-forward torque
+      scale_rad_s: 20.0
+      kd_nm_s_rad: 0.4
+      scale_nm: 3.0             # torque mode only
+    clip: 1.0
+
+  observation:
+    history: 4                  # actor frames stacked (current first)
+    accelerometer: false
+    imu_offset_correction: ros  # tasks.roll.imu_offset_rad of the robot overrides
+    scales: {gyro: 0.25, leg_vel: 0.1, wheel_vel: 0.05}
+
+  commands:
+    resample_s: [2.0, 5.0]
+    zero_probability: 0.2
+    component_zero_probability: 0.25
+    forward_m_s: ros            # drive.max_forward_velocity_m_s
+    yaw_rad_s: ros              # drive.max_yaw_rate_rad_s
+    height_m: ros               # tasks.height.min_m / max_m
+    height_change_probability: 0.5
+    # Command shaping of the whole-body controller, so the policy and the
+    # WBC follow the same reference from the same /cmd_vel.
+    forward_accel_m_s2: ros     # drive.forward_accel_limit_m_s2
+    yaw_time_constant_s: ros    # drive.yaw_command_time_constant_s
+    height_rate_m_s: ros        # drive.max_height_rate_m_s
+
+  rewards:
+    scale_by_dt: true
+    sigma: {forward: 0.15, yaw: 0.35, height: 0.012}
+    weights:
+      alive: 1.0
+      track_forward: 2.0
+      track_yaw: 1.0
+      track_height: 1.0
+      roll: -20.0               # (roll - lean-into-turn roll)^2
+      pitch: -2.0
+      pitch_rate: -0.05
+      vertical_velocity: -2.0
+      leg_symmetry: -200.0      # fore-aft offset difference between the legs, m^2
+      action_rate: -0.02
+      action_accel: -0.01
+      leg_torque: -0.002
+      wheel_torque: -0.01
+      leg_velocity: -0.0005
+      termination: -200.0
+
+  termination:
+    tilt_rad: 0.8               # the WBC declares a fall at safety.fall_angle_rad (1.0)
+    imu_height_m: 0.17          # IMU site height above the floor (0.34 standing)
+    max_qvel: 200.0             # any |qvel| above this is a diverged simulation, not a motion
+
+  constraints:                  # Constraints as Terminations (Chane-Sane et al. 2024)
+    enabled: true
+    p_max: 0.25
+    leg_torque: {limit: ros, slack: 0.5}          # |tau| above the controllers.yaml limit, Nm
+    stretch: {limit: 0.97, slack: 0.02}           # reach / (upper + lower) from the farther pivot (1 = singular)
+    joint_range: {margin_rad: 0.1, slack: 0.1}
+    height: {margin_m: 0.008, slack: 0.01}
+    tilt: {limit_rad: 0.45, slack: 0.3}
+    wheel_lift: {limit_m: 0.01, slack: 0.02}
+
+  init:
+    joint_noise_rad: 0.03
+    tilt_rad: 0.05
+    velocity_noise: 0.05
+
+  pushes:
+    enabled: true
+    interval_s: [3.0, 8.0]
+    duration_s: [0.05, 0.2]
+    force_n: 12.0               # fore-aft, uniform +-
+    lateral_force_n: 5.0
+
+  randomization:
+    enabled: true
+    latency:
+      imu_delay_s: [0.003, 0.025]
+      imu_rate_hz: [100.0, 400.0]
+      degraded_imu_probability: 0.25
+      degraded_imu_rate_hz: [25.0, 60.0]
+      joint_delay_s: [0.0005, 0.006]
+      joint_rate_hz: [150.0, 300.0]
+      synchronous_joints_probability: 0.2
+      command_delay_s: [0.0005, 0.003]
+    sensors:
+      imu_noise_scale: [0.5, 2.0]
+      encoder_noise_rad: 0.0005
+      joint_velocity_noise: 0.05
+      joint_velocity_gain: [0.75, 1.05]
+      imu_mount_bias_rad: 0.02
+      gyro_bias_rad_s: 0.01
+    drives:
+      torque_scale: [0.85, 1.15]
+      leg_gain_scale: [0.9, 1.1]
+    model:                      # multiplicative around the identified MJCF unless noted
+      body_mass_scale: [0.9, 1.1]
+      payload_mass_add_kg: [-0.4, 0.4]
+      payload_offset_m: [0.04, 0.02, 0.03]          # +- per axis, IMU frame
+      tyre_sliding_friction: [0.5, 1.2]             # absolute
+      tyre_torsional_scale: [0.5, 2.0]
+      leg_frictionloss_scale: [0.5, 3.0]
+      wheel_frictionloss_scale: [0.5, 2.0]
+      damping_scale: [0.5, 2.0]
+      armature_scale: [0.5, 8.0]                    # log-uniform
+
+train:
+  num_envs: 8192
+  steps_per_env: 24
+  iterations: 1500
+  learning_rate: 1.0e-3
+  desired_kl: 0.01
+  gamma: 0.99
+  lam: 0.95
+  clip: 0.2
+  value_coef: 1.0
+  entropy_coef: 0.005
+  epochs: 5
+  minibatches: 4
+  max_grad_norm: 1.0
+  init_log_std: -0.7
+  actor_hidden: [256, 256, 128]
+  critic_hidden: [512, 256, 128]
+  activation: elu
+  symmetry_coef: 0.5            # mirror loss weight (Mittal et al. 2024); 0 disables
+  checkpoint_every: 100
+  eval_every: 50

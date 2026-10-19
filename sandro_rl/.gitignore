@@ -1,0 +1,7 @@
+runs/
+.cache/
+.pytest_cache/
+# Per-run recordings of the evaluation (about 50 MB per policy); the
+# summaries (comparison.md/json) and plots are kept.
+policies/*/eval/*.csv
+MUJOCO_LOG.TXT

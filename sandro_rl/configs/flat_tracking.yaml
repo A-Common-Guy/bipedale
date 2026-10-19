@@ -1,0 +1,7 @@
+# First task: balance and track forward speed, yaw rate and body height from
+# changing commands on flat ground, within the whole-body controller's
+# command limits (drive.* in controllers.yaml). Asymmetric actor-critic PPO,
+# leg joint targets through the drives' MIT PD, wheel velocity targets through
+# the drives' kd, latency and dynamics randomisation, CaT constraints and the
+# mirror loss. Everything else is configs/base.yaml.
+inherit: base.yaml

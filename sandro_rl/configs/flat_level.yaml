@@ -1,0 +1,14 @@
+# flat_tracking with the body held level. The first flat policy stood at
+# about +0.15, +0.02 or -0.06 rad of body pitch depending on how it came to
+# rest, with twice the WBC's standing pitch RMS (docs/DESIGN.md section 7):
+# at weight -2 pitch was nearly free. The legs can carry the axle under the
+# CoM instead, which is what the WBC does. The wheel-torque weight is
+# doubled for the 1-2 Nm RMS the first policy spent under worst-case latency.
+inherit: flat_tracking.yaml
+
+env:
+  rewards:
+    weights:
+      pitch: -25.0
+      pitch_rate: -0.3
+      wheel_torque: -0.02
