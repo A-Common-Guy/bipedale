@@ -216,6 +216,9 @@ struct GIM6010System::Impl
 
   void open_socket()
   {
+    // Assigning over a running receiver thread would std::terminate the
+    // controller manager.
+    close_socket();
     socket = ::socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (socket < 0) {
       throw std::runtime_error("cannot create SocketCAN socket: " + std::string(std::strerror(errno)));
@@ -336,11 +339,15 @@ struct GIM6010System::Impl
     std::unique_lock<std::mutex> lock(mutex);
     awaited_endpoint = endpoint;
     sdo_reply.clear();
-    lock.unlock();
-    send(node, CanCommand::rx_sdo, request, 8);
-    lock.lock();
-    const auto received = reply_cv.wait_for(
-      lock, std::chrono::milliseconds(500), [this] {return !sdo_reply.empty();});
+    bool received = false;
+    // A drive that has just cleared its errors can drop the first read.
+    for (int attempt = 0; attempt < 3 && !received; ++attempt) {
+      lock.unlock();
+      send(node, CanCommand::rx_sdo, request, 8);
+      lock.lock();
+      received = reply_cv.wait_for(
+        lock, std::chrono::milliseconds(300), [this] {return !sdo_reply.empty();});
+    }
     awaited_endpoint = std::numeric_limits<uint16_t>::max();
     if (!received || sdo_reply.size() < 8) {
       throw std::runtime_error("node " + std::to_string(node) + ": SDO verification timed out");
@@ -757,7 +764,10 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
         continue;
       }
       const double expected = protocol::wire_position(logical, joint.sign, joint.ratio, joint.offset);
-      const double bias = reply - expected;
+      // The MIT position field spans [-limit, limit] and wraps beyond it,
+      // while the broadcast counts turns: a wheel that has rolled past the
+      // range differs by whole spans, which is not a zero error.
+      const double bias = std::remainder(reply - expected, 2.0 * joint.limits.position);
       RCLCPP_INFO(
         rclcpp::get_logger("GIM6010System"),
         "%s node %u: MIT position %.4f rad, encoder frame %.4f rad, bias %.4f rad",
@@ -841,6 +851,9 @@ CallbackReturn GIM6010System::on_error(const rclcpp_lifecycle::State & previous)
   if (impl_->active) {
     on_deactivate(previous);
   }
+  // Error handling ends in unconfigured: release what configure opened, so
+  // re-arming (configure, activate) starts from a clean socket.
+  impl_->close_socket();
   return CallbackReturn::SUCCESS;
 }
 
