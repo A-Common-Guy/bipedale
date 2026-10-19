@@ -55,7 +55,9 @@ actuators:
 # the CAD one, i.e. roughly 1.2 kg some 11 cm behind the CoM (battery and
 # electronics at the rear). Replace mass_kg with the weighed total minus 3.40
 # and re-place it once trim_m on the real robot reads about zero with the
-# controller's neutral_offset_m.
+# controller's neutral_offset_m. The 28 mm was later found to be mostly the
+# lean held against wheel stiction (SIM_TO_REAL.md, fourth comparison; the
+# robot overrides use -0.008 m), so this placement is still too far back.
 payload:
   mass_kg: 1.2
   position_m: [-0.031, 0.035, -0.15]

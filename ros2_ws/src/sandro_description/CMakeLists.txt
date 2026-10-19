@@ -9,7 +9,7 @@ install(
 )
 
 install(
-  PROGRAMS tools/sync_model.py
+  PROGRAMS tools/sync_model.py tools/com_from_weighing.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

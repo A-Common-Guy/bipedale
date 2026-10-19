@@ -11,6 +11,8 @@
   -->
   <xacro:arg name="control_backend" default="none"/>
   <xacro:arg name="can_interface" default="can0"/>
+  <xacro:arg name="imu_transport" default="spi"/>
+  <xacro:arg name="imu_spi_device" default="/dev/spidev6.0"/>
   <xacro:arg name="imu_port" default="/dev/ttyUSB0"/>
   <xacro:arg name="state_source" default="encoder"/>
   <xacro:arg name="encoder_period_ms" default="5"/>
@@ -18,9 +20,10 @@
   <xacro:arg name="simulation_latency" default="true"/>
   <xacro:arg name="sim_imu_delay_s" default="0.010"/>
   <xacro:arg name="sim_imu_rate_hz" default="200"/>
-  <xacro:arg name="sim_joint_delay_s" default="0.005"/>
+  <xacro:arg name="sim_joint_delay_s" default="0.001"/>
   <xacro:arg name="sim_joint_rate_hz" default="200"/>
-  <xacro:arg name="sim_command_delay_s" default="0.0033"/>
+  <xacro:arg name="sim_joint_stagger" default="true"/>
+  <xacro:arg name="sim_command_delay_s" default="0.001"/>
   <xacro:property name="control_backend" value="$(arg control_backend)"/>
 
   <material name="body_blue"><color rgba="0.18 0.45 0.85 1"/></material>
@@ -139,12 +142,14 @@
   <xacro:include filename="$(find sandro_description)/urdf/sandro.ros2_control.xacro"/>
   <xacro:if value="${control_backend != 'none'}">
     <xacro:sandro_ros2_control backend="${control_backend}"
-      can_interface="$(arg can_interface)" imu_port="$(arg imu_port)"
+      can_interface="$(arg can_interface)" imu_transport="$(arg imu_transport)"
+      imu_spi_device="$(arg imu_spi_device)" imu_port="$(arg imu_port)"
       state_source="$(arg state_source)" encoder_period_ms="$(arg encoder_period_ms)"
       simulation_headless="$(arg simulation_headless)"
       simulation_latency="$(arg simulation_latency)"
       sim_imu_delay_s="$(arg sim_imu_delay_s)" sim_imu_rate_hz="$(arg sim_imu_rate_hz)"
       sim_joint_delay_s="$(arg sim_joint_delay_s)" sim_joint_rate_hz="$(arg sim_joint_rate_hz)"
+      sim_joint_stagger="$(arg sim_joint_stagger)"
       sim_command_delay_s="$(arg sim_command_delay_s)"/>
   </xacro:if>
 </robot>

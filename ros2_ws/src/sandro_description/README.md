@@ -6,10 +6,14 @@ ROS 2 Jazzy description resources for Sandro.
 
 - `urdf/sandro.urdf.xacro` is the `robot_state_publisher` model. It exposes the
   six stable actuated joint names and `imu_link`.
-- `urdf/sandro.mujoco.urdf.xacro` adds
-  `mujoco_ros2_control/MujocoSystem`.
-- `urdf/sandro.real.urdf.xacro` adds the GIM6010 system and BNO085 sensor from
+  The launch file expands it with `control_backend:=mujoco|real` (and the
+  `sim_*` latency arguments), which adds the `ros2_control` block from
+  `urdf/sandro.ros2_control.xacro`: the MuJoCo backend wrapped in
+  `sandro_sim/LatencySystem`, or the GIM6010 system and BNO085 sensor from
   `sandro_hardware`.
+- `urdf/sandro.mujoco.urdf.xacro` and `urdf/sandro.real.urdf.xacro` are
+  shortcuts for the same two blocks with the macro's default arguments, for
+  inspection outside the launch file.
 - `mjcf/scene_floating.xml` and `mjcf/robot_full_floating.xml` are byte-for-byte
   copies of the canonical Onshape export. Their referenced STL files are kept
   below `mjcf/assets`, preserving MuJoCo's relative `meshdir`.

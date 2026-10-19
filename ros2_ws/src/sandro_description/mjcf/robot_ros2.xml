@@ -1,6 +1,6 @@
 <mujoco model="robot">
   <compiler angle="radian" meshdir="assets/" />
-  <option integrator="implicitfast" />
+  <option integrator="implicitfast" timestep="0.000833333333333" />
   <size nkey="2" />
   <default>
     <default class="robot">

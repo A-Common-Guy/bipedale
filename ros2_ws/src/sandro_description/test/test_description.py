@@ -52,6 +52,16 @@ def test_ros2_mjcf_uses_bounded_unit_gain_effort_actuators():
     assert scene.find("./include").attrib["file"] == "robot_ros2.xml"
 
 
+def test_ros2_mjcf_timestep_divides_the_control_period():
+    # The controller manager wakes on the first /clock tick past each period,
+    # so any remainder slows the loop (2 ms steps give 250 Hz instead of 300).
+    root = ET.parse(PACKAGE / "mjcf" / "robot_ros2.xml").getroot()
+    timestep = float(root.find("./option").attrib["timestep"])
+    steps = (1.0 / sync_model.CONTROL_RATE_HZ) / timestep
+    assert abs(steps - round(steps)) < 1e-6
+    assert round(steps) >= 2
+
+
 def test_identified_payload_is_a_body_with_inertia():
     """A geom mass on the torso would be ignored: it carries an <inertial>."""
     identified = sync_model.load_identified()
@@ -187,3 +197,16 @@ def test_xacro_expands_for_visualization_and_both_backends():
         "sandro_hardware/GIM6010System",
         "sandro_hardware/BNO085Sensor",
     }
+
+    def imu_params(root):
+        hardware = root.find("./ros2_control[@name='SandroImu']/hardware")
+        return {node.get("name"): node.text for node in hardware.findall("param")}
+
+    spi = imu_params(real)
+    assert spi["transport"] == "spi"
+    assert spi["spi_device"] == "/dev/spidev6.0"
+    assert "port" not in spi
+    uart = imu_params(_expand("real", "imu_transport:=uart", "imu_port:=/dev/ttyUSB1"))
+    assert uart["transport"] == "uart"
+    assert uart["port"] == "/dev/ttyUSB1"
+    assert "spi_device" not in uart

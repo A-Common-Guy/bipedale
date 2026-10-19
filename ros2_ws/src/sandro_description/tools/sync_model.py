@@ -21,6 +21,15 @@ MJCF_FILES = ("robot_full_floating.xml", "scene_floating.xml")
 # export never loses it.
 IDENTIFIED_FILE = PACKAGE_ROOT / "config" / "sim_identified.yaml"
 ROS2_MJCF_FILES = ("robot_ros2.xml", "scene_ros2.xml")
+# Physics step of the ROS model. mujoco_ros2_control publishes /clock once per
+# step and the controller manager sleeps on it until the next 1/300 s
+# boundary, so the step must divide the control period: with MuJoCo's default
+# 2 ms the controller wakes every 4 ms and runs at 250 Hz, against the
+# robot's 300 Hz. Four steps per cycle also let the drive law
+# (sandro_sim/MitDrivePlugin) act on fresh state every 0.83 ms.
+CONTROL_RATE_HZ = 300
+PHYSICS_STEPS_PER_CONTROL_CYCLE = 4
+PHYSICS_TIMESTEP_S = 1.0 / (CONTROL_RATE_HZ * PHYSICS_STEPS_PER_CONTROL_CYCLE)
 # Logical frames of the six actuated joints, derived from the export by
 # tools/derive_joint_frames.py (needs the mujoco Python package; rerun it after
 # every CAD export). Entry: (sign, zero_rad).
@@ -335,6 +344,12 @@ def ros2_models(source: Path) -> dict[str, str]:
     for key in robot.findall("./keyframe/key"):
         if "ctrl" in key.attrib:
             key.set("ctrl", " ".join(["0"] * len(STABLE_JOINTS)))
+
+    option = robot.find("./option")
+    if option is None:
+        option = ET.Element("option")
+        robot.insert(0, option)
+    option.set("timestep", f"{PHYSICS_TIMESTEP_S:.12g}")
 
     _apply_joint_frames(robot)
     apply_identified(robot, load_identified())
