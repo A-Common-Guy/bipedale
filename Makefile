@@ -1,4 +1,4 @@
-.PHONY: build sim sim-wbc real test shell hardware-shell xauth
+.PHONY: build sim sim-cascade real test shell hardware-shell xauth
 
 XAUTH ?= /tmp/.sandro.xauth
 
@@ -23,9 +23,9 @@ xauth:
 sim: xauth
 	docker compose --profile sim run --rm sim
 
-# Same simulation with the whole-body controller instead of the cascade.
-sim-wbc: xauth
-	SANDRO_LAUNCH_ARGS="controller:=whole_body_controller $(SANDRO_LAUNCH_ARGS)" \
+# Same simulation with the PID cascade instead of the whole-body controller.
+sim-cascade: xauth
+	SANDRO_LAUNCH_ARGS="controller:=driving_balancer $(SANDRO_LAUNCH_ARGS)" \
 	  docker compose --profile sim run --rm sim
 
 real:

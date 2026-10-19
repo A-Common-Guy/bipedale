@@ -45,7 +45,10 @@ def _setup(context):
             "xacro", os.path.join(description, "urdf", "sandro.urdf.xacro"),
             "control_backend:=real",
             f"can_interface:={LaunchConfiguration('can_interface').perform(context)}",
-            f"imu_port:={LaunchConfiguration('imu_port').perform(context)}",
+            *[
+                f"{name}:={LaunchConfiguration(name).perform(context)}"
+                for name in ("imu_transport", "imu_spi_device", "imu_port")
+            ],
         ],
         text=True,
     )
@@ -110,6 +113,8 @@ def generate_launch_description():
         DeclareLaunchArgument("activate", default_value="false",
                               description="Explicit hardware-arm opt-in; defaults safe"),
         DeclareLaunchArgument("can_interface", default_value="can0"),
+        DeclareLaunchArgument("imu_transport", default_value="spi"),
+        DeclareLaunchArgument("imu_spi_device", default_value="/dev/spidev6.0"),
         DeclareLaunchArgument("imu_port", default_value="/dev/ttyUSB0"),
         OpaqueFunction(function=_setup),
     ])

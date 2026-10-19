@@ -57,7 +57,10 @@ def _setup(context):
                         "xacro", xacro_file,
                         f"control_backend:={hardware}",
                         f"can_interface:={LaunchConfiguration('can_interface').perform(context)}",
-                        f"imu_port:={LaunchConfiguration('imu_port').perform(context)}",
+                        *[
+                            f"{name}:={LaunchConfiguration(name).perform(context)}"
+                            for name in ("imu_transport", "imu_spi_device", "imu_port")
+                        ],
                         f"state_source:={LaunchConfiguration('state_source').perform(context)}",
                         f"encoder_period_ms:={LaunchConfiguration('encoder_period_ms').perform(context)}",
                         f"simulation_headless:={'true' if headless else 'false'}",
@@ -65,7 +68,8 @@ def _setup(context):
                         *[
                             f"{name}:={LaunchConfiguration(name).perform(context)}"
                             for name in ("sim_imu_delay_s", "sim_imu_rate_hz", "sim_joint_delay_s",
-                                         "sim_joint_rate_hz", "sim_command_delay_s")
+                                         "sim_joint_rate_hz", "sim_joint_stagger",
+                                         "sim_command_delay_s")
                         ],
                     ],
                     text=True,
@@ -109,6 +113,7 @@ def _setup(context):
             ))
             control_allowed = False
 
+        sim_share = _package("sandro_sim") if hardware == "mujoco" else None
         if control_allowed:
             actions.append(Node(
                 package=(
@@ -119,6 +124,9 @@ def _setup(context):
                 parameters=[
                     {"robot_description": robot_description},
                     os.path.join(bringup, "config", "controllers.yaml"),
+                    # The MuJoCo backend's plugins: the per-step MIT drive law.
+                    *([os.path.join(sim_share, "config", "mujoco_plugins.yaml")]
+                      if sim_share else []),
                     # Optional overrides (tuning experiments, per-robot values)
                     # applied after the shipped configuration.
                     *([extra_params] if extra_params else []),
@@ -204,16 +212,20 @@ def _setup(context):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("hardware", default_value="mujoco",
-                              description="mujoco or real"),
+                              description="mujoco (alias: sim) or real"),
         DeclareLaunchArgument(
-            "controller", default_value="driving_balancer",
+            "controller", default_value="whole_body_controller",
             description=(
-                "Controller to spawn, or none: driving_balancer (cascade), "
-                "lqr_balancer (full state feedback), whole_body_controller"
+                "Controller to spawn, or none: whole_body_controller, "
+                "driving_balancer (cascade), lqr_balancer (full state feedback)"
             ),
         ),
         DeclareLaunchArgument("can_interface", default_value="can0"),
-        DeclareLaunchArgument("imu_port", default_value="/dev/ttyUSB0"),
+        DeclareLaunchArgument("imu_transport", default_value="spi",
+                              description="BNO085 link: spi (Raspberry Pi) or uart (FTDI)"),
+        DeclareLaunchArgument("imu_spi_device", default_value="/dev/spidev6.0"),
+        DeclareLaunchArgument("imu_port", default_value="/dev/ttyUSB0",
+                              description="UART device, used with imu_transport:=uart"),
         DeclareLaunchArgument(
             "state_source", default_value="encoder",
             description="real only: joint state from the 0x09 'encoder' broadcast or the synchronous 'mit' reply",
@@ -238,15 +250,20 @@ def generate_launch_description():
             description="MuJoCo only: emulate sensor and command latency (sandro_sim/LatencySystem)",
         ),
         DeclareLaunchArgument("sim_imu_delay_s", default_value="0.010",
-                              description="MuJoCo only: IMU latency in seconds"),
+                              description="MuJoCo only: IMU latency from sample to host, seconds"),
         DeclareLaunchArgument("sim_imu_rate_hz", default_value="200",
-                              description="MuJoCo only: IMU refresh rate in Hz (0 = every cycle)"),
-        DeclareLaunchArgument("sim_joint_delay_s", default_value="0.005",
-                              description="MuJoCo only: encoder latency in seconds"),
+                              description="MuJoCo only: IMU sample rate in Hz (0 = every cycle)"),
+        DeclareLaunchArgument("sim_joint_delay_s", default_value="0.001",
+                              description="MuJoCo only: encoder latency from sample to host "
+                                          "(CAN frame plus USB adapter), seconds"),
         DeclareLaunchArgument("sim_joint_rate_hz", default_value="200",
-                              description="MuJoCo only: encoder refresh rate in Hz (0 = every cycle)"),
-        DeclareLaunchArgument("sim_command_delay_s", default_value="0.0033",
-                              description="MuJoCo only: command latency in seconds"),
+                              description="MuJoCo only: encoder sample rate in Hz (0 = every cycle)"),
+        DeclareLaunchArgument("sim_joint_stagger", default_value="true",
+                              description="MuJoCo only: drives sample at spread phases (broadcast); "
+                                          "false for state_source:=mit replies"),
+        DeclareLaunchArgument("sim_command_delay_s", default_value="0.001",
+                              description="MuJoCo only: latency from write() to the drive "
+                                          "(USB adapter plus CAN frames), seconds"),
         DeclareLaunchArgument(
             "extra_params", default_value="",
             description="Additional controller-manager YAML applied after controllers.yaml",

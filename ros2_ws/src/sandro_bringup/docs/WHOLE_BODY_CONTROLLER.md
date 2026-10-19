@@ -1,18 +1,19 @@
 # Whole-body controller
 
-`sandro_controllers/WholeBodyController` is the leg-exploiting alternative to
-the wheel-only balancers. The modelling record and the reasoning behind each
+`sandro_controllers/WholeBodyController` is the launch's default controller
+and the leg-exploiting alternative to the wheel-only balancers. The modelling record and the reasoning behind each
 control choice are in `MODELLING_AND_CONTROL.md`; this page is the operating
 manual. It claims the same six effort commands, joint states
 and IMU states, and listens to the same `/cmd_vel` `TwistStamped`, so it is a
 drop-in swap:
 
 ```bash
-make sim-wbc                      # MuJoCo with viewer
+make sim                          # MuJoCo with viewer
 ros2 launch sandro_bringup sandro.launch.py \
   hardware:=mujoco controller:=whole_body_controller headless:=true rviz:=false
+ros2 control load_controller --set-state inactive driving_balancer
 ros2 control switch_controllers \
-  --deactivate driving_balancer --activate whole_body_controller
+  --deactivate whole_body_controller --activate driving_balancer
 ```
 
 `linear.x` is forward speed, `angular.z` yaw rate, and additionally `linear.z`
@@ -69,12 +70,12 @@ offset.
 ### Model
 
 The robot reduces to a body of mass `M` (everything the legs carry) on wheels
-of radius `r`, with the body's centre of mass `L = k * leg_height` above the
+of radius `r` (mass `m_w` and axle inertia `I_w` each), with the body's centre of mass `L = k * leg_height` above the
 axle and shifted forward by `d` (the leg offset, positive when the wheels are
 placed backward). With total wheel torque `tau` acting between wheels and body:
 
 ```
-a x_dd + b pitch_dd = tau / r                 a = M + m_w + I_w / r^2
+a x_dd + b pitch_dd = tau / r                 a = M + 2 m_w + 2 I_w / r^2
 b x_dd + c pitch_dd = M g (L pitch + d) - tau  b = M L,  c = I + M L^2
 ```
 
@@ -100,9 +101,9 @@ lists the joint convention and the derivation tools): `M = 3.284 kg`, CoM
 
 - **Balance LQR** gives total wheel torque and the leg offset rate. The rate is
   integrated into a leg offset command, bounded by `balance.leg_offset_limit_m`
-  and the workspace check. The offset state it feeds back is the measured axle
-  position by default; `balance.measured_offset_blend` moves it toward the
-  commanded offset (see *Tuning*). Every parameter set is checked for its
+  and the workspace check. The achieved offset it feeds back is the leg-lag
+  model's prediction by default; `balance.measured_offset_blend` moves it
+  toward the measured axle position (see *Tuning*). Every parameter set is checked for its
   input-delay margin at configure time (`balance.required_delay_margin_s`) and
   the margin is printed with the gains.
 - **Legs** hold a Cartesian reference per side (fore-aft placement from the
@@ -158,9 +159,12 @@ lists the joint convention and the derivation tools): `M = 3.284 kg`, CoM
 
 The simulation emulates the physical sensor and command latency by default
 (`sandro_sim/LatencySystem`; `sim_latency:=false` for the ideal backend, and
-`sim_imu_delay_s`, `sim_joint_delay_s`, `sim_command_delay_s` and the rates as
-launch arguments). Parameters that only balance the ideal simulation will not
-balance the robot; see `SIM_TO_REAL.md`.
+`sim_imu_delay_s`, `sim_joint_delay_s`, `sim_command_delay_s`, the rates and
+`sim_joint_stagger` as launch arguments) and runs the drives' MIT law on every
+physics step (`sandro_sim/MitDrivePlugin`). Parameters that only balance the
+ideal simulation will not balance the robot; see `SIM_TO_REAL.md`. For
+sweeps, `sandro_sim/tools/closed_loop.py` runs the same controller and
+emulation without ROS, about 50 times faster than real time.
 
 Physics runs from the moment the controller manager starts, about a second
 before the balancer is active, and unpowered legs collapse in that time. The
@@ -199,8 +203,8 @@ reports why. In order:
    far the real centre of mass sits behind the model's neutral axle position.
    Move the neutral there with `tasks.fore_aft.neutral_offset_m` (negative for
    backward) so the legs keep their full offset range; a rearward shift needs
-   `tasks.height.max_m` lowered (0.175 m for 28 mm) to stay clear of the front
-   pivot's stretched singularity. Per-robot values live in
+   `tasks.height.max_m` lowered (0.185 m for the robot's 8 mm) to stay clear
+   of the front pivot's stretched singularity. Per-robot values live in
    `config/sandro_real_overrides.yaml` (`SIM_TO_REAL.md`).
 2. `balance.weights` / `balance.effort_weights`: Bryson's rule in SI units. The
    log line at configure prints the resulting gains and the input-delay

@@ -27,11 +27,12 @@ it clamps at `effort_limit_nm`, requires continuous messages, and zeros after
 Switch controllers with the standard manager:
 
 ```bash
+ros2 control load_controller --set-state inactive my_controller
 ros2 control switch_controllers \
-  --deactivate driving_balancer --activate my_controller
+  --deactivate whole_body_controller --activate my_controller
 ```
 
-RL and whole-body controllers can use the same interfaces directly; see
+New controllers (a learned policy, for example) can use the same interfaces directly; see
 `WHOLE_BODY_CONTROLLER.md` for the leg-exploiting balancer that ships here. Keep
 final policy limits in each controller; the separate 10 Nm hardware boundary is
 fault containment, not a tuning value.

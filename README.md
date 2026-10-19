@@ -7,14 +7,15 @@ The existing `SandroControl/` application remains separate and unchanged.
 
 ```bash
 make build
-make sim       # simulation profile (driving_balancer)
-make sim-wbc   # simulation with the whole-body controller
+make sim         # simulation with the whole-body controller (launch default)
+make sim-cascade # simulation with the PID cascade (driving_balancer)
 make shell     # development shell
 make test      # builds and runs colcon tests
 ```
 
-The image builds four local packages: `sandro_description`, `sandro_hardware`,
-`sandro_controllers`, and `sandro_bringup`. It pins the maintained
+The image builds five local packages: `sandro_description`, `sandro_hardware`,
+`sandro_controllers`, `sandro_sim` (latency and drive emulation for MuJoCo) and
+`sandro_bringup`. It pins the maintained
 `ros-controls/mujoco_ros2_control` source because a Jazzy binary is not
 available in the configured apt repository.
 
@@ -25,8 +26,15 @@ For physical setup:
 make real
 ```
 
-`make real` **does not arm hardware**. Set `SANDRO_IMU_DEVICE` if the UART is
-not `/dev/ttyUSB0`. The launch default
+`make real` **does not arm hardware**. The ROS IMU plugin reads the BNO085
+over SPI on the Raspberry Pi by default (`imu_transport:=spi`,
+`/dev/spidev6.0` with `dtoverlay=spi6-1cs`, INT on GPIO25, RST on GPIO24; the
+same wiring as `raspi_tests/bno085_spi.py`). Set `SANDRO_IMU_DEVICE` and
+`SANDRO_GPIO_CHIP` if the devices differ. The old FTDI UART link, which
+delivered only about 30 samples per second on every recorded run
+(`SIM_TO_REAL.md`), is still available:
+`SANDRO_IMU_DEVICE=/dev/ttyUSB0 SANDRO_LAUNCH_ARGS=imu_transport:=uart make real`.
+The launch default
 `arm_hardware:=false` prevents the controller manager from starting. Read
 `ros2_ws/src/sandro_bringup/docs/HARDWARE_COMMISSIONING.md` before overriding
 it. Container networking is host mode for DDS and SocketCAN; serial and
@@ -49,7 +57,7 @@ Top-level launch arguments:
 
 ```bash
 ros2 launch sandro_bringup sandro.launch.py \
-  hardware:=mujoco controller:=driving_balancer \
+  hardware:=mujoco controller:=whole_body_controller \
   teleop:=true rviz:=true headless:=false
 ```
 
@@ -65,9 +73,10 @@ axis/button indices with `ros2 topic echo /joy` before use. Limits and units are
 Tune any policy value with normal ROS parameters, for example:
 
 ```bash
-ros2 param set /driving_balancer balance.pitch_kp_nm_rad 14.0
-ros2 param dump /driving_balancer --output-dir tuned_profiles
-ros2 control switch_controllers --deactivate driving_balancer --activate my_controller
+ros2 param set /whole_body_controller balance.effort_weights.wheel_torque 5.0
+ros2 param dump /whole_body_controller --output-dir tuned_profiles
+ros2 control load_controller --set-state inactive my_controller
+ros2 control switch_controllers --deactivate whole_body_controller --activate my_controller
 ```
 
 All torque, slew, velocity, angle, and timeout boundaries are named. Controller

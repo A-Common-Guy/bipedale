@@ -11,10 +11,12 @@ tuning in `WHOLE_BODY_CONTROLLER.md`, hardware bring-up in
 Two planar five-bar legs carry a rigid body on two wheels. Each leg has two
 motors on the body (inner and outer pivot, 90 mm apart), two 80 mm upper links,
 two 130 mm lower links meeting at the wheel axle, and a wheel motor at the
-axle. All six actuators are GIM6010 drives (8:1) in torque mode over CAN at
-300 Hz; a BNO085 IMU on the roof gives orientation and rates. The controllers
-see six effort commands, six joint positions and velocities, and the ten
-standard IMU interfaces, identically in MuJoCo and on hardware.
+axle. All six actuators are GIM6010 drives (8:1) commanded with one MIT frame
+each over CAN at 300 Hz (position and velocity references, kp, kd and a
+torque; the wheels use the torque only); a BNO085 IMU on the roof gives
+orientation and rates. The controllers see the six MIT frames, six joint
+positions and velocities, and the ten standard IMU interfaces, identically in
+MuJoCo and on hardware.
 
 Frames: body x forward, y left, z up (the IMU frame). Planar leg coordinates
 are +x from the inner toward the outer pivot and +y down toward the wheel. The
@@ -116,7 +118,7 @@ and an unmodelled CoM offset) as the plant the controller is unit-tested on.
 | Tyre contact compliance, gearbox backlash | wheels chatter at the sampling rate when the velocity gain is high | gain limit on wheel velocity feedback, 15 Hz velocity filter |
 | Leg compliance under wheel torque: the ground force `tau / r` at the axle and the stator moment `-tau` on the lower link that carries the wheel motor deflect the leg impedance (about 50 mm per Nm per wheel at the first 300 N/m, 15 mm at 400 N/m) | the axle moved centimetres with every torque swing on the robot; the yaw differential twisted the two legs in opposite directions | the leg PD in the drives' MIT loop (about 1800 N/m at the axle, 3.3), the leg lag in the LQR model, optional reaction feed-forward (off), `measured_offset_blend` |
 | Yaw dynamics: body twisting on the legs and on the tyre scrub | the 1.0–1.5 Nm per rad/s yaw gain on the IMU rate rang at 3.6 Hz with ±0.8 Nm while the robot stood still | model-based yaw loop: proportional on the wheel-differential rate at about 7 rad/s, integral on the IMU rate, scrub and inertia feed-forward (3.5) |
-| Sensor and command latency (IMU 200 Hz plus fusion, encoders 200 Hz, one cycle of command delay) | oscillation on hardware; the ideal-sim tuning falls in the latency-emulating simulation | `sandro_sim/LatencySystem` in simulation, gains chosen for 17–30 ms of delay margin (`SIM_TO_REAL.md`) |
+| Sensor and command latency (IMU 30 Hz over UART plus fusion, encoders 200 Hz on unsynchronised clocks, about 1 ms of command transport) | oscillation on hardware; the ideal-sim tuning falls in the latency-emulating simulation | `sandro_sim/LatencySystem` and `MitDrivePlugin` in simulation, the LQR's input-delay margin (16.7 ms shipped; `SIM_TO_REAL.md`, timing and eighth comparison) |
 | Leg tracking lag (~40 rad/s loaded) | LQR assumes ideal placement | leg-offset weights keep that mode below the leg bandwidth |
 | CoM position error, slopes, rolling drag | steady lean | posture trim moves the axle under the CoM |
 | Lateral dynamics in turns | outward tipping | lean-into-turn roll task |
@@ -134,9 +136,11 @@ the leg masses, so about 0.7 mm of lever is gained per mm of shift and the
 trim iterates once. CoM height and inertia only enter through the gains and
 are tolerant of 10–20 % error; the earlier `SandroControl/fit_sysid.py` route
 remains available for actuator friction and inertia if higher fidelity is
-wanted. The first robot recording and its comparison are in `SIM_TO_REAL.md`:
-about 1.2 kg more than CAD, CoM 28 mm behind the CAD neutral, tyres that do
-not skid, and a yaw loop that was torque-limited.
+wanted. The robot recordings and their comparisons are in `SIM_TO_REAL.md`:
+about 1.2 kg more than CAD, CoM 7 to 8 mm behind the CAD neutral
+(`neutral_offset_m: -0.008`; the 28 mm first read from `trim_m` was a lean
+held against wheel stiction), tyres that do not skid, and a yaw loop that was
+torque-limited.
 
 ## 3. Control choices
 
@@ -215,9 +219,9 @@ the lag model; 0.015 against 0.036 without it); with a third of the gain on
 the measurement it may be usable on the robot again, and the parameter
 exists to find out.
 
-### 3.3 Legs as Cartesian impedances
+### 3.3 Legs: drive-side PD (default) or Cartesian impedance
 
-Per leg, in the planar frame, `F = Kp (p_ref − p) − Kd p_dot_f + [0, F_support]`,
+With `tasks.legs.pd_in_drive: 0`, per leg, in the planar frame, `F = Kp (p_ref − p) − Kd p_dot_f + [0, F_support]`,
 mapped through `J^T`, with `p_dot_f` the Cartesian velocity low-passed at
 30 Hz. Gravity support `M g / 2` is fed forward so the impedance only has to
 correct errors, and a slow integral on the mean height error (150 N/(m s),
@@ -252,8 +256,9 @@ kinematics of its Cartesian reference with SandroControl's gains (12 Nm/rad,
 support as torque (`tasks.legs.pd_in_drive`); the policy limit is kept by
 pulling the reference toward the measured position when the torque the
 drive will compute from the latest state would exceed it. The simulation
-emulates the same loop (`sandro_sim/LatencySystem`: command fields delayed
-like the CAN frame, the law computed on the undelayed joint state) and with
+emulates the same loop (`sandro_sim/LatencySystem` delays the frame like the
+CAN bus, `sandro_sim/MitDrivePlugin` computes the law before every physics
+step on the current joint state) and with
 it accepts these gains and stiffer ones: kp 12 / kd 0.5 gives a 72 ms leg
 response (the robot's 70 ms), 19 / 0.5 gives 48 ms, 20 / 0.3 gives 24 ms,
 all stable (`recordings/sim_wbc4_drivepd_*`). The response time is what

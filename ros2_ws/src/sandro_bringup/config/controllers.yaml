@@ -97,8 +97,8 @@ driving_balancer:
 # driving_balancer; both exclusively claim all six effort interfaces.
 #
 # Regenerate the gains after any mass or geometry change with:
-#   mujoco_sim/venv/bin/python \
-#     ros2_ws/src/sandro_controllers/tools/lqr_design.py --wheel-radius 0.0742
+#   python3 ros2_ws/src/sandro_controllers/tools/lqr_design.py --wheel-radius 0.0742
+# (any Python with the mujoco package, e.g. pip install mujoco)
 lqr_balancer:
   ros__parameters:
     joints: [right_motor_inner, right_motor_outer, right_wheel,
@@ -161,13 +161,14 @@ lqr_balancer:
       engage_angle_rad: 0.15
 
 # Whole-body controller. One height-scheduled LQR coordinates total wheel
-# torque with fore-aft wheel placement through both five-bar legs, the legs
-# run a stiff Cartesian impedance with gravity support and the wheel torque's
-# reaction fed forward, a model-based yaw loop turns the robot, the body leans
-# into turns by a differential leg height, and a slow posture trim puts the
-# axle under the centre of mass so the body stands level. Switch to it with:
+# torque with fore-aft wheel placement through both five-bar legs; the legs
+# hold their inverse-kinematics references with the drives' own MIT PD
+# (tasks.legs) and get the gravity support as feed-forward torque, a
+# model-based yaw loop turns the robot, the body leans into turns by a
+# differential leg height, and a slow posture trim puts the axle under the
+# centre of mass so the body stands level. Switch to it with:
 #   controller:=whole_body_controller
-# It claims all six effort interfaces, so activate exactly one balancer.
+# It claims every joint's full MIT frame, so activate exactly one balancer.
 #
 # The same /cmd_vel TwistStamped drives it: linear.x forward speed, angular.z
 # yaw rate, and linear.z as a body height rate (m/s, optional).
@@ -204,11 +205,11 @@ whole_body_controller:
       # reflected through the track included (identified MJCF, stand pose).
       yaw_inertia_kgm2: 0.09
       # Time constant with which the measured axle follows its commanded
-      # fore-aft offset: 70 ms on the robot (fourth run, cross-correlation of
-      # leg_offset_command_m and leg_offset_m in the diagnostics), about
-      # 30 ms in MuJoCo. The LQR designed without it asked the legs for a
-      # 72 ms mode and hunted at 1.9 Hz. Re-identify after changing the leg
-      # impedance (the overdamped leg responds in about kd / kp).
+      # fore-aft offset: 60 to 85 ms on the robot (fourth run, controller-side
+      # impedance; compare_runs.py leg_lag_ms), 55 to 65 ms in MuJoCo with the
+      # drive-side kp 12 / kd 0.5. The LQR designed without it asked the legs
+      # for a 72 ms mode and hunted at 1.9 Hz. Re-identify after changing the
+      # leg gains (the overdamped leg responds in about kd / kp).
       leg_lag_s: 0.07
       com_height_per_leg_height: 0.654  # CoM above axle = 0.654 * leg height
       com_height_offset_m: 0.0
@@ -280,21 +281,17 @@ whole_body_controller:
       engage_pitch_rad: 0.15
       engage_pitch_rate_rad_s: 0.5
     tasks:
-      # The legs are the balance loop's inner actuator and should hold the
-      # axle where it was placed: at 300 N/m one newton-metre of wheel torque
-      # moved the axle 20 to 50 mm (ground force tau / r plus the stator
-      # moment on the wheel link), which is the 2 Hz leg swing the robot
-      # showed. Stiffness is bounded by loop delay: the stiffness term is
-      # negative damping k * delay, so kd must grow with kp (kd / kp about
-      # 0.04 s, the PID cascade's joint ratio that balances the robot). The
-      # latency-emulating simulation falls above about 400 N/m and also falls
-      # with the cascade's gains the robot balances on, so it cannot set this
-      # value: raise kp on the robot in steps of 200 N/m with kd = 0.04 * kp,
-      # watching the leg efforts for sample-rate chatter
-      # (compare_runs.py leg metrics), toward the cascade's 1500 to 2000 N/m.
+      # Cartesian leg impedance, used only with tasks.legs.pd_in_drive: 0
+      # (the default runs the leg PD in the drives, below; tune
+      # drive_kp_nm_rad / drive_kd_nm_s_rad there). Closed in the controller,
+      # the stiffness is bounded by the sensor and command delay: the
+      # stiffness term is negative damping k * delay, so kd must grow with kp
+      # (kd / kp about 0.04 s), and the latency-emulating simulation fell
+      # above about 400 N/m. At 300 N/m one newton-metre of wheel torque moved
+      # the axle 20 to 50 mm, the 2 Hz leg swing of the early hardware runs.
       # Damping acts on a low-passed Cartesian velocity
-      # (leg_velocity_filter_hz). The height integral learns the share of the
-      # weight the feed-forward misses.
+      # (leg_velocity_filter_hz). The height integral (ki, integral_limit)
+      # learns the share of the weight the feed-forward misses in both modes.
       height:
         target_m: 0.17
         min_m: 0.14

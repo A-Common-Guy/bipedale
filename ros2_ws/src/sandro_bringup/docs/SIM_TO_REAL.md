@@ -10,25 +10,57 @@ tuning done in MuJoCo transfers. Model background is in
 
 | Effect | Reality | Simulation before | Now |
 | --- | --- | --- | --- |
-| Sensor latency | BNO085 reports at 200 Hz plus fusion lag; drive encoder broadcasts every 5 ms | fresh every 3.3 ms, zero delay | `sandro_sim/LatencySystem` decorator: delay + sample-and-hold per interface |
-| Command latency | a command reaches the drive one control cycle later | applied at the next physics step | same decorator, command path |
-| Drive-side MIT loop | the drive computes `kp (q_ref - q) + kd (v_ref - v) + tau` in its own cycle from its own encoder | backend takes torque only | same decorator: the frame's fields are delayed like the CAN command, the law runs on the undelayed joint state, only the torque reaches the backend |
+| Sensor latency | BNO085 reports at 200 Hz plus fusion lag; drive encoder broadcasts every 5 ms, the six drives unsynchronised | fresh every 3.3 ms, zero delay | `sandro_sim/LatencySystem` decorator: each interface is sampled on its own 200 Hz clock (joint clocks staggered) and delivered after a transport delay |
+| Command latency | a frame is on the wire about 1 ms after the write | applied at the next physics step | `sandro_sim/MitDrivePlugin` holds each frame for `sim_command_delay_s` at physics-step resolution |
+| Drive-side MIT loop | the drive computes `kp (q_ref - q) + kd (v_ref - v) + tau` in its own cycle from its own encoder | backend takes torque only | `sandro_sim/MitDrivePlugin` runs the law before every physics step on the current joint state |
+| Control rate | 300 Hz | 250 Hz: the controller manager sleeps on `/clock`, which only ticks every 2 ms physics step | physics step 1/1200 s (`sync_model.py`), four steps per control cycle |
 | Tyre scrub | rubber tyre resists twisting about the contact normal | condim 3, no torsional friction | condim 4, torsional friction 0.004 m, 10 ms contact |
 | CoM / mass | robot not weighed; CAD only | CAD | `payload` in `config/sim_identified.yaml` |
 | Drive friction, torque constant | unmeasured | legacy fit / CAD | `joints`, `actuators` in the same file |
 
 The two latencies turned out to be the whole story of the oscillation. With
-the emulation on (IMU 10 ms at 200 Hz, encoders 5 ms at 200 Hz, one cycle of
-command delay), the parameters that balanced the ideal simulation fell within
+the first emulation (until 2026-10-16: IMU 10 ms at 200 Hz, encoders 5 ms at
+200 Hz, one cycle of command delay, a 250 Hz controller), the parameters that balanced the ideal simulation fell within
 two seconds: the leg Cartesian impedance (fore-aft 1000/40, height 600/40)
 oscillated at the sample rate, and the balance LQR had a loop-delay margin of
 exactly 3 samples (10 ms). A sweep isolated the encoder-plus-command path as
 the critical one; 10 ms on the IMU alone was tolerated.
 
-The shipped parameters changed accordingly (fore-aft 300/12, height 400/20
-with a support integral, wheel torque weight 2.0 giving 17 ms of margin); the
-latency-emulating simulation now balances, drives, turns and spins with them.
-Expect the robot to be calmer with the same set.
+The parameters changed accordingly (fore-aft 300/12, later 400/20, height
+400/20 with a support integral, wheel torque weight 2.0 giving 17 ms of
+margin); the latency-emulating simulation balanced, drove, turned and spun
+with them. The leg PD has since moved into the drives (seventh comparison).
+
+### Timing of the emulation (2026-10-16)
+
+The first emulation was harsher than the robot in four ways, all of which
+the numbers above were obtained with:
+
+- The controller ran at 250 Hz. mujoco_ros2_control publishes `/clock` once
+  per physics step and the controller manager sleeps until `now + 1/300 s`,
+  so with MuJoCo's default 2 ms step it woke every 4 ms. The LQR, discretised
+  for 3.33 ms, was running on a slower plant than it was designed for.
+- The MIT law ran once per control cycle on 3.3 ms old state and its torque
+  was held for the whole cycle: a sampled PD at 300 Hz, against the drive's
+  continuous one. It now runs in a mujoco_ros2_control plugin before every
+  physics step.
+- "Delay" and "rate" compounded. A 200 Hz channel read by a 300 Hz loop
+  refreshed only every other cycle (150 Hz), and on top of the hold the value
+  was the 5 ms delay old, so the encoders were 5 to 13 ms old instead of the
+  robot's 1 to 6 ms. The rate now sets a sample clock and the delay is the
+  transport latency from the sample to the controller; with the default
+  1 ms the encoder data is 1 to 6 ms old, as on the robot.
+- The command delay was rounded up to whole control cycles (3.3 ms) and is
+  now applied per physics step (1 ms by default, about one 3-frame CAN
+  burst plus the gs_usb round trip).
+
+The IMU stays at 10 ms / 200 Hz until the SPI path on the Raspberry Pi
+(`imu_transport:=spi`, the launch default) is measured with
+`compare_runs.py imu_update_hz`; the UART path delivered only 30 Hz (`sim_imu_rate_hz:=30`
+reproduces it, eighth comparison). Recheck the shipped gains against these settings before relying on
+the margins quoted above: the loop is less delayed than the one they were
+tuned for. `sim_joint_stagger:=false` puts all drives on one clock, as
+`state_source:=mit` does.
 
 ## 2. Measuring the gap
 
@@ -113,8 +145,9 @@ joint velocity and leg position from the MIT reply each drive sends to every
 command, one cycle old at most and synchronous with the loop, instead of the
 5 ms encoder broadcast that the loop beats against. It is untested on the
 robot as of this writing; try it once the baseline above is repeatable, and
-if it helps set `sim_joint_delay_s:=0.0033 sim_joint_rate_hz:=300` for the
-simulation to match.
+if it helps set `sim_joint_delay_s:=0.0023 sim_joint_rate_hz:=300
+sim_joint_stagger:=false` for the simulation to match (the reply is sampled
+when the previous cycle's command arrives and read one cycle later).
 
 ### Third comparison (2026-09-20, identified simulation with the override)
 
@@ -297,7 +330,8 @@ Three results from the same campaign bound what the simulation can decide:
 - **Offset state.** Feeding the LQR the commanded leg offset instead of the
   measured axle position removes the compliance path entirely but leaves the
   legs' sway undamped: standing pitch RMS 0.036 against 0.015 in the
-  emulation. The measured position ships (`measured_offset_blend` 1).
+  emulation. The measured position shipped (`measured_offset_blend` 1)
+  until the fourth hardware run; the sixth comparison set it back to 0.
 
 Next robot recording, with this build and the override:
 
@@ -414,13 +448,96 @@ left legs move together in height, and that standing pitch stays within
 about ±0.03 rad without the 1.9 Hz leg swing. The legs should follow their
 command with about 70 ms of lag (if it differs, set `model.leg_lag_s`).
 
+### Eighth comparison (2026-10-16, closed-loop simulation without ROS)
+
+`sandro_sim/tools/closed_loop.py` runs the whole-body controller against
+MuJoCo in one process: the unchanged `WholeBodyCore`, the latency emulation's
+own `DelayLine`, `DriveBus` and MIT law, the controller manager's wake-up
+rule on the 1/1200 s physics clock, and the IMU noise mujoco_ros2_control
+adds. It writes `drive_test.py` recordings, a 23 s run takes under a second,
+and `check` runs the gates below in a few seconds. Against the ROS
+simulation's `sim_wbc4_drivepd_kp12` recording it reproduces standing pitch
+RMS 0.024 vs 0.025 rad, speed error 0.072 vs 0.070 m/s, yaw rise 1.02 vs
+0.96 s and identical leg efforts, so sweeps can be run there and only the
+conclusions confirmed through the launch.
+
+`compare_runs.py` now also reports the timing the controller saw. On the
+hardware recordings and the simulations (phase 0):
+
+| | `real4` | ROS simulation until now | simulation now |
+| --- | --- | --- | --- |
+| IMU orientation updates | 29.9 Hz | 125 Hz | 200 Hz (`sim_imu_rate_hz`) |
+| encoder updates per joint | 199.9 Hz | 125 Hz | 199.9 Hz |
+| joints updating together | 0.66 | 1.00 | 0.60 |
+
+The encoders now match. **The IMU does not: every hardware run so far
+received a new BNO085 sample only every 30 to 37 ms**, although the plugin
+asks for 200 Hz, consistent with the FTDI adapter's USB latency timer
+batching the UART stream. The emulation assumed 200 Hz. With the shipped
+parameters and the robot overrides:
+
+| IMU rate | 5 ms | 10 ms | 20 ms | 30 ms IMU delay |
+| --- | --- | --- | --- | --- |
+| 200 Hz | ok | ok | ok | falls |
+| 100 Hz | ok | ok | ok | falls |
+| 50 Hz | ok | ok | falls | falls |
+| 30 Hz | ok | ok (falls at 15 ms) | falls | falls |
+
+At 30 Hz a command delay of 6 ms also falls (3.3 ms does not), while the
+encoder delay hardly matters any more (1 to 10 ms change nothing) because
+the leg loop runs in the drives. The falls are a 6 Hz oscillation of the
+balance loop growing within a second. At 30 Hz the hardware sequence still
+passes, but `drive_test.py`'s default sequence (0.3 m/s, 1 rad/s turn,
+spin, height changes) falls while driving at 0.3 m/s. Raising
+`balance.effort_weights.wheel_torque` from 2 to 5 survives 30 Hz with 20 ms
+at the cost of a softer stance (pitch RMS 0.041 against 0.024). The SPI
+path on the Raspberry Pi should remove the batching; measure its rate and
+delay with `compare_runs.py` before choosing between the two.
+
+Two more results:
+
+- **The 0.3 to 0.4 Hz standing sway is friction, not latency.** It is the
+  same with every delay at zero; compensating the full 0.2 Nm of simulated
+  wheel Coulomb friction (`balance.wheel_friction_ff_nm`) calms it to
+  0.009 rad but makes the wheels chatter (10 % sign flips), and the posture
+  trim adapting during it makes it larger. `real3` stood with the same
+  0.38 Hz.
+- **The robot's controller-side legs were faster than the simulated ones.**
+  With the 400/20 Cartesian impedance the measured axle followed its command
+  by 62 to 84 ms on the robot (`real4`) against 120 to 230 ms in simulation;
+  with the drive-side PD the simulation's 54 to 66 ms matches
+  `model.leg_lag_s` 0.07. The leg drives' simulated friction or armature is
+  the suspect (identification step 4 below). The simulation does not
+  reproduce `real4`'s 1.9 Hz leg hunting with that configuration at any
+  latency it survives.
+
+The gates (`closed_loop.py check`, controllers.yaml plus the robot
+overrides): the hardware sequence at nominal latency standing within
+0.035 rad RMS and tracking 0.2 m/s; the same with a 30 Hz IMU; the same
+with the drive law once per control cycle; 8 N shoves; the default
+drive_test sequence at nominal latency and with a 30 Hz IMU. The last fails
+today, for the reason above. Run them after every parameter or model change.
+
 ## 3. Identify, in this order
 
 Each step changes one thing in `sandro_description/config/sim_identified.yaml`
 or the controller model, then `tools/sync_model.py sync` regenerates the ROS
 model and the comparison is repeated.
 
-1. **Mass and CoM.** Weigh the robot. `payload.mass_kg` is the total minus the
+1. **Mass and CoM.** Lock both legs at a known pose (spacer or zip ties,
+   drives unpowered) and weigh the robot. Then stand it on its wheels, tilt
+   the body forward and hold it on a kitchen scale at a measured horizontal
+   distance from the axle; note the IMU pitch and the reading. Repeat
+   backward (+-15 to 30 deg, support 0.2 m or more from the axle).
+   `sandro_description/tools/com_from_weighing.py` turns the readings into
+   the CoM height above the axle and its forward offset (about +-2 mm and
+   +-1 mm with a 2 g scale), evaluates the MuJoCo model at the same leg pose,
+   and prints the payload (`--write` puts it into `sim_identified.yaml`),
+   `model.body_mass_kg`, `tasks.fore_aft.neutral_offset_m` and, with
+   `--leg-height`, `model.com_height_offset_m`. It needs the `mujoco` Python
+   package. The CoM height is the one number the balance model cannot get
+   from the trim; the trim check below still applies.
+   `payload.mass_kg` is the total minus the
    CAD's 3.40 kg. Stand on the controller and read `trim_m` from
    `~/diagnostics` once it settles: positive means the real centre of mass is
    behind the model's neutral axle by that lever. Move the controller's
@@ -429,13 +546,19 @@ model and the comparison is repeated.
    `model.body_mass_kg` to the weighed value minus the two wheels. Both go in
    `config/sandro_real_overrides.yaml`, applied with `extra_params:=` on both
    backends.
-2. **Latency.** The defaults are estimates. Measure the IMU path by tapping
-   the body while recording `/imu_broadcaster/imu` and `/joint_states` at
-   full rate (the recorder does this) and comparing the pitch-rate onset with
-   the wheel encoder reaction; measure the encoder age from the `feedback_age`
-   interface on `/dynamic_joint_states`. Set `sim_imu_delay_s`,
-   `sim_joint_delay_s` and the rates as launch arguments until the standing
-   phase's `pitch_peak_hz` and `wheel_flip_frac` match the robot.
+2. **Latency.** The rates are measured: `compare_runs.py` reports
+   `imu_update_hz`, `encoder_update_hz` and `encoder_sync_frac` from any
+   recording, and `sim_imu_rate_hz` / `sim_joint_rate_hz` must reproduce
+   them (encoders 200 Hz unsynchronised; IMU 30 Hz over UART, the SPI path
+   still to be measured). Measure the IMU delay with
+   `tools/imu_delay.py`: legs locked, wheels blocked so they cannot roll,
+   broadcasters running (`controller:=none`), rock the body by hand for
+   30 s. Each wheel encoder then reads minus the body pitch, so the shift of
+   maximum correlation is the IMU delay minus the encoder delay, as the
+   controller receives them (synthetic recordings: within 0.1 ms).
+   `sim_imu_delay_s` is that lag plus `sim_joint_delay_s`. Measure the
+   encoder age from the `feedback_age` interface on `/dynamic_joint_states`.
+   The IMU delay is the one that matters (eighth comparison).
 3. **Tyre scrub.** Compare `yaw_rise_s` and `yaw_err_rms` in the turning
    phases. Raise `tyre.friction[1]` (torsional) until the simulated yaw
    response is as slow as the robot's, then retune `tasks.yaw.*` in
@@ -460,25 +583,26 @@ The controller manager and the CAN traffic run at 300 Hz. Raising them to
   heartbeats: about 6 000 frames/s, roughly 75 % of a 1 Mbit/s bus. At 500 Hz
   that is about 8 500 frames/s, over 100 %. The queue then adds far more delay
   than the faster cycle removes.
-- The delay that matters is the sensor path, not the cycle. The emulation
-  shows the encoder hold (5 ms) plus one command cycle is what limits the leg
-  and wheel loops; the IMU at 10 ms is tolerated. Going from 300 to 500 Hz
-  shaves 1.3 ms of the roughly 15 ms loop while the encoder broadcast stays at
-  200 Hz.
+- The delay that matters is the sensor path, not the cycle. With the leg PD
+  in the drives the IMU path decides the balance loop's margin (eighth
+  comparison); going from 300 to 500 Hz shaves 1.3 ms while the IMU holds
+  each sample for up to 33 ms over UART.
 
-What does help: raise the BNO085 report rate (the game rotation vector runs
-to 400 Hz) and take joint state from the MIT reply frames that already arrive
-every cycle instead of the separate 5 ms encoder broadcast, which would remove
-about 20 % of the bus load and give 300 Hz fresh joint data. Both are
-hardware-plugin changes, worth doing after the identification above shows how
-much latency remains.
+What does help: get the BNO085 samples to the controller at their report
+rate (the SPI path; the game rotation vector runs to 400 Hz) and take joint
+state from the MIT reply frames that already arrive every cycle instead of
+the separate 5 ms encoder broadcast (`state_source:=mit`), which removes
+about 20 % of the bus load.
 
 ## 5. Tooling summary
 
 | Tool | Purpose |
 | --- | --- |
 | `sandro_bringup/tools/drive_test.py --record` | same scripted drive on any backend, CSV of diagnostics, joint states and IMU; `--record-from-start` also captures the engagement transient (phase -1) |
-| `sandro_bringup/tools/compare_runs.py` | per-phase gap metrics for two or more recordings |
+| `sandro_bringup/tools/compare_runs.py` | per-phase gap metrics for two or more recordings, including the sensor update rates and the leg lag |
+| `sandro_bringup/tools/imu_delay.py` | `record` joint states and IMU while the body is rocked with the wheels blocked; `analyze` the IMU delay relative to the encoders (orientation and gyro) |
+| `sandro_description/tools/com_from_weighing.py` | CoM height and forward offset from tilted weighings, and the matching sim payload and controller parameters |
+| `sandro_sim/tools/closed_loop.py` | the whole-body controller against MuJoCo without ROS, about 50 times real time: `run` (one recording), `sweep` (grid over latencies and parameters), `check` (the gates of the eighth comparison) |
 | `sandro_description/config/sim_identified.yaml` | identified reality applied to the ROS MJCF by `sync_model.py` |
 | `sandro_sim/LatencySystem` | sensor and command latency in simulation; `sim_latency:=false` and the `sim_*` launch arguments control it |
 | `extra_params:=file.yaml` launch argument | controller parameter overrides for tuning experiments without editing the shipped config |

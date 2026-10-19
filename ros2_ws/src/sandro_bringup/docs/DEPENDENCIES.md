@@ -14,8 +14,9 @@
   300 Hz actuator path and does not implement GIM6010 lifecycle/SDO/MIT
   semantics. `sandro_hardware` therefore uses Linux SocketCAN directly.
 - IMU: available BNO08x ROS projects do not provide a clearly maintained
-  Jazzy UART-SHTP implementation plus the required future SPI path. The small
-  sensor plugin keeps transport isolated behind standard IMU state interfaces.
+  Jazzy SHTP implementation over both UART and SPI. The small sensor plugin
+  implements both (spidev and the GPIO character device directly, no extra
+  library) behind standard IMU state interfaces.
 - Host networking is required for straightforward DDS discovery and access to
   host SocketCAN. Serial/gamepad access is separate and must use narrowly
   scoped Compose `devices:` plus host udev/group permissions.
