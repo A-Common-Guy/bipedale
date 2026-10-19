@@ -5,8 +5,7 @@ The cascade controller's gains are hand-tuned; these are solved from the
 plant. Run this whenever the chassis mass, wheel size or centre of mass
 changes, and paste the printed block into sandro_bringup/config/controllers.yaml.
 
-    mujoco_sim/venv/bin/python \
-        ros2_ws/src/sandro_controllers/tools/lqr_design.py
+    python3 ros2_ws/src/sandro_controllers/tools/lqr_design.py   # needs pip install mujoco
 
 State vector is [position_m, velocity_m_s, pitch_rad, pitch_rate_rad_s] and the
 input is the common-mode wheel torque in Nm (the sum across both wheels).

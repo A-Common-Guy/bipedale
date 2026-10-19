@@ -70,7 +70,7 @@ LinearModel linearize(const WholeBodyModel &m, const double leg_height_m) {
   // motor torque tau acting between wheels and body:
   //   a x_dd + b pitch_dd = tau / r
   //   b x_dd + c pitch_dd = M g (L pitch + d) - tau
-  // with a = M + m_w + I_w / r^2, b = M L, c = I + M L^2. The leg offset d
+  // with a = M + 2 m_w + 2 I_w / r^2, b = M L, c = I + M L^2. The leg offset d
   // enters exactly like pitch scaled by 1/L, which is why moving the wheels
   // under the body is as effective as leaning it. The legs are not
   // instantaneous, though: the achieved d follows the commanded d_c with

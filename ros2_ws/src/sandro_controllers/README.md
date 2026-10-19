@@ -24,7 +24,7 @@ mistaking an unchanged, stationary quaternion for a stale sample.
 
 Requested and effective motion, pitch, torque, ramp, age, and saturation mask
 are published as `diagnostic_msgs/msg/DiagnosticArray` on `~/diagnostics`.
-Parameters in `config/controllers.yaml` use SI units and can be changed
+Parameters in `sandro_bringup/config/controllers.yaml` use SI units and can be changed
 atomically while active; invalid signs, limits, geometry, or unreachable leg
 height are rejected.
 

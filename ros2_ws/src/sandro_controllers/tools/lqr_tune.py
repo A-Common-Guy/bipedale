@@ -6,8 +6,7 @@ controller uses against the linearised plant, and reports what you actually
 care about: how fast it reaches a commanded speed, how hard it leans and pushes
 to get there, and how well it recovers from a shove.
 
-    mujoco_sim/venv/bin/python \
-        ros2_ws/src/sandro_controllers/tools/lqr_tune.py
+    python3 ros2_ws/src/sandro_controllers/tools/lqr_tune.py   # needs pip install mujoco
 """
 
 from __future__ import annotations

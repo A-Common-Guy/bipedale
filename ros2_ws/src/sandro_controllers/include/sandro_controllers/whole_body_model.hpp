@@ -1,8 +1,9 @@
 #pragma once
 
 // Reduced whole-body model of Sandro: two planar five-bar legs carrying a
-// rigid body on two wheels. The legs are treated as position-controlled
-// Cartesian actuators, so the fast balance dynamics reduce to a wheeled
+// rigid body on two wheels. The legs are treated as Cartesian placement
+// actuators that follow their command with a first-order lag (model.leg_lag_s),
+// whichever loop holds them, so the fast balance dynamics reduce to a wheeled
 // inverted pendulum whose centre of mass can be shifted fore-aft by the legs
 // and whose height, and therefore pendulum length, follows the leg height.
 //

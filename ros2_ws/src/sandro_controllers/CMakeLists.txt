@@ -31,6 +31,7 @@ add_library(sandro_controllers SHARED
   src/whole_body_controller.cpp
   src/whole_body_core.cpp
   src/whole_body_model.cpp
+  src/whole_body_parameters.cpp
 )
 target_include_directories(sandro_controllers PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -48,7 +49,6 @@ install(TARGETS sandro_controllers
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
-install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 install(FILES README.md sandro_controllers_plugins.xml
   DESTINATION share/${PROJECT_NAME})
 

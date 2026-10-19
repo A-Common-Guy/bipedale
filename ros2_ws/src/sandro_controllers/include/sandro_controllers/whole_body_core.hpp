@@ -20,11 +20,13 @@
 //              it. The achieved offset fed back is the model's prediction by
 //              default; measured_offset_blend mixes in the measured axle
 //              position.
-//   tasks      Cartesian impedance per leg (height with gravity support,
-//              fore-aft placement), damping on low-passed velocities, an
-//              optional feed-forward of the wheel torque's reaction on the
-//              leg, mapped to motor torques through J^T with the gravity
-//              support protected from saturation; a model-based PI on the
+//   tasks      a Cartesian reference per leg (height with gravity support,
+//              fore-aft placement), held by default by the drives' MIT PD
+//              on the inverse-kinematics joint references
+//              (leg_pd_in_drive), otherwise by a Cartesian impedance on
+//              low-passed velocities mapped through J^T; gravity support as
+//              feed-forward, protected from saturation, and an optional
+//              feed-forward of the wheel torque's reaction; a model-based PI on the
 //              yaw rate with scrub and inertia feed-forward producing a
 //              differential wheel torque
 //   safety     command/IMU timeouts, engage-when-upright, effort ramp, fall
@@ -131,21 +133,18 @@ struct WholeBodyParameters {
   double engage_pitch_rad{0.15};
   double engage_pitch_rate_rad_s{0.5};
 
-  // Height task (planar leg height, pivot to axle). The legs are the balance
-  // loop's inner actuator and should be as stiff as the loop delay allows:
-  // at 300 N/m one newton-metre of wheel torque moved the axle 20 to 50 mm
-  // through the ground force and the stator reaction, which is what the
-  // robot's legs did at 2 Hz. With about 13 ms of sensor-plus-command delay
-  // the stiffness term itself is negative damping (k sin(wT)/w), so the
-  // damping must grow with the stiffness (kd / kp of 0.04 s, the ratio of
-  // the PID cascade's joint gains that balance the robot) while kd / m_leg
-  // times the delay stays small. The latency-emulating simulation falls
-  // above about 400 N/m with either ratio, and it also falls with the
-  // cascade's joint gains that the robot balances on, so the leg stiffness
-  // is tuned on the robot (WHOLE_BODY_CONTROLLER.md); these are the values
-  // the emulation accepts. The derivative gain acts on a low-passed
-  // Cartesian velocity. The integral absorbs the part of the body weight the
-  // feed-forward gets wrong (the lower links rest on the wheels directly).
+  // Height task (planar leg height, pivot to axle). target/min/max/rate and
+  // the integral apply in both leg modes; kp/kd (and the fore-aft ones
+  // below) only with leg_pd_in_drive 0. Closed in the controller, the
+  // stiffness is bounded by the sensor-plus-command delay: the stiffness
+  // term is negative damping (k sin(wT)/w), so the damping must grow with
+  // the stiffness (kd / kp of 0.04 s) while kd / m_leg times the delay stays
+  // small, and the latency-emulating simulation fell above about 400 N/m. At
+  // 300 N/m one newton-metre of wheel torque moved the axle 20 to 50 mm,
+  // which is what the robot's legs did at 2 Hz. The derivative gain acts on
+  // a low-passed Cartesian velocity. The integral absorbs the part of the
+  // body weight the feed-forward gets wrong (the lower links rest on the
+  // wheels directly).
   double height_target_m{0.17};
   double height_min_m{0.14};
   double height_max_m{0.19};
