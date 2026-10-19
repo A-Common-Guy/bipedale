@@ -151,7 +151,7 @@
           <xacro:if value="${imu_transport == 'spi'}">
             <!-- Raspberry Pi 4 hardware SPI6 (dtoverlay=spi6-1cs: SCLK GPIO21,
                  MOSI GPIO20, MISO GPIO19, CE0 GPIO18), INT on GPIO25, RST on
-                 GPIO24, as raspi_tests/bno085_spi.py. -->
+                 GPIO24, as deploy/pi/tools/bno085_spi_probe.py. -->
             <param name="spi_device">${imu_spi_device}</param>
             <param name="spi_speed_hz">3000000</param>
             <param name="gpio_chip">/dev/gpiochip0</param>

@@ -281,7 +281,7 @@ struct BNO085Sensor::Impl
   }
 
   // Header first, then the whole packet in one transfer while INT is still
-  // asserted (the chip re-sends it from the start), as raspi_tests/bno085_spi.py.
+  // asserted (the chip re-sends it from the start), as deploy/pi/tools/bno085_spi_probe.py.
   std::vector<uint8_t> read_spi_packet(std::chrono::milliseconds timeout) const
   {
     if (!wait_int(timeout)) {

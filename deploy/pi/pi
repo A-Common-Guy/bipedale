@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# Develop against the robot's Raspberry Pi without slow pushes.
+#
+#   deploy/pi/pi setup            one-time provisioning of the Pi (docker, can0, image)
+#   deploy/pi/pi sync             rsync ros2_ws/src to the Pi (about a second)
+#   deploy/pi/pi build [args]     sync + incremental colcon build on the Pi
+#   deploy/pi/pi launch [args]    sync + build + launch the real-hardware stack
+#   deploy/pi/pi shell [cmd...]   shell (or one command) inside the robot container
+#   deploy/pi/pi can [args]       candump on can0 (default: all frames, timestamped)
+#   deploy/pi/pi status           container, CAN, SPI and CPU state at a glance
+#   deploy/pi/pi reset            recreate the container (after editing the Dockerfile/flags)
+#
+# Python, YAML, URDF and launch changes are live as soon as they are synced
+# (--symlink-install). Only C++ changes recompile, and only the files that changed.
+#
+# Environment: PI_HOST (default pi@10.42.0.169), PI_DIR (default ~/sandro on the Pi),
+# PI_LAUNCH_DEFAULTS (arguments prepended to every `launch`).
+set -euo pipefail
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+REPO=$(cd "$HERE/../.." && pwd)
+PI=${PI_HOST:-pi@10.42.0.169}
+DIR=${PI_DIR:-sandro}
+IMAGE=sandro-robot:jazzy
+CONTAINER=sandro
+LAUNCH_DEFAULTS=${PI_LAUNCH_DEFAULTS:-"hardware:=real imu_transport:=spi imu_spi_device:=/dev/spidev6.0 rviz:=false \
+extra_params:=/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml"}
+
+# One multiplexed connection: every later command skips the SSH handshake.
+SSH_OPTS=(-o ControlMaster=auto -o "ControlPath=/tmp/sandro-pi-%C" -o ControlPersist=15m
+  -o ConnectTimeout=10 -o ServerAliveInterval=15)
+pi_ssh() { ssh "${SSH_OPTS[@]}" "$@"; }
+remote() { pi_ssh "$PI" "$@"; }
+remote_tty() { pi_ssh -t "$PI" "$@"; }
+
+in_container() {  # in_container <-t|-i> <command...>; -t allocates a tty
+  local flag=$1; shift
+  [ -t 0 ] || flag=-i  # no terminal here (scripts, CI): plain exec
+  local inner="source /opt/ros/jazzy/setup.bash; [ -f install/setup.bash ] && source install/setup.bash; $*"
+  local quoted
+  quoted=$(printf '%q' "$inner")
+  if [ "$flag" = "-t" ]; then
+    remote_tty "docker exec -it $CONTAINER bash -c $quoted"
+  else
+    remote "docker exec $CONTAINER bash -c $quoted"
+  fi
+}
+
+ensure_container() {
+  if ! remote "docker image inspect $IMAGE >/dev/null 2>&1"; then
+    echo "Image $IMAGE is missing on the Pi: run 'deploy/pi/pi setup' first." >&2
+    exit 1
+  fi
+  local state
+  state=$(remote "docker inspect -f '{{.State.Running}}' $CONTAINER 2>/dev/null" || true)
+  if [ "$state" = "true" ]; then
+    return
+  fi
+  remote "docker rm -f $CONTAINER >/dev/null 2>&1 || true"
+  # Privileged on purpose: spidev, gpiochip, gamepads and realtime scheduling all
+  # need device access, and this box exists only to run the robot. Host networking
+  # exposes can0 and keeps DDS discovery working with the development machine.
+  remote "mkdir -p ~/$DIR/ros2_ws/src && docker run -d --name $CONTAINER --restart unless-stopped \
+    --privileged --network host --ipc host \
+    --ulimit rtprio=99 --ulimit memlock=-1 \
+    -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+    -e CYCLONEDDS_URI=file:///workspaces/sandro/ros2_ws/src/sandro_bringup/config/cyclonedds.xml \
+    -v /home/\$USER/$DIR:/workspaces/sandro -v /dev:/dev \
+    $IMAGE >/dev/null"
+  echo "Started container $CONTAINER."
+}
+
+# Sets NEEDS_BUILD when the sync touched anything colcon must act on: C++ sources,
+# build files, or any newly created file (symlink installs only see new files after a
+# re-run). Plain edits to existing Python/YAML/URDF/launch files are live without it.
+NEEDS_BUILD=0
+cmd_sync() {
+  local changes
+  changes=$(rsync -az --delete --itemize-changes \
+    --exclude '__pycache__' --exclude '*.pyc' --exclude 'sandro_sim' --exclude '.pytest_cache' \
+    -e "ssh ${SSH_OPTS[*]}" \
+    "$REPO/ros2_ws/src/" "$PI:$DIR/ros2_ws/src/")
+  if grep -qE '^(\*deleting|[<>ch.]f\+\+\+)|\.(cpp|hpp|h|cc|c)$|CMakeLists\.txt$|package\.xml$|setup\.(py|cfg)$|plugins\.xml$' <<<"$changes" ||
+    ! remote "[ -f ~/$DIR/install/setup.bash ]"; then
+    NEEDS_BUILD=1
+  fi
+  [ -n "$changes" ] && echo "synced $(grep -c '^[<>ch.]f' <<<"$changes" || true) file(s)" || echo "already in sync"
+}
+
+cmd_build() {
+  ensure_container
+  [ "${SKIP_SYNC:-0}" = 1 ] || cmd_sync
+  # Release matters: with no build type the controllers compile unoptimised.
+  in_container -i "colcon build --base-paths ros2_ws/src --symlink-install \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+    --event-handlers console_cohesion+ $*"
+}
+
+cmd_launch() {
+  ensure_container
+  cmd_sync
+  [ "$NEEDS_BUILD" = 1 ] && SKIP_SYNC=1 cmd_build || echo "no compile needed"
+  echo "--- launching: $LAUNCH_DEFAULTS $*"
+  in_container -t "ros2 launch sandro_bringup sandro.launch.py $LAUNCH_DEFAULTS $*"
+}
+
+cmd_shell() {
+  ensure_container
+  if [ $# -eq 0 ]; then
+    in_container -t "exec bash"
+  else
+    in_container -t "$*"
+  fi
+}
+
+cmd_can() {
+  remote_tty candump -t A "${@:-can0}"
+}
+
+cmd_status() {
+  remote "
+    echo '== container'; docker ps -a --filter name=$CONTAINER --format '{{.Names}}  {{.Status}}'
+    echo '== can0';      ip -br link show can0; ip -details -statistics link show can0 | grep -E 'bitrate|state|RX:|TX:' -A1 | head -12
+    echo '== spi/gpio';  ls /dev/spidev* /dev/gpiochip0 2>&1
+    echo '== cpu';       cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor; vcgencmd measure_temp; vcgencmd get_throttled
+  "
+}
+
+cmd_reset() {
+  remote "docker rm -f $CONTAINER >/dev/null 2>&1 || true"
+  ensure_container
+}
+
+cmd_setup() {
+  if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$PI" true 2>/dev/null; then
+    echo "Installing your SSH key on the Pi (asks for its password once)..."
+    ssh-copy-id "$PI"
+  fi
+  local -a cfg=(
+    "dtparam=spi=on"
+    "dtoverlay=spi6-1cs"
+    "dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=23"
+  )
+  # Copy the provisioning inputs, then run everything privileged in one sudo session.
+  remote "mkdir -p ~/$DIR/docker ~/$DIR/ros2_ws/src"
+  rsync -az -e "ssh ${SSH_OPTS[*]}" \
+    "$HERE/Dockerfile" "$HERE/can0.service" "$HERE/sandro-perf.service" "$PI:$DIR/docker/"
+  # PI_SUDO_PASS lets this run without a terminal; otherwise sudo prompts as usual.
+  local script="set -e
+    ${PI_SUDO_PASS:+read -r PW; sudo() { command sudo -S -p '' \"\$@\" <<<\"\$PW\"; }}
+    command -v docker >/dev/null || sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io
+    command -v rsync >/dev/null  || sudo apt-get install -y rsync
+    sudo apt-get install -y can-utils >/dev/null
+    sudo usermod -aG docker \$USER
+    sudo install -m 644 ~/$DIR/docker/can0.service ~/$DIR/docker/sandro-perf.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl enable can0.service sandro-perf.service
+    sudo systemctl restart can0.service sandro-perf.service
+    changed=0
+    for line in ${cfg[*]@Q}; do
+      grep -qxF \"\$line\" /boot/firmware/config.txt || { echo \"\$line\" | sudo tee -a /boot/firmware/config.txt >/dev/null; changed=1; }
+    done
+    [ \$changed = 1 ] && echo 'config.txt updated: REBOOT the Pi once (sudo reboot).' || true
+    sudo docker build -t $IMAGE ~/$DIR/docker
+  "
+  if [ -n "${PI_SUDO_PASS:-}" ]; then
+    printf '%s\n' "$PI_SUDO_PASS" | remote "$script"
+  else
+    remote_tty "$script"
+  fi
+  pi_ssh -O exit "$PI" 2>/dev/null || true  # new docker group needs a fresh connection
+  echo "Setup done. Next: deploy/pi/pi build   (first build compiles everything, a few minutes)"
+}
+
+cmd=${1:-help}
+shift || true
+case "$cmd" in
+  setup|sync|build|launch|shell|can|status|reset) "cmd_$cmd" "$@" ;;
+  *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' ;;
+esac

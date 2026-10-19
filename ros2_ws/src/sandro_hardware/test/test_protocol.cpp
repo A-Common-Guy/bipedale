@@ -80,7 +80,7 @@ TEST(ShtpProtocol, EscapingAndChunkedFraming)
 
 TEST(ShtpProtocol, SpiPacketAndSetFeatureLayout)
 {
-  // Matches raspi_tests/bno085_spi.py: struct.pack("<BBBHIII", 0xFD, id, 0, 0, period, 0, 0).
+  // Matches deploy/pi/tools/bno085_spi_probe.py: struct.pack("<BBBHIII", 0xFD, id, 0, 0, period, 0, 0).
   const auto command = p::set_feature_command(0x08, 5000);
   const std::vector<uint8_t> expected{
     0xfd, 0x08, 0, 0, 0, 0x88, 0x13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};

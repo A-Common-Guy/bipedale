@@ -1,0 +1,18 @@
+[Unit]
+Description=Bring up can0 at 1 Mbit/s (candlelight USB or MCP2515, whichever claims can0)
+After=sys-subsystem-net-devices-can0.device
+Wants=sys-subsystem-net-devices-can0.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# No explicit sample-point: forcing 0.875 has caused trouble before, so the adapter's
+# default timing is used. restart-ms recovers from bus-off on its own but not every adapter
+# supports it (gs_usb refuses it), hence the fallback. A deep txqueuelen keeps sends
+# working while a bus problem is diagnosed.
+ExecStart=/bin/sh -c 'ip link set can0 up type can bitrate 1000000 restart-ms 100 || ip link set can0 up type can bitrate 1000000'
+ExecStart=/sbin/ip link set can0 txqueuelen 1000
+ExecStop=/sbin/ip link set can0 down
+
+[Install]
+WantedBy=multi-user.target

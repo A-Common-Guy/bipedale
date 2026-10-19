@@ -62,7 +62,7 @@ and `max_backlog_bytes`. Its ten standard state interfaces are
 `linear_acceleration.{x,y,z}`. Optional diagnostics are `age` and `online`.
 Quaternion ordering is ROS `x,y,z,w`.
 
-Over SPI the plugin follows `raspi_tests/bno085_spi.py`: SPI mode 3, the
+Over SPI the plugin follows `deploy/pi/tools/bno085_spi_probe.py`: SPI mode 3, the
 chip's WAKE pin tied high, so it only accepts a write while it asserts INT.
 Activation pulses RST, reads one boot packet, then enables the game rotation
 vector, calibrated gyro and accelerometer while INT is still asserted;

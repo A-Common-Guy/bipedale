@@ -1,4 +1,4 @@
-.PHONY: build sim sim-cascade real test shell hardware-shell xauth
+.PHONY: build sim sim-cascade real test shell hardware-shell xauth pi-build pi-launch pi-shell pi-can
 
 XAUTH ?= /tmp/.sandro.xauth
 
@@ -41,3 +41,16 @@ shell: xauth
 hardware-shell: xauth
 	@printf '%s\n' 'Shell WITH the IMU attached. Launching the balancer here arms the drives.'
 	docker compose --profile hardware run --rm hardware-shell
+
+# Raspberry Pi deployment (see deploy/pi/README.md)
+pi-build:
+	deploy/pi/pi build
+
+pi-launch:
+	deploy/pi/pi launch $(ARGS)
+
+pi-shell:
+	deploy/pi/pi shell
+
+pi-can:
+	deploy/pi/pi can

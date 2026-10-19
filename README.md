@@ -29,7 +29,7 @@ make real
 `make real` **does not arm hardware**. The ROS IMU plugin reads the BNO085
 over SPI on the Raspberry Pi by default (`imu_transport:=spi`,
 `/dev/spidev6.0` with `dtoverlay=spi6-1cs`, INT on GPIO25, RST on GPIO24; the
-same wiring as `raspi_tests/bno085_spi.py`). Set `SANDRO_IMU_DEVICE` and
+same wiring as `deploy/pi/tools/bno085_spi_probe.py`). Set `SANDRO_IMU_DEVICE` and
 `SANDRO_GPIO_CHIP` if the devices differ. The old FTDI UART link, which
 delivered only about 30 samples per second on every recorded run
 (`SIM_TO_REAL.md`), is still available:
@@ -60,6 +60,13 @@ ros2 launch sandro_bringup sandro.launch.py \
   hardware:=mujoco controller:=whole_body_controller \
   teleop:=true rviz:=true headless:=false
 ```
+
+## Raspberry Pi deployment
+
+The real robot runs on a Raspberry Pi 4 (BNO085 over SPI, MCP2515 CAN on SPI0). Push and
+run with one command, `make pi-launch` (or `deploy/pi/pi launch`): Python/YAML changes are
+live after a ~1 s rsync, C++ changes recompile incrementally on the Pi. See
+`deploy/pi/README.md` for setup, wiring and the fast-loop details.
 
 PS5 teleoperation uses L1 as a deadman and publishes standard
 `geometry_msgs/msg/TwistStamped` on `/cmd_vel`: left stick vertical is forward
