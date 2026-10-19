@@ -1,0 +1,119 @@
+{
+ "onnx": "policy.onnx",
+ "onnx_max_abs_error_vs_reference": 6.212392682503065e-07,
+ "policy_rate_hz": 100,
+ "control_rate_hz": 300.0,
+ "observation": {
+  "history": 4,
+  "order": "newest frame first",
+  "frame": [
+   [
+    "gravity",
+    3
+   ],
+   [
+    "gyro",
+    3
+   ],
+   [
+    "leg_pos",
+    4
+   ],
+   [
+    "leg_vel",
+    4
+   ],
+   [
+    "wheel_vel",
+    2
+   ],
+   [
+    "last_action",
+    6
+   ],
+   [
+    "command",
+    4
+   ]
+  ],
+  "legs": [
+   "right_motor_inner",
+   "right_motor_outer",
+   "left_motor_inner",
+   "left_motor_outer"
+  ],
+  "wheels": [
+   "right_wheel",
+   "left_wheel"
+  ],
+  "scales": {
+   "gyro": 0.25,
+   "leg_vel": 0.1,
+   "wheel_vel": 0.05
+  },
+  "imu_offset_correction_rad": -0.049,
+  "command_normalisation": {
+   "forward_m_s": 1.0,
+   "yaw_rad_s": 3.0,
+   "height_m": [
+    0.09,
+    0.19
+   ],
+   "roll_rad": 0.3
+  }
+ },
+ "action": {
+  "joints": [
+   "right_motor_inner",
+   "right_motor_outer",
+   "right_wheel",
+   "left_motor_inner",
+   "left_motor_outer",
+   "left_wheel"
+  ],
+  "legs": {
+   "q_ref": "stand_q + scale_rad * a",
+   "scale_rad": 0.5,
+   "kp": 12.0,
+   "kd": 0.5,
+   "range_rad": [
+    -2.0943951024,
+    2.0943951024
+   ]
+  },
+  "wheels": {
+   "mode": "velocity",
+   "scale_rad_s": 25.0,
+   "kd_nm_s_rad": 0.4,
+   "scale_nm": 3.0
+  },
+  "stand_q": [
+   0.41133484,
+   0.21714621,
+   -1.48937,
+   0.21523191,
+   0.41288111,
+   0.438598
+  ],
+  "torque_limits_nm": [
+   3.0,
+   3.0,
+   6.0,
+   3.0,
+   3.0,
+   6.0
+  ]
+ },
+ "command_shaping": {
+  "forward_accel_m_s2": 2.0,
+  "yaw_time_constant_s": 0.15,
+  "height_rate_m_s": 0.15,
+  "roll_rate_rad_s": 0.6,
+  "leg_height_limits_m": [
+   0.07,
+   0.195
+  ],
+  "track_width_m": 0.304
+ },
+ "fingerprint": "b294a9f8a79efae08eb877c66779950aaa08d6563f1ffcc6af444fad6b81da21"
+}
