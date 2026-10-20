@@ -55,10 +55,11 @@ bool LatencySystem::flag(const std::string &key, const bool fallback) const {
   if (it == parameters.end() || it->second.empty()) {
     return fallback;
   }
-  if (it->second == "true" || it->second == "1") {
+  // xacro renders a boolean expression as True or False.
+  if (it->second == "true" || it->second == "True" || it->second == "1") {
     return true;
   }
-  if (it->second == "false" || it->second == "0") {
+  if (it->second == "false" || it->second == "False" || it->second == "0") {
     return false;
   }
   throw std::invalid_argument("hardware parameter '" + key + "' must be true or false");
