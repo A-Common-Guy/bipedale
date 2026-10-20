@@ -24,8 +24,13 @@ teleop_twist_joy_node:
       z: 0.05
     axis_angular:
       yaw: 2                    # PS5 right stick horizontal
+      roll: 0                   # PS5 left stick horizontal: body roll target
     scale_angular:
       yaw: 1.5                  # rad/s, SandroControl drive limit
+      # rad of body roll at full deflection; joy reports left as +1, so the
+      # stick pushed right puts the right side down (positive roll).
+      # Read by rl_agile_terrain only.
+      roll: -0.3
     publish_stamped_twist: true # geometry_msgs/msg/TwistStamped on /cmd_vel
     frame: base_link
 

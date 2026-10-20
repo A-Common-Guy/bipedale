@@ -48,9 +48,10 @@ def test_teleop_maps_height_and_estop_chord():
     assert len(estop["axes"]) >= 2
     assert estop["axes"][0] != estop["axes"][1]
     assert -1.0 < estop["axis_pressed_below"] < 0.0
-    motion_axes = {teleop["axis_linear"]["x"], teleop["axis_linear"]["z"],
-                   teleop["axis_angular"]["yaw"]}
-    assert not motion_axes & set(estop["axes"])
+    motion_axes = [teleop["axis_linear"]["x"], teleop["axis_linear"]["z"],
+                   teleop["axis_angular"]["yaw"], teleop["axis_angular"]["roll"]]
+    assert len(set(motion_axes)) == len(motion_axes)
+    assert not set(motion_axes) & set(estop["axes"])
     assert len(estop["rearm_buttons"]) >= 2
     assert teleop["enable_button"] not in estop["rearm_buttons"]
     assert estop["rearm_hold_s"] >= 1.0
@@ -91,8 +92,9 @@ def test_joy_estop_chord_and_controller_selection():
 def test_real_robot_overrides_only_touch_known_parameters():
     """The per-robot override file must stay a subset of the shipped config."""
     shipped = yaml.safe_load((ROOT / "config" / "controllers.yaml").read_text())
+    shipped.update(yaml.safe_load((ROOT / "config" / "rl_policies.yaml").read_text()))
     overrides = yaml.safe_load((ROOT / "config" / "sandro_real_overrides.yaml").read_text())
-    assert set(overrides) == {"whole_body_controller"}
+    assert set(overrides) == {"whole_body_controller", "rl_flat_level", "rl_agile_terrain"}
     base = shipped["whole_body_controller"]["ros__parameters"]
 
     def check(subset, reference, path=""):
@@ -108,6 +110,26 @@ def test_real_robot_overrides_only_touch_known_parameters():
     # A rearward neutral shift eats the front pivot's stretch margin at height.
     assert tasks["fore_aft"]["neutral_offset_m"] < 0.0
     assert tasks["height"]["max_m"] <= 0.19
+    for name in ("rl_flat_level", "rl_agile_terrain"):
+        check(overrides[name]["ros__parameters"], shipped[name]["ros__parameters"], f"{name}.")
+        # One physical IMU mounting for every controller.
+        assert (overrides[name]["ros__parameters"]["observation"]["imu_offset_rad"]
+                == tasks["roll"]["imu_offset_rad"])
+
+
+def test_rl_policies_are_complete():
+    config = yaml.safe_load((ROOT / "config" / "rl_policies.yaml").read_text())
+    manager = config["controller_manager"]["ros__parameters"]
+    controllers = ROOT.parent / "sandro_controllers"
+    assert set(manager) == {"rl_flat_level", "rl_agile_terrain"}
+    for name, entry in manager.items():
+        assert entry["type"] == "sandro_controllers/RlPolicyController"
+        parameters = config[name]["ros__parameters"]
+        policy = parameters["policy_file"].removeprefix("package://sandro_controllers/")
+        assert (controllers / policy).is_file(), policy
+        assert parameters["command_topic"] == "/cmd_vel"
+        assert parameters["observation"]["command_size"] == (
+            4 if parameters["commands"]["roll_rad"] > 0.0 else 3)
 
 
 def test_cyclone_configuration_is_well_formed():

@@ -59,3 +59,14 @@ whole_body_controller:
         # at 3.6 Hz with +-0.8 Nm while standing (docs/SIM_TO_REAL.md).
         torque_limit_nm: 2.0
         scrub_ff_nm: 0.35
+
+# The sandro_rl policies (rl_policies.yaml) take the same physical IMU
+# mounting as tasks.roll.imu_offset_rad above.
+rl_flat_level:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
+rl_agile_terrain:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
