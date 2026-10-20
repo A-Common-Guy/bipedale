@@ -726,6 +726,68 @@ The example video is `policies/flat_level/default_uart_imu.mp4`: the
 `default` drive_test sequence with the 30 Hz IMU, the case where the WBC
 falls.
 
+### jump: wheels off the ground on command, at 10 Nm
+
+`configs/jump.yaml` is `agile_terrain` (same terrain, pushes, roll and
+height commands) plus a jump event. It is a first policy to build the more
+dynamic tasks on; its torques are past what the hardware has been run at, so
+it is not expected to transfer before the system identification is done.
+
+- **Torque limits** go to 10 Nm on legs and wheels (`action.torque_limit_nm`,
+  the hardware plugin's `hard_effort_limit_nm`), against 3 and 6 Nm from
+  controllers.yaml for the other policies. The CaT leg-torque limit is
+  9.5 Nm. Legs use kp 20, kd 0.6 and an action scale of 0.8 rad.
+- **The jump event.** Every 2–5 s a jump window of 0.8 s opens with a target
+  height of 2–8 cm (curriculum: 1–3, 2–5, then 2–8 cm at iterations 0, 400
+  and 900). The actor sees two more inputs, `[height / 8 cm, time left /
+  0.8 s]`, zero outside the window, so the observation grows by 2 per frame
+  (112 actor, 74 critic).
+- **Rewards in the window:** the lower wheel's clearance up to the target
+  (weight 40), upward base speed (2), and a quadratic penalty above the
+  target (−2000). Height tracking, the vertical-speed penalty and the
+  wheel-lift constraint are off during the window and 0.3 s after it.
+- **The evaluation** gives a jump the sixth field of a scenario phase,
+  started on its rising edge (`--scenario jump`), and records the lower
+  wheel's clearance above flat ground (`diag_truth_wheel_clearance_m`).
+
+Training took 74.6 minutes for 2500 iterations (491.5M env steps, 109.8k
+env steps/s, 1.32M physics steps/s), with no divergence. At the end it falls
+0.35 times per 1000 policy steps, against `agile_terrain`'s 0.08.
+
+**What it learned** (`jump.mp4`, `eval/jump_frames.png`, `eval/jump.png`):
+in every window it hops three times, tucking the legs to 0.10 m between
+hops, and lands back at its 0.17 m height within 0.2 s of the window's end.
+It does this standing and at 0.5 m/s:
+
+| Phase | Target | Hops | Peak clearance | Peak leg / wheel torque |
+| --- | --- | --- | --- | --- |
+| standing | 3 cm | 3 | 66 mm | 8.4 / 5.0 Nm |
+| standing | 5 cm | 3 | 84 mm | 7.7 / 5.2 Nm |
+| standing | 8 cm | 3 | 127 mm | 7.3 / 7.1 Nm |
+| 0.5 m/s | 5 cm | 3 | 107 mm | 7.4 / 6.3 Nm |
+| 0.5 m/s | 8 cm | 3 | 126 mm | 7.2 / 6.2 Nm |
+
+It completes all nine standard scenario/profile runs (`eval/comparison.md`;
+the WBC falls in three, the `worst` latency profile).
+
+**Where it is worse, and what to change:**
+
+- **It hops three times instead of jumping once.** The reward pays for
+  clearance at every step of the window, and short hops keep the wheels up
+  for more of it than a single flight of about 0.3 s. A single jump needs a
+  reward on the flight's apex, or a window that closes at the first
+  touchdown.
+- **The height command shapes it only loosely.** It overshoots small
+  targets (66 mm for 3 cm) despite the overshoot penalty; the 8 cm target
+  is met. Rewarding the apex against the target would fix both.
+- **It falls four times as often as `agile_terrain` in training.** The
+  jumps are on the same terrain and pushes, and landings on plank edges are
+  the likely cause (not traced).
+- **The torque is 10 Nm on every drive, and the landings are not checked
+  against the hardware.** The drives' peak current, the five-bar links'
+  strength and the tyres' landing impact are not modelled. The deployment
+  controller has no jump input yet (section 9).
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that

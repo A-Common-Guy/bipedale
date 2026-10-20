@@ -1,0 +1,917 @@
+{
+ "config": {
+  "seed": 0,
+  "env": {
+   "impl": "warp",
+   "graph_mode": "warp_staged",
+   "policy_rate_hz": 100,
+   "episode_s": 20.0,
+   "naconmax_per_env": 24,
+   "njmax_per_env": 192,
+   "terrain": {
+    "type": "obstacles",
+    "obstacles": {},
+    "friction": 0.8,
+    "planks": {
+     "count": 12,
+     "height_m": [
+      0.005,
+      0.03
+     ],
+     "depth_m": [
+      0.04,
+      0.3
+     ],
+     "width_m": [
+      0.2,
+      1.0
+     ],
+     "radius_m": [
+      0.4,
+      4.0
+     ]
+    },
+    "hills": {
+     "count": 4,
+     "height_m": [
+      0.02,
+      0.1
+     ],
+     "slope_deg": [
+      5.0,
+      15.0
+     ],
+     "plateau_m": [
+      0.2,
+      0.8
+     ],
+     "width_m": [
+      0.8,
+      1.6
+     ],
+     "radius_m": [
+      0.3,
+      4.0
+     ]
+    }
+   },
+   "action": {
+    "legs": {
+     "mode": "position",
+     "scale_rad": 0.8,
+     "kp": 20.0,
+     "kd": 0.6
+    },
+    "wheels": {
+     "mode": "velocity",
+     "scale_rad_s": 25.0,
+     "kd_nm_s_rad": 0.4,
+     "scale_nm": 3.0
+    },
+    "clip": 1.0,
+    "torque_limit_nm": {
+     "legs": 10.0,
+     "wheels": 10.0
+    }
+   },
+   "observation": {
+    "history": 4,
+    "accelerometer": false,
+    "imu_offset_correction": "ros",
+    "scales": {
+     "gyro": 0.25,
+     "leg_vel": 0.1,
+     "wheel_vel": 0.05
+    }
+   },
+   "commands": {
+    "resample_s": [
+     2.0,
+     5.0
+    ],
+    "zero_probability": 0.2,
+    "component_zero_probability": 0.25,
+    "forward_m_s": 1.0,
+    "yaw_rad_s": 3.0,
+    "height_m": [
+     0.09,
+     0.19
+    ],
+    "height_change_probability": 0.5,
+    "forward_accel_m_s2": 2.0,
+    "yaw_time_constant_s": "ros",
+    "height_rate_m_s": 0.15,
+    "roll_rad": 0.3,
+    "roll_rate_rad_s": 0.6,
+    "roll_zero_probability": 0.4,
+    "leg_height_limits_m": [
+     0.07,
+     0.195
+    ],
+    "jump": {
+     "interval_s": [
+      2.0,
+      5.0
+     ],
+     "window_s": 0.8,
+     "landing_s": 0.3,
+     "height_m": [
+      0.02,
+      0.08
+     ]
+    },
+    "sample_fraction": 1.0
+   },
+   "rewards": {
+    "scale_by_dt": true,
+    "sigma": {
+     "forward": 0.2,
+     "yaw": 0.5,
+     "height": 0.03,
+     "roll": 0.06
+    },
+    "weights": {
+     "alive": 1.0,
+     "track_forward": 2.0,
+     "track_yaw": 1.0,
+     "track_height": 2.0,
+     "roll": -5.0,
+     "pitch": -10.0,
+     "pitch_rate": -0.05,
+     "vertical_velocity": -2.0,
+     "leg_symmetry": -200.0,
+     "action_rate": -0.02,
+     "action_accel": -0.01,
+     "leg_torque": -0.002,
+     "wheel_torque": -0.01,
+     "leg_velocity": -0.0005,
+     "termination": -200.0,
+     "track_roll": 1.0,
+     "jump_clearance": 40.0,
+     "jump_overshoot": -2000.0,
+     "jump_vz": 2.0
+    }
+   },
+   "termination": {
+    "tilt_rad": 0.8,
+    "imu_height_m": 0.17,
+    "max_qvel": 200.0
+   },
+   "constraints": {
+    "enabled": true,
+    "p_max": 0.25,
+    "leg_torque": {
+     "limit": 9.5,
+     "slack": 0.5
+    },
+    "stretch": {
+     "limit": 0.97,
+     "slack": 0.02
+    },
+    "joint_range": {
+     "margin_rad": 0.1,
+     "slack": 0.1
+    },
+    "height": {
+     "margin_m": 0.008,
+     "slack": 0.01
+    },
+    "tilt": {
+     "limit_rad": 0.45,
+     "slack": 0.3
+    },
+    "wheel_lift": {
+     "limit_m": 0.035,
+     "slack": 0.02
+    }
+   },
+   "init": {
+    "joint_noise_rad": 0.03,
+    "tilt_rad": 0.05,
+    "velocity_noise": 0.05
+   },
+   "pushes": {
+    "enabled": true,
+    "interval_s": [
+     2.0,
+     6.0
+    ],
+    "duration_s": [
+     0.05,
+     0.25
+    ],
+    "force_n": 25.0,
+    "lateral_force_n": 12.0,
+    "vertical_force_n": 15.0,
+    "torque_nm": [
+     1.0,
+     1.0
+    ]
+   },
+   "randomization": {
+    "enabled": true,
+    "latency": {
+     "imu_delay_s": [
+      0.003,
+      0.025
+     ],
+     "imu_rate_hz": [
+      100.0,
+      400.0
+     ],
+     "degraded_imu_probability": 0.25,
+     "degraded_imu_rate_hz": [
+      25.0,
+      60.0
+     ],
+     "joint_delay_s": [
+      0.0005,
+      0.006
+     ],
+     "joint_rate_hz": [
+      150.0,
+      300.0
+     ],
+     "synchronous_joints_probability": 0.2,
+     "command_delay_s": [
+      0.0005,
+      0.003
+     ]
+    },
+    "sensors": {
+     "imu_noise_scale": [
+      0.5,
+      2.0
+     ],
+     "encoder_noise_rad": 0.0005,
+     "joint_velocity_noise": 0.05,
+     "joint_velocity_gain": [
+      0.75,
+      1.05
+     ],
+     "imu_mount_bias_rad": 0.02,
+     "gyro_bias_rad_s": 0.01
+    },
+    "drives": {
+     "torque_scale": [
+      0.85,
+      1.15
+     ],
+     "leg_gain_scale": [
+      0.9,
+      1.1
+     ]
+    },
+    "model": {
+     "body_mass_scale": [
+      0.9,
+      1.1
+     ],
+     "payload_mass_add_kg": [
+      -0.4,
+      0.4
+     ],
+     "payload_offset_m": [
+      0.04,
+      0.02,
+      0.03
+     ],
+     "tyre_sliding_friction": [
+      0.5,
+      1.2
+     ],
+     "tyre_torsional_scale": [
+      0.5,
+      2.0
+     ],
+     "leg_frictionloss_scale": [
+      0.5,
+      3.0
+     ],
+     "wheel_frictionloss_scale": [
+      0.5,
+      2.0
+     ],
+     "damping_scale": [
+      0.5,
+      2.0
+     ],
+     "armature_scale": [
+      0.5,
+      8.0
+     ]
+    }
+   }
+  },
+  "train": {
+   "num_envs": 8192,
+   "steps_per_env": 24,
+   "iterations": 2500,
+   "learning_rate": 0.001,
+   "desired_kl": 0.01,
+   "gamma": 0.99,
+   "lam": 0.95,
+   "clip": 0.2,
+   "value_coef": 1.0,
+   "entropy_coef": 0.005,
+   "epochs": 5,
+   "minibatches": 4,
+   "max_grad_norm": 1.0,
+   "init_log_std": -0.7,
+   "actor_hidden": [
+    256,
+    256,
+    128
+   ],
+   "critic_hidden": [
+    512,
+    256,
+    128
+   ],
+   "activation": "elu",
+   "symmetry_coef": 0.5,
+   "checkpoint_every": 100,
+   "eval_every": 50
+  },
+  "curriculum": {
+   "stages": [
+    {
+     "iteration": 0,
+     "set": {
+      "env.commands.sample_fraction": 0.4,
+      "env.terrain.planks.height_m": [
+       0.002,
+       0.01
+      ],
+      "env.terrain.hills.height_m": [
+       0.0,
+       0.03
+      ],
+      "env.pushes.force_n": 12.0,
+      "env.pushes.lateral_force_n": 5.0,
+      "env.pushes.vertical_force_n": 0.0,
+      "env.pushes.torque_nm": [
+       0.0,
+       0.0
+      ],
+      "env.commands.jump.height_m": [
+       0.01,
+       0.03
+      ]
+     }
+    },
+    {
+     "iteration": 400,
+     "set": {
+      "env.commands.sample_fraction": 0.7,
+      "env.terrain.planks.height_m": [
+       0.004,
+       0.02
+      ],
+      "env.terrain.hills.height_m": [
+       0.01,
+       0.06
+      ],
+      "env.pushes.force_n": 18.0,
+      "env.pushes.lateral_force_n": 8.0,
+      "env.pushes.vertical_force_n": 8.0,
+      "env.pushes.torque_nm": [
+       0.5,
+       0.5
+      ],
+      "env.commands.jump.height_m": [
+       0.02,
+       0.05
+      ]
+     }
+    },
+    {
+     "iteration": 900,
+     "set": {
+      "env.commands.sample_fraction": 1.0,
+      "env.terrain.planks.height_m": [
+       0.005,
+       0.03
+      ],
+      "env.terrain.hills.height_m": [
+       0.02,
+       0.1
+      ],
+      "env.pushes.force_n": 25.0,
+      "env.pushes.lateral_force_n": 12.0,
+      "env.pushes.vertical_force_n": 15.0,
+      "env.pushes.torque_nm": [
+       1.0,
+       1.0
+      ],
+      "env.commands.jump.height_m": [
+       0.02,
+       0.08
+      ]
+     }
+    }
+   ]
+  },
+  "name": "jump"
+ },
+ "fingerprint": {
+  "sha256": "93a61db7193cab1bbdc27611d23f18622090021db44137b385a5ce2a9aef9cb3",
+  "files": {
+   "ros2_ws/src/sandro_description/mjcf/assets/bearing_5_2_4_0_7.stl": "ac58e802905c4664921c4473e3e8e3cc11e4d802d8b7c89fa72b67623528173c",
+   "ros2_ws/src/sandro_description/mjcf/assets/biella.stl": "de58942a235b4d1f9ed6d6e320452faf6d45870798fd4127a290c8383952757f",
+   "ros2_ws/src/sandro_description/mjcf/assets/body_lower.stl": "fdfeda5b5d885fafa8c338fc4bc28814b351ec771abdedf54b9874c3597249ad",
+   "ros2_ws/src/sandro_description/mjcf/assets/bodymotorholder.stl": "453f0f99719d1cc8d26591baaf61d7d85e4422b55d80b1035a3c3ce1347dba6a",
+   "ros2_ws/src/sandro_description/mjcf/assets/manovella1.stl": "9eb03f2ed663788732fdc13cec726e3b19280a43a16cba3f939a558c44e9a1f3",
+   "ros2_ws/src/sandro_description/mjcf/assets/manovella2.stl": "abfb35049b9dbbcb8246d7d3118a27be7eff7745d9fc0a850d45c434844b56f0",
+   "ros2_ws/src/sandro_description/mjcf/assets/motor_2.stl": "886869de2a02654403898fbcdbea31f67836422a3bf16912de10f37b16c81f73",
+   "ros2_ws/src/sandro_description/mjcf/assets/motor_shaft_2.stl": "e95faf42376472e0c23ea52ca730f58bed830f099adecb19bbba0150e2dbd0b3",
+   "ros2_ws/src/sandro_description/mjcf/assets/pernobiella.stl": "ee448bc5bd8ac6b01c75c3e66fa5b05f8c3d3dad8dc0f26d91e3266b54e934a9",
+   "ros2_ws/src/sandro_description/mjcf/assets/robot_roof.stl": "833d174c58824b54ff7e521a8a6071ae4d672bb2e8e5a854dc3c0790edb97bf9",
+   "ros2_ws/src/sandro_description/mjcf/assets/smallplate_manovella2.stl": "9818bb453f52633ed2fe2be44c7c3b80810853c39e04a0abe0fcf0ddfe9338a6",
+   "ros2_ws/src/sandro_description/mjcf/assets/tire.stl": "261fc7297281a28ec17cde23dac3f9bed4606afad1e03ce2ac0065e1af40bc4a",
+   "ros2_ws/src/sandro_description/mjcf/assets/wheel_tire_holder.stl": "1166386dd0f0e21361f6085d5a37ea0343784eec9cb9728f06b9454922a686a3",
+   "ros2_ws/src/sandro_description/mjcf/assets/wheelmotorhub.stl": "e5317517f0024f3f06449d371c36fa4c28c174753ab2288407c16220ba69804e",
+   "ros2_ws/src/sandro_description/mjcf/assets/wheelstickcover.stl": "b01f44d2926da6eae7efbb7ca1d07c9f50dbd5e2098bb4ca549b459cce102d8a",
+   "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "367159b2f36580084e6ecd8c35110c8403edc540505a5b94bde04dd04de7d6bc",
+   "ros2_ws/src/sandro_description/mjcf/scene_ros2.xml": "aec6f8d0f526e4a62374753c4f9dbbf2493eeee961bc7077043737c0378952c8",
+   "ros2_ws/src/sandro_description/config/sim_identified.yaml": "795d6bd93e9c14ef18cb9b127fdfe6a8375c1564c904274e1b8176ba2b6441cf",
+   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "0ca3477775ca722122b133ce3e5079087235548466b38cfb65ff54f4b9fa2d57",
+   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "9aed37aed54f737b916610f9f8a1884add1e05cf9a0f3ea84609bfb943f575c6",
+   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "4d2851df4a6a102ac944b3142b6ae9554764c843cae26e2c8d214b56437db839"
+  }
+ },
+ "contract": {
+  "joints": [
+   "right_motor_inner",
+   "right_motor_outer",
+   "right_wheel",
+   "left_motor_inner",
+   "left_motor_outer",
+   "left_wheel"
+  ],
+  "actuator_gear": [
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "tyre_condim": [
+   4,
+   4
+  ],
+  "tyre_friction": [
+   [
+    0.8,
+    0.07,
+    0.0001
+   ],
+   [
+    0.8,
+    0.07,
+    0.0001
+   ]
+  ],
+  "physics_dt": 0.000833333333333,
+  "steps_per_control": 4,
+  "total_mass_kg": 4.6006499,
+  "stand_q": [
+   0.41133484,
+   0.21714621,
+   -1.48937,
+   0.21523191,
+   0.41288111,
+   0.438598
+  ],
+  "imu_roll_bias_rad": -0.049,
+  "control_rate_hz": 300.0
+ },
+ "versions": {
+  "mujoco": "3.16.0",
+  "mujoco-mjx": "3.16.0",
+  "mujoco-warp": "3.16.0",
+  "jax": "0.11.2",
+  "flax": "0.12.10"
+ },
+ "python": "3.12.15",
+ "iteration": 2500,
+ "env_steps": 491520000,
+ "wall_s": 4475.57506942749,
+ "compile_s": 23.65678358078003,
+ "curriculum_stage": 2,
+ "base_config": {
+  "seed": 0,
+  "env": {
+   "impl": "warp",
+   "graph_mode": "warp_staged",
+   "policy_rate_hz": 100,
+   "episode_s": 20.0,
+   "naconmax_per_env": 24,
+   "njmax_per_env": 192,
+   "terrain": {
+    "type": "obstacles",
+    "obstacles": {},
+    "friction": 0.8,
+    "planks": {
+     "count": 12,
+     "height_m": [
+      0.005,
+      0.03
+     ],
+     "depth_m": [
+      0.04,
+      0.3
+     ],
+     "width_m": [
+      0.2,
+      1.0
+     ],
+     "radius_m": [
+      0.4,
+      4.0
+     ]
+    },
+    "hills": {
+     "count": 4,
+     "height_m": [
+      0.02,
+      0.1
+     ],
+     "slope_deg": [
+      5.0,
+      15.0
+     ],
+     "plateau_m": [
+      0.2,
+      0.8
+     ],
+     "width_m": [
+      0.8,
+      1.6
+     ],
+     "radius_m": [
+      0.3,
+      4.0
+     ]
+    }
+   },
+   "action": {
+    "legs": {
+     "mode": "position",
+     "scale_rad": 0.8,
+     "kp": 20.0,
+     "kd": 0.6
+    },
+    "wheels": {
+     "mode": "velocity",
+     "scale_rad_s": 25.0,
+     "kd_nm_s_rad": 0.4,
+     "scale_nm": 3.0
+    },
+    "clip": 1.0,
+    "torque_limit_nm": {
+     "legs": 10.0,
+     "wheels": 10.0
+    }
+   },
+   "observation": {
+    "history": 4,
+    "accelerometer": false,
+    "imu_offset_correction": "ros",
+    "scales": {
+     "gyro": 0.25,
+     "leg_vel": 0.1,
+     "wheel_vel": 0.05
+    }
+   },
+   "commands": {
+    "resample_s": [
+     2.0,
+     5.0
+    ],
+    "zero_probability": 0.2,
+    "component_zero_probability": 0.25,
+    "forward_m_s": 1.0,
+    "yaw_rad_s": 3.0,
+    "height_m": [
+     0.09,
+     0.19
+    ],
+    "height_change_probability": 0.5,
+    "forward_accel_m_s2": 2.0,
+    "yaw_time_constant_s": "ros",
+    "height_rate_m_s": 0.15,
+    "roll_rad": 0.3,
+    "roll_rate_rad_s": 0.6,
+    "roll_zero_probability": 0.4,
+    "leg_height_limits_m": [
+     0.07,
+     0.195
+    ],
+    "jump": {
+     "interval_s": [
+      2.0,
+      5.0
+     ],
+     "window_s": 0.8,
+     "landing_s": 0.3,
+     "height_m": [
+      0.02,
+      0.08
+     ]
+    }
+   },
+   "rewards": {
+    "scale_by_dt": true,
+    "sigma": {
+     "forward": 0.2,
+     "yaw": 0.5,
+     "height": 0.03,
+     "roll": 0.06
+    },
+    "weights": {
+     "alive": 1.0,
+     "track_forward": 2.0,
+     "track_yaw": 1.0,
+     "track_height": 2.0,
+     "roll": -5.0,
+     "pitch": -10.0,
+     "pitch_rate": -0.05,
+     "vertical_velocity": -2.0,
+     "leg_symmetry": -200.0,
+     "action_rate": -0.02,
+     "action_accel": -0.01,
+     "leg_torque": -0.002,
+     "wheel_torque": -0.01,
+     "leg_velocity": -0.0005,
+     "termination": -200.0,
+     "track_roll": 1.0,
+     "jump_clearance": 40.0,
+     "jump_overshoot": -2000.0,
+     "jump_vz": 2.0
+    }
+   },
+   "termination": {
+    "tilt_rad": 0.8,
+    "imu_height_m": 0.17,
+    "max_qvel": 200.0
+   },
+   "constraints": {
+    "enabled": true,
+    "p_max": 0.25,
+    "leg_torque": {
+     "limit": 9.5,
+     "slack": 0.5
+    },
+    "stretch": {
+     "limit": 0.97,
+     "slack": 0.02
+    },
+    "joint_range": {
+     "margin_rad": 0.1,
+     "slack": 0.1
+    },
+    "height": {
+     "margin_m": 0.008,
+     "slack": 0.01
+    },
+    "tilt": {
+     "limit_rad": 0.45,
+     "slack": 0.3
+    },
+    "wheel_lift": {
+     "limit_m": 0.035,
+     "slack": 0.02
+    }
+   },
+   "init": {
+    "joint_noise_rad": 0.03,
+    "tilt_rad": 0.05,
+    "velocity_noise": 0.05
+   },
+   "pushes": {
+    "enabled": true,
+    "interval_s": [
+     2.0,
+     6.0
+    ],
+    "duration_s": [
+     0.05,
+     0.25
+    ],
+    "force_n": 25.0,
+    "lateral_force_n": 12.0,
+    "vertical_force_n": 15.0,
+    "torque_nm": [
+     1.0,
+     1.0
+    ]
+   },
+   "randomization": {
+    "enabled": true,
+    "latency": {
+     "imu_delay_s": [
+      0.003,
+      0.025
+     ],
+     "imu_rate_hz": [
+      100.0,
+      400.0
+     ],
+     "degraded_imu_probability": 0.25,
+     "degraded_imu_rate_hz": [
+      25.0,
+      60.0
+     ],
+     "joint_delay_s": [
+      0.0005,
+      0.006
+     ],
+     "joint_rate_hz": [
+      150.0,
+      300.0
+     ],
+     "synchronous_joints_probability": 0.2,
+     "command_delay_s": [
+      0.0005,
+      0.003
+     ]
+    },
+    "sensors": {
+     "imu_noise_scale": [
+      0.5,
+      2.0
+     ],
+     "encoder_noise_rad": 0.0005,
+     "joint_velocity_noise": 0.05,
+     "joint_velocity_gain": [
+      0.75,
+      1.05
+     ],
+     "imu_mount_bias_rad": 0.02,
+     "gyro_bias_rad_s": 0.01
+    },
+    "drives": {
+     "torque_scale": [
+      0.85,
+      1.15
+     ],
+     "leg_gain_scale": [
+      0.9,
+      1.1
+     ]
+    },
+    "model": {
+     "body_mass_scale": [
+      0.9,
+      1.1
+     ],
+     "payload_mass_add_kg": [
+      -0.4,
+      0.4
+     ],
+     "payload_offset_m": [
+      0.04,
+      0.02,
+      0.03
+     ],
+     "tyre_sliding_friction": [
+      0.5,
+      1.2
+     ],
+     "tyre_torsional_scale": [
+      0.5,
+      2.0
+     ],
+     "leg_frictionloss_scale": [
+      0.5,
+      3.0
+     ],
+     "wheel_frictionloss_scale": [
+      0.5,
+      2.0
+     ],
+     "damping_scale": [
+      0.5,
+      2.0
+     ],
+     "armature_scale": [
+      0.5,
+      8.0
+     ]
+    }
+   }
+  },
+  "train": {
+   "num_envs": 8192,
+   "steps_per_env": 24,
+   "iterations": 2500,
+   "learning_rate": 0.001,
+   "desired_kl": 0.01,
+   "gamma": 0.99,
+   "lam": 0.95,
+   "clip": 0.2,
+   "value_coef": 1.0,
+   "entropy_coef": 0.005,
+   "epochs": 5,
+   "minibatches": 4,
+   "max_grad_norm": 1.0,
+   "init_log_std": -0.7,
+   "actor_hidden": [
+    256,
+    256,
+    128
+   ],
+   "critic_hidden": [
+    512,
+    256,
+    128
+   ],
+   "activation": "elu",
+   "symmetry_coef": 0.5,
+   "checkpoint_every": 100,
+   "eval_every": 50
+  },
+  "curriculum": {
+   "stages": [
+    {
+     "iteration": 0,
+     "set": {
+      "env.commands.sample_fraction": 0.4,
+      "env.terrain.planks.height_m": [
+       0.002,
+       0.01
+      ],
+      "env.terrain.hills.height_m": [
+       0.0,
+       0.03
+      ],
+      "env.pushes.force_n": 12.0,
+      "env.pushes.lateral_force_n": 5.0,
+      "env.pushes.vertical_force_n": 0.0,
+      "env.pushes.torque_nm": [
+       0.0,
+       0.0
+      ],
+      "env.commands.jump.height_m": [
+       0.01,
+       0.03
+      ]
+     }
+    },
+    {
+     "iteration": 400,
+     "set": {
+      "env.commands.sample_fraction": 0.7,
+      "env.terrain.planks.height_m": [
+       0.004,
+       0.02
+      ],
+      "env.terrain.hills.height_m": [
+       0.01,
+       0.06
+      ],
+      "env.pushes.force_n": 18.0,
+      "env.pushes.lateral_force_n": 8.0,
+      "env.pushes.vertical_force_n": 8.0,
+      "env.pushes.torque_nm": [
+       0.5,
+       0.5
+      ],
+      "env.commands.jump.height_m": [
+       0.02,
+       0.05
+      ]
+     }
+    },
+    {
+     "iteration": 900,
+     "set": {
+      "env.commands.sample_fraction": 1.0,
+      "env.terrain.planks.height_m": [
+       0.005,
+       0.03
+      ],
+      "env.terrain.hills.height_m": [
+       0.02,
+       0.1
+      ],
+      "env.pushes.force_n": 25.0,
+      "env.pushes.lateral_force_n": 12.0,
+      "env.pushes.vertical_force_n": 15.0,
+      "env.pushes.torque_nm": [
+       1.0,
+       1.0
+      ],
+      "env.commands.jump.height_m": [
+       0.02,
+       0.08
+      ]
+     }
+    }
+   ]
+  },
+  "name": "jump"
+ }
+}

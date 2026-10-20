@@ -87,6 +87,7 @@ each policy's `train_summary.json`:
 | `flat_level`, 1500 iterations (295M steps) | 154.9k | 1.86M | 31.7 min |
 | `agile_obstacles`, 1500 iterations, 16 planks per world | 127.2k | 1.53M | 38.7 min |
 | `agile_terrain`, 1200 + 800 + 500 iterations (DESIGN.md 8), 12 planks and 4 hills per world, pushes | 111–114k | 1.33–1.37M | 36 + 24 + 15 min |
+| `jump`, 2500 iterations (492M steps), `agile_terrain` plus jumps at 10 Nm | 109.8k | 1.32M | 74.6 min |
 
 Raw physics from `sandro_rl.bench` (`docs/bench.json`):
 
@@ -112,6 +113,7 @@ Each folder under `policies/` contains:
 | [`flat_level`](policies/flat_level) | `flat_tracking` with pitch penalised (−25) | `default_uart_imu.mp4` | Completes all 9. Stands level, calmer than the WBC (pitch RMS 0.013 against 0.023 rad). Drives with more pitch than the WBC |
 | [`agile_obstacles`](policies/agile_obstacles) | Superseded. Its planks did not collide (DESIGN.md 8), so it was trained on flat ground | `agile_course.mp4` | Its course result is invalid: only the first plank was solid |
 | [`agile_terrain`](policies/agile_terrain) | 1 m/s, 3 rad/s, planks up to 3 cm, hills up to 10 cm with 15° ramps, pushes and torque kicks, and a commanded body roll and height for animation | `course.mp4`, `expressive.mp4` | Crosses four planks and climbs the 8 cm hill, spins 2.5 rad/s on its plateau. Holds 0.22–0.26 rad of roll for 0.25–0.3 commanded. Completes all 9 standard runs (the WBC falls in 4). Height follows only within 0.12–0.18 m |
+| [`jump`](policies/jump) | `agile_terrain` with 10 Nm on every drive and a commanded jump (2–8 cm). A base to build dynamic tasks on; not meant for the hardware yet | `jump.mp4` | Hops three times per jump command, 66–127 mm of wheel clearance, standing and at 0.5 m/s, and lands every time. Completes all 9 standard runs. Height follows the command only loosely, and it falls 4× as often as `agile_terrain` in training |
 
 Results, including where each policy is worse than the WBC, are in
 [docs/DESIGN.md](docs/DESIGN.md) sections 7 and 8.
