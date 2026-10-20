@@ -141,8 +141,11 @@ class SandroEnv:
         self.leg_kd = float(_ros(a["legs"]["kd"], lim.leg_kd_nm_s_rad))
         self.leg_scale = float(a["legs"]["scale_rad"])
         self.wheel_mode = a["wheels"]["mode"]
-        self.torque_limit = jp.array([lim.leg_torque_nm if j not in ("right_wheel", "left_wheel")
-                                      else lim.wheel_torque_nm for j in JOINTS], dtype=jp.float32)
+        tl = a.get("torque_limit_nm", {})
+        self.leg_torque_nm = float(_ros(tl.get("legs", "ros"), lim.leg_torque_nm))
+        self.wheel_torque_nm = float(_ros(tl.get("wheels", "ros"), lim.wheel_torque_nm))
+        self.torque_limit = jp.array([self.leg_torque_nm if j not in ("right_wheel", "left_wheel")
+                                      else self.wheel_torque_nm for j in JOINTS], dtype=jp.float32)
         self.q_lo, self.q_hi = s.leg_joint_range
 
         c = cfg["commands"]
@@ -161,6 +164,11 @@ class SandroEnv:
         reach = c.get("leg_height_limits_m", [self.h_min, self.h_max])
         self.leg_h_lo, self.leg_h_hi = float(reach[0]), float(reach[1])
         self.track_width = float(lim.track_width_m)
+        # Optional jump events: every interval_s a jump of a sampled wheel
+        # clearance is requested; the policy sees its target and a countdown.
+        self.jump = c.get("jump") or {}
+        self.has_jump = bool(self.jump.get("enabled", bool(self.jump)))
+        self.jump_h_max = float(self.jump.get("height_m", [0.0, 0.1])[1])
         p = cfg["pushes"]
         self.push_dim = 5 if ("vertical_force_n" in p or "torque_nm" in p) else 2
 
@@ -208,6 +216,7 @@ class SandroEnv:
             "leg_offset": (np.array([1, 0]), np.ones(2)),
             "wheel_clearance": (np.array([1, 0]), np.ones(2)),
             "push": (np.arange(size), np.array([1, -1, 1, -1, -1])[:size]),
+            "jump": (np.arange(size), np.ones(size)),
             "params": (np.arange(size), np.ones(size)),
         }
         return table[name]
@@ -228,14 +237,18 @@ class SandroEnv:
         if self.cfg["observation"].get("accelerometer", False):
             comps.append(("accel", 3))
         comps += [("leg_pos", 4), ("leg_vel", 4), ("wheel_vel", 2), ("last_action", 6), ("command", self.n_command)]
+        if self.has_jump:
+            comps.append(("jump", 2))
         return self._layout(comps)
 
     N_PARAMS = 8 + 8   # episode parameters + randomize.MODEL_PARAMS
 
     def _critic_layout(self):
         comps = [("gravity", 3), ("gyro", 3), ("leg_pos", 4), ("leg_vel", 4), ("wheel_vel", 2),
-                 ("last_action", 6), ("command", self.n_command),
-                 ("true_gravity", 3), ("true_gyro", 3), ("base_velocity", 3), ("true_leg_pos", 4),
+                 ("last_action", 6), ("command", self.n_command)]
+        if self.has_jump:
+            comps.append(("jump", 2))
+        comps += [("true_gravity", 3), ("true_gyro", 3), ("base_velocity", 3), ("true_leg_pos", 4),
                  ("true_leg_vel", 4), ("true_wheel_vel", 2), ("leg_height", 2), ("leg_offset", 2),
                  ("wheel_clearance", 2), ("push", self.push_dim), ("params", self.N_PARAMS)]
         return self._layout(comps)
@@ -342,6 +355,19 @@ class SandroEnv:
         limit = jp.arctan(2.0 * room / self.track_width)
         return jp.clip(roll, -limit, limit)
 
+    def _sample_jump(self, rng):
+        """Wait until the next jump request and its target wheel clearance."""
+        j = self.jump
+        k = jax.random.split(rng, 2)
+        wait = jax.random.uniform(k[0], minval=j["interval_s"][0], maxval=j["interval_s"][1])
+        height = jax.random.uniform(k[1], minval=j["height_m"][0], maxval=j["height_m"][1])
+        return wait, height
+
+    def jump_observation(self, timer, height):
+        """(target clearance / max, remaining fraction of the window), zero outside a jump."""
+        active = timer > 0.0
+        return jp.where(active, jp.array([height / self.jump_h_max, timer / self.jump["window_s"]]), 0.0)
+
     def _sample_push(self, rng):
         """Fore-aft, lateral (and vertical force, roll and yaw torque) in the heading frame."""
         p = self.cfg["pushes"]
@@ -427,6 +453,8 @@ class SandroEnv:
                  "leg_pos": q[self.leg_idx] - self.stand_q[self.leg_idx],
                  "leg_vel": v[self.leg_idx] * sc["leg_vel"], "wheel_vel": v[self.wheel_idx] * sc["wheel_vel"],
                  "last_action": info["last_action"], "command": command}
+        if self.has_jump:
+            parts["jump"] = self.jump_observation(info["jump_timer"], info["jump_height"])
         return jp.concatenate([parts[n] for n in self.actor_layout.names]), parts
 
     def _truth(self, data, info):
@@ -456,6 +484,7 @@ class SandroEnv:
             "tilt": jp.arccos(jp.clip(r_body[2, 2], -1.0, 1.0)),
             "q": q, "qd": qd, "heights": heights, "offsets": offsets, "stretch": stretch,
             "imu_height": data.site_xpos[self.spec.imu_site][2] - ground[2], "clearance": clearance, "axle": mid,
+            "base_vz": data.qvel[2],   # the free joint's world linear velocity
         }
 
     def _critic_obs(self, actor_parts, truth, info, model_params):
@@ -517,6 +546,9 @@ class SandroEnv:
             "frame": zero_frame, "axle_prev": self._axle_mid(data),
             "obs_history": jp.zeros((self.history, self.actor_layout.size)),
         }
+        if self.has_jump:
+            jump_wait, jump_height = self._sample_jump(jax.random.fold_in(k[9], 1))
+            info.update({"jump_wait": jump_wait, "jump_timer": jp.float32(-10.0), "jump_height": jump_height})
         sensed = self._read_sensors(info)
         frame, parts = self._actor_frame(sensed, info)
         obs_history = jp.tile(frame[None], (self.history, 1))
@@ -547,6 +579,15 @@ class SandroEnv:
         info = dict(state.info)
         params = info["params"]
         rng, k_noise, k_cmd, k_push = jax.random.split(info["rng"], 4)
+        if self.has_jump:
+            # Requested jumps: the window opens when the wait runs out.
+            info["jump_timer"] = info["jump_timer"] - self.dt
+            info["jump_wait"] = info["jump_wait"] - self.dt
+            start = (info["jump_wait"] <= 0.0) & (info["jump_timer"] <= 0.0)
+            wait, height = self._sample_jump(jax.random.fold_in(k_cmd, 7))
+            info["jump_timer"] = jp.where(start, self.jump["window_s"], info["jump_timer"])
+            info["jump_height"] = jp.where(start, height, info["jump_height"])
+            info["jump_wait"] = jp.where(start, wait + self.jump["window_s"], info["jump_wait"])
         action = jp.clip(action, -self.cfg["action"]["clip"], self.cfg["action"]["clip"])
         new_frame = self._frames(action, params)
         old_frame = info["frame"]
@@ -633,7 +674,8 @@ class SandroEnv:
         diverged = ~(jp.all(jp.isfinite(data.qpos)) & jp.all(jp.isfinite(data.qvel))
                      & (jp.max(jp.abs(data.qvel)) < max_qvel))
         terminated = jp.maximum(self._terminated(truth), diverged.astype(jp.float32))
-        cat_delta = self._constraints(truth, taus) if self.cfg["constraints"].get("enabled", True) else jp.float32(0)
+        cat_delta = (self._constraints(truth, taus, info) if self.cfg["constraints"].get("enabled", True)
+                     else jp.float32(0))
         reward, terms = self._reward(truth, info, action, prev_action, info["last_action2"], taus, terminated)
         timeout = info["step"] >= self.episode_steps
         done = jp.maximum(terminated, timeout.astype(jp.float32))
@@ -646,6 +688,9 @@ class SandroEnv:
         cat_delta = jp.where(diverged, 0.0, cat_delta)
         info["obs_history"] = jp.where(diverged, 0.0, info["obs_history"])
         metrics = dict(terms)
+        if self.has_jump:
+            metrics["jump_active"] = (info["jump_timer"] > 0.0).astype(jp.float32)
+            metrics["clearance_min"] = jp.min(truth["clearance"])
         metrics.update({
             "err_forward": jp.abs(truth["forward_speed"] - v_ref),
             "err_yaw": jp.abs(truth["yaw_rate"] - w_ref),
@@ -658,8 +703,9 @@ class SandroEnv:
                      cat_delta=cat_delta, info=info, metrics=metrics)
 
     def metric_names(self):
-        return list(self.cfg["rewards"]["weights"]) + ["err_forward", "err_yaw", "err_height", "cat_delta", "tilt",
-                                                       "err_roll"]
+        names = list(self.cfg["rewards"]["weights"]) + ["err_forward", "err_yaw", "err_height", "cat_delta", "tilt",
+                                                        "err_roll"]
+        return names + (["jump_active", "clearance_min"] if self.has_jump else [])
 
     # ------------------------------------------------------------ task terms
     def _terminated(self, truth):
@@ -668,7 +714,13 @@ class SandroEnv:
         bad = bad | ~jp.all(jp.isfinite(truth["q"]))
         return bad.astype(jp.float32)
 
-    def _constraints(self, truth, taus):
+    def _jumping(self, info):
+        """1 inside a jump window and for landing_s after it."""
+        if not self.has_jump:
+            return jp.float32(0.0)
+        return (info["jump_timer"] > -self.jump.get("landing_s", 0.3)).astype(jp.float32)
+
+    def _constraints(self, truth, taus, info):
         c = self.cfg["constraints"]
         legs = self.leg_idx
         tau_leg = jp.max(jp.abs(taus[:, legs]), axis=0)
@@ -683,7 +735,8 @@ class SandroEnv:
             (truth["tilt"] - c["tilt"]["limit_rad"]) / c["tilt"]["slack"],
         ]
         if "wheel_lift" in c and c["wheel_lift"]:
-            violations.append(jp.max(truth["clearance"] - c["wheel_lift"]["limit_m"]) / c["wheel_lift"]["slack"])
+            lift = jp.max(truth["clearance"] - c["wheel_lift"]["limit_m"]) / c["wheel_lift"]["slack"]
+            violations.append(lift * (1.0 - self._jumping(info)))
         v = jp.clip(jp.stack(violations), 0.0, 1.0)
         return c["p_max"] * jp.max(v)
 
@@ -715,6 +768,17 @@ class SandroEnv:
             "leg_velocity": jp.sum(truth["qd"][legs] ** 2),
             "termination": terminated,
         }
+        if self.has_jump:
+            # In a jump window: reward both wheels' clearance up to the target,
+            # and drop the terms that hold the body at a steady height.
+            jumping = self._jumping(info)
+            in_window = (info["jump_timer"] > 0.0).astype(jp.float32)
+            lift = jp.clip(jp.min(truth["clearance"]), 0.0, info["jump_height"]) / info["jump_height"]
+            terms["jump_clearance"] = in_window * lift
+            terms["jump_vz"] = in_window * jp.clip(truth["base_vz"], 0.0, 1.5)
+            terms["jump_overshoot"] = in_window * jp.maximum(jp.min(truth["clearance"]) - info["jump_height"], 0.0) ** 2
+            for name in ("track_height", "vertical_velocity"):
+                terms[name] = terms[name] * (1.0 - jumping)
         terms = {k: v for k, v in terms.items() if k in w}
         scale = self.dt if r.get("scale_by_dt", True) else 1.0
         weighted = {k: w[k] * v * scale for k, v in terms.items()}

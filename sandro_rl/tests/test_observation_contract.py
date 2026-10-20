@@ -11,7 +11,7 @@ from sandro_rl.interface import PolicyInterface
 from sandro_rl.robot import RobotSpec
 
 
-@pytest.fixture(scope="module", params=["flat_tracking.yaml", "agile_terrain.yaml"])
+@pytest.fixture(scope="module", params=["flat_tracking.yaml", "agile_terrain.yaml", "jump.yaml"])
 def cfg(request):
     return config_mod.load(request.param)
 
@@ -44,7 +44,7 @@ def test_policy_rate_divides_control_rate(cfg, spec):
 def test_sizes_and_mirror(env):
     frame = env.actor_layout.size
     assert env.actor_obs_size == frame * env.history
-    expected = 3 + 3 + (3 if env.cfg["observation"].get("accelerometer") else 0) + 4 + 4 + 2 + 6 + env.n_command
+    expected = 3 + 3 + (3 if env.cfg["observation"].get("accelerometer") else 0) + 4 + 4 + 2 + 6 + env.n_command + 2 * env.has_jump
     assert frame == expected
     rng = np.random.default_rng(0)
     obs = rng.normal(size=env.actor_obs_size)
@@ -71,8 +71,12 @@ def test_interface_matches_environment(env, cfg, spec):
                         rng.uniform(-0.3, 0.3)])[: env.n_command]
         info = {"params": {"mount": jp.eye(3), "gyro_bias": jp.zeros(3), "vel_gain": jp.ones(6)},
                 "command_ref": jp.asarray(ref), "last_action": jp.asarray(last_action)}
+        timer, height = rng.uniform(-0.5, 0.8), rng.uniform(0.02, 0.08)
+        if env.has_jump:
+            info.update({"jump_timer": jp.float32(timer), "jump_height": jp.float32(height)})
         want, _ = env._actor_frame(jp.asarray(sensed, dtype=jp.float32), info)
-        got = iface.frame(sensed[0:4], sensed[4:7], sensed[7:10], sensed[10:16], sensed[16:22], last_action, ref)
+        got = iface.frame(sensed[0:4], sensed[4:7], sensed[7:10], sensed[10:16], sensed[16:22], last_action, ref,
+                          iface.jump_observation(timer, height) if iface.has_jump else (0.0, 0.0))
         np.testing.assert_allclose(got, np.asarray(want), rtol=1e-5, atol=1e-5)
 
         action = rng.uniform(-1.2, 1.2, 6)
@@ -101,5 +105,5 @@ def test_actor_sees_no_privileged_state(cfg, spec):
     args = [rng.normal(size=4), rng.normal(size=3), rng.normal(size=3), rng.normal(size=6), rng.normal(size=6),
             rng.normal(size=6), np.array([0.1, 0.2, 0.16, 0.1])]
     frame = i.frame(*args)
-    assert frame.shape == (26 if i.has_roll else 25,)
+    assert frame.shape == ((26 if i.has_roll else 25) + 2 * i.has_jump,)
     assert np.all(np.isfinite(frame))

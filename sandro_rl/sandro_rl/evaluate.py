@@ -257,6 +257,7 @@ class PolicyController:
         self.history = None
         self.ref = None
         self.fallen = False
+        self.jump_timer, self.jump_height, self.jump_request = -10.0, 0.0, 0.0
 
     def reset(self, quat, gyro, accel, q, v, height_target):
         heights = self._heights(q)
@@ -292,7 +293,16 @@ class PolicyController:
             target = np.array([np.clip(command[0], -i.v_max, i.v_max), np.clip(command[1], -i.yaw_max, i.yaw_max),
                                self.height_command, command[3] if len(command) > 3 else 0.0])
             self.ref = i.shape(self.ref, target)
-            frame = i.frame(quat, gyro, accel, q, v, self.last_action, self.ref)
+            jump = 0.0
+            if i.has_jump:
+                # A rising edge of the requested jump height opens a jump window.
+                request = command[4] if len(command) > 4 else 0.0
+                self.jump_timer -= i.dt
+                if request > 0.0 and self.jump_request <= 0.0 and self.jump_timer <= 0.0:
+                    self.jump_timer, self.jump_height = i.jump_window, request
+                self.jump_request = request
+                jump = i.jump_observation(self.jump_timer, self.jump_height)
+            frame = i.frame(quat, gyro, accel, q, v, self.last_action, self.ref, jump)
             self.history = np.concatenate([frame[None], self.history[:-1]], axis=0)
             action = np.clip(self.policy(self.history.reshape(-1)), -i.clip, i.clip)
             self.last_action = action
@@ -335,7 +345,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     staged = np.zeros(m.nu)
     limits = iface.torque_limit
 
-    phases = [[float(x) for x in p.split(",")] + [0.0] * (5 - len(p.split(","))) for p in SCENARIOS[scenario]]
+    phases = [[float(x) for x in p.split(",")] + [0.0] * (6 - len(p.split(","))) for p in SCENARIOS[scenario]]
     pushes = [[float(x) for x in p.split(",")] for p in closed_loop.SCENARIO_PUSHES.get(scenario, [])]
     total_phase_s = sum(p[0] for p in phases)
 
@@ -378,8 +388,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     last_ns = wake_ns = step_ns()
     activated = False
     recording_start = phase_start = engaged_at = last_diag = last_publish = -1.0
-    published = [0.0] * 5
-    received = [0.0] * 4
+    published = [0.0] * 6
+    received = [0.0] * 5
     phase_index = 0
     fall_time = -1.0
     finished = False
@@ -429,11 +439,11 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                     elapsed -= phases[index][0]
                     index += 1
                 phase_index = index
-                published = phases[index] if index < len(phases) else [0.0] * 5
+                published = phases[index] if index < len(phases) else [0.0] * 6
             else:
-                published = [0.0] * 5
+                published = [0.0] * 6
             if engaged_at >= 0:
-                received = [published[1], published[2], published[3], published[4]]
+                received = published[1:6]
         frames = controller.update(quat, gyro, accel, pos, vel, received, period)
 
         # write()
@@ -455,7 +465,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
 
         phase = -1 if phase_start < 0 else phase_index
         base = {"t_s": f"{now - recording_start:.6g}", "phase": phase, "cmd_forward": published[1],
-                "cmd_yaw": published[2], "cmd_height_rate": published[3], "cmd_roll": published[4]}
+                "cmd_yaw": published[2], "cmd_height_rate": published[3], "cmd_roll": published[4], "cmd_jump": published[5]}
         if last_diag < 0 or now - last_diag >= 1.0 / options.diagnostics_rate_hz - 1e-9:
             last_diag = now
             r_body = iface.body_rotation(quat)
@@ -510,7 +520,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         rows.append(joint_row)
         rows.append({**base, "stream": "imu", **{k: f"{x:.6g}" for k, x in zip(IMU_COLUMNS, imu)}})
 
-    header = (["t_s", "stream", "phase", "cmd_forward", "cmd_yaw", "cmd_height_rate", "cmd_roll"]
+    header = (["t_s", "stream", "phase", "cmd_forward", "cmd_yaw", "cmd_height_rate", "cmd_roll", "cmd_jump"]
               + [f"diag_{k}" for k in DIAG_KEYS]
               + [f"{p}{j}" for p in ("pos_", "vel_", "eff_") for j in JOINTS] + IMU_COLUMNS
               + [f"diag_{k}" for k in TRUTH_KEYS])

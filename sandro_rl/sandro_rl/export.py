@@ -103,7 +103,7 @@ def export(policy_dir: Path) -> Path:
     spec = RobotSpec.load()
     i = PolicyInterface(cfg, spec)
     frame = [("gravity", 3), ("gyro", 3)] + ([("accel", 3)] if i.accelerometer else []) + [
-        ("leg_pos", 4), ("leg_vel", 4), ("wheel_vel", 2), ("last_action", 6), ("command", 4 if i.has_roll else 3)]
+        ("leg_pos", 4), ("leg_vel", 4), ("wheel_vel", 2), ("last_action", 6), ("command", 4 if i.has_roll else 3)] + ([("jump", 2)] if i.has_jump else [])
     if sum(n for _, n in frame) * i.history != payload["actor_norm"]["mean"].size:
         raise RuntimeError("interface.PolicyInterface no longer matches the trained observation size")
     a = cfg["env"]["action"]
@@ -115,7 +115,11 @@ def export(policy_dir: Path) -> Path:
                         "scales": i.scales, "imu_offset_correction_rad": i.imu_offset_correction,
                         "command_normalisation": {"forward_m_s": i.v_max, "yaw_rad_s": i.yaw_max,
                                                   "height_m": [i.h_min, i.h_max],
-                                                  **({"roll_rad": i.roll_max} if i.has_roll else {})}},
+                                                  **({"roll_rad": i.roll_max} if i.has_roll else {}),
+                                                  **({"jump": {"height_max_m": i.jump_h_max, "window_s": i.jump_window,
+                                                               "observation": "[target / height_max_m, remaining / window_s], "
+                                                                              "zero outside a jump"}}
+                                                     if i.has_jump else {})}},
         "action": {"joints": list(JOINTS),
                    "legs": {"q_ref": "stand_q + scale_rad * a", "scale_rad": i.leg_scale,
                             "kp": i.leg_kp, "kd": i.leg_kd, "range_rad": [i.q_lo, i.q_hi]},

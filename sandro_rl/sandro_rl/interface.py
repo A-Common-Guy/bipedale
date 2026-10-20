@@ -47,7 +47,9 @@ class PolicyInterface:
         self.leg_kd = float(_ros(a["legs"]["kd"], lim.leg_kd_nm_s_rad))
         self.leg_scale = float(a["legs"]["scale_rad"])
         self.wheels = a["wheels"]
-        self.torque_limit = np.array([lim.wheel_torque_nm if j in sources.WHEEL_JOINTS else lim.leg_torque_nm
+        tl = a.get("torque_limit_nm", {})
+        self.torque_limit = np.array([float(_ros(tl.get("wheels", "ros"), lim.wheel_torque_nm))
+                                      if j in sources.WHEEL_JOINTS else float(_ros(tl.get("legs", "ros"), lim.leg_torque_nm))
                                       for j in JOINTS])
         self.q_lo, self.q_hi = spec.leg_joint_range
         offset = cfg["observation"].get("imu_offset_correction", "ros")
@@ -72,6 +74,10 @@ class PolicyInterface:
         reach = c.get("leg_height_limits_m", [self.h_min, self.h_max])
         self.leg_h_lo, self.leg_h_hi = float(reach[0]), float(reach[1])
         self.track_width = float(lim.track_width_m)
+        jump = c.get("jump") or {}
+        self.has_jump = bool(jump.get("enabled", bool(jump)))
+        self.jump_h_max = float(jump.get("height_m", [0.0, 0.1])[1])
+        self.jump_window = float(jump.get("window_s", 0.8))
 
     # ------------------------------------------------------------ observation
     def body_rotation(self, quat_wxyz) -> np.ndarray:
@@ -79,8 +85,16 @@ class PolicyInterface:
         q = q / np.linalg.norm(q)
         return quat_to_mat(*q) @ self.body_from_imu_correction
 
-    def frame(self, quat_wxyz, gyro, accel, q, v, last_action, command_ref) -> np.ndarray:
-        """One observation frame from the measured signals (JOINTS order)."""
+    def jump_observation(self, timer, height) -> np.ndarray:
+        """(target clearance / max, remaining fraction of the window), zero outside a jump."""
+        if timer <= 0.0:
+            return np.zeros(2)
+        return np.array([height / self.jump_h_max, timer / self.jump_window])
+
+    def frame(self, quat_wxyz, gyro, accel, q, v, last_action, command_ref, jump=(0.0, 0.0)) -> np.ndarray:
+        """One observation frame from the measured signals (JOINTS order).
+
+        jump: jump_observation(...) for policies trained with jump events."""
         r_body = self.body_rotation(quat_wxyz)
         gravity = r_body.T @ np.array([0.0, 0.0, -1.0])
         q, v = np.asarray(q, float), np.asarray(v, float)
@@ -93,6 +107,8 @@ class PolicyInterface:
             parts.append(np.asarray(accel, float) / 9.81)
         parts += [q[self.leg_idx] - self.stand_q[self.leg_idx], v[self.leg_idx] * self.scales["leg_vel"],
                   v[self.wheel_idx] * self.scales["wheel_vel"], np.asarray(last_action, float), command]
+        if self.has_jump:
+            parts.append(np.asarray(jump, float))
         return np.concatenate(parts)
 
     # ------------------------------------------------------------ action

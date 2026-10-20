@@ -1,0 +1,72 @@
+# agile_terrain plus jump events, with the drives' full torque.
+#
+# Every 2-5 s a jump is requested: the policy sees the target wheel clearance
+# and a countdown of the 0.8 s window. In the window it is rewarded for both
+# wheels' clearance above the ground up to the target, and for the body's
+# upward speed (a shaping term that gets the first lift-offs); the
+# steady-height terms and the wheel-lift constraint are off from the window's
+# start until landing_s after it.
+#
+# The torque limits are the drives' 10 Nm (hard_effort_limit_nm in
+# sandro.ros2_control.xacro) instead of controllers.yaml's 3 / 6 Nm, and the
+# legs are stiffer with a wider action range, so a full extension can be
+# commanded in one step. The deployment controller (RlPolicyController) has
+# no jump input yet.
+inherit: agile_terrain.yaml
+
+env:
+  action:
+    torque_limit_nm: {legs: 10.0, wheels: 10.0}
+    legs: {kp: 20.0, kd: 0.6, scale_rad: 0.8}
+
+  commands:
+    jump:
+      interval_s: [2.0, 5.0]
+      window_s: 0.8
+      landing_s: 0.3
+      height_m: [0.02, 0.08]
+
+  rewards:
+    weights:
+      jump_clearance: 40.0      # both wheels' clearance / target, up to 1, per second in the window
+      jump_overshoot: -2000.0   # (clearance - target)^2 above the target
+      jump_vz: 2.0              # upward body speed in the window, clipped at 1.5 m/s
+
+  constraints:
+    leg_torque: {limit: 9.5, slack: 0.5}
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.commands.sample_fraction: 0.4
+        env.terrain.planks.height_m: [0.002, 0.01]
+        env.terrain.hills.height_m: [0.0, 0.03]
+        env.pushes.force_n: 12.0
+        env.pushes.lateral_force_n: 5.0
+        env.pushes.vertical_force_n: 0.0
+        env.pushes.torque_nm: [0.0, 0.0]
+        env.commands.jump.height_m: [0.01, 0.03]
+    - iteration: 400
+      set:
+        env.commands.sample_fraction: 0.7
+        env.terrain.planks.height_m: [0.004, 0.02]
+        env.terrain.hills.height_m: [0.01, 0.06]
+        env.pushes.force_n: 18.0
+        env.pushes.lateral_force_n: 8.0
+        env.pushes.vertical_force_n: 8.0
+        env.pushes.torque_nm: [0.5, 0.5]
+        env.commands.jump.height_m: [0.02, 0.05]
+    - iteration: 900                    # stages accumulate: restate the full values
+      set:
+        env.commands.sample_fraction: 1.0
+        env.terrain.planks.height_m: [0.005, 0.03]
+        env.terrain.hills.height_m: [0.02, 0.10]
+        env.pushes.force_n: 25.0
+        env.pushes.lateral_force_n: 12.0
+        env.pushes.vertical_force_n: 15.0
+        env.pushes.torque_nm: [1.0, 1.0]
+        env.commands.jump.height_m: [0.02, 0.08]
+
+train:
+  iterations: 2500
