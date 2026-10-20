@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(controller_interface REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -27,6 +28,8 @@ add_library(sandro_controllers SHARED
   src/lqr.cpp
   src/lqr_balancer_controller.cpp
   src/lqr_core.cpp
+  src/rl_policy_controller.cpp
+  src/rl_policy_core.cpp
   src/timed_effort_controller.cpp
   src/whole_body_controller.cpp
   src/whole_body_core.cpp
@@ -37,7 +40,7 @@ target_include_directories(sandro_controllers PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(sandro_controllers
-  controller_interface diagnostic_msgs geometry_msgs hardware_interface
+  ament_index_cpp controller_interface diagnostic_msgs geometry_msgs hardware_interface
   pluginlib rclcpp rcl_interfaces realtime_tools std_msgs)
 target_link_libraries(sandro_controllers Eigen3::Eigen)
 
@@ -49,6 +52,7 @@ install(TARGETS sandro_controllers
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY policies DESTINATION share/${PROJECT_NAME})
 install(FILES README.md sandro_controllers_plugins.xml
   DESTINATION share/${PROJECT_NAME})
 
@@ -70,6 +74,15 @@ if(BUILD_TESTING)
     src/whole_body_model.cpp)
   target_include_directories(test_sandro_whole_body PRIVATE include)
   target_link_libraries(test_sandro_whole_body Eigen3::Eigen)
+
+  ament_add_gtest(test_sandro_rl_policy
+    test/test_rl_policy.cpp
+    src/kinematics.cpp
+    src/rl_policy_core.cpp)
+  target_include_directories(test_sandro_rl_policy PRIVATE include)
+  target_link_libraries(test_sandro_rl_policy Eigen3::Eigen)
+  target_compile_definitions(test_sandro_rl_policy PRIVATE
+    SANDRO_CONTROLLERS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 ament_export_include_directories(include)

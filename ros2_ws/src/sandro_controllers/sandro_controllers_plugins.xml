@@ -24,4 +24,10 @@
     base_class_type="controller_interface::ControllerInterface">
     <description>Whole-body controller: height-scheduled LQR over wheels and fore-aft leg placement, Cartesian leg impedance with gravity support, lean-into-turn roll and yaw tasks.</description>
   </class>
+  <class
+    name="sandro_controllers/RlPolicyController"
+    type="sandro_controllers::RlPolicyController"
+    base_class_type="controller_interface::ControllerInterface">
+    <description>Runs a locomotion policy trained in sandro_rl on the drives' MIT frames.</description>
+  </class>
 </library>
