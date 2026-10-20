@@ -57,7 +57,8 @@ DIAG_KEYS = [
     "leg_offset_m", "leg_offset_reference_m", "leg_offset_command_m", "leg_offset_model_m",
     "leg_offset_state_m", "leg_offset_rate_m_s", "trim_m", "balance_torque_nm",
     "yaw_torque_nm", "yaw_feedforward_nm", "truth_pitch_rad", "truth_speed_m_s"]
-TRUTH_KEYS = ["truth_forward_m_s", "truth_yaw_rate_rad_s", "truth_height_m", "truth_roll_rad"]
+TRUTH_KEYS = ["truth_forward_m_s", "truth_yaw_rate_rad_s", "truth_height_m", "truth_roll_rad",
+              "truth_wheel_clearance_m"]
 IMU_COLUMNS = ["imu_qx", "imu_qy", "imu_qz", "imu_qw", "imu_gx", "imu_gy", "imu_gz", "imu_ax", "imu_ay", "imu_az"]
 
 # Latency profiles of the comparison. "uart_imu" is the gate closed_loop.py
@@ -191,6 +192,10 @@ EXTRA_SCENARIOS = {
     "expressive": ["2,0,0", "3,0,0,-0.013,0", "3,0,0,0,0.3", "3,0,0,0,-0.3", "2,0,0,0,0",
                    "3,0,0,-0.013,0", "3,0,0,0.033,0", "4,0.4,1.0,0,0", "3,0,0,-0.017,0",
                    "3,0.3,0,0,-0.25", "3,-0.3,0,0,0.25", "2,0,0,0,0"],
+    # Sixth field: jump height in m (jump-trained policies). A jump starts on
+    # the phase's rising edge, so each jump phase is followed by a zero one.
+    "jump": ["2,0,0", "1,0,0,0,0,0.03", "2,0,0", "1,0,0,0,0,0.05", "2,0,0", "1,0,0,0,0,0.08", "2,0,0",
+             "2,0.5,0", "1,0.5,0,0,0,0.05", "2,0.5,0", "1,0.5,0,0,0,0.08", "2,0.5,0", "2,0,0"],
 }
 SCENARIOS = {**closed_loop.SCENARIOS, **EXTRA_SCENARIOS}
 
@@ -512,6 +517,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                 "truth_forward_m_s": truth_forward, "truth_yaw_rate_rad_s": truth_yaw,
                 "truth_height_m": float(np.mean(true_heights)),
                 "truth_roll_rad": math.atan2(rb[2, 1], rb[2, 2]),
+                # Lower wheel above z = 0, so only meaningful on flat ground.
+                "truth_wheel_clearance_m": nan if course else float(np.min(d.xanchor[wheel_joints][:, 2]) - radius),
             }
             rows.append({**base, "stream": "diag", **{f"diag_{k}": f"{v:.6g}" for k, v in values.items()}})
         joint_row = {**base, "stream": "joint"}

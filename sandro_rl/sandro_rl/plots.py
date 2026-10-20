@@ -27,7 +27,10 @@ def traces(recordings: dict[str, Path], out: Path, title: str = "") -> Path:
     has_roll = any(np.isfinite(d.get("diag_roll_reference_rad", [np.nan])).any() for d in loaded.values())
     if has_roll:
         panels.insert(4, ("diag_truth_roll_rad", "roll, truth (rad)"))
-    fig, axes = plt.subplots(len(panels), 1, figsize=(12, 11 + 2 * has_roll), sharex=True)
+    has_jump = any((np.nan_to_num(d.get("cmd_jump", [0.0])) > 0).any() for d in loaded.values())
+    if has_jump:
+        panels.insert(4, ("diag_truth_wheel_clearance_m", "lower wheel clearance (m)"))
+    fig, axes = plt.subplots(len(panels), 1, figsize=(12, 11 + 2 * (has_roll + has_jump)), sharex=True)
     for label, d in loaded.items():
         for ax, (keys, name) in zip(axes, panels):
             keys = (keys,) if isinstance(keys, str) else keys
@@ -41,10 +44,14 @@ def traces(recordings: dict[str, Path], out: Path, title: str = "") -> Path:
     axes[2].plot(first["t_s"], first["cmd_yaw"], "k--", linewidth=0.8, label="command")
     if "diag_height_reference_m" in first:
         axes[3].plot(first["t_s"], first["diag_height_reference_m"], "k--", linewidth=0.8, label="reference")
+    if has_jump:
+        axes[4].plot(first["t_s"], first["cmd_jump"], "k--", linewidth=0.8, label="jump height command")
+        axes[4].legend(fontsize=8)
     if has_roll:
         roll = next(d for d in loaded.values() if np.isfinite(d.get("diag_roll_reference_rad", [np.nan])).any())
-        axes[4].plot(roll["t_s"], roll["diag_roll_reference_rad"], "k--", linewidth=0.8, label="reference")
-        axes[4].legend(fontsize=8)
+        ax = axes[4 + has_jump]
+        ax.plot(roll["t_s"], roll["diag_roll_reference_rad"], "k--", linewidth=0.8, label="reference")
+        ax.legend(fontsize=8)
     for ax, (_, name) in zip(axes, panels):
         ax.set_ylabel(name, fontsize=8)
         ax.grid(alpha=0.3)
