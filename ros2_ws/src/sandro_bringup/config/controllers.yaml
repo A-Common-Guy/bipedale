@@ -66,7 +66,7 @@ driving_balancer:
     wheels:
       torque_limit_nm: 6.0
     drive:
-      wheel_radius_m: 0.0742
+      wheel_radius_m: 0.0672             # loaded tyre, see whole_body_controller
       track_width_m: 0.304
       max_forward_velocity_m_s: 0.5
       max_yaw_rate_rad_s: 1.5
@@ -131,7 +131,7 @@ lqr_balancer:
     wheels:
       torque_limit_nm: 6.0
     drive:
-      wheel_radius_m: 0.0742
+      wheel_radius_m: 0.0672             # loaded tyre, see whole_body_controller
       track_width_m: 0.304
       max_forward_velocity_m_s: 0.5
       max_yaw_rate_rad_s: 1.5
@@ -196,14 +196,20 @@ whole_body_controller:
               wheel_on_outer_link: 1.0}
       left: {base_m: 0.09, upper_m: 0.08, lower_m: 0.13, forward_sign: -1.0,
              wheel_on_outer_link: 0.0}
-      body_mass_kg: 3.284             # CAD total 3.40 kg minus two 58 g wheels
-      wheel_mass_kg: 0.0584
-      wheel_inertia_kgm2: 0.00033     # tyre disc plus reflected rotor (armature)
-      wheel_radius_m: 0.0742
+      # Masses, inertias and CoM height below are the weighed robot
+      # (sandro_description/config/sim_identified.yaml masses, 2026-10-21)
+      # evaluated in the MJCF at the stand keyframe.
+      body_mass_kg: 4.485             # weighed 4.825 kg minus two 170 g wheels
+      wheel_mass_kg: 0.170
+      wheel_inertia_kgm2: 0.00064     # hub, tyre and rotor plus armature
+      # Loaded radius: the airless tyres squash about 7 mm from the CAD's
+      # 0.0742 (sandro_description/config/sim_identified.yaml tyre.radius_m).
+      # On the robot this is also the rolling radius until measured.
+      wheel_radius_m: 0.0672
       track_width_m: 0.304
       # Whole robot about the vertical through its CoM, wheels' spin inertia
       # reflected through the track included (identified MJCF, stand pose).
-      yaw_inertia_kgm2: 0.09
+      yaw_inertia_kgm2: 0.093
       # Time constant with which the measured axle follows its commanded
       # fore-aft offset: 60 to 85 ms on the robot (fourth run, controller-side
       # impedance; compare_runs.py leg_lag_ms), 55 to 65 ms in MuJoCo with the
@@ -211,9 +217,9 @@ whole_body_controller:
       # for a 72 ms mode and hunted at 1.9 Hz. Re-identify after changing the
       # leg gains (the overdamped leg responds in about kd / kp).
       leg_lag_s: 0.07
-      com_height_per_leg_height: 0.654  # CoM above axle = 0.654 * leg height
+      com_height_per_leg_height: 0.756  # CoM above axle = 0.756 * leg height
       com_height_offset_m: 0.0
-      pitch_inertia_kgm2: 0.0295      # about the CoM at 0.1855 m leg height
+      pitch_inertia_kgm2: 0.037       # about the CoM at 0.1855 m leg height
       pitch_inertia_reference_height_m: 0.1855
       pitch_inertia_per_m: 0.15
       gravity_m_s2: 9.81

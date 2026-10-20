@@ -124,9 +124,14 @@ def test_ros2_mjcf_actuated_joints_use_the_logical_convention():
         expected = sync_model.logical_joint_value(name, canonical_qpos[index])
         assert abs(ros2_qpos[index] - expected) < 1e-7, name
         converted.add(index)
+    # The free joint's height drops by the tyre squash (tyre.radius_m).
+    cad_radius = float(canonical.find(".//geom[@name='right_motor_shaft_2_3_tire_cyl']")
+                       .attrib["size"].split()[0])
+    loaded = (sync_model.load_identified().get("tyre") or {}).get("radius_m", cad_radius)
+    canonical_qpos[2] -= cad_radius - float(loaded)
     for index, (raw, generated) in enumerate(zip(canonical_qpos, ros2_qpos)):
         if index not in converted:
-            assert raw == generated
+            assert abs(raw - generated) < 1e-7, index
     # In the stand pose both legs are close to symmetric in the logical frame.
     right = (ros2_qpos[layout["right_motor_inner"]], ros2_qpos[layout["right_motor_outer"]])
     left = (ros2_qpos[layout["left_motor_inner"]], ros2_qpos[layout["left_motor_outer"]])

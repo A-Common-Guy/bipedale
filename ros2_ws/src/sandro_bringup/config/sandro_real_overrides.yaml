@@ -13,11 +13,8 @@
 whole_body_controller:
   ros__parameters:
     model:
-      # Estimate from the learnt leg support force (16.4 N per leg on the
-      # robot versus 10.4 N in the CAD simulation, whose body mass is
-      # 3.284 kg): about 1.2 kg more than CAD. Replace with the weighed total
-      # minus the two wheels (about 0.12 kg).
-      body_mass_kg: 4.5
+      # Weighed 2026-10-21: 4.825 kg minus two 170 g wheels, no battery.
+      body_mass_kg: 4.485
     balance:
       # Second recording (real2_2026-09-20): 0.43 Nm of average wheel torque
       # produced almost no acceleration, about 0.2 Nm of Coulomb friction per

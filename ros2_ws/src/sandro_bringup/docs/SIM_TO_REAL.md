@@ -15,7 +15,8 @@ tuning done in MuJoCo transfers. Model background is in
 | Drive-side MIT loop | the drive computes `kp (q_ref - q) + kd (v_ref - v) + tau` in its own cycle from its own encoder | backend takes torque only | `sandro_sim/MitDrivePlugin` runs the law before every physics step on the current joint state |
 | Control rate | 300 Hz | 250 Hz: the controller manager sleeps on `/clock`, which only ticks every 2 ms physics step | physics step 1/1200 s (`sync_model.py`), four steps per control cycle |
 | Tyre scrub | rubber tyre resists twisting about the contact normal | condim 3, no torsional friction | condim 4, torsional friction 0.004 m, 10 ms contact |
-| CoM / mass | robot not weighed; CAD only | CAD | `payload` in `config/sim_identified.yaml` |
+| Tyre squash | airless tyre, 6 to 8 mm shorter under the robot's weight; rolling radius not measured | rigid 0.0742 m cylinder | contact cylinder at the loaded 0.0672 m (`tyre.radius_m`) and `model.wheel_radius_m` to match; the tyre's vertical spring is not modelled |
+| CoM / mass | components weighed (4.825 kg); CoM not yet measured | CAD masses | `masses` and `payload` in `config/sim_identified.yaml` |
 | Drive friction, torque constant | unmeasured | legacy fit / CAD | `joints`, `actuators` in the same file |
 
 The two latencies turned out to be the whole story of the oscillation. With
@@ -537,8 +538,12 @@ model and the comparison is repeated.
    `--leg-height`, `model.com_height_offset_m`. It needs the `mujoco` Python
    package. The CoM height is the one number the balance model cannot get
    from the trim; the trim check below still applies.
-   `payload.mass_kg` is the total minus the
-   CAD's 3.40 kg. Stand on the controller and read `trim_m` from
+   The component masses (hub, leg motors, upper cranks, lower links, wheels;
+   weighed 2026-10-21, 4.825 kg without battery) are in the `masses` section
+   of `sim_identified.yaml` and replace the CAD body masses at every sync,
+   also after a CAD re-export. The payload is a part of the hub's mass whose
+   position the tilt weighing sets, so pass `--mass` equal to `masses.total_kg`.
+   Stand on the controller and read `trim_m` from
    `~/diagnostics` once it settles: positive means the real centre of mass is
    behind the model's neutral axle by that lever. Move the controller's
    neutral there (`tasks.fore_aft.neutral_offset_m`, negative for backward)

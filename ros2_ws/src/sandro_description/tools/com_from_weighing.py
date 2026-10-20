@@ -8,7 +8,7 @@ the scale reading and the horizontal distance from the wheel axle to that
 point. Do it at two or more pitches, forward and backward (+-15 to 30 deg,
 support 0.2 m or more from the axle):
 
-    python3 tools/com_from_weighing.py --mass 4.92 \\
+    python3 tools/com_from_weighing.py --mass 4.825 \\
         --tilt 25,0.731,0.30 --tilt -20,0.512,-0.28 [--legs RI,RO,LI,LO] [--write]
 
 Each --tilt is "pitch_deg,scale_kg,x_m": IMU pitch with the top of the body
@@ -228,7 +228,7 @@ def main() -> int:
     sim_rel = sim["com"] - sim["axle"]
     base_rel = sim["base_com"] - sim["axle"]
     print(f"\nmodel (pose: {'--legs' if legs else 'stand keyframe'})")
-    print(f"  CAD only     {sim['base_mass']:.3f} kg   L = {1e3 * base_rel[2]:6.1f} mm   "
+    print(f"  no payload   {sim['base_mass']:.3f} kg   L = {1e3 * base_rel[2]:6.1f} mm   "
           f"e = {1e3 * base_rel[0]:6.1f} mm")
     print(f"  with payload {sim['mass']:.3f} kg   L = {1e3 * sim_rel[2]:6.1f} mm   "
           f"e = {1e3 * sim_rel[0]:6.1f} mm   (current sim_identified.yaml)")

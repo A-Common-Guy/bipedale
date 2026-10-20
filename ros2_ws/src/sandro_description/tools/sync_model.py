@@ -208,6 +208,7 @@ def apply_identified(robot: ET.Element, identified: dict) -> None:
     tyres = identified.get("tyre") or {}
     if tyres:
         found = 0
+        drop = 0.0
         for geom in worldbody.iter("geom"):
             name = geom.attrib.get("name", "")
             if not name.endswith("_tire_cyl"):
@@ -216,8 +217,18 @@ def apply_identified(robot: ET.Element, identified: dict) -> None:
             for key in ("condim", "friction", "solref", "solimp", "margin"):
                 if key in tyres:
                     geom.set(key, _format_list(tyres[key]))
+            if "radius_m" in tyres:
+                size = [float(v) for v in geom.attrib["size"].split()]
+                drop = size[0] - float(tyres["radius_m"])
+                geom.set("size", _format_list([float(tyres["radius_m"])] + size[1:]))
         if found != 2:
             raise ValueError(f"expected two *_tire_cyl geoms, found {found}")
+        # Keyframes keep the wheels on the floor: the free joint's height
+        # comes down by the radius lost to the squash.
+        for key in robot.findall("./keyframe/key"):
+            qpos = [float(v) for v in key.attrib["qpos"].split()]
+            qpos[2] -= drop
+            key.set("qpos", " ".join(_format(v) for v in qpos))
 
     joints = identified.get("joints") or {}
     for group, names in (("legs", ("right_motor_inner", "right_motor_outer",
@@ -246,6 +257,8 @@ def apply_identified(robot: ET.Element, identified: dict) -> None:
                 motor.set("gear", _format(float(scale)))
 
     payload = identified.get("payload") or {}
+    if identified.get("masses"):
+        apply_masses(worldbody, identified["masses"], float(payload.get("mass_kg", 0.0)))
     if payload.get("mass_kg", 0.0) > 0.0:
         torso = worldbody.find("./body[@name='torso']")
         if torso is None:
@@ -300,6 +313,70 @@ def apply_identified(robot: ET.Element, identified: dict) -> None:
             for sensor in robot.find("./sensor"):
                 if sensor.attrib.get("name") == sensor_name:
                     sensor.set("noise", _format(float(sensors[key])))
+
+
+def apply_masses(worldbody: ET.Element, masses: dict, payload_kg: float) -> None:
+    """Replace the CAD body masses with the weighed components.
+
+    Each body keeps the CAD centre of mass and principal axes; mass and
+    inertia scale by one ratio. The payload's mass comes out of the hub.
+    """
+    leg_motors = ("right_motor_inner", "right_motor_outer",
+                  "left_motor_inner", "left_motor_outer")
+    joint_body: dict[str, ET.Element] = {}
+    parent: dict[ET.Element, ET.Element] = {}
+    for body in worldbody.iter("body"):
+        for child in body.findall("body"):
+            parent[child] = body
+        for joint in body.findall("joint"):
+            joint_body[joint.attrib.get("name", "")] = body
+
+    def inertial(body: ET.Element) -> ET.Element:
+        element = body.find("inertial")
+        if element is None:
+            raise ValueError(f"body {body.attrib.get('name')} has no inertial")
+        return element
+
+    def set_mass(bodies: list[ET.Element], kg: float) -> None:
+        cad = sum(float(inertial(b).attrib["mass"]) for b in bodies)
+        if kg <= 0.0 or cad <= 0.0:
+            raise ValueError(f"cannot set {[b.attrib.get('name') for b in bodies]} to {kg} kg")
+        for body in bodies:
+            element = inertial(body)
+            element.set("mass", _format(float(element.attrib["mass"]) * kg / cad))
+            for key in ("diaginertia", "fullinertia"):
+                if key in element.attrib:
+                    element.set(key, _format_list(
+                        [float(v) * kg / cad for v in element.attrib[key].split()]))
+
+    torso = worldbody.find("./body[@name='torso']")
+    if torso is None:
+        raise ValueError("torso body not found for the measured masses")
+    set_mass([torso], float(masses["central_hub_kg"]) - payload_kg)
+
+    holders: dict[ET.Element, int] = {}
+    for name in leg_motors:
+        crank = joint_body[name]
+        set_mass([crank], float(masses["upper_crank_kg"]))
+        holders[parent[crank]] = holders.get(parent[crank], 0) + 1
+    for holder, count in holders.items():
+        if holder is torso or holder.find("joint") is not None:
+            raise ValueError(f"leg motor holder {holder.attrib.get('name')} is not a "
+                             "jointless child of the torso")
+        set_mass([holder], count * float(masses["leg_motor_kg"]))
+
+    for side in ("right", "left"):
+        links = [b for n, b in joint_body.items() if n.startswith(f"{side}_passive_")]
+        if len(links) != 2:
+            raise ValueError(f"expected two {side} passive links, found {len(links)}")
+        set_mass(links, float(masses["lower_links_per_side_kg"]))
+        set_mass([joint_body[f"{side}_wheel"]], float(masses["wheel_kg"]))
+
+    total = payload_kg + sum(float(b.find("inertial").attrib["mass"])
+                             for b in worldbody.iter("body") if b.find("inertial") is not None)
+    if abs(total - float(masses["total_kg"])) > 0.001:
+        raise ValueError(f"measured components add up to {total:.4f} kg, "
+                         f"not the weighed {masses['total_kg']} kg")
 
 
 def _format_list(values) -> str:

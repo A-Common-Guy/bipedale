@@ -15,6 +15,13 @@
 # simulation. condim 4 adds torsional friction (unit: metres, roughly the
 # contact patch radius times the friction coefficient).
 tyre:
+  # Contact radius under load. The airless tyres (CAD 0.0742 m free) squash
+  # 6 to 8 mm with the robot standing on them (2026-10-21, by eye); MuJoCo's
+  # contact cannot squash that far, so the contact cylinder is the loaded
+  # radius instead: axle height and the axle-to-ground lever are right, the
+  # vertical spring of the tyre is missing. The simulated rolling radius is
+  # then this too; the controllers' model.wheel_radius_m follows it.
+  radius_m: 0.0672
   condim: 4
   # Torsional friction from the turning comparison (recordings/*2026-09-20):
   # the robot needed 0.37 Nm of differential torque for 0.22 rad/s of yaw;
@@ -46,21 +53,42 @@ actuators:
   legs:   {torque_scale: 1.0}
   wheels: {torque_scale: 1.0}
 
-# Mass the CAD does not carry, in the IMU frame (x forward, y left, z up).
-# Set mass_kg to the weighed total minus the CAD's 3.40 kg, and position_m to
-# where the trim readout of the whole-body controller says the centre of mass
-# really is (see SIM_TO_REAL.md). Zero disables it.
-# Inferred from the 2026-09-20 recording, not yet weighed: the legs carry
-# about 1.2 kg more than CAD and the centre of mass sits about 28 mm behind
-# the CAD one, i.e. roughly 1.2 kg some 11 cm behind the CoM (battery and
-# electronics at the rear). Replace mass_kg with the weighed total minus 3.40
-# and re-place it once trim_m on the real robot reads about zero with the
-# controller's neutral_offset_m. The 28 mm was later found to be mostly the
-# lean held against wheel stiction (SIM_TO_REAL.md, fourth comparison; the
-# robot overrides use -0.008 m), so this placement is still too far back.
+# Weighed component masses (kg), 2026-10-21. The CAD export's body masses are
+# replaced by these; each CAD body keeps its centre of mass and its inertia is
+# scaled by the same ratio. Components are found through the joints, not CAD
+# body names, so a re-exported CAD keeps them:
+#   central_hub_kg           torso body: frame, electronics, cabling, every
+#                            bracket; everything but the four leg motors
+#   leg_motor_kg             each of the four, on the jointless holder bodies
+#                            that carry the leg motor joints (assumed, not
+#                            weighed individually)
+#   upper_crank_kg           each body of a leg motor joint, bearings included
+#   lower_links_per_side_kg  the two passive-joint bodies of one leg together:
+#                            both lower cranks, the wheel motor stator and the
+#                            two coupling shafts to the upper cranks; split
+#                            between the two in the CAD proportion
+#   wheel_kg                 each wheel joint body: hub, tyre, motor rotor
+# total_kg is the whole robot on the scale; sync fails if the components do
+# not add up to it within 1 g. Weighed without a battery (bench supply):
+# weigh again, and redo the tilt weighing, once one is fitted.
+masses:
+  total_kg: 4.825
+  central_hub_kg: 1.145
+  leg_motor_kg: 0.388
+  upper_crank_kg: 0.112
+  lower_links_per_side_kg: 0.670
+  wheel_kg: 0.170
+
+# Part of the central hub's mass, in the IMU frame (x forward, y left, z up),
+# placed where the tilt weighing puts the CoM (tools/com_from_weighing.py
+# --write). It is taken out of central_hub_kg, so the total stays the weighed
+# one; it also carries the training's payload mass and offset randomisation.
+# Zero disables it (and then the hub is the CAD torso body alone).
+# The hub was reported slightly rear-heavy: until the tilt weighing, 0.4 kg
+# sits 20 mm behind the CAD torso's centre of mass.
 payload:
-  mass_kg: 1.2
-  position_m: [-0.031, 0.035, -0.15]
+  mass_kg: 0.4
+  position_m: [-0.012, 0.038, -0.058]
   half_size_m: [0.04, 0.06, 0.03]
 
 # IMU mounting. Both hardware recordings show the leg kinematics 14 mm
