@@ -953,10 +953,27 @@ crossing and drives past the others beside them, which is what
   together and steep faces that punish a failed try, v2 learnt not to try.
   Commanding a jump in front of the plank does not help: it reverses away
   from the face after landing.
-- **Next:** a hop on command. In training the jump command fires
-  automatically just before an obstacle edge, so the policy learns that a
-  jump request means "hop onto what is ahead". On the robot the operator, or
-  a forward range sensor, sends it.
+- **Hop on command** (`configs/step_climb_hop.yaml`, run `step_climb_hop_v1`,
+  1500 iterations from v2, 45.6 min). In training the jump request also fires
+  whenever the ground 0.1–0.4 m ahead rises by more than 1.5 cm, with a
+  target of the rise plus 2 cm. `evaluate.py --hop` plays an operator who
+  does the same from rays against the course. The legs stay together
+  (≤ 5 mm). With heading hold 2 and hops, 5 seeds:
+
+  | Checkpoint | 600 | 800 | 1000 | 1100 | 1200 | 1300 | 1400 | 1500 |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | planks / 20 | 8 | 5 | 5 | 3 | 11 | 2 | 6 | 10 |
+  | falls on the steps course / 5 | 5 | 5 | 5 | 5 | 4 | 5 | 3 | 5 |
+  | onto the curb / 5 | 3 | 1 | 3 | 0 | 0 | 4 | 0 | 2 |
+  | falls on the curb course / 5 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
+
+  It is the first policy to get onto the 6 cm curb, and checkpoint 1500
+  crossed the 5 cm plank once. But it falls on most runs over the planks,
+  usually after landing from the first or second. It also falls without hop
+  requests (4–5 of 5), where v2 only stopped. The checkpoints vary too much
+  to pick one, so it is not kept. Next would be a longer run with a smaller
+  learning rate, landings rewarded explicitly, and planks deep enough to
+  land on in training (0.04–0.4 m now).
 - **The heading drifts after crossings.** The command is a yaw rate, not a
   heading. `evaluate.py --heading-hold GAIN` models an operator who steers
   back to the scenario's heading.
