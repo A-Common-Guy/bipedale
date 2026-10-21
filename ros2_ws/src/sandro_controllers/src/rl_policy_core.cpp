@@ -143,7 +143,7 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
       !(s.policy_rate_hz > 0.0) || update_rate_hz <= 0 || !(s.forward_m_s > 0.0) ||
       !(s.yaw_rad_s > 0.0) || !(s.height_max_m > s.height_min_m) ||
       (s.command_size == 4 && !(s.roll_rad > 0.0)) || !(s.leg_kp_nm_rad > 0.0) ||
-      !(s.wheel_kd_nm_s_rad > 0.0) || !(s.stand_s > 0.0)) {
+      !(s.wheel_kd_nm_s_rad > 0.0) || !(s.stand_s > 0.0) || !(s.wheel_filter_hz >= 0.0)) {
     *error = "inconsistent policy settings";
     return false;
   }
@@ -301,12 +301,42 @@ void RlPolicyCore::engage(const RlPolicyState &state) {
   height_command_m_ = std::clamp(settings_.initial_height_m, settings_.height_min_m,
                                  settings_.height_max_m);
   last_action_.fill(0.0F);
+  applied_action_.fill(0.0F);
   build_frame(state, frame_);
   for (int k = 0; k < settings_.history; ++k) {
     observation_.segment(k * frame_size_, frame_size_) = frame_;
   }
   cycle_ = 0;
   phase_ = RlPhase::kPolicy;
+}
+
+bool RlPolicyCore::hand_over(const RlPolicyState &state) {
+  if (!imu_fresh(state) || !finite(state)) {
+    return false;
+  }
+  const Eigen::Matrix3d r = body_rotation(state);
+  if (std::acos(std::clamp(r(2, 2), -1.0, 1.0)) > settings_.engage_tilt_rad) {
+    return false;
+  }
+  engage(state);
+  // The previous balancer's references are close to the measured joint
+  // state, so that is the last action the history starts from.
+  for (const auto j : kLegs) {
+    last_action_[j] =
+        static_cast<float>((state.position[j] - settings_.stand_q[j]) / settings_.leg_scale_rad);
+  }
+  for (const auto j : kWheels) {
+    last_action_[j] = settings_.wheel_velocity_mode
+                          ? static_cast<float>(state.velocity[j] / settings_.wheel_scale_rad_s)
+                          : 0.0F;
+  }
+  build_frame(state, frame_);
+  for (int k = 0; k < settings_.history; ++k) {
+    observation_.segment(k * frame_size_, frame_size_) = frame_;
+  }
+  applied_action_ = last_action_;
+  policy_frame_ = frames_from_action(applied_action_);
+  return true;
 }
 
 RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCommand &raw,
@@ -412,7 +442,17 @@ RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCo
     for (std::size_t j = 0; j < 6; ++j) {
       last_action_[j] = action[static_cast<Eigen::Index>(j)];
     }
-    policy_frame_ = frames_from_action(last_action_);
+    const float blend =
+        s.wheel_filter_hz > 0.0
+            ? static_cast<float>(1.0 - std::exp(-2.0 * M_PI * s.wheel_filter_hz * policy_dt_s_))
+            : 1.0F;
+    for (const auto j : kLegs) {
+      applied_action_[j] = last_action_[j];
+    }
+    for (const auto j : kWheels) {
+      applied_action_[j] += blend * (last_action_[j] - applied_action_[j]);
+    }
+    policy_frame_ = frames_from_action(applied_action_);
   }
   if (phase_ == RlPhase::kPolicy) {
     ++cycle_;

@@ -73,6 +73,9 @@ struct RlPolicySettings {
   double wheel_scale_rad_s{20.0};
   double wheel_kd_nm_s_rad{0.4};
   double wheel_scale_nm{3.0};
+  // First-order low-pass on the wheel commands sent to the drives, Hz; 0 off.
+  // The observation keeps the policy's own action, as in training.
+  double wheel_filter_hz{0.0};
   std::array<double, 6> stand_q{};
 
   LegGeometry leg_geometry{};
@@ -156,6 +159,11 @@ public:
   bool configure(const RlPolicySettings &settings, int update_rate_hz,
                  std::string *error);
   void reset(const RlPolicyState &state);
+  // Takes over from another balancer holding the robot upright: engages at
+  // once from the measured pose, without the stand phase. False (and the
+  // stand phase stays) unless the IMU is valid and the body within
+  // engage_tilt_rad.
+  bool hand_over(const RlPolicyState &state);
   RlPolicyOutput update(const RlPolicyState &state,
                         const RlPolicyCommand &command, double period_s);
 
@@ -189,6 +197,7 @@ private:
   std::array<double, 4> reference_{};
   double height_command_m_{};
   std::array<float, 6> last_action_{};
+  std::array<float, 6> applied_action_{};
   Eigen::VectorXf observation_;
   Eigen::VectorXf frame_;
   RlPolicyFrame policy_frame_{};

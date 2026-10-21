@@ -19,6 +19,7 @@ find_package(rclcpp REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(realtime_tools REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(Eigen3 REQUIRED NO_MODULE)
 
 add_library(sandro_controllers SHARED
@@ -41,7 +42,7 @@ target_include_directories(sandro_controllers PUBLIC
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(sandro_controllers
   ament_index_cpp controller_interface diagnostic_msgs geometry_msgs hardware_interface
-  pluginlib rclcpp rcl_interfaces realtime_tools std_msgs)
+  pluginlib rclcpp rcl_interfaces realtime_tools std_msgs std_srvs)
 target_link_libraries(sandro_controllers Eigen3::Eigen)
 
 pluginlib_export_plugin_description_file(

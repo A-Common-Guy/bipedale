@@ -19,6 +19,7 @@
   <depend>rcl_interfaces</depend>
   <depend>realtime_tools</depend>
   <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
 

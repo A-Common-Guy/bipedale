@@ -245,6 +245,64 @@ TEST(RlPolicy, LegsAtTheStandPoseHoldItWhateverTheStartPose) {
   }
 }
 
+TEST(RlPolicy, HandOverEngagesAtOnceFromTheMeasuredPoseOnlyWhenUpright) {
+  sc::RlPolicyCore core;
+  std::string error;
+  const auto s = agile_settings();
+  ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+  // Balancing crouched, legs far outside the stand tolerance.
+  auto crouched = standing(s);
+  for (const int j : {0, 1, 3, 4}) {
+    crouched.position[j] += 0.4;
+  }
+  auto tipped = crouched;
+  tipped.orientation = {0.0, std::sin(0.15), 0.0, std::cos(0.15)};
+  core.reset(tipped);
+  EXPECT_FALSE(core.hand_over(tipped));
+  EXPECT_EQ(core.phase(), sc::RlPhase::kStand);
+
+  core.reset(crouched);
+  ASSERT_TRUE(core.hand_over(crouched));
+  EXPECT_EQ(core.phase(), sc::RlPhase::kPolicy);
+  const auto heights = core.leg_heights(crouched);
+  EXPECT_NEAR(core.reference()[2],
+              std::clamp(0.5 * (heights[0] + heights[1]), s.height_min_m, s.height_max_m), 1e-9);
+  const auto out = core.update(crouched, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
+  EXPECT_TRUE(out.inferred);
+}
+
+TEST(RlPolicy, WheelFilterSmoothsOnlyTheWheelCommands) {
+  std::string error;
+  const auto s = flat_settings();
+  auto filtered_settings = s;
+  filtered_settings.wheel_filter_hz = 4.0;
+  sc::RlPolicyCore plain;
+  sc::RlPolicyCore filtered;
+  ASSERT_TRUE(plain.configure(s, 300, &error)) << error;
+  ASSERT_TRUE(filtered.configure(filtered_settings, 300, &error)) << error;
+  auto leaning = standing(s);
+  leaning.orientation = {0.0, std::sin(0.04), 0.0, std::cos(0.04)};
+  plain.reset(leaning);
+  filtered.reset(leaning);
+  ASSERT_TRUE(plain.hand_over(leaning));
+  ASSERT_TRUE(filtered.hand_over(leaning));
+  const auto a = plain.update(leaning, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  const auto b = filtered.update(leaning, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  ASSERT_TRUE(a.inferred && b.inferred);
+  const double blend = 1.0 - std::exp(-2.0 * M_PI * 4.0 * 0.01);
+  for (const int j : {2, 5}) {
+    EXPECT_FLOAT_EQ(a.action[j], b.action[j]);  // the observation keeps the raw action
+    ASSERT_GT(std::abs(a.frame.velocity[j]), 0.1);
+    EXPECT_NEAR(b.frame.velocity[j], blend * a.frame.velocity[j], 1e-4);
+  }
+  for (const int j : {0, 1, 3, 4}) {
+    EXPECT_DOUBLE_EQ(a.frame.position[j], b.frame.position[j]);
+  }
+  filtered_settings.wheel_filter_hz = -1.0;
+  EXPECT_FALSE(filtered.configure(filtered_settings, 300, &error));
+}
+
 TEST(RlPolicy, StaleImuBeyondTheTimeoutIsAFall) {
   sc::RlPolicyCore core;
   std::string error;

@@ -1,6 +1,7 @@
 #include "sandro_controllers/rl_policy_controller.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -71,6 +72,8 @@ const std::vector<DoubleParameter> &double_parameters() {
        "Wheel drive damping (velocity mode)."},
       {"action.wheel_scale_nm", &RlPolicySettings::wheel_scale_nm,
        "Wheel torque per unit action (torque mode)."},
+      {"action.wheel_filter_hz", &RlPolicySettings::wheel_filter_hz,
+       "First-order low-pass on the wheel commands, Hz; 0 disables it."},
       {"safety.fall_angle_rad", &RlPolicySettings::fall_angle_rad,
        "Tilt beyond which the drives go limp until re-activation."},
       {"safety.imu_timeout_s", &RlPolicySettings::imu_timeout_s,
@@ -104,6 +107,11 @@ std::string resolve(const std::string &path) {
   const std::string package = path.substr(prefix.size(), slash - prefix.size());
   return ament_index_cpp::get_package_share_directory(package) +
          (slash == std::string::npos ? "" : path.substr(slash));
+}
+
+double steady_seconds() {
+  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch())
+      .count();
 }
 
 const char *phase_name(const RlPhase phase) {
@@ -263,6 +271,14 @@ RlPolicyController::on_configure(const rclcpp_lifecycle::State &) {
                                                message->twist.linear.z, message->twist.angular.x,
                                                get_node()->now().seconds()});
       });
+  handover_service_ = node->create_service<std_srvs::srv::Trigger>(
+      "~/arm_handover",
+      [this](const std::shared_ptr<std_srvs::srv::Trigger::Request>,
+             std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+        handover_armed_s_.store(steady_seconds());
+        response->success = true;
+        response->message = "the next activation within 1 s takes over without the stand phase";
+      });
   diagnostics_ros_publisher_ = node->create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
       "~/diagnostics", rclcpp::SystemDefaultsQoS());
   diagnostics_publisher_ =
@@ -309,16 +325,23 @@ RlPolicyController::on_activate(const rclcpp_lifecycle::State &) {
     return controller_interface::CallbackReturn::ERROR;
   }
   core_.reset(state);
+  const bool armed = steady_seconds() - handover_armed_s_.exchange(-1e9) <= kHandoverWindowS;
+  const bool handed_over = armed && core_.hand_over(state);
   command_.writeFromNonRT(StampedCommand{});
   last_diagnostics_time_s_ = 0.0;
   inference_max_s_ = 0.0;
-  last_phase_ = RlPhase::kStand;
+  last_phase_ = core_.phase();
   last_reported_status_ = 0U;
   zero_commands();
-  RCLCPP_INFO(get_node()->get_logger(), "%s",
-              core_.phase() == RlPhase::kStand
-                  ? "Activated: legs move to the stand pose, the policy engages once upright"
-                  : "Activated");
+  if (handed_over) {
+    RCLCPP_INFO(get_node()->get_logger(), "Activated: took over the running balancer, policy engaged");
+  } else if (armed) {
+    RCLCPP_WARN(get_node()->get_logger(),
+                "Activated for a handover but the body is not upright: stand phase instead");
+  } else {
+    RCLCPP_INFO(get_node()->get_logger(),
+                "Activated: legs move to the stand pose, the policy engages once upright");
+  }
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
