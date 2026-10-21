@@ -39,7 +39,9 @@ from controller_manager_msgs.srv import (
 from lifecycle_msgs.msg import State
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import Joy
+from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 
@@ -138,6 +140,12 @@ class JoyEstop(Node):
         self.subscription = self.create_subscription(
             Joy, self.get_parameter("joy_topic").value, self._on_joy, 10,
             callback_group=group)
+        # The gamepad policy switch (joy_teleop) changes which policy runs;
+        # re-arm restarts that one rather than the launch's.
+        self.create_subscription(
+            String, "/teleop/selected_policy", self._on_selected,
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL),
+            callback_group=group)
         self.latched = False
         self.rearm_since = None
         self.rearm_fired = False
@@ -146,6 +154,11 @@ class JoyEstop(Node):
         self.get_logger().info(
             f"gamepad E-stop armed on axes {self.chord} (press together); re-arm by "
             f"holding buttons {self.rearm_chord} for {self.rearm_hold_s:.1f} s, twice")
+
+    def _on_selected(self, msg: String) -> None:
+        if msg.data and msg.data != self.rearm_controller:
+            self.rearm_controller = msg.data
+            self.get_logger().info(f"re-arm now starts {self.rearm_controller}")
 
     def _on_joy(self, msg: Joy) -> None:
         pressed = chord_pressed(msg.axes, self.chord, self.pressed_below)

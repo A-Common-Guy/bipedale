@@ -25,6 +25,7 @@ setup(
     entry_points={
         "console_scripts": [
             "joy_estop = sandro_bringup.joy_estop:main",
+            "joy_teleop = sandro_bringup.joy_teleop:main",
             "sim_reset = sandro_bringup.sim_reset:main",
         ],
     },

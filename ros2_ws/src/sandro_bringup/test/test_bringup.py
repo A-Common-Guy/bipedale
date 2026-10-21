@@ -37,26 +37,93 @@ def test_controller_limits_and_commissioning_watchdogs_are_explicit():
         assert parameters["effort_limit_nm"] == 0.5
 
 
-def test_teleop_maps_height_and_estop_chord():
+def test_teleop_maps_sticks_switch_and_estop_chord():
     config = yaml.safe_load((ROOT / "config" / "teleop.yaml").read_text())
-    teleop = config["teleop_twist_joy_node"]["ros__parameters"]
-    assert teleop["require_enable_button"] is True
-    assert teleop["axis_linear"]["z"] != teleop["axis_linear"]["x"]
-    assert teleop["axis_linear"]["z"] != teleop["axis_angular"]["yaw"]
-    assert 0.0 < teleop["scale_linear"]["z"] <= 0.05
+    teleop = config["joy_teleop"]["ros__parameters"]
     estop = config["joy_estop"]["ros__parameters"]
     assert len(estop["axes"]) >= 2
     assert estop["axes"][0] != estop["axes"][1]
     assert -1.0 < estop["axis_pressed_below"] < 0.0
-    motion_axes = [teleop["axis_linear"]["x"], teleop["axis_linear"]["z"],
-                   teleop["axis_angular"]["yaw"], teleop["axis_angular"]["roll"]]
-    assert len(set(motion_axes)) == len(motion_axes)
+    # Throttle and turning on the left stick, height and roll on the right.
+    assert {teleop["forward_axis"], teleop["yaw_axis"]} == {0, 1}
+    assert {teleop["height_axis"], teleop["roll_axis"]} == {2, 3}
+    motion_axes = [teleop[k] for k in ("forward_axis", "yaw_axis", "height_axis", "roll_axis")]
     assert not set(motion_axes) & set(estop["axes"])
+    assert teleop["estop_axes"] == estop["axes"]
+    buttons = [teleop["deadman_button"], teleop["switch_button"], teleop["announce_button"],
+               teleop["recentre_button"]]
+    assert len(set(buttons)) == len(buttons)
+    assert not set(buttons) & set(estop["rearm_buttons"])
     assert len(estop["rearm_buttons"]) >= 2
-    assert teleop["enable_button"] not in estop["rearm_buttons"]
     assert estop["rearm_hold_s"] >= 1.0
+    policies = yaml.safe_load((ROOT / "config" / "rl_policies.yaml").read_text())
+    assert set(teleop["policies"]) <= set(policies["controller_manager"]["ros__parameters"])
+    for name in teleop["policies"]:
+        commands = policies[name]["ros__parameters"]["commands"]
+        assert commands["height_min_m"] <= teleop["handover_height_m"] <= commands["height_max_m"]
     launch = (ROOT / "launch" / "sandro.launch.py").read_text()
     assert 'executable="joy_estop"' in launch
+    assert 'executable="joy_teleop"' in launch
+
+
+def test_joy_teleop_mapping_and_handover():
+    from sandro_bringup.joy_teleop import (
+        Limits, handover_ready, height_rate_towards, next_policy, stick_command)
+
+    mapping = {"forward_axis": 1, "yaw_axis": 0, "height_axis": 3, "roll_axis": 2,
+               "forward_sign": 1.0, "yaw_sign": 1.0, "height_sign": 1.0, "roll_sign": -1.0}
+    limits = Limits(1.0, 3.0, 0.15, 0.3)
+    # Left stick up and left: forward and turning left; right stick right: +roll.
+    assert stick_command([1.0, 1.0, -1.0, 0.0], mapping, limits, 0.5) == (0.5, 1.5, 0.0, 0.3)
+    assert stick_command([], mapping, limits, 1.0) == (0.0, 0.0, 0.0, -0.0)
+    assert abs(height_rate_towards(0.17, 0.18, 0.05, 3.0) - 0.03) < 1e-12
+    assert height_rate_towards(0.10, 0.18, 0.05, 3.0) == 0.05
+
+    policies = ["rl_flat_level", "rl_agile_terrain"]
+    assert next_policy(policies, "rl_flat_level") == "rl_agile_terrain"
+    assert next_policy(policies, "rl_agile_terrain") == "rl_flat_level"
+    assert next_policy(policies, "whole_body_controller") is None
+
+    target = Limits(0.5, 1.5, 0.05, 0.0, 0.17, 0.15, 2.0)
+    diag = {"message": "policy", "velocity_reference_m_s": 0.0, "height_reference_m": 0.17,
+            "roll_reference_rad": 0.0, "tilt_rad": 0.03, "rate_rad_s": 0.1}
+    still = [0.0] * 6
+    assert handover_ready(diag, still, target, 0.17, 0.6)[0]
+    assert not handover_ready(diag, [0, 0, 1.5, 0, 0, 0], target, 0.17, 0.6)[0]
+    assert not handover_ready(diag, None, target, 0.17, 0.6)[0]
+    assert not handover_ready({**diag, "message": "standing up"}, still, target, 0.17, 0.6)[0]
+    assert not handover_ready({**diag, "height_reference_m": 0.15}, still, target, 0.17, 0.6)[0]
+    assert not handover_ready({**diag, "roll_reference_rad": 0.1}, still, target, 0.17, 0.6)[0]
+    assert not handover_ready({**diag, "tilt_rad": 0.1}, still, target, 0.17, 0.6)[0]
+
+
+def test_joy_teleop_leds_show_policy_and_switch(tmp_path):
+    from sandro_bringup.joy_teleop import PadLeds, led_state
+
+    policies = ["rl_flat_level", "rl_agile_terrain"]
+    colors = [0, 255, 0, 255, 100, 0]
+    assert led_state(policies, colors, "rl_agile_terrain", None, True) == ((255, 100, 0), 2)
+    assert led_state(policies, colors, None, None, False) == ((255, 0, 0), 0)
+    assert led_state(policies, colors, "whole_body_controller", None, False) == (
+        (255, 255, 255), 0)
+    # A switch blinks between the outgoing and the incoming policy.
+    assert led_state(policies, colors, "rl_flat_level", "rl_agile_terrain", False) == (
+        (0, 255, 0), 1)
+    assert led_state(policies, colors, "rl_flat_level", "rl_agile_terrain", True) == (
+        (255, 100, 0), 2)
+
+    leaves = ["rgb:indicator/multi_intensity", "rgb:indicator/brightness"] + [
+        f"white:player-{k}/brightness" for k in range(1, 6)]
+    for leaf in leaves:
+        path = tmp_path / f"input7:{leaf}"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("0")
+    PadLeds(str(tmp_path)).show((255, 100, 0), 2)
+    read = {leaf: (tmp_path / f"input7:{leaf}").read_text() for leaf in leaves}
+    assert read["rgb:indicator/multi_intensity"] == "255 100 0"
+    assert [read[f"white:player-{k}/brightness"] for k in range(1, 6)] == [
+        "1", "1", "0", "0", "0"]
+    PadLeds(str(tmp_path / "absent")).show((255, 0, 0), 0)  # no pad: silently nothing
 
 
 def test_joy_estop_chord_and_controller_selection():

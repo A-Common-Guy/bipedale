@@ -9,8 +9,13 @@
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>controller_manager_msgs</exec_depend>
   <exec_depend>mujoco_ros2_control_msgs</exec_depend>
+  <exec_depend>diagnostic_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
   <exec_depend>std_srvs</exec_depend>
   <exec_depend>diagnostic_updater</exec_depend>
   <exec_depend>imu_sensor_broadcaster</exec_depend>
@@ -28,7 +33,6 @@
   <exec_depend>sandro_description</exec_depend>
   <exec_depend>sandro_hardware</exec_depend>
   <exec_depend>sandro_sim</exec_depend>
-  <exec_depend>teleop_twist_joy</exec_depend>
   <exec_depend>xacro</exec_depend>
 
   <test_depend>ament_copyright</test_depend>

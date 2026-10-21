@@ -3,6 +3,8 @@
 import os
 import subprocess
 
+import yaml
+
 from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
@@ -22,6 +24,13 @@ def _package(name):
         return get_package_share_directory(name)
     except PackageNotFoundError:
         return None
+
+
+def _switchable(bringup, controller):
+    """The gamepad switch's other policies when the launched controller is one of them."""
+    with open(os.path.join(bringup, "config", "teleop.yaml"), encoding="utf-8") as stream:
+        policies = yaml.safe_load(stream)["joy_teleop"]["ros__parameters"]["policies"]
+    return [p for p in policies if p != controller] if controller in policies else []
 
 
 def _setup(context):
@@ -157,6 +166,18 @@ def _setup(context):
                     output="screen",
                 )
                 actions.append(controller_spawner)
+                # The other policies of the gamepad switch, loaded and
+                # configured but inactive, so a switch is a single activation.
+                for policy in _switchable(bringup, controller):
+                    actions.append(Node(
+                        package="controller_manager",
+                        executable="spawner",
+                        arguments=[
+                            policy, "--inactive", "--controller-manager", "/controller_manager",
+                            "--controller-manager-timeout", "30",
+                        ],
+                        output="screen",
+                    ))
                 if hardware == "mujoco" and sim_reset:
                     # Physics runs from the moment the controller manager starts,
                     # about a second before the balancer is active, and unpowered
@@ -181,13 +202,15 @@ def _setup(context):
             msg="REAL SAFE STATE: teleop publisher suppressed until arm_hardware:=true."
         ))
     elif teleop:
-        if _package("joy") and _package("teleop_twist_joy"):
+        if _package("joy"):
             teleop_config = os.path.join(bringup, "config", "teleop.yaml")
             actions.extend([
                 Node(package="joy", executable="joy_node",
                      parameters=[teleop_config], output="screen"),
-                Node(package="teleop_twist_joy", executable="teleop_node",
-                     name="teleop_twist_joy_node",
+                # Sticks to /cmd_vel scaled to the running controller, the
+                # soft policy switch and the rumble that tells the policy.
+                Node(package="sandro_bringup", executable="joy_teleop",
+                     name="joy_teleop",
                      parameters=[teleop_config], output="screen"),
                 # Gamepad E-stop chord (L2 + R2): deactivates the balancer and,
                 # on hardware, fires the CAN E-stop. Software only; the
@@ -201,7 +224,7 @@ def _setup(context):
                      output="screen"),
             ])
         else:
-            actions.append(LogInfo(msg="joy/teleop_twist_joy unavailable; teleop skipped."))
+            actions.append(LogInfo(msg="joy unavailable; teleop skipped."))
 
     if rviz and not headless:
         if _package("rviz2"):

@@ -360,8 +360,13 @@ reference between 0.14 and 0.19 m that the `linear.z` field of the same
   once the controller is up. A start-paused sequence was rejected because the
   simulator's control loop is paced by simulated time and activation would
   deadlock.
-- Gamepad: L1 deadman; L2 + R2 together deactivate every command-owning
-  controller and fire the CAN E-stop on hardware. Software only, never re-arms.
+- Gamepad (`sandro_bringup/joy_teleop.py`, `joy_estop.py`): L1 deadman; left
+  stick forward speed and yaw rate, right stick height rate and roll, scaled
+  to the running controller's limits. L1 + triangle switches policy softly
+  (standstill at 0.17 m, then `~/arm_handover` and one controller switch),
+  circle rumbles the running policy's number. L2 + R2 together deactivate
+  every command-owning controller and fire the CAN E-stop on hardware;
+  re-arm is two deliberate holds of Create + Options.
 
 ### 3.8 Alternatives considered
 

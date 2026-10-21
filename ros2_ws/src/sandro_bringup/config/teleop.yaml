@@ -4,35 +4,47 @@ joy_node:
     deadzone: 0.08
     autorepeat_rate: 20.0  # Hz; faster than the 0.3 s command timeout
 
-teleop_twist_joy_node:
+# Gamepad driving and policy switching (sandro_bringup/joy_teleop.py).
+# Indices are SDL's gamepad layout, which joy reports for a DualSense over
+# Bluetooth (verified on the robot's Pi): buttons 0-3 cross, circle, square,
+# triangle, 4 Create, 6 Options, 7/8 L3/R3, 9/10 L1/R1; axes 0/1 left stick,
+# 2/3 right stick (left and up are +1), 4/5 L2/R2 (+1 released, -1 pressed).
+# Check another pad with `ros2 topic echo /joy`.
+joy_teleop:
   ros__parameters:
-    require_enable_button: true
-    # Indices are SDL's gamepad layout, which joy reports for a DualSense over
-    # Bluetooth (verified on the robot's Pi): buttons 0-3 cross, circle, square,
-    # triangle, 9/10 L1/R1; axes 0/1 left stick, 2/3 right stick, 4/5 L2/R2
-    # (+1 released, -1 pressed). Check another pad with `ros2 topic echo /joy`.
-    enable_button: 9             # PS5 L1 deadman
-    enable_turbo_button: -1
-    axis_linear:
-      x: 1                      # PS5 left stick vertical
-      z: 3                      # PS5 right stick vertical: body height rate
-    scale_linear:
-      x: 0.5                    # m/s, SandroControl drive limit
-      # m/s of leg height per full deflection, up = stand taller. Read by
-      # whole_body_controller (drive.max_height_rate_m_s); ignored by the
-      # wheel-only balancers.
-      z: 0.05
-    axis_angular:
-      yaw: 2                    # PS5 right stick horizontal
-      roll: 0                   # PS5 left stick horizontal: body roll target
-    scale_angular:
-      yaw: 1.5                  # rad/s, SandroControl drive limit
-      # rad of body roll at full deflection; joy reports left as +1, so the
-      # stick pushed right puts the right side down (positive roll).
-      # Read by rl_agile_terrain only.
-      roll: -0.3
-    publish_stamped_twist: true # geometry_msgs/msg/TwistStamped on /cmd_vel
-    frame: base_link
+    deadman_button: 9          # L1: hold to drive
+    forward_axis: 1            # left stick vertical
+    yaw_axis: 0                # left stick horizontal, left turns left
+    height_axis: 3             # right stick vertical, up stands taller
+    roll_axis: 2               # right stick horizontal
+    forward_sign: 1.0
+    yaw_sign: 1.0
+    height_sign: 1.0
+    roll_sign: -1.0            # stick right puts the right side down (+roll)
+    # Full deflection is the running controller's own limit (its commands.*
+    # parameters) times this; lower it for first runs on a new policy.
+    speed_fraction: 1.0
+    switch_button: 3           # L1 + triangle: next policy
+    announce_button: 1         # circle: rumble the running policy's number (pads with rumble)
+    recentre_button: 8         # L1 + R3: height back to the policy's initial
+    estop_axes: [4, 5]         # the E-stop chord aborts a switch in progress
+    estop_pressed_below: -0.5
+    # Policies the switch cycles through, in rumble order (1 pulse, 2 ...).
+    # The launch loads the ones it does not start as inactive.
+    policies: [rl_flat_level, rl_agile_terrain]
+    # The switch settles here first: both policies' initial height, so the
+    # incoming one engages at the height it would start from anyway.
+    handover_height_m: 0.17
+    handover_margin: 0.6       # fraction of the incoming engage joint velocity
+                               # the joints must stay below
+    handover_hold_s: 0.3
+    handover_timeout_s: 8.0
+    # Stick ranges until the running controller's parameters are read:
+    # forward m/s, yaw rad/s, height rate m/s, roll rad.
+    default_limits: [0.5, 1.5, 0.05, 0.0]
+    # Lightbar colour of each policy, r g b in `policies` order: flat_level
+    # green, agile_terrain orange. Red means no controller is running.
+    policy_colors: [0, 255, 0, 255, 100, 0]
 
 # Gamepad E-stop: squeeze both triggers together. PS5 L2 and R2 are axes 4 and
 # 5; a trigger counts as pressed at or below axis_pressed_below. It deactivates every
@@ -41,7 +53,8 @@ teleop_twist_joy_node:
 # service exists.
 # Re-arm: hold Create + Options (buttons 4 and 6) for rearm_hold_s. The first
 # hold arms the drives at zero torque with no controller, a second hold starts
-# rearm_controller; hold the robot upright before the second.
+# rearm_controller, or the policy last selected with the gamepad switch; hold
+# the robot upright before the second.
 joy_estop:
   ros__parameters:
     axes: [4, 5]

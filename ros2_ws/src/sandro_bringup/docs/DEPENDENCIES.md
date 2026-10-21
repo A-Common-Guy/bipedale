@@ -5,8 +5,8 @@
   Cyclone DDS file uses automatic interface selection so it works on different
   hosts; production deployments should pin the intended NIC.
 - Control: ROS 2 control, controller manager, standard controllers, joint state
-  broadcaster, diagnostics, xacro, robot state publisher, Joy,
-  teleop_twist_joy, and RViz use Jazzy binary packages.
+  broadcaster, diagnostics, xacro, robot state publisher, Joy and RViz use
+  Jazzy binary packages.
 - MuJoCo: the maintained `ros-controls/mujoco_ros2_control` project is pinned
   by commit in the Dockerfile because the configured Jazzy apt repository has
   no binary. The existing composed MJCF remains the physics source.
