@@ -1,0 +1,49 @@
+# jump.yaml with planks and curbs up to 6.5 cm, about the loaded tyre's
+# radius (67 mm). Above roughly a third of the radius a wheel does not roll
+# over an edge on torque alone (docs/DESIGN.md 8), and both wheels meet a
+# square plank at once, so getting over it is a hop.
+#
+# The policy is blind: it has to feel an edge (the wheels stall, the body
+# pitches) and hop on its own. It keeps jump.yaml's commanded jumps, so an
+# operator can also trigger the hop. Forward tracking pays twice as much and a
+# fall costs half as much as in jump.yaml: with agile_terrain's weights a
+# policy fine-tuned on these planks learnt to wait in front of them
+# (docs/DESIGN.md 8). The wheel-lift constraint allows the clearance a lifted
+# wheel needs over the tallest plank. Fine-tuned from the jump policy:
+#
+#     uv run python -m sandro_rl.train configs/step_climb.yaml --resume policies/jump \
+#         --set train.learning_rate=1.0e-4
+inherit: jump.yaml
+
+env:
+  terrain:
+    # Shapes are compiled at the top of each range; the curriculum sinks them.
+    planks: {count: 12, height_m: [0.01, 0.065], depth_m: [0.04, 0.4], width_m: [0.3, 1.2], radius_m: [0.4, 4.0]}
+    hills: {count: 4, height_m: [0.02, 0.08], slope_deg: [10.0, 50.0], plateau_m: [0.3, 0.8],
+            width_m: [0.8, 1.6], radius_m: [0.3, 4.0]}
+
+  rewards:
+    weights:
+      track_forward: 4.0
+      termination: -100.0
+
+  constraints:
+    wheel_lift: {limit_m: 0.09, slack: 0.03}
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.terrain.planks.height_m: [0.005, 0.035]
+        env.terrain.hills.height_m: [0.02, 0.05]
+    - iteration: 300
+      set:
+        env.terrain.planks.height_m: [0.01, 0.05]
+        env.terrain.hills.height_m: [0.02, 0.065]
+    - iteration: 700
+      set:
+        env.terrain.planks.height_m: [0.01, 0.065]
+        env.terrain.hills.height_m: [0.02, 0.08]
+
+train:
+  iterations: 1500

@@ -11,7 +11,7 @@ from sandro_rl.interface import PolicyInterface
 from sandro_rl.robot import RobotSpec
 
 
-@pytest.fixture(scope="module", params=["flat_tracking.yaml", "agile_terrain.yaml", "jump.yaml"])
+@pytest.fixture(scope="module", params=["flat_tracking.yaml", "agile_terrain.yaml", "jump.yaml", "step_climb.yaml"])
 def cfg(request):
     return config_mod.load(request.param)
 

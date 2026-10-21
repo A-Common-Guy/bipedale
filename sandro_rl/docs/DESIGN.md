@@ -890,6 +890,70 @@ command, landing every time. It stands with 0.005 rad of roll:
 
 The height command matters even less than before: 3 cm now gives 92 mm.
 
+### step_climb: planks up to 6 cm on the weighed robot
+
+`configs/step_climb.yaml` is `jump.yaml` (10 Nm on every drive, commanded
+jumps kept) on taller terrain. Planks go up to 6.5 cm, about the loaded
+tyre's radius, and the hills' ramps go from 10° up to 50°. Forward tracking
+pays 4 instead of 2, and a fall costs −100 instead of −200. The wheel-lift
+constraint allows 9 cm of clearance instead of 3.5. The curriculum raises
+the planks' maximum from 3.5 cm to 5 cm to 6.5 cm at iterations 0, 300 and
+700.
+
+**Two attempts:**
+
+| Run | Start | Iterations | Wall time | Result on the steps course |
+| --- | --- | --- | --- | --- |
+| `step_climb_v0` | `agile_terrain`, its weights, kp 12, 10 Nm | 1000 | 29.8 min | Never crosses the 3 cm plank. It learnt to wait in front of planks: 0.10 falls per 1000 steps in training |
+| `step_climb_v1` | `jump`, with the weights above | 1500 | 46.1 min | Checkpoint 1200 crosses all four planks (3–6 cm) |
+
+v0's outcome follows from the weights. A fall cost 200, while waiting in
+front of a plank for the rest of an episode cost about 20 of forward
+tracking. A manual check showed the hop is physically possible: the `jump`
+policy, commanded to jump as it reached the 3 cm plank, got over it. v1
+therefore starts from `jump`.
+
+**Evaluation** (`--course steps --scenario steps`). The course has planks of
+30, 40, 50 and 60 mm at 1–4 m, 0.1 m deep and 1.2 m wide, then a 6 cm curb
+with 45° faces at 5.4 m. The drive phase is 14 s at 0.5 m/s. Progress is
+measured from the axle's world position (`diag_truth_axle_x_m`, `_y_m`).
+Measured along the robot's own heading, it counted planks the robot had
+actually driven past at their side.
+
+v1's checkpoints vary a lot. Planks crossed out of 20 (5 seeds × 4 planks):
+
+| Checkpoint | 500 | 600 | 700 | 800 | 900 | 1000 | 1100 | 1200 | 1300 | 1400 | 1500 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| planks | 14 | 12 | 11 | 0 | 5 | 9 | 6 | **20** | 13 | 4 | 0 |
+
+`policies/step_climb` is checkpoint 1200, chosen on this course, which makes
+the course a selection set rather than a held-out test. Over 10 seeds it
+crosses all four planks every time and never falls (`steps.mp4`,
+`eval/steps_frames.png`). It crosses them at an angle, with the legs split
+fore and aft, so it seems to lift one wheel at a time rather than hop both.
+
+- **The curb is not solved.** On the steps course it drifts 2.4–2.8 m
+  sideways by the end of the planks and passes beside the curb. With the
+  curb alone at 1.5 m (`--course curb`), it stops at the foot on 5 of 5
+  seeds, as `agile_terrain` does. It learnt to get over obstacles, not to
+  step up onto one and stay there. Only 4 of the 16 training obstacles are
+  hills, with ramps compiled at 10–50°.
+- **The heading drifts after crossings.** The command is a yaw rate, not a
+  heading, so a crossing that turns the body is not corrected. On the robot,
+  the operator steers back.
+- **The original course at 0.8 m/s** (`--course`): it crosses all four
+  planks, 25 mm included, which `agile_terrain` no longer does on the
+  weighed robot. It then passes 1.0–1.3 m beside the hill.
+- **The standard runs:** it completes all nine (`eval/comparison.md`); the
+  WBC falls in three.
+- **Commanded jumps** still give three hops each, with 90–115 mm of
+  clearance.
+- **Deployment:** like `jump`, its observation includes the two jump inputs,
+  which `RlPolicyController` does not provide. It is not exported to ROS.
+
+The next step for curbs is training on step-ups: long, tall platforms, and
+more of them, rather than thin planks.
+
 The weighing was done on a bench supply. Once the battery is fitted, weigh
 the robot again, redo the tilt weighing and repeat this refit.
 
