@@ -973,6 +973,104 @@ more of them, rather than thin planks.
 The weighing was done on a bench supply. Once the battery is fitted, weigh
 the robot again, redo the tilt weighing and repeat this refit.
 
+### stand_up: from switched off to balancing
+
+`configs/stand_up.yaml`, `policies/stand_up` (checkpoint 2000 of 3000).
+
+**What switched off looks like.** The description collides only the torso
+shell and the two tyre cylinders; the leg links and motor holders have no
+collision geometry and the leg joints no limits. Dropped limp, the legs fold
+through each other and the body to more than 5 rad. The real legs have no
+hard stop either: the links meet each other and the body.
+`sandro_rl/collision.py` therefore adds one box per leg body, the oriented
+bounding box of its collision-class CAD meshes (their convex hulls have up to
+5184 vertices, too many for the GPU contact pipeline), massless, to
+`sandro_rl`'s compiled model only. Six body pairs touch throughout a sweep of
+the leg motors over ±0.6 rad around the stand pose: each lower link with its
+motor holder, and the two lower links at the knee. They share a pin and are
+excluded; every other pair collides. Only `stand_up` uses the boxes
+(`env.collision.leg_boxes`); the other policies are unchanged.
+
+With the boxes a limp robot folds until the lower links rest on the cranks
+(about 1.2 and 1.44 rad) and tips over, front or back.
+`python -m sandro_rl.fallen` drops it 1024 times from the stand pose, pitched
+by up to ±80°, with some roll, a fore-aft shove and leg noise, and keeps the
+852 that come to rest within 3 s (`data/fallen_states.npz`). About 60% lean
+15–40° on a folded crank, IMU at 0.19 m. The rest lie at about 83° on the
+motor holders, IMU at 0.10–0.13 m.
+
+**Training.**
+
+- **Starts:** 70% of episodes from a random pose of the bank, turned to a
+  random heading; the rest standing.
+- **No fall termination.** Lying down is where the episode starts. The tilt,
+  leg-height and joint-range constraints are off. Stretch and leg split apply
+  only once upright (tilt below 0.5 and 0.3 rad): folded flat, the legs are
+  stretched, and getting up may brace on one leg. The leg-torque constraint
+  is above the 10 Nm cap, which pushing up out of the fold saturates.
+- **Rewards:** `upright`, (1 + cos tilt)/2, weight 6. `stand_height`, the IMU
+  height from 0.15 m to standing mapped to 0–1, weight 10. Tracking pays only
+  once upright (× exp(−(tilt/0.4)²)), so lying still earns nothing for it.
+- **Lift assist:** an upward pull on the torso, 30 N while the IMU is below
+  half its standing height and fading to 0 at standing height. The curriculum
+  halves it at iteration 600 and removes it at 1200.
+- **Horizon:** γ 0.995 (2 s at 100 Hz) instead of 0.99, because getting up
+  takes seconds.
+- **Start:** `flat_level`, with the action noise reset to 0.37 (it was 0.04).
+- **Batch:** 4096 environments × 48 steps. The leg boxes' contact buffers do
+  not fit 8192 in 16 GB.
+- **Drives:** 10 Nm on every drive, as `jump`.
+
+**Attempts:**
+
+| Run | Change | Result |
+| --- | --- | --- |
+| v1 | From scratch, γ 0.99, `stand_height` = IMU height / standing height, no assist | Never stands: the IMU stays at about 60% of standing height and the noise grows to 1.2. Lying at 30° already earned 93% of `upright` and 58% of `stand_height`, and a 1 s horizon does not see the reward of a get-up that takes 2 s |
+| v2 | The lift assist, γ 0.995, `stand_height` from 0.15 m, from `flat_level` with the noise reset | Stands up (below) |
+
+Before either run could learn, three constraints had to change, each of
+which held the termination probability at 0.24 of its 0.25 ceiling. A 9.5 Nm
+torque limit fired at the 10 Nm cap. The stretch limit fired on legs folded
+flat. And a 10.5 Nm limit still fired, because the torque is measured after
+the ±15% drive spread.
+
+**Evaluation** (`evaluate.py --scenario stand_up --fallen PITCH`). The robot
+starts at the stand pose tipped by PITCH, unpowered for 3 s, and falls limp.
+Then the policy engages, with no fall cut-off. The scenario gives 8 s to get
+up, then 3 s at 0.4 m/s, 3 s turning at 1 rad/s and 2 s still. Success:
+tilt below 0.25 rad with the IMU above 0.27 m at some point, and never above
+0.5 rad during the drive phases.
+
+- **Checkpoint choice:** checkpoints 1800–3000 on pitches ±0.3, ±0.8, ±1.4,
+  3 seeds each. 1800, 2000, 2200 and 2800 succeed 18 of 18; 2400, 2600 and
+  3000 only 14, 9 and 15. The four were then tested on pitches ±0.5, ±1.1,
+  ±1.4, 2 seeds, under three latency profiles:
+
+  | Checkpoint | nominal | uart_imu | worst |
+  | --- | --- | --- | --- |
+  | 1800 | 12/12 | 10/12 | 8/12 |
+  | 2000 | 12/12 | 12/12 | 12/12 |
+  | 2200 | 12/12 | 12/12 | 12/12 |
+  | 2800 | 11/12 | 12/12 | 12/12 |
+
+- **Speed:** from a lean of 23–31° it is up in 0.1 s. From 43–62° it takes
+  0.7–1.6 s, and lying at 80–83° 0.4–0.9 s. Nose down, it rocks back onto
+  the wheels and extends the legs. Nose up, it braces on one leg ahead of
+  the other before standing (`eval/stand_up_*_frames.png`, `stand_up_front.mp4`,
+  `stand_up_back.mp4`).
+- **Once up**, it holds 6–7° of tilt at most while driving and turning,
+  with the IMU at 0.32 m. The legs stay within 3 mm of each other fore and
+  aft (15 mm in the turn, from the roll).
+- **Torque:** the push up reaches the 10 Nm cap on single drives, above the
+  controller's 3 Nm leg limit. On the robot this needs `jump`'s higher
+  limits.
+- **The standard runs** from standing: it completes all nine
+  (`eval/comparison.md`); the WBC falls in three.
+- **Not checked:** stand-ups on slopes or obstacles. And the boxes are a
+  coarse stand-in for the CAD links. Where the robot really comes to rest
+  depends on them, so a photo or a measurement of the real switched-off pose
+  would be worth comparing against the bank.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that
@@ -1097,3 +1195,12 @@ interfaces on the wheel drives. The plugin exports them for all six joints
    correct by the simulated mount and the robot's mount reaches them through
    the `rl_*` overrides. Matching it would make the WBC's simulation hold the
    same horizon as the robot.
+8. **`sandro_description` collision geometry**: only the torso shell and
+   the tyres collide. Leg-link collision shapes (`sandro_rl/collision.py`
+   fits boxes to the CAD meshes) would make falls and the switched-off pose
+   physical in every simulation, not only in `stand_up`.
+9. **Starting a policy lying down** (`stand_up`): `RlPolicyController` would
+   need a mode that engages with the robot fallen. The WBC's fall cut-off
+   (`safety.fall_angle_rad`) must not apply until the policy is upright. The
+   folded legs sit at up to 2.2 rad, outside the ±2.09 rad joint range.
+   Pushing up takes the 10 Nm drive limits, against 3 Nm today.
