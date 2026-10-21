@@ -1,0 +1,27 @@
+whole_body_controller:
+  ros__parameters:
+    model:
+      body_mass_kg: 4.485
+    balance:
+      wheel_friction_ff_nm: 0.12
+    tasks:
+      roll:
+        imu_offset_rad: 0.016
+      height:
+        max_m: 0.185
+      fore_aft:
+        neutral_offset_m: -0.008
+      yaw:
+        torque_limit_nm: 2.0
+        scrub_ff_nm: 0.35
+rl_flat_level:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
+    action:
+      wheel_kd_nm_s_rad: 0.25
+      wheel_filter_hz: 4.0
+rl_agile_terrain:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
