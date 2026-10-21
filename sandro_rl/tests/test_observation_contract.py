@@ -40,6 +40,12 @@ def test_policy_rate_divides_control_rate(cfg, spec):
     assert i.cycles_per_action * cfg["env"]["policy_rate_hz"] == pytest.approx(spec.limits.control_rate_hz)
 
 
+def test_imu_correction_is_the_simulated_mount(cfg, spec):
+    # A correction other than the simulated mount trains the policy on a
+    # tilted horizon, which it then holds on the robot.
+    assert PolicyInterface(cfg, spec).imu_offset_correction == pytest.approx(spec.imu_roll_bias_rad)
+
+
 @pytest.mark.gpu
 def test_sizes_and_mirror(env):
     frame = env.actor_layout.size

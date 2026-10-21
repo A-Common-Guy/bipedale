@@ -69,6 +69,17 @@ def identified() -> dict:
     return yaml.safe_load(IDENTIFIED.read_text()) or {}
 
 
+def simulated_imu_roll_offset() -> float:
+    """Roll of the simulated IMU's mounting (sim_identified.yaml imu_mount).
+
+    This, not the robot overrides' tasks.roll.imu_offset_rad, is the correction
+    that levels the simulated body: the two differ whenever the physical IMU
+    is re-identified before the simulated mount follows. The robot's value
+    reaches the controller through its own rl_* overrides.
+    """
+    return float((identified().get("imu_mount") or {}).get("roll_offset_rad", 0.0))
+
+
 def launch_defaults(path: Path = LAUNCH) -> dict[str, str]:
     """DeclareLaunchArgument(name, default_value=...) pairs of the launch file."""
     tree = ast.parse(path.read_text())

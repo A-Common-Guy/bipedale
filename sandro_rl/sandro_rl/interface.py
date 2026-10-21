@@ -53,9 +53,7 @@ class PolicyInterface:
                                       for j in JOINTS])
         self.q_lo, self.q_hi = spec.leg_joint_range
         offset = cfg["observation"].get("imu_offset_correction", "ros")
-        self.imu_offset_correction = float(
-            sources.controller_parameters()["tasks"]["roll"].get("imu_offset_rad", 0.0)
-            if offset == "ros" else offset)
+        self.imu_offset_correction = sources.simulated_imu_roll_offset() if offset == "ros" else float(offset)
         self.body_from_imu_correction = rotation_x(-self.imu_offset_correction)
         self.scales = cfg["observation"]["scales"]
         self.history = int(cfg["observation"]["history"])

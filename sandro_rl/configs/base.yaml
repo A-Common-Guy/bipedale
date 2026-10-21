@@ -38,7 +38,7 @@ env:
   observation:
     history: 4                  # actor frames stacked (current first)
     accelerometer: false
-    imu_offset_correction: ros  # tasks.roll.imu_offset_rad of the robot overrides
+    imu_offset_correction: ros  # the simulated IMU's mounting, sim_identified.yaml imu_mount
     scales: {gyro: 0.25, leg_vel: 0.1, wheel_vel: 0.05}
 
   commands:
