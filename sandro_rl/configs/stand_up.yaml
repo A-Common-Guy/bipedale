@@ -7,8 +7,10 @@
 # config collides the leg links (collision.py); there is no fall termination,
 # and tracking pays only once upright.
 #
-#     uv run python -m sandro_rl.train configs/stand_up.yaml --resume policies/flat_level \
-#         --set train.learning_rate=1.0e-4
+#     uv run python -m sandro_rl.train configs/stand_up.yaml --resume policies/flat_level
+#
+# Early on an upward pull on the torso (init.fallen.assist_n, while it is
+# low) helps exploration find standing; the curriculum takes it to zero.
 inherit: flat_level.yaml
 
 env:
@@ -22,7 +24,7 @@ env:
     legs: {kp: 20.0, kd: 0.6, scale_rad: 0.8}
 
   init:
-    fallen: {fraction: 0.7, states: data/fallen_states.npz}
+    fallen: {fraction: 0.7, states: data/fallen_states.npz, assist_n: 30.0}
 
   termination:
     tilt_rad: 3.2               # never: lying down is the start, not a failure
@@ -41,9 +43,24 @@ env:
 
   rewards:
     upright_gate_rad: 0.4
+    stand_height_from_m: 0.15   # about the IMU's height lying down
     weights:
       upright: 6.0              # (1 + cos tilt) / 2
-      stand_height: 6.0         # IMU height / standing IMU height, up to 1
+      stand_height: 10.0        # IMU height from 0.15 m to standing, 0 to 1
+
+curriculum:
+  stages:
+    - iteration: 0
+      set: {env.init.fallen.assist_n: 30.0}
+    - iteration: 600
+      set: {env.init.fallen.assist_n: 15.0}
+    - iteration: 1200
+      set: {env.init.fallen.assist_n: 0.0}
 
 train:
-  iterations: 1500
+  iterations: 3000
+  num_envs: 4096                # the leg boxes' contact buffers: 8192 do not fit in 16 GB
+  steps_per_env: 48
+  gamma: 0.995                  # getting up takes seconds: a 2 s horizon at 100 Hz
+  learning_rate: 3.0e-4
+  resume_log_std: -1.0          # flat_level's action noise is 0.04

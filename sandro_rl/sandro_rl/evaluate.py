@@ -223,6 +223,27 @@ COURSES = {
 }
 
 
+GROUND_GROUPS = np.array([1, 0, 0, 0, 0, 0], dtype=np.uint8)   # floor and course geoms only
+
+
+def _rise_ahead(m, d, spec, imu_site, ahead=(0.1, 0.2, 0.3, 0.4)) -> float:
+    """Highest ground 0.1-0.4 m ahead of the axle, above the ground under it (rays from 0.1 m up)."""
+    rt = d.site_xmat[imu_site].reshape(3, 3)
+    heading = np.array([rt[0, 0], rt[1, 0], 0.0])
+    heading /= max(np.linalg.norm(heading), 1e-9)
+    axle = d.xanchor[spec.wheel_joint_ids].mean(axis=0)
+    down = np.array([0.0, 0.0, -1.0])
+    geom = np.zeros(1, dtype=np.int32)
+
+    def ground(x):
+        top = np.array([x[0], x[1], 0.1])
+        dist = mujoco.mj_ray(m, d, top, down, GROUND_GROUPS, 1, -1, geom)
+        return 0.1 - dist if dist >= 0 else 0.0
+
+    under = ground(axle + 0.0 * heading)
+    return max(ground(axle + a * heading) for a in ahead) - under
+
+
 def course_model(spec: RobotSpec, layout: str = "planks", leg_boxes: bool = False) -> mujoco.MjModel:
     """The course compiled in place (static geoms collide only where compiled)."""
     from . import terrain
@@ -337,11 +358,13 @@ class PolicyController:
 def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         video: Path | None = None, video_fps: int = 30, seed: int = 1,
         course: bool | str = False, heading_hold: float = 0.0,
-        fallen_pitch: float | None = None) -> tuple[int, Path]:
+        fallen_pitch: float | None = None, hop: bool = False) -> tuple[int, Path]:
     """`course`: a layout of COURSES, or True for "planks". `heading_hold`: gain
     (rad/s per rad) of an operator who steers back to the scenario's heading.
     `fallen_pitch`: start tipped by this pitch (rad, + nose down) and unpowered
-    for 3 s, so the robot falls limp before the policy engages."""
+    for 3 s, so the robot falls limp before the policy engages. `hop`: an
+    operator who requests a jump when the ground 0.1-0.4 m ahead rises, as
+    configs/step_climb_hop.yaml does in training."""
     policy_dir = Path(policy_dir)
     _, meta = checkpoint.load(policy_dir)
     checkpoint.check_model(meta)
@@ -437,6 +460,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     recording_start = phase_start = engaged_at = last_diag = last_publish = -1.0
     published = [0.0] * 6
     heading_ref = None
+    last_hop = -10.0
     received = [0.0] * 5
     phase_index = 0
     fall_time = -1.0
@@ -500,6 +524,11 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                 heading_ref += published[2] / options.command_rate_hz
                 error = math.remainder(heading_ref - yaw_now, 2.0 * math.pi)
                 published[2] = float(np.clip(published[2] + heading_hold * error, -1.5, 1.5))
+            if hop and now - last_hop > 1.1:
+                rise = _rise_ahead(m, d, spec, imu_site)
+                if rise > 0.015:
+                    published[5] = float(np.clip(rise + 0.02, 0.02, 0.08))
+                    last_hop = now
             if engaged_at >= 0:
                 received = published[1:6]
         frames = controller.update(quat, gyro, accel, pos, vel, received, period)
@@ -688,6 +717,8 @@ def main() -> int:
                         help="steer back to the scenario's heading, GAIN rad/s per rad (an operator)")
     parser.add_argument("--fallen", type=float, metavar="PITCH",
                         help="start tipped by PITCH rad (+ nose down), 3 s unpowered (stand-up policies)")
+    parser.add_argument("--hop", action="store_true",
+                        help="request a jump when the ground ahead rises (hop-on-command policies)")
     parser.add_argument("--compare", action="store_true",
                         help="policy and WBC on hardware/default/push x nominal/uart_imu/worst")
     args = parser.parse_args()
@@ -705,7 +736,7 @@ def main() -> int:
            **policy_only}
     output = Path(args.output) if args.output else Path(tempfile.mkstemp(suffix=".csv")[1])
     code, _ = run(policy_dir, args.scenario, sim, output, Path(args.video) if args.video else None,
-                  course=args.course, heading_hold=args.heading_hold, fallen_pitch=args.fallen)
+                  course=args.course, heading_hold=args.heading_hold, fallen_pitch=args.fallen, hop=args.hop)
     print(f"{'FELL' if code == 3 else 'completed all phases'}; recording: {output}")
     per_phase = all_metrics(output, args.scenario)
     keys = COMPARE_KEYS

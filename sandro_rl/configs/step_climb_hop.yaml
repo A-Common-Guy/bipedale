@@ -1,0 +1,18 @@
+# Hop onto steps on command (docs/DESIGN.md 8). A blind robot cannot roll up
+# an edge much over 2 cm (tyre friction), so the jump request becomes the
+# climbing input: in training it fires whenever the ground 0.1-0.4 m ahead
+# rises by more than 1.5 cm, with a target of the rise plus 2 cm. On the
+# robot an operator, or a forward range sensor, sends it. Timed random jumps
+# stay, so the request is not a sign that an obstacle is there.
+#
+#     uv run python -m sandro_rl.train configs/step_climb_hop.yaml --resume runs/step_climb_v2 \
+#         --set train.learning_rate=1.0e-4
+inherit: step_climb_v2.yaml
+
+env:
+  commands:
+    jump:
+      at_edges: {lookahead_m: [0.1, 0.4], min_rise_m: 0.015, margin_m: 0.02}
+
+train:
+  iterations: 1500

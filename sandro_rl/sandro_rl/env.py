@@ -604,6 +604,21 @@ class SandroEnv:
             info["jump_wait"] = info["jump_wait"] - self.dt
             start = (info["jump_wait"] <= 0.0) & (info["jump_timer"] <= 0.0)
             wait, height = self._sample_jump(jax.random.fold_in(k_cmd, 7))
+            edges = self.jump.get("at_edges")
+            if edges:
+                # Hop on command: a request whenever the ground ahead rises, as
+                # an operator or a forward range sensor would send it.
+                _, r_now = self._body_frame(state.data)
+                fwd = jp.array([r_now[0, 0], r_now[1, 0], 0.0])
+                fwd = fwd / jp.maximum(jp.linalg.norm(fwd), 1e-6)
+                mid = self._axle_mid(state.data)
+                ahead = jp.linspace(edges["lookahead_m"][0], edges["lookahead_m"][1], 4)
+                points = jp.concatenate([mid[None], mid[None] + ahead[:, None] * fwd[None]])
+                ground = self.terrain.ground_height(points, state.data)
+                rise = jp.max(ground[1:]) - ground[0]
+                edge = (rise > edges["min_rise_m"]) & (info["jump_timer"] <= -self.jump.get("landing_s", 0.3))
+                start = start | edge
+                height = jp.where(edge, jp.clip(rise + edges["margin_m"], *self.jump["height_m"]), height)
             info["jump_timer"] = jp.where(start, self.jump["window_s"], info["jump_timer"])
             info["jump_height"] = jp.where(start, height, info["jump_height"])
             info["jump_wait"] = jp.where(start, wait + self.jump["window_s"], info["jump_wait"])
@@ -626,6 +641,11 @@ class SandroEnv:
             force = force + push_force[2] * jp.array([0.0, 0.0, 1.0])
             torque = push_force[3] * heading + push_force[4] * jp.array([0.0, 0.0, 1.0])
             xfrc = xfrc.at[self.spec.torso_body, 3:6].set(torque)
+        if self.fallen.get("assist_n", 0.0):
+            # Stand-up curriculum: an upward pull on the torso while it is low,
+            # gone at standing height; the curriculum takes it to zero.
+            low = jp.clip(2.0 * (1.0 - state.data.site_xpos[self.spec.imu_site][2] / self.stand_imu_height), 0.0, 1.0)
+            force = force + self.fallen["assist_n"] * low * jp.array([0.0, 0.0, 1.0])
         xfrc = xfrc.at[self.spec.torso_body, 0:3].set(force)
 
         noise_keys = jax.random.split(k_noise, self.decimation)
@@ -807,7 +827,8 @@ class SandroEnv:
             "leg_velocity": jp.sum(truth["qd"][legs] ** 2),
             "termination": terminated,
             "upright": 0.5 * (1.0 + truth["r_body"][2, 2]),
-            "stand_height": jp.clip(truth["imu_height"] / self.stand_imu_height, 0.0, 1.0),
+            "stand_height": jp.clip((truth["imu_height"] - r.get("stand_height_from_m", 0.0))
+                                    / (self.stand_imu_height - r.get("stand_height_from_m", 0.0)), 0.0, 1.0),
         }
         if "upright_gate_rad" in r:
             # Tracking pays only once up, so lying still is not a way to earn it.

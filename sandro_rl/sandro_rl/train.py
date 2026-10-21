@@ -124,6 +124,11 @@ def main() -> int:
         ts = ts.replace(params=jax.tree.map(jp.asarray, payload["params"]),
                         actor_norm=Normalizer(**{k: jp.asarray(v) for k, v in payload["actor_norm"].items()}),
                         critic_norm=Normalizer(**{k: jp.asarray(v) for k, v in payload["critic_norm"].items()}))
+        if "resume_log_std" in t:
+            # A converged policy's action noise is too small to explore a new task.
+            params = dict(ts.params)
+            params["log_std"] = jp.full_like(params["log_std"], float(t["resume_log_std"]))
+            ts = ts.replace(params=params)
         ts = ts.replace(opt_state=agent.optimizer.init(ts.params))
         print(f"resumed from {args.resume}")
     runner = agent.init_runner(jax.jit(reset), k_runner)
