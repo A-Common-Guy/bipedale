@@ -58,7 +58,7 @@ DIAG_KEYS = [
     "leg_offset_state_m", "leg_offset_rate_m_s", "trim_m", "balance_torque_nm",
     "yaw_torque_nm", "yaw_feedforward_nm", "truth_pitch_rad", "truth_speed_m_s"]
 TRUTH_KEYS = ["truth_forward_m_s", "truth_yaw_rate_rad_s", "truth_height_m", "truth_roll_rad",
-              "truth_wheel_clearance_m"]
+              "truth_wheel_clearance_m", "truth_axle_x_m", "truth_axle_y_m"]
 IMU_COLUMNS = ["imu_qx", "imu_qy", "imu_qz", "imu_qw", "imu_gx", "imu_gy", "imu_gz", "imu_ax", "imu_ay", "imu_az"]
 
 # Latency profiles of the comparison. "uart_imu" is the gate closed_loop.py
@@ -189,6 +189,8 @@ EXTRA_SCENARIOS = {
     "course": ["2,0,0", "3,0.5,0", "6,0.8,0", "2,0,0", "2,0,2.5", "4,0.6,0", "2,0,0"],
     # The course at the hardware's 0.5 m/s drive limit (controllers.yaml).
     "course_slow": ["2,0,0", "3,0.5,0", "8,0.5,0", "2,0,0", "2,0,2.5", "4,0.5,0", "2,0,0"],
+    # For `--course steps`: straight over the four planks and onto the curb.
+    "steps": ["2,0,0", "14,0.5,0", "3,0,0"],
     # Fields: duration, forward, yaw, height rate, roll. Roll is feasible up
     # to +-0.3 rad only near mid height (0.13 m), so the rolls happen there.
     "expressive": ["2,0,0", "3,0,0,-0.013,0", "3,0,0,0,0.3", "3,0,0,0,-0.3", "2,0,0,0,0",
@@ -206,12 +208,22 @@ SCENARIOS = {**closed_loop.SCENARIOS, **EXTRA_SCENARIOS}
 # (10 degree ramps, 0.6 m plateau, 1.6 m wide) 8 cm high centred at 5.0 m.
 COURSE = [(1.0, 0.010), (1.8, 0.015), (2.6, 0.020), (3.4, 0.025)]
 COURSE_HILL = {"distance_m": 5.0, "height_m": 0.08, "slope_deg": 10.0, "plateau_m": 0.6, "width_m": 1.6}
+# `--course steps`: planks from 45 % to 90 % of the loaded tyre radius, then a
+# 6 cm curb with 45 degree faces and a 0.8 m top.
+COURSES = {
+    "planks": (COURSE, COURSE_HILL),
+    "steps": ([(1.0, 0.030), (2.0, 0.040), (3.0, 0.050), (4.0, 0.060)],
+              {"distance_m": 5.4, "height_m": 0.06, "slope_deg": 45.0, "plateau_m": 0.8, "width_m": 1.6}),
+    # The same curb alone, close enough that heading drift does not miss it.
+    "curb": ([], {"distance_m": 1.5, "height_m": 0.06, "slope_deg": 45.0, "plateau_m": 0.8, "width_m": 1.6}),
+}
 
 
-def course_model(spec: RobotSpec, terrain_cfg: dict | None = None) -> mujoco.MjModel:
+def course_model(spec: RobotSpec, layout: str = "planks") -> mujoco.MjModel:
     """The course compiled in place (static geoms collide only where compiled)."""
     from . import terrain
 
+    planks, hill_cfg = COURSES[layout]
     d = mujoco.MjData(spec.model)
     mujoco.mj_resetDataKeyframe(spec.model, d, mujoco.mj_name2id(spec.model, mujoco.mjtObj.mjOBJ_KEY, "stand"))
     mujoco.mj_forward(spec.model, d)
@@ -222,14 +234,14 @@ def course_model(spec: RobotSpec, terrain_cfg: dict | None = None) -> mujoco.MjM
     yaw = math.atan2(heading[1], heading[0])
     quat = [math.cos(0.5 * yaw), 0.0, 0.0, math.sin(0.5 * yaw)]
     items, poses = [], []
-    for i, (distance, height) in enumerate(COURSE):
+    for i, (distance, height) in enumerate(planks):
         plank = terrain.boxes({"type": "obstacles", "planks": {
             "count": 1, "height_m": [height, height], "depth_m": [0.1, 0.1], "width_m": [1.2, 1.2]}})[0]
         plank["name"] = f"{terrain.OBSTACLE_PREFIX}course_plank{i}"
         centre = start + distance * heading
         items.append(plank)
         poses.append(([centre[0], centre[1], height], quat))
-    h = COURSE_HILL
+    h = hill_cfg
     hill = terrain.boxes({"type": "obstacles", "hills": {
         "count": 1, "height_m": [h["height_m"]] * 2, "slope_deg": [h["slope_deg"]] * 2,
         "plateau_m": [h["plateau_m"]] * 2, "width_m": [h["width_m"]] * 2}})[0]
@@ -319,7 +331,9 @@ class PolicyController:
 
 
 def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
-        video: Path | None = None, video_fps: int = 30, seed: int = 1, course: bool = False) -> tuple[int, Path]:
+        video: Path | None = None, video_fps: int = 30, seed: int = 1,
+        course: bool | str = False) -> tuple[int, Path]:
+    """`course`: a layout of COURSES, or True for "planks"."""
     policy_dir = Path(policy_dir)
     _, meta = checkpoint.load(policy_dir)
     checkpoint.check_model(meta)
@@ -331,7 +345,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     rng = np.random.default_rng(options.seed)
     controller = PolicyController(iface, OnnxPolicy(policy_dir / "policy.onnx"), lim.fall_angle_rad)
 
-    m = course_model(spec) if course else mujoco.MjModel.from_xml_path(str(spec.scene))
+    m = (course_model(spec, "planks" if course is True else course) if course
+         else mujoco.MjModel.from_xml_path(str(spec.scene)))
     d = mujoco.MjData(m)
     mujoco.mj_resetDataKeyframe(m, d, mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, "stand"))
     mujoco.mj_forward(m, d)
@@ -521,6 +536,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                 "truth_roll_rad": math.atan2(rb[2, 1], rb[2, 2]),
                 # Lower wheel above z = 0, so only meaningful on flat ground.
                 "truth_wheel_clearance_m": nan if course else float(np.min(d.xanchor[wheel_joints][:, 2]) - radius),
+                "truth_axle_x_m": float(axle[0]), "truth_axle_y_m": float(axle[1]),
             }
             rows.append({**base, "stream": "diag", **{f"diag_{k}": f"{v:.6g}" for k, v in values.items()}})
         joint_row = {**base, "stream": "joint"}
@@ -627,8 +643,9 @@ def main() -> int:
     parser.add_argument("--sim", action="append", default=[], metavar="KEY=VALUE")
     parser.add_argument("--output")
     parser.add_argument("--video")
-    parser.add_argument("--course", action="store_true",
-                        help=f"planks {COURSE} and a hill {COURSE_HILL} along the start heading")
+    parser.add_argument("--course", nargs="?", const="planks", choices=sorted(COURSES),
+                        help="an obstacle course along the start heading (default planks: "
+                             f"{COURSE} and a hill {COURSE_HILL}); see COURSES")
     parser.add_argument("--compare", action="store_true",
                         help="policy and WBC on hardware/default/push x nominal/uart_imu/worst")
     args = parser.parse_args()
