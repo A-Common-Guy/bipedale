@@ -79,7 +79,8 @@
    },
    "termination": {
     "tilt_rad": 0.8,
-    "imu_height_m": 0.17
+    "imu_height_m": 0.17,
+    "max_qvel": 200.0
    },
    "constraints": {
     "enabled": true,
@@ -225,8 +226,8 @@
   "train": {
    "num_envs": 8192,
    "steps_per_env": 24,
-   "iterations": 1000,
-   "learning_rate": 0.001,
+   "iterations": 300,
+   "learning_rate": 0.0001,
    "desired_kl": 0.01,
    "gamma": 0.99,
    "lam": 0.95,
@@ -252,10 +253,13 @@
    "checkpoint_every": 100,
    "eval_every": 50
   },
-  "name": "base"
+  "curriculum": {
+   "stages": []
+  },
+  "name": "flat_tracking"
  },
  "fingerprint": {
-  "sha256": "b294a9f8a79efae08eb877c66779950aaa08d6563f1ffcc6af444fad6b81da21",
+  "sha256": "691c6b7cfd3668ed77daf598b2ca29fd5f25af6034db913d6faa9e0fe5e8ee3e",
   "files": {
    "ros2_ws/src/sandro_description/mjcf/assets/bearing_5_2_4_0_7.stl": "ac58e802905c4664921c4473e3e8e3cc11e4d802d8b7c89fa72b67623528173c",
    "ros2_ws/src/sandro_description/mjcf/assets/biella.stl": "de58942a235b4d1f9ed6d6e320452faf6d45870798fd4127a290c8383952757f",
@@ -272,12 +276,12 @@
    "ros2_ws/src/sandro_description/mjcf/assets/wheel_tire_holder.stl": "1166386dd0f0e21361f6085d5a37ea0343784eec9cb9728f06b9454922a686a3",
    "ros2_ws/src/sandro_description/mjcf/assets/wheelmotorhub.stl": "e5317517f0024f3f06449d371c36fa4c28c174753ab2288407c16220ba69804e",
    "ros2_ws/src/sandro_description/mjcf/assets/wheelstickcover.stl": "b01f44d2926da6eae7efbb7ca1d07c9f50dbd5e2098bb4ca549b459cce102d8a",
-   "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "367159b2f36580084e6ecd8c35110c8403edc540505a5b94bde04dd04de7d6bc",
+   "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "78eb25b704494a948842a89682c206438192d9011dde158a39d2f49d53dcba79",
    "ros2_ws/src/sandro_description/mjcf/scene_ros2.xml": "aec6f8d0f526e4a62374753c4f9dbbf2493eeee961bc7077043737c0378952c8",
-   "ros2_ws/src/sandro_description/config/sim_identified.yaml": "795d6bd93e9c14ef18cb9b127fdfe6a8375c1564c904274e1b8176ba2b6441cf",
-   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "0ca3477775ca722122b133ce3e5079087235548466b38cfb65ff54f4b9fa2d57",
-   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "e54926299a57fa97090cf34aa1fe1c0a88d045da049e5ce06c082dd0bf322341",
-   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "2ae99548aca6d3e718d7abe05d32c379f6bffe98f3161a56e81db91449b6df4f"
+   "ros2_ws/src/sandro_description/config/sim_identified.yaml": "c8e180acd14806ccee366de5d5c6fdd58b4fcfef221c7c35012c8476977cc04f",
+   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "461c172e27a5e853d64d94e715632ba46da7e3b3c01acbe0cd4ad0da32de96b8",
+   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "0c74096985846ff5c9a52ac0dba4cacc5db42fa98949301bd7ea7045b3ef6e58",
+   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "4d2851df4a6a102ac944b3142b6ae9554764c843cae26e2c8d214b56437db839"
   }
  },
  "contract": {
@@ -315,7 +319,7 @@
   ],
   "physics_dt": 0.000833333333333,
   "steps_per_control": 4,
-  "total_mass_kg": 4.6006499,
+  "total_mass_kg": 4.825,
   "stand_q": [
    0.41133484,
    0.21714621,
@@ -335,8 +339,268 @@
   "flax": "0.12.10"
  },
  "python": "3.12.15",
- "iteration": 1000,
- "env_steps": 196608000,
- "wall_s": 1278.9976952075958,
- "compile_s": 16.724138975143433
+ "iteration": 300,
+ "env_steps": 58982400,
+ "wall_s": 396.04482889175415,
+ "compile_s": 16.6927433013916,
+ "curriculum_stage": -1,
+ "base_config": {
+  "seed": 0,
+  "env": {
+   "impl": "warp",
+   "graph_mode": "warp_staged",
+   "policy_rate_hz": 100,
+   "episode_s": 20.0,
+   "naconmax_per_env": 12,
+   "njmax_per_env": 96,
+   "terrain": {
+    "type": "flat",
+    "obstacles": {}
+   },
+   "action": {
+    "legs": {
+     "mode": "position",
+     "scale_rad": 0.5,
+     "kp": "ros",
+     "kd": "ros"
+    },
+    "wheels": {
+     "mode": "velocity",
+     "scale_rad_s": 20.0,
+     "kd_nm_s_rad": 0.4,
+     "scale_nm": 3.0
+    },
+    "clip": 1.0
+   },
+   "observation": {
+    "history": 4,
+    "accelerometer": false,
+    "imu_offset_correction": "ros",
+    "scales": {
+     "gyro": 0.25,
+     "leg_vel": 0.1,
+     "wheel_vel": 0.05
+    }
+   },
+   "commands": {
+    "resample_s": [
+     2.0,
+     5.0
+    ],
+    "zero_probability": 0.2,
+    "component_zero_probability": 0.25,
+    "forward_m_s": "ros",
+    "yaw_rad_s": "ros",
+    "height_m": "ros",
+    "height_change_probability": 0.5,
+    "forward_accel_m_s2": "ros",
+    "yaw_time_constant_s": "ros",
+    "height_rate_m_s": "ros"
+   },
+   "rewards": {
+    "scale_by_dt": true,
+    "sigma": {
+     "forward": 0.15,
+     "yaw": 0.35,
+     "height": 0.012
+    },
+    "weights": {
+     "alive": 1.0,
+     "track_forward": 2.0,
+     "track_yaw": 1.0,
+     "track_height": 1.0,
+     "roll": -20.0,
+     "pitch": -2.0,
+     "pitch_rate": -0.05,
+     "vertical_velocity": -2.0,
+     "leg_symmetry": -200.0,
+     "action_rate": -0.02,
+     "action_accel": -0.01,
+     "leg_torque": -0.002,
+     "wheel_torque": -0.01,
+     "leg_velocity": -0.0005,
+     "termination": -200.0
+    }
+   },
+   "termination": {
+    "tilt_rad": 0.8,
+    "imu_height_m": 0.17,
+    "max_qvel": 200.0
+   },
+   "constraints": {
+    "enabled": true,
+    "p_max": 0.25,
+    "leg_torque": {
+     "limit": "ros",
+     "slack": 0.5
+    },
+    "stretch": {
+     "limit": 0.97,
+     "slack": 0.02
+    },
+    "joint_range": {
+     "margin_rad": 0.1,
+     "slack": 0.1
+    },
+    "height": {
+     "margin_m": 0.008,
+     "slack": 0.01
+    },
+    "tilt": {
+     "limit_rad": 0.45,
+     "slack": 0.3
+    },
+    "wheel_lift": {
+     "limit_m": 0.01,
+     "slack": 0.02
+    }
+   },
+   "init": {
+    "joint_noise_rad": 0.03,
+    "tilt_rad": 0.05,
+    "velocity_noise": 0.05
+   },
+   "pushes": {
+    "enabled": true,
+    "interval_s": [
+     3.0,
+     8.0
+    ],
+    "duration_s": [
+     0.05,
+     0.2
+    ],
+    "force_n": 12.0,
+    "lateral_force_n": 5.0
+   },
+   "randomization": {
+    "enabled": true,
+    "latency": {
+     "imu_delay_s": [
+      0.003,
+      0.025
+     ],
+     "imu_rate_hz": [
+      100.0,
+      400.0
+     ],
+     "degraded_imu_probability": 0.25,
+     "degraded_imu_rate_hz": [
+      25.0,
+      60.0
+     ],
+     "joint_delay_s": [
+      0.0005,
+      0.006
+     ],
+     "joint_rate_hz": [
+      150.0,
+      300.0
+     ],
+     "synchronous_joints_probability": 0.2,
+     "command_delay_s": [
+      0.0005,
+      0.003
+     ]
+    },
+    "sensors": {
+     "imu_noise_scale": [
+      0.5,
+      2.0
+     ],
+     "encoder_noise_rad": 0.0005,
+     "joint_velocity_noise": 0.05,
+     "joint_velocity_gain": [
+      0.75,
+      1.05
+     ],
+     "imu_mount_bias_rad": 0.02,
+     "gyro_bias_rad_s": 0.01
+    },
+    "drives": {
+     "torque_scale": [
+      0.85,
+      1.15
+     ],
+     "leg_gain_scale": [
+      0.9,
+      1.1
+     ]
+    },
+    "model": {
+     "body_mass_scale": [
+      0.9,
+      1.1
+     ],
+     "payload_mass_add_kg": [
+      -0.4,
+      0.4
+     ],
+     "payload_offset_m": [
+      0.04,
+      0.02,
+      0.03
+     ],
+     "tyre_sliding_friction": [
+      0.5,
+      1.2
+     ],
+     "tyre_torsional_scale": [
+      0.5,
+      2.0
+     ],
+     "leg_frictionloss_scale": [
+      0.5,
+      3.0
+     ],
+     "wheel_frictionloss_scale": [
+      0.5,
+      2.0
+     ],
+     "damping_scale": [
+      0.5,
+      2.0
+     ],
+     "armature_scale": [
+      0.5,
+      8.0
+     ]
+    }
+   }
+  },
+  "train": {
+   "num_envs": 8192,
+   "steps_per_env": 24,
+   "iterations": 300,
+   "learning_rate": 0.0001,
+   "desired_kl": 0.01,
+   "gamma": 0.99,
+   "lam": 0.95,
+   "clip": 0.2,
+   "value_coef": 1.0,
+   "entropy_coef": 0.005,
+   "epochs": 5,
+   "minibatches": 4,
+   "max_grad_norm": 1.0,
+   "init_log_std": -0.7,
+   "actor_hidden": [
+    256,
+    256,
+    128
+   ],
+   "critic_hidden": [
+    512,
+    256,
+    128
+   ],
+   "activation": "elu",
+   "symmetry_coef": 0.5,
+   "checkpoint_every": 100,
+   "eval_every": 50
+  },
+  "curriculum": {
+   "stages": []
+  },
+  "name": "flat_tracking"
+ }
 }

@@ -261,7 +261,9 @@ The actor sees one frame of 25 values per policy step, and stacks the 4 most
 recent frames (100 inputs):
 
 - projected gravity (3), from the delayed IMU quaternion, with the known
-  mounting roll removed as `tasks.roll.imu_offset_rad` does in the WBC;
+  mounting roll removed as `tasks.roll.imu_offset_rad` does in the WBC. In
+  training that is the simulated mount (`sim_identified.yaml` `imu_mount`);
+  on the robot it is the `rl_*` override's `observation.imu_offset_rad`;
 - gyro (3, ×0.25);
 - leg joint positions relative to `stand_q` (4);
 - leg velocities (4, ×0.1);
@@ -358,8 +360,8 @@ value.
 | Gyro bias | ±0.01 rad/s | Assumption; the BNO085 calibrates its gyro online. |
 | Drive torque scale | 0.85–1.15 per drive | The torque constant is unmeasured (S2R l.19). The robot spends about 1.7× the simulated wheel torque (S2R l.191–192), which is friction and is covered by the next rows. |
 | Leg kp/kd scale | 0.9–1.1 | MIT gain quantisation and the drive's own loop. Assumption. |
-| Robot mass | ±10 % | The robot has not been weighed (S2R l.18, l.124). |
-| Payload mass | identified 1.2 kg ± 0.4 kg | 16.4 N against 10.4 N of learnt support per leg (S2R l.100). |
+| Robot mass | ±10 % | Components weighed 2026-10-21, 4.825 kg in total (`sim_identified.yaml` `masses`), without the battery. |
+| Payload mass | 0.4 kg ± 0.4 kg | The part of the hub's weighed mass placed by the tilt weighing (`payload`). The range also covers part of a battery not yet fitted. |
 | Payload position | ±40 mm fore-aft, ±20 mm lateral, ±30 mm vertical, IMU frame | The CoM estimate moved from 28 mm to 7–8 mm behind neutral between comparisons (S2R l.101, l.230–233). |
 | Tyre sliding friction | 0.5–1.2 absolute | Identified value 0.8 in `sim_identified.yaml` (`tyre.friction`). Ascento found high grip an exploit that did not transfer (RESEARCH.md §1). |
 | Tyre torsional friction | 0.5–2 × | 0.07 m was identified from the turn cost (S2R l.102, `sim_identified.yaml`). |
@@ -503,6 +505,11 @@ column. Section 11 proposes the fix.
 The plot `policies/flat_tracking/eval/hardware_nominal.png` shows the traces.
 
 ## 8. Further policies
+
+The results in sections 7 and 8 were measured on the CAD-mass model, as
+trained. The policies in `policies/` have since been fine-tuned on the
+weighed robot; their current results are in the last subsection,
+"Refit to the weighed robot".
 
 ### agile_obstacles: using the legs
 
@@ -788,6 +795,104 @@ the WBC falls in three, the `worst` latency profile).
   strength and the tyres' landing impact are not modelled. The deployment
   controller has no jump input yet (section 9).
 
+### Refit to the weighed robot
+
+On 2026-10-21 the model changed from the CAD masses to the weighed ones
+(`sim_identified.yaml` `masses`): 4.825 kg against 3.40 kg, wheels 170 g
+against 58 g, and the loaded tyre radius 0.0672 m against 0.0742 m. The
+controllers' model, wheel radius included, followed. The contract and the
+CPU/GPU check pass on the new model.
+
+**IMU roll correction, fixed with the refit.** Training had taken the
+observed roll correction from the robot overrides'
+`tasks.roll.imu_offset_rad`. That value was re-identified to +0.016 rad for
+the SPI6 mounting, while the simulated IMU stayed mounted at −0.049. The
+first `jump` training therefore saw a horizon tilted by 0.065 rad, which it
+would have held on the robot. The correction is now the simulated mount
+(`sources.simulated_imu_roll_offset`), guarded by a contract test. The
+refit below starts from the committed checkpoints with that fix: three of
+them were trained before the re-identification, and `jump` relearns the
+horizon in its refit.
+
+The policies as committed before the refit, on the new model: `flat_tracking`,
+`flat_level` and `agile_terrain` complete the `default` sequence, and `jump`
+completes its jumps, but `agile_terrain` falls on the obstacle course. Each
+policy was therefore fine-tuned from its committed checkpoint on the new
+model, at full difficulty and a learning rate of 1e-4:
+
+```bash
+uv run python -m sandro_rl.train configs/<policy>.yaml --out runs/<policy>_mass --resume policies/<policy> \
+    --set 'curriculum.stages=[]' --set train.iterations=<300 or 600> --set train.learning_rate=1.0e-4
+```
+
+| Policy | Iterations | Wall time | Falls per 1000 steps at the end, before → after |
+| --- | --- | --- | --- |
+| `flat_tracking` | +300 | 6.6 min | 0 → 0 |
+| `flat_level` | +300 | 6.6 min | 0 → 0 |
+| `agile_terrain` | +600 | 17.6 min | 0.08 → 0.11 |
+| `jump` | +600 | 17.6 min | 0.35 → 0.21 |
+
+Each folder keeps its original `train_log.csv` and curves and adds
+`train_log_mass.csv`, `train_summary_mass.json` and `curves_mass.png`. All
+four complete the nine standard runs (`eval/comparison.md`). On the new
+model, the WBC falls in the three `worst`-latency runs.
+
+**flat_tracking and flat_level** (`hardware/nominal`):
+
+| Metric | flat_tracking | flat_level | WBC |
+| --- | --- | --- | --- |
+| standing pitch RMS (phases 0, 2, 4), rad | 0.017 / 0.033 / 0.020 | 0.028 / 0.015 / 0.023 | 0.023 / 0.030 / 0.033 |
+| standing mean pitch, rad | +0.020 / +0.018 / −0.001 | +0.002 / −0.007 / −0.004 | |
+| driving 0.2 m/s pitch RMS, rad | 0.043 | 0.029 | **0.006** |
+| turn yaw-rate error RMS, rad/s | **0.048** | 0.063 | 0.199 |
+| turn yaw rise time, s | 0.20 | **0.16** | 1.42 |
+
+Both stand about as calmly as the WBC. `flat_level` stands level, within
+0.007 rad. `flat_tracking`'s forward tilt is down from +0.06–0.09 rad to at
+most +0.02.
+
+**agile_terrain:**
+
+- **The course at 0.8 m/s** (`--scenario course`) now ends in a fall on
+  every seed tried (5 of 5). The robot hits the 25 mm plank, the last and
+  highest, at 0.78 m/s. The wheel stops dead (0.07 m/s within 80 ms), and
+  the robot pitches over the plank. Another 800 iterations did not change
+  that. Over seeds 1–3, with the drive phase at a lower speed, it stays up
+  at 0.4 and 0.5 m/s, falls once at 0.6, and falls every time at 0.7.
+- **At 0.5 m/s it does not fall, but it does not cross the 25 mm plank
+  either** (`--scenario course_slow`, `course.mp4`, `eval/course_frames.png`).
+  It crosses the 10, 15 and 20 mm planks. At the 25 mm one it bounces back
+  about 0.4 m, retries, and is barely over it when the drive phase ends, so
+  it never reaches the hill. It then spins at 2.56 rad/s for 2.5 commanded.
+- **Why:** a 25 mm edge against the loaded 67 mm tyre takes about 1.2 Nm per
+  wheel to climb statically on the weighed robot, against 0.9 Nm on the CAD
+  model (half the weight times the radius times the sine of the contact
+  angle). A balancing robot can only apply that torque by leaning into the
+  edge or by arriving with momentum. Before the weighing, it managed this.
+  The policy is blind, so it cannot slow down for an edge it cannot see. A
+  step-climbing task that lifts the wheel with the legs, or a terrain
+  estimate in the observation, is the way past 20 mm.
+- **Expressive sequence:** roll 0.27 rad for ±0.3 commanded, and 0.23–0.24
+  for ±0.25 while driving.
+- **Height range:** still about 0.12–0.18 m. The commands of 0.093 and
+  0.19 m reach 0.125 and 0.176 m.
+
+**jump** (`jump.mp4`, `eval/jump_frames.png`): still three hops per
+command, landing every time. It stands with 0.005 rad of roll:
+
+| Phase | Target | Hops | Peak clearance | Peak leg / wheel torque |
+| --- | --- | --- | --- | --- |
+| standing | 3 cm | 3 | 92 mm | 7.5 / 7.4 Nm |
+| standing | 5 cm | 3 | 95 mm | 7.7 / 7.2 Nm |
+| standing | 8 cm | 3 | 120 mm | 7.6 / 7.2 Nm |
+| 0.5 m/s | 5 cm | 3 | 95 mm | 7.6 / 7.3 Nm |
+| 0.5 m/s | 8 cm | 3 | 108 mm | 7.8 / 5.7 Nm |
+
+The height command matters even less than before: 3 cm now gives 92 mm.
+
+The weighing was done on a bench supply. Once the battery is fitted, weigh
+the robot again, redo the tilt weighing and repeat this refit.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that
@@ -843,8 +948,8 @@ interfaces on the wheel drives. The plugin exports them for all six joints
 ## 10. Assumptions and open issues
 
 - **Drive speed limit.** No wheel speed limit is documented. The MIT frame
-  encodes ±65 rad/s (the GIM6010 MIT range). 1 m/s needs 13.5 rad/s at the
-  0.074 m tyre radius, and the policies use at most 20 rad/s.
+  encodes ±65 rad/s (the GIM6010 MIT range). 1 m/s needs 14.9 rad/s at the
+  loaded 0.0672 m tyre radius, and the policies use at most 20 rad/s.
 - **The 0.31–0.46 velocity gain of one left drive** (S2R l.248, l.283) is
   outside the randomised 0.75–1.05. A policy that relies on leg velocity
   would be hurt by that fault. Check that drive first, as S2R advises.
@@ -905,3 +1010,10 @@ interfaces on the wheel drives. The plugin exports them for all six joints
    policy can be commanded through the WBC's shaping. `agile_obstacles` is
    trained to 1.0 m/s and 3 rad/s. Deploying it at that speed needs those
    limits raised for the RL controller only.
+7. **`sim_identified.yaml` `imu_mount.roll_offset_rad`**: still the UART
+   IMU's −0.049, while the robot overrides give the SPI6 mounting as
+   +0.016. Its own comment says the simulated IMU should be rotated by the
+   overrides' amount. The policies are unaffected either way, because they
+   correct by the simulated mount and the robot's mount reaches them through
+   the `rl_*` overrides. Matching it would make the WBC's simulation hold the
+   same horizon as the robot.

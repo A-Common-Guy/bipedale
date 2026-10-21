@@ -109,14 +109,17 @@ Each folder under `policies/` contains:
 
 | Policy | What it is | Video | Result (CPU MuJoCo, latency emulation) |
 | --- | --- | --- | --- |
-| [`flat_tracking`](policies/flat_tracking) | First task: balance, forward speed, yaw rate, height on flat ground | `default_sequence.mp4` | Completes all 9 scenario/latency runs (the WBC falls in 4). Yaw tracking is 3× better than the WBC. Standing pitch is twice the WBC's, with a tilted posture |
-| [`flat_level`](policies/flat_level) | `flat_tracking` with pitch penalised (−25) | `default_uart_imu.mp4` | Completes all 9. Stands level, calmer than the WBC (pitch RMS 0.013 against 0.023 rad). Drives with more pitch than the WBC |
+| [`flat_tracking`](policies/flat_tracking) | First task: balance, forward speed, yaw rate, height on flat ground | `default_sequence.mp4` | Completes all 9 scenario/latency runs (the WBC falls in 3). Yaw tracking is about 5× better than the WBC. Stands as calmly as the WBC (pitch RMS 0.017–0.033 rad), tilted forward by up to 0.02 rad |
+| [`flat_level`](policies/flat_level) | `flat_tracking` with pitch penalised (−25) | `default_uart_imu.mp4` | Completes all 9. Stands level and as calmly as the WBC. Drives with more pitch than the WBC |
 | [`agile_obstacles`](policies/agile_obstacles) | Superseded. Its planks did not collide (DESIGN.md 8), so it was trained on flat ground | `agile_course.mp4` | Its course result is invalid: only the first plank was solid |
-| [`agile_terrain`](policies/agile_terrain) | 1 m/s, 3 rad/s, planks up to 3 cm, hills up to 10 cm with 15° ramps, pushes and torque kicks, and a commanded body roll and height for animation | `course.mp4`, `expressive.mp4` | Crosses four planks and climbs the 8 cm hill, spins 2.5 rad/s on its plateau. Holds 0.22–0.26 rad of roll for 0.25–0.3 commanded. Completes all 9 standard runs (the WBC falls in 4). Height follows only within 0.12–0.18 m |
-| [`jump`](policies/jump) | `agile_terrain` with 10 Nm on every drive and a commanded jump (2–8 cm). A base to build dynamic tasks on; not meant for the hardware yet | `jump.mp4` | Hops three times per jump command, 66–127 mm of wheel clearance, standing and at 0.5 m/s, and lands every time. Completes all 9 standard runs. Height follows the command only loosely, and it falls 4× as often as `agile_terrain` in training |
+| [`agile_terrain`](policies/agile_terrain) | 1 m/s, 3 rad/s, planks up to 3 cm, hills up to 10 cm with 15° ramps, pushes and torque kicks, and a commanded body roll and height for animation | `course.mp4`, `expressive.mp4` | On the weighed robot it crosses planks up to 20 mm but not the 25 mm one: at 0.5 m/s it bounces back from it, and at 0.7 m/s or more it falls over it. Holds 0.23–0.27 rad of roll for 0.25–0.3 commanded. Completes all 9 standard runs (the WBC falls in 3). Height follows only within 0.12–0.18 m |
+| [`jump`](policies/jump) | `agile_terrain` with 10 Nm on every drive and a commanded jump (2–8 cm). A base to build dynamic tasks on; not meant for the hardware yet | `jump.mp4` | Hops three times per jump command, 92–120 mm of wheel clearance, standing and at 0.5 m/s, and lands every time. Completes all 9 standard runs. The height command barely matters, and it falls twice as often as `agile_terrain` in training |
 
-Results, including where each policy is worse than the WBC, are in
-[docs/DESIGN.md](docs/DESIGN.md) sections 7 and 8.
+All four were fine-tuned on the weighed robot (4.825 kg, loaded tyre radius
+0.0672 m) from their CAD-mass checkpoints; the results above are on that
+model. Results, including where each policy is worse than the WBC, are in
+[docs/DESIGN.md](docs/DESIGN.md) sections 7 and 8; the refit is the last
+subsection of section 8.
 
 ## Layout
 

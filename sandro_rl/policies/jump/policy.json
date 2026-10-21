@@ -1,6 +1,6 @@
 {
  "onnx": "policy.onnx",
- "onnx_max_abs_error_vs_reference": 5.690981688122321e-07,
+ "onnx_max_abs_error_vs_reference": 4.2649553311235877e-07,
  "policy_rate_hz": 100,
  "control_rate_hz": 300.0,
  "observation": {
@@ -55,7 +55,7 @@
    "leg_vel": 0.1,
    "wheel_vel": 0.05
   },
-  "imu_offset_correction_rad": 0.016,
+  "imu_offset_correction_rad": -0.049,
   "command_normalisation": {
    "forward_m_s": 1.0,
    "yaw_rad_s": 3.0,
@@ -124,5 +124,5 @@
   ],
   "track_width_m": 0.304
  },
- "fingerprint": "93a61db7193cab1bbdc27611d23f18622090021db44137b385a5ce2a9aef9cb3"
+ "fingerprint": "691c6b7cfd3668ed77daf598b2ca29fd5f25af6034db913d6faa9e0fe5e8ee3e"
 }

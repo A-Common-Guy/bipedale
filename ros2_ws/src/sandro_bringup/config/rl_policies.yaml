@@ -14,7 +14,7 @@ rl_flat_level:
     imu_name: imu
     command_topic: /cmd_vel
     policy_file: package://sandro_controllers/policies/flat_level.bin
-    policy_fingerprint: b294a9f8a79efae08eb877c66779950aaa08d6563f1ffcc6af444fad6b81da21
+    policy_fingerprint: 691c6b7cfd3668ed77daf598b2ca29fd5f25af6034db913d6faa9e0fe5e8ee3e
     policy_rate_hz: 100.0
     observation:
       history: 4
@@ -60,7 +60,7 @@ rl_agile_terrain:
     imu_name: imu
     command_topic: /cmd_vel
     policy_file: package://sandro_controllers/policies/agile_terrain.bin
-    policy_fingerprint: b294a9f8a79efae08eb877c66779950aaa08d6563f1ffcc6af444fad6b81da21
+    policy_fingerprint: 691c6b7cfd3668ed77daf598b2ca29fd5f25af6034db913d6faa9e0fe5e8ee3e
     policy_rate_hz: 100.0
     observation:
       history: 4

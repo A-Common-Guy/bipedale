@@ -119,8 +119,7 @@
       0.02,
       0.08
      ]
-    },
-    "sample_fraction": 1.0
+    }
    },
    "rewards": {
     "scale_by_dt": true,
@@ -306,8 +305,8 @@
   "train": {
    "num_envs": 8192,
    "steps_per_env": 24,
-   "iterations": 2500,
-   "learning_rate": 0.001,
+   "iterations": 600,
+   "learning_rate": 0.0001,
    "desired_kl": 0.01,
    "gamma": 0.99,
    "lam": 0.95,
@@ -334,88 +333,12 @@
    "eval_every": 50
   },
   "curriculum": {
-   "stages": [
-    {
-     "iteration": 0,
-     "set": {
-      "env.commands.sample_fraction": 0.4,
-      "env.terrain.planks.height_m": [
-       0.002,
-       0.01
-      ],
-      "env.terrain.hills.height_m": [
-       0.0,
-       0.03
-      ],
-      "env.pushes.force_n": 12.0,
-      "env.pushes.lateral_force_n": 5.0,
-      "env.pushes.vertical_force_n": 0.0,
-      "env.pushes.torque_nm": [
-       0.0,
-       0.0
-      ],
-      "env.commands.jump.height_m": [
-       0.01,
-       0.03
-      ]
-     }
-    },
-    {
-     "iteration": 400,
-     "set": {
-      "env.commands.sample_fraction": 0.7,
-      "env.terrain.planks.height_m": [
-       0.004,
-       0.02
-      ],
-      "env.terrain.hills.height_m": [
-       0.01,
-       0.06
-      ],
-      "env.pushes.force_n": 18.0,
-      "env.pushes.lateral_force_n": 8.0,
-      "env.pushes.vertical_force_n": 8.0,
-      "env.pushes.torque_nm": [
-       0.5,
-       0.5
-      ],
-      "env.commands.jump.height_m": [
-       0.02,
-       0.05
-      ]
-     }
-    },
-    {
-     "iteration": 900,
-     "set": {
-      "env.commands.sample_fraction": 1.0,
-      "env.terrain.planks.height_m": [
-       0.005,
-       0.03
-      ],
-      "env.terrain.hills.height_m": [
-       0.02,
-       0.1
-      ],
-      "env.pushes.force_n": 25.0,
-      "env.pushes.lateral_force_n": 12.0,
-      "env.pushes.vertical_force_n": 15.0,
-      "env.pushes.torque_nm": [
-       1.0,
-       1.0
-      ],
-      "env.commands.jump.height_m": [
-       0.02,
-       0.08
-      ]
-     }
-    }
-   ]
+   "stages": []
   },
   "name": "jump"
  },
  "fingerprint": {
-  "sha256": "93a61db7193cab1bbdc27611d23f18622090021db44137b385a5ce2a9aef9cb3",
+  "sha256": "691c6b7cfd3668ed77daf598b2ca29fd5f25af6034db913d6faa9e0fe5e8ee3e",
   "files": {
    "ros2_ws/src/sandro_description/mjcf/assets/bearing_5_2_4_0_7.stl": "ac58e802905c4664921c4473e3e8e3cc11e4d802d8b7c89fa72b67623528173c",
    "ros2_ws/src/sandro_description/mjcf/assets/biella.stl": "de58942a235b4d1f9ed6d6e320452faf6d45870798fd4127a290c8383952757f",
@@ -432,11 +355,11 @@
    "ros2_ws/src/sandro_description/mjcf/assets/wheel_tire_holder.stl": "1166386dd0f0e21361f6085d5a37ea0343784eec9cb9728f06b9454922a686a3",
    "ros2_ws/src/sandro_description/mjcf/assets/wheelmotorhub.stl": "e5317517f0024f3f06449d371c36fa4c28c174753ab2288407c16220ba69804e",
    "ros2_ws/src/sandro_description/mjcf/assets/wheelstickcover.stl": "b01f44d2926da6eae7efbb7ca1d07c9f50dbd5e2098bb4ca549b459cce102d8a",
-   "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "367159b2f36580084e6ecd8c35110c8403edc540505a5b94bde04dd04de7d6bc",
+   "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "78eb25b704494a948842a89682c206438192d9011dde158a39d2f49d53dcba79",
    "ros2_ws/src/sandro_description/mjcf/scene_ros2.xml": "aec6f8d0f526e4a62374753c4f9dbbf2493eeee961bc7077043737c0378952c8",
-   "ros2_ws/src/sandro_description/config/sim_identified.yaml": "795d6bd93e9c14ef18cb9b127fdfe6a8375c1564c904274e1b8176ba2b6441cf",
-   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "0ca3477775ca722122b133ce3e5079087235548466b38cfb65ff54f4b9fa2d57",
-   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "9aed37aed54f737b916610f9f8a1884add1e05cf9a0f3ea84609bfb943f575c6",
+   "ros2_ws/src/sandro_description/config/sim_identified.yaml": "c8e180acd14806ccee366de5d5c6fdd58b4fcfef221c7c35012c8476977cc04f",
+   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "461c172e27a5e853d64d94e715632ba46da7e3b3c01acbe0cd4ad0da32de96b8",
+   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "0c74096985846ff5c9a52ac0dba4cacc5db42fa98949301bd7ea7045b3ef6e58",
    "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "4d2851df4a6a102ac944b3142b6ae9554764c843cae26e2c8d214b56437db839"
   }
  },
@@ -475,7 +398,7 @@
   ],
   "physics_dt": 0.000833333333333,
   "steps_per_control": 4,
-  "total_mass_kg": 4.6006499,
+  "total_mass_kg": 4.825,
   "stand_q": [
    0.41133484,
    0.21714621,
@@ -495,11 +418,11 @@
   "flax": "0.12.10"
  },
  "python": "3.12.15",
- "iteration": 2500,
- "env_steps": 491520000,
- "wall_s": 4475.57506942749,
- "compile_s": 23.65678358078003,
- "curriculum_stage": 2,
+ "iteration": 600,
+ "env_steps": 117964800,
+ "wall_s": 1056.8480615615845,
+ "compile_s": 18.205697536468506,
+ "curriculum_stage": -1,
  "base_config": {
   "seed": 0,
   "env": {
@@ -806,8 +729,8 @@
   "train": {
    "num_envs": 8192,
    "steps_per_env": 24,
-   "iterations": 2500,
-   "learning_rate": 0.001,
+   "iterations": 600,
+   "learning_rate": 0.0001,
    "desired_kl": 0.01,
    "gamma": 0.99,
    "lam": 0.95,
@@ -834,83 +757,7 @@
    "eval_every": 50
   },
   "curriculum": {
-   "stages": [
-    {
-     "iteration": 0,
-     "set": {
-      "env.commands.sample_fraction": 0.4,
-      "env.terrain.planks.height_m": [
-       0.002,
-       0.01
-      ],
-      "env.terrain.hills.height_m": [
-       0.0,
-       0.03
-      ],
-      "env.pushes.force_n": 12.0,
-      "env.pushes.lateral_force_n": 5.0,
-      "env.pushes.vertical_force_n": 0.0,
-      "env.pushes.torque_nm": [
-       0.0,
-       0.0
-      ],
-      "env.commands.jump.height_m": [
-       0.01,
-       0.03
-      ]
-     }
-    },
-    {
-     "iteration": 400,
-     "set": {
-      "env.commands.sample_fraction": 0.7,
-      "env.terrain.planks.height_m": [
-       0.004,
-       0.02
-      ],
-      "env.terrain.hills.height_m": [
-       0.01,
-       0.06
-      ],
-      "env.pushes.force_n": 18.0,
-      "env.pushes.lateral_force_n": 8.0,
-      "env.pushes.vertical_force_n": 8.0,
-      "env.pushes.torque_nm": [
-       0.5,
-       0.5
-      ],
-      "env.commands.jump.height_m": [
-       0.02,
-       0.05
-      ]
-     }
-    },
-    {
-     "iteration": 900,
-     "set": {
-      "env.commands.sample_fraction": 1.0,
-      "env.terrain.planks.height_m": [
-       0.005,
-       0.03
-      ],
-      "env.terrain.hills.height_m": [
-       0.02,
-       0.1
-      ],
-      "env.pushes.force_n": 25.0,
-      "env.pushes.lateral_force_n": 12.0,
-      "env.pushes.vertical_force_n": 15.0,
-      "env.pushes.torque_nm": [
-       1.0,
-       1.0
-      ],
-      "env.commands.jump.height_m": [
-       0.02,
-       0.08
-      ]
-     }
-    }
-   ]
+   "stages": []
   },
   "name": "jump"
  }

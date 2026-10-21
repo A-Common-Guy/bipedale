@@ -286,7 +286,7 @@
   "train": {
    "num_envs": 8192,
    "steps_per_env": 24,
-   "iterations": 500,
+   "iterations": 600,
    "learning_rate": 0.0001,
    "desired_kl": 0.01,
    "gamma": 0.99,
@@ -319,7 +319,7 @@
   "name": "agile_terrain"
  },
  "fingerprint": {
-  "sha256": "b294a9f8a79efae08eb877c66779950aaa08d6563f1ffcc6af444fad6b81da21",
+  "sha256": "691c6b7cfd3668ed77daf598b2ca29fd5f25af6034db913d6faa9e0fe5e8ee3e",
   "files": {
    "ros2_ws/src/sandro_description/mjcf/assets/bearing_5_2_4_0_7.stl": "ac58e802905c4664921c4473e3e8e3cc11e4d802d8b7c89fa72b67623528173c",
    "ros2_ws/src/sandro_description/mjcf/assets/biella.stl": "de58942a235b4d1f9ed6d6e320452faf6d45870798fd4127a290c8383952757f",
@@ -336,12 +336,12 @@
    "ros2_ws/src/sandro_description/mjcf/assets/wheel_tire_holder.stl": "1166386dd0f0e21361f6085d5a37ea0343784eec9cb9728f06b9454922a686a3",
    "ros2_ws/src/sandro_description/mjcf/assets/wheelmotorhub.stl": "e5317517f0024f3f06449d371c36fa4c28c174753ab2288407c16220ba69804e",
    "ros2_ws/src/sandro_description/mjcf/assets/wheelstickcover.stl": "b01f44d2926da6eae7efbb7ca1d07c9f50dbd5e2098bb4ca549b459cce102d8a",
-   "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "367159b2f36580084e6ecd8c35110c8403edc540505a5b94bde04dd04de7d6bc",
+   "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "78eb25b704494a948842a89682c206438192d9011dde158a39d2f49d53dcba79",
    "ros2_ws/src/sandro_description/mjcf/scene_ros2.xml": "aec6f8d0f526e4a62374753c4f9dbbf2493eeee961bc7077043737c0378952c8",
-   "ros2_ws/src/sandro_description/config/sim_identified.yaml": "795d6bd93e9c14ef18cb9b127fdfe6a8375c1564c904274e1b8176ba2b6441cf",
-   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "0ca3477775ca722122b133ce3e5079087235548466b38cfb65ff54f4b9fa2d57",
-   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "e54926299a57fa97090cf34aa1fe1c0a88d045da049e5ce06c082dd0bf322341",
-   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "2ae99548aca6d3e718d7abe05d32c379f6bffe98f3161a56e81db91449b6df4f"
+   "ros2_ws/src/sandro_description/config/sim_identified.yaml": "c8e180acd14806ccee366de5d5c6fdd58b4fcfef221c7c35012c8476977cc04f",
+   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "461c172e27a5e853d64d94e715632ba46da7e3b3c01acbe0cd4ad0da32de96b8",
+   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "0c74096985846ff5c9a52ac0dba4cacc5db42fa98949301bd7ea7045b3ef6e58",
+   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "4d2851df4a6a102ac944b3142b6ae9554764c843cae26e2c8d214b56437db839"
   }
  },
  "contract": {
@@ -379,7 +379,7 @@
   ],
   "physics_dt": 0.000833333333333,
   "steps_per_control": 4,
-  "total_mass_kg": 4.6006499,
+  "total_mass_kg": 4.825,
   "stand_q": [
    0.41133484,
    0.21714621,
@@ -399,10 +399,10 @@
   "flax": "0.12.10"
  },
  "python": "3.12.15",
- "iteration": 500,
- "env_steps": 98304000,
- "wall_s": 882.6403918266296,
- "compile_s": 21.625683069229126,
+ "iteration": 600,
+ "env_steps": 117964800,
+ "wall_s": 1057.5129017829895,
+ "compile_s": 21.393849849700928,
  "curriculum_stage": -1,
  "base_config": {
   "seed": 0,
@@ -691,7 +691,7 @@
   "train": {
    "num_envs": 8192,
    "steps_per_env": 24,
-   "iterations": 500,
+   "iterations": 600,
    "learning_rate": 0.0001,
    "desired_kl": 0.01,
    "gamma": 0.99,
