@@ -301,6 +301,7 @@ class SandroEnv:
             D = r["drives"]
             torque_scale = u(keys[13], D["torque_scale"], (N_JOINTS,))
             gain_scale = u(keys[14], D["leg_gain_scale"])
+            wheel_lag = u(keys[15], D.get("wheel_lag_s", [0.0, 0.0]))
             enc_noise, vel_noise = S["encoder_noise_rad"], S["joint_velocity_noise"]
         else:
             imu_delay = jp.float32(lat.imu_delay_s)
@@ -318,6 +319,7 @@ class SandroEnv:
             gyro_bias = jp.zeros(3)
             torque_scale = jp.ones(N_JOINTS)
             gain_scale = jp.float32(1.0)
+            wheel_lag = jp.float32(r["drives"].get("nominal_wheel_lag_s", 0.0))
             enc_noise, vel_noise = 0.0, 0.0
         imu_period = jp.where(imu_rate > 0, 1.0 / jp.maximum(imu_rate, 1e-6), 0.0)
         joint_period = jp.where(joint_rate > 0, 1.0 / jp.maximum(joint_rate, 1e-6), 0.0)
@@ -335,6 +337,7 @@ class SandroEnv:
             "gyro_bias": gyro_bias.astype(jp.float32),
             "torque_scale": torque_scale.astype(jp.float32),
             "gain_scale": jp.float32(gain_scale),
+            "wheel_lag": jp.float32(wheel_lag),
             "imu_rate": jp.float32(imu_rate), "imu_delay": jp.float32(imu_delay),
         }
 
@@ -559,7 +562,7 @@ class SandroEnv:
             "command_timer": duration, "push_timer": wait, "push_duration": push_duration,
             "push_force_sample": push_force, "push_force": jp.zeros(self.push_dim),
             "last_action": jp.zeros(N_JOINTS), "last_action2": jp.zeros(N_JOINTS),
-            "frame": zero_frame, "axle_prev": self._axle_mid(data),
+            "frame": zero_frame, "drive_tau": jp.zeros(N_JOINTS), "axle_prev": self._axle_mid(data),
             "obs_history": jp.zeros((self.history, self.actor_layout.size)),
         }
         if self.has_jump:
@@ -626,23 +629,30 @@ class SandroEnv:
         xfrc = xfrc.at[self.spec.torso_body, 0:3].set(force)
 
         noise_keys = jax.random.split(k_noise, self.decimation)
+        # The wheel torque reaches the body through the drive train's backlash
+        # and compliance: a first-order lag of wheel_lag seconds (0: none).
+        lag = params["wheel_lag"]
+        blend = jp.where(lag > 0, 1.0 - jp.exp(-self.dt_physics / jp.maximum(lag, 1e-6)), 1.0)
+        blend = jp.ones(N_JOINTS).at[self.wheel_idx].set(blend)
 
         def substep(carry, inputs):
-            data, history, pstep = carry
+            data, history, pstep, drive_tau = carry
             j, key = inputs
             due = j.astype(jp.float32) * self.dt_physics >= delay - 1e-9
             frame = jp.where(due, new_frame, old_frame)
             tau = self._mit_torque(frame, data, params) * params["torque_scale"]
-            ctrl = jp.zeros(self.mj_model.nu).at[self.act_ids].set(tau)
+            drive_tau = drive_tau + blend * (tau - drive_tau)
+            ctrl = jp.zeros(self.mj_model.nu).at[self.act_ids].set(drive_tau)
             data = data.replace(ctrl=ctrl, xfrc_applied=xfrc)
             data = mjx.step(model, data)
             pstep = pstep + 1
             history = latency.write(history, pstep, self._record(data, params, key))
-            return (data, history, pstep), tau
+            return (data, history, pstep, drive_tau), tau
 
-        (data, history, pstep), taus = jax.lax.scan(
-            substep, (state.data, info["history"], info["physics_step"]),
+        (data, history, pstep, drive_tau), taus = jax.lax.scan(
+            substep, (state.data, info["history"], info["physics_step"], info["drive_tau"]),
             (jp.arange(self.decimation), noise_keys))
+        info["drive_tau"] = drive_tau
         info["history"] = history
         info["physics_step"] = pstep
         info["frame"] = new_frame

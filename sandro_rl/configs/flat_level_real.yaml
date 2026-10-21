@@ -1,0 +1,21 @@
+# flat_level for the measured robot. On hardware (2026-10-21, recordings/
+# rl_flat_vibration_2026-10-21 and rl_flat_A_kd025) flat_level rang at
+# 7.4-7.5 Hz: both wheel actions swung +-0.7 every 133 ms, 2.3 Nm RMS of
+# torque per wheel against 0.3-0.5 in simulation, and the frequency stayed
+# put when the wheel kd went from 0.4 to 0.25, so the loop is delay-limited.
+# The body's pitch acceleration lagged the reported wheel torque by 24-25 ms,
+# while the IMU lags the encoders by only 9 ms (rocking test with the wheel
+# blocked, recordings/imu_rock3_left_2026-10-21.csv): the lag sits in the
+# wheel drive train (backlash, compliance). evaluate.py with wheel_lag
+# reproduces the ringing with this policy: 10 ms 11 Hz, 20 ms 10 Hz,
+# 30 ms 8 Hz at 2 Nm summed, so the robot sits near 30-40 ms.
+inherit: flat_level.yaml
+
+env:
+  randomization:
+    drives:
+      wheel_lag_s: [0.005, 0.05]
+  rewards:
+    weights:
+      action_rate: -0.08
+      action_accel: -0.04

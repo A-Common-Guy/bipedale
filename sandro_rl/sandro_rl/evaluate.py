@@ -156,6 +156,7 @@ class SimOptions:
     joint_stagger: bool
     command_delay_s: float
     imu_noise: bool = True
+    wheel_lag_s: float = 0.0
     unpowered_s: float = 0.03
     settle_s: float = 3.0
     command_rate_hz: float = 20.0
@@ -168,7 +169,7 @@ class SimOptions:
                 latency.joint_stagger, latency.command_delay_s)
         names = {"imu_delay": "imu_delay_s", "imu_rate": "imu_rate_hz", "joint_delay": "joint_delay_s",
                  "joint_rate": "joint_rate_hz", "command_delay": "command_delay_s", "settle": "settle_s",
-                 "seed": "seed"}
+                 "seed": "seed", "wheel_lag": "wheel_lag_s"}
         for key, value in sim.items():
             if key == "joint_stagger":
                 o.joint_stagger = value in ("true", "1")
@@ -398,6 +399,11 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         camera.distance, camera.elevation, camera.azimuth = 1.2, -15.0, 120.0
         last_frame_t = -1.0
 
+    # env.py's drive-train lag on the wheel torque (wheel_lag, s).
+    wheel_blend = 1.0 - math.exp(-m.opt.timestep / options.wheel_lag_s) if options.wheel_lag_s > 0 else 1.0
+    wheel_act = [act[i] for i, name in enumerate(JOINTS) if "wheel" in name]
+    wheel_tau = {a: 0.0 for a in wheel_act}
+
     def step(push_force):
         nonlocal last_frame_t
         d.ctrl[:] = staged
@@ -405,6 +411,9 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         for i in range(len(JOINTS)):
             if frames[i] is not None:
                 d.ctrl[act[i]] = iface.mit_torque(frames[i], d.qpos[qadr[i]], d.qvel[dadr[i]], limits[i])
+        for a in wheel_act:
+            wheel_tau[a] += wheel_blend * (d.ctrl[a] - wheel_tau[a])
+            d.ctrl[a] = wheel_tau[a]
         d.xfrc_applied[torso, :] = 0.0
         if push_force != 0.0:
             r = d.xmat[torso].reshape(3, 3)
@@ -689,7 +698,11 @@ def main() -> int:
         (policy_dir / "eval" / "comparison.md").write_text(text + "\n")
         print(text)
         return 0
-    sim = {**PROFILES[args.profile], **closed_loop.parse_sim(args.sim)}
+    # wheel_lag is emulated here only, not by sandro_sim's closed loop.
+    policy_only = {k: v for k, v in (item.split("=", 1) for item in args.sim) if k == "wheel_lag"}
+    sim = {**PROFILES[args.profile],
+           **closed_loop.parse_sim([s for s in args.sim if not s.startswith("wheel_lag=")]),
+           **policy_only}
     output = Path(args.output) if args.output else Path(tempfile.mkstemp(suffix=".csv")[1])
     code, _ = run(policy_dir, args.scenario, sim, output, Path(args.video) if args.video else None,
                   course=args.course, heading_hold=args.heading_hold, fallen_pitch=args.fallen)
