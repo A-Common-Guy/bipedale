@@ -58,7 +58,8 @@ DIAG_KEYS = [
     "leg_offset_state_m", "leg_offset_rate_m_s", "trim_m", "balance_torque_nm",
     "yaw_torque_nm", "yaw_feedforward_nm", "truth_pitch_rad", "truth_speed_m_s"]
 TRUTH_KEYS = ["truth_forward_m_s", "truth_yaw_rate_rad_s", "truth_height_m", "truth_roll_rad",
-              "truth_wheel_clearance_m", "truth_axle_x_m", "truth_axle_y_m"]
+              "truth_wheel_clearance_m", "truth_axle_x_m", "truth_axle_y_m", "truth_tilt_rad",
+              "truth_imu_height_m"]
 IMU_COLUMNS = ["imu_qx", "imu_qy", "imu_qz", "imu_qw", "imu_gx", "imu_gy", "imu_gz", "imu_ax", "imu_ay", "imu_az"]
 
 # Latency profiles of the comparison. "uart_imu" is the gate closed_loop.py
@@ -200,6 +201,8 @@ EXTRA_SCENARIOS = {
     # the phase's rising edge, so each jump phase is followed by a zero one.
     "jump": ["2,0,0", "1,0,0,0,0,0.03", "2,0,0", "1,0,0,0,0,0.05", "2,0,0", "1,0,0,0,0,0.08", "2,0,0",
              "2,0.5,0", "1,0.5,0,0,0,0.05", "2,0.5,0", "1,0.5,0,0,0,0.08", "2,0.5,0", "2,0,0"],
+    # With --fallen: engaged lying down, 8 s to get up, then drive and turn.
+    "stand_up": ["8,0,0", "3,0.4,0", "3,0,1.0", "2,0,0"],
 }
 SCENARIOS = {**closed_loop.SCENARIOS, **EXTRA_SCENARIOS}
 
@@ -219,7 +222,7 @@ COURSES = {
 }
 
 
-def course_model(spec: RobotSpec, layout: str = "planks") -> mujoco.MjModel:
+def course_model(spec: RobotSpec, layout: str = "planks", leg_boxes: bool = False) -> mujoco.MjModel:
     """The course compiled in place (static geoms collide only where compiled)."""
     from . import terrain
 
@@ -249,7 +252,7 @@ def course_model(spec: RobotSpec, layout: str = "planks") -> mujoco.MjModel:
     centre = start + h["distance_m"] * heading
     items.append(hill)
     poses.append(([centre[0], centre[1], h["height_m"]], quat))
-    return terrain.static_course(spec, items, poses)
+    return terrain.static_course(spec, items, poses, leg_boxes=leg_boxes)
 
 
 class OnnxPolicy:
@@ -332,9 +335,12 @@ class PolicyController:
 
 def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         video: Path | None = None, video_fps: int = 30, seed: int = 1,
-        course: bool | str = False, heading_hold: float = 0.0) -> tuple[int, Path]:
+        course: bool | str = False, heading_hold: float = 0.0,
+        fallen_pitch: float | None = None) -> tuple[int, Path]:
     """`course`: a layout of COURSES, or True for "planks". `heading_hold`: gain
-    (rad/s per rad) of an operator who steers back to the scenario's heading."""
+    (rad/s per rad) of an operator who steers back to the scenario's heading.
+    `fallen_pitch`: start tipped by this pitch (rad, + nose down) and unpowered
+    for 3 s, so the robot falls limp before the policy engages."""
     policy_dir = Path(policy_dir)
     _, meta = checkpoint.load(policy_dir)
     checkpoint.check_model(meta)
@@ -344,12 +350,21 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     lim = spec.limits
     options = SimOptions.from_closed_loop({"seed": str(seed), **sim}, spec.latency)
     rng = np.random.default_rng(options.seed)
-    controller = PolicyController(iface, OnnxPolicy(policy_dir / "policy.onnx"), lim.fall_angle_rad)
+    # A stand-up policy is engaged lying down: no fall cut-off.
+    fall_angle = math.inf if config["env"]["init"].get("fallen") else lim.fall_angle_rad
+    controller = PolicyController(iface, OnnxPolicy(policy_dir / "policy.onnx"), fall_angle)
 
-    m = (course_model(spec, "planks" if course is True else course) if course
+    from . import terrain
+    leg_boxes = bool((config["env"].get("collision") or {}).get("leg_boxes", False))
+    m = (course_model(spec, "planks" if course is True else course, leg_boxes) if course
+         else terrain.build(spec, {}, leg_boxes=True) if leg_boxes
          else mujoco.MjModel.from_xml_path(str(spec.scene)))
     d = mujoco.MjData(m)
     mujoco.mj_resetDataKeyframe(m, d, mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, "stand"))
+    if fallen_pitch is not None:
+        from . import fallen
+        d.qpos[:] = fallen.tipped_qpos(spec, m, fallen_pitch)
+        options.unpowered_s = 3.0
     mujoco.mj_forward(m, d)
     qadr, dadr, act = spec.joint_qpos, spec.joint_dof, spec.joint_actuator
     sensors = [mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SENSOR, s) for s in ("imu_quat", "imu_gyro", "imu_accel")]
@@ -549,6 +564,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                 # Lower wheel above z = 0, so only meaningful on flat ground.
                 "truth_wheel_clearance_m": nan if course else float(np.min(d.xanchor[wheel_joints][:, 2]) - radius),
                 "truth_axle_x_m": float(axle[0]), "truth_axle_y_m": float(axle[1]),
+                "truth_tilt_rad": math.acos(float(np.clip(rb[2, 2], -1.0, 1.0))),
+                "truth_imu_height_m": float(d.site_xpos[imu_site][2]),
             }
             rows.append({**base, "stream": "diag", **{f"diag_{k}": f"{v:.6g}" for k, v in values.items()}})
         joint_row = {**base, "stream": "joint"}
@@ -660,6 +677,8 @@ def main() -> int:
                              f"{COURSE} and a hill {COURSE_HILL}); see COURSES")
     parser.add_argument("--heading-hold", type=float, default=0.0, metavar="GAIN",
                         help="steer back to the scenario's heading, GAIN rad/s per rad (an operator)")
+    parser.add_argument("--fallen", type=float, metavar="PITCH",
+                        help="start tipped by PITCH rad (+ nose down), 3 s unpowered (stand-up policies)")
     parser.add_argument("--compare", action="store_true",
                         help="policy and WBC on hardware/default/push x nominal/uart_imu/worst")
     args = parser.parse_args()
@@ -673,7 +692,7 @@ def main() -> int:
     sim = {**PROFILES[args.profile], **closed_loop.parse_sim(args.sim)}
     output = Path(args.output) if args.output else Path(tempfile.mkstemp(suffix=".csv")[1])
     code, _ = run(policy_dir, args.scenario, sim, output, Path(args.video) if args.video else None,
-                  course=args.course, heading_hold=args.heading_hold)
+                  course=args.course, heading_hold=args.heading_hold, fallen_pitch=args.fallen)
     print(f"{'FELL' if code == 3 else 'completed all phases'}; recording: {output}")
     per_phase = all_metrics(output, args.scenario)
     keys = COMPARE_KEYS

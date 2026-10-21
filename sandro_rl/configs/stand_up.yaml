@@ -1,0 +1,46 @@
+# Stand up from switched off, then balance and drive as flat_level.
+#
+# Most episodes start from a limp rest pose (data/fallen_states.npz, made by
+# python -m sandro_rl.fallen): legs folded until their links meet, the robot
+# leaning on a folded crank or lying on the motor holders, nose down or up.
+# The rest start standing, so the policy keeps its balance skills. Only this
+# config collides the leg links (collision.py); there is no fall termination,
+# and tracking pays only once upright.
+#
+#     uv run python -m sandro_rl.train configs/stand_up.yaml --resume policies/flat_level \
+#         --set train.learning_rate=1.0e-4
+inherit: flat_level.yaml
+
+env:
+  naconmax_per_env: 40          # tyres, torso shell and leg boxes on the floor, link stops
+  njmax_per_env: 240
+  collision:
+    leg_boxes: true
+
+  action:
+    torque_limit_nm: {legs: 10.0, wheels: 10.0}
+    legs: {kp: 20.0, kd: 0.6, scale_rad: 0.8}
+
+  init:
+    fallen: {fraction: 0.7, states: data/fallen_states.npz}
+
+  termination:
+    tilt_rad: 3.2               # never: lying down is the start, not a failure
+    imu_height_m: -1.0
+
+  constraints:
+    leg_torque: {limit: 9.5, slack: 0.5}
+    tilt: {limit_rad: 3.2, slack: 0.3}
+    height: {margin_m: 0.2, slack: 0.01}        # folded legs are far below the commandable range
+    joint_range: {margin_rad: -3.0, slack: 0.1} # and outside the controller's joint range
+    wheel_lift: null
+    leg_split: {limit_m: 0.02, slack: 0.03, upright_rad: 0.3}
+
+  rewards:
+    upright_gate_rad: 0.4
+    weights:
+      upright: 6.0              # (1 + cos tilt) / 2
+      stand_height: 6.0         # IMU height / standing IMU height, up to 1
+
+train:
+  iterations: 1500

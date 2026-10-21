@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 from functools import partial
 from typing import Any
 
@@ -90,7 +91,8 @@ class SandroEnv:
         cfg = config["env"]
         self.cfg = cfg
         base_spec = spec or RobotSpec.load()
-        model = terrain.build(base_spec, cfg.get("terrain", {}))
+        self.leg_boxes = bool((cfg.get("collision") or {}).get("leg_boxes", False))
+        model = terrain.build(base_spec, cfg.get("terrain", {}), leg_boxes=self.leg_boxes)
         self.spec = RobotSpec.load(base_spec.scene, model=model) if model is not base_spec.model else base_spec
         s = self.spec
         lim = s.limits
@@ -188,6 +190,16 @@ class SandroEnv:
         d.qpos[:] = s.stand_qpos
         mujoco.mj_kinematics(s.model, d)
         self.stand_axle = d.xanchor[s.wheel_joint_ids].mean(axis=0)
+        self.stand_imu_height = float(d.site_xpos[s.imu_site][2])
+        # Optional switched-off starts (stand-up task): limp rest poses from fallen.py.
+        self.fallen = cfg["init"].get("fallen") or {}
+        self.fallen_states = None
+        if self.fallen:
+            from . import fallen
+            path = Path(self.fallen.get("states", fallen.DEFAULT_PATH))
+            if not path.is_absolute():
+                path = Path(__file__).resolve().parent.parent / path
+            self.fallen_states = jp.array(fallen.load(path, nq=s.model.nq), dtype=jp.float32)
 
     # ------------------------------------------------------------ layouts
     def _component_mirror(self, name: str, size: int):
@@ -523,6 +535,12 @@ class SandroEnv:
         yaw = jax.random.uniform(k[2], minval=-math.pi, maxval=math.pi)
         qpos = self._rotate_base(qpos, tilt, yaw)
         qvel = jax.random.uniform(k[4], (self.mj_model.nv,), minval=-1, maxval=1) * init["velocity_noise"]
+        if self.fallen_states is not None:
+            kf = jax.random.split(jax.random.fold_in(k[2], 3))
+            pick = jax.random.randint(kf[0], (), 0, self.fallen_states.shape[0])
+            off = jax.random.uniform(kf[1]) < self.fallen["fraction"]
+            qpos = jp.where(off, self._rotate_base(self.fallen_states[pick], jp.zeros(2), yaw), qpos)
+            qvel = jp.where(off, 0.0, qvel)
         data = data.replace(qpos=qpos, qvel=qvel, ctrl=jp.zeros(self.mj_model.nu))
         data = self.terrain.apply(data, *self.terrain.layout(k[3]))
         data = mjx.forward(model, data)
@@ -736,7 +754,11 @@ class SandroEnv:
             # Legs split fore and aft make the robot statically stable in
             # pitch: a stance the jump training found and kept (DESIGN.md 8).
             split = jp.abs(truth["offsets"][0] - truth["offsets"][1])
-            violations.append((split - c["leg_split"]["limit_m"]) / c["leg_split"]["slack"])
+            split = (split - c["leg_split"]["limit_m"]) / c["leg_split"]["slack"]
+            if "upright_rad" in c["leg_split"]:
+                # Only the stance counts: getting up may brace on one leg.
+                split = split * (truth["tilt"] < c["leg_split"]["upright_rad"])
+            violations.append(split)
         if "wheel_lift" in c and c["wheel_lift"]:
             lift = jp.max(truth["clearance"] - c["wheel_lift"]["limit_m"]) / c["wheel_lift"]["slack"]
             violations.append(lift * (1.0 - self._jumping(info)))
@@ -770,7 +792,14 @@ class SandroEnv:
             "wheel_torque": jp.mean(jp.sum(taus[:, wheels] ** 2, axis=1)),
             "leg_velocity": jp.sum(truth["qd"][legs] ** 2),
             "termination": terminated,
+            "upright": 0.5 * (1.0 + truth["r_body"][2, 2]),
+            "stand_height": jp.clip(truth["imu_height"] / self.stand_imu_height, 0.0, 1.0),
         }
+        if "upright_gate_rad" in r:
+            # Tracking pays only once up, so lying still is not a way to earn it.
+            up = jp.exp(-(truth["tilt"] / r["upright_gate_rad"]) ** 2)
+            for name in ("track_forward", "track_yaw", "track_height", "track_roll"):
+                terms[name] = terms[name] * up
         if self.has_jump:
             # In a jump window: reward both wheels' clearance up to the target,
             # and drop the terms that hold the body at a steady height.

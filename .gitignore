@@ -28,3 +28,5 @@ SandroControl/sysid_runs/
 *.gcode
 *.bgcode
 *.npz
+# ...except the stand-up task's switched-off poses (python -m sandro_rl.fallen)
+!sandro_rl/data/fallen_states.npz

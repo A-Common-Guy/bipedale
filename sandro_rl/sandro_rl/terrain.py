@@ -95,20 +95,29 @@ def add_bodies(mj_spec, items, friction, mocap: bool, poses=None):
         mj_spec.add_exclude(bodyname1="world", bodyname2=item["name"])
 
 
-def build(spec, cfg: dict) -> mujoco.MjModel:
+def _scene(spec, leg_boxes: bool) -> mujoco.MjSpec:
+    if leg_boxes:
+        from . import collision
+        return collision.build_spec(spec)
+    return mujoco.MjSpec.from_file(str(spec.scene))
+
+
+def build(spec, cfg: dict, leg_boxes: bool = False) -> mujoco.MjModel:
+    """`leg_boxes`: collide the leg links too (collision.py)."""
     kind = cfg.get("type", "flat")
-    if kind == "flat":
-        return spec.model
-    if kind != "obstacles":
+    if kind not in ("flat", "obstacles"):
         raise ValueError(f"unknown terrain type {kind}")
-    mj_spec = mujoco.MjSpec.from_file(str(spec.scene))
-    add_bodies(mj_spec, boxes(cfg), float(cfg.get("friction", 0.8)), mocap=True)
+    if kind == "flat" and not leg_boxes:
+        return spec.model
+    mj_spec = _scene(spec, leg_boxes)
+    if kind == "obstacles":
+        add_bodies(mj_spec, boxes(cfg), float(cfg.get("friction", 0.8)), mocap=True)
     return mj_spec.compile()
 
 
-def static_course(spec, items, poses, friction=0.8) -> mujoco.MjModel:
+def static_course(spec, items, poses, friction=0.8, leg_boxes: bool = False) -> mujoco.MjModel:
     """A fixed course for the CPU evaluation: the same shapes, compiled in place."""
-    mj_spec = mujoco.MjSpec.from_file(str(spec.scene))
+    mj_spec = _scene(spec, leg_boxes)
     add_bodies(mj_spec, items, friction, mocap=False, poses=poses)
     return mj_spec.compile()
 
