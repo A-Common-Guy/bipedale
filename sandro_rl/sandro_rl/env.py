@@ -750,9 +750,13 @@ class SandroEnv:
         c = self.cfg["constraints"]
         legs = self.leg_idx
         tau_leg = jp.max(jp.abs(taus[:, legs]), axis=0)
+        stretch = jp.max(truth["stretch"] - c["stretch"]["limit"]) / c["stretch"]["slack"]
+        if "upright_rad" in c["stretch"]:
+            # Folded flat against their stops, unpowered legs are stretched too.
+            stretch = stretch * (truth["tilt"] < c["stretch"]["upright_rad"])
         violations = [
             jp.max(tau_leg - (self.cat_torque_limit - 0.05)) / c["leg_torque"]["slack"],
-            jp.max(truth["stretch"] - c["stretch"]["limit"]) / c["stretch"]["slack"],
+            stretch,
             jp.max(jp.maximum(self.q_lo + c["joint_range"]["margin_rad"] - truth["q"][legs],
                               truth["q"][legs] - (self.q_hi - c["joint_range"]["margin_rad"])))
             / c["joint_range"]["slack"],

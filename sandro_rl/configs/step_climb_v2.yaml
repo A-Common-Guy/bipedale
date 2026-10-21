@@ -1,0 +1,36 @@
+# step_climb v2 (docs/DESIGN.md 8): the leg-split constraint and steep
+# step-ups. The legs stay together, but it learnt to stop in front of steps;
+# kept as the record of that run, not as a policy.
+#
+#     uv run python -m sandro_rl.train configs/step_climb_v2.yaml --resume policies/step_climb \
+#         --set train.learning_rate=1.0e-4
+inherit: step_climb.yaml
+
+env:
+  terrain:
+    # Step-ups: near-vertical faces and long tops, so the robot has to climb
+    # onto them and stay, rather than get over them as over a plank.
+    hills: {count: 8, height_m: [0.02, 0.065], slope_deg: [70.0, 85.0], plateau_m: [0.6, 2.0],
+            width_m: [0.8, 1.6], radius_m: [0.3, 4.0]}
+  constraints:
+    # The jump training found a stance with the legs 60-75 mm apart fore and
+    # aft, statically stable in pitch.
+    leg_split: {limit_m: 0.02, slack: 0.03}
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.terrain.planks.height_m: [0.005, 0.035]
+        env.terrain.hills.height_m: [0.01, 0.03]
+    - iteration: 300
+      set:
+        env.terrain.planks.height_m: [0.01, 0.05]
+        env.terrain.hills.height_m: [0.01, 0.045]
+    - iteration: 700
+      set:
+        env.terrain.planks.height_m: [0.01, 0.065]
+        env.terrain.hills.height_m: [0.02, 0.065]
+
+train:
+  iterations: 2000

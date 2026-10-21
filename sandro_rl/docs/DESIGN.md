@@ -900,12 +900,13 @@ constraint allows 9 cm of clearance instead of 3.5. The curriculum raises
 the planks' maximum from 3.5 cm to 5 cm to 6.5 cm at iterations 0, 300 and
 700.
 
-**Two attempts:**
+**Three attempts:**
 
 | Run | Start | Iterations | Wall time | Result on the steps course |
 | --- | --- | --- | --- | --- |
 | `step_climb_v0` | `agile_terrain`, its weights, kp 12, 10 Nm | 1000 | 29.8 min | Never crosses the 3 cm plank. It learnt to wait in front of planks: 0.10 falls per 1000 steps in training |
-| `step_climb_v1` | `jump`, with the weights above | 1500 | 46.1 min | Checkpoint 1200 crosses all four planks (3–6 cm) |
+| `step_climb_v1` | `jump`, with the weights above | 1500 | 46.1 min | Checkpoint 1200 crosses the 3 cm plank, the 4 cm one sometimes: 7 of 20 planks |
+| `step_climb_v2` (`configs/step_climb_v2.yaml`) | v1, plus the leg-split constraint and 8 step-ups (70–85° faces, 0.6–2 m tops) | 2000 | 75 min | Legs together (1–6 mm apart), but stops 10–25 cm before the 3 cm plank and at the foot of the curb on every seed. Not kept |
 
 v0's outcome follows from the weights. A fall cost 200, while waiting in
 front of a plank for the rest of an episode cost about 20 of forward
@@ -916,35 +917,50 @@ therefore starts from `jump`.
 **Evaluation** (`--course steps --scenario steps`). The course has planks of
 30, 40, 50 and 60 mm at 1–4 m, 0.1 m deep and 1.2 m wide, then a 6 cm curb
 with 45° faces at 5.4 m. The drive phase is 14 s at 0.5 m/s. Progress is
-measured from the axle's world position (`diag_truth_axle_x_m`, `_y_m`).
-Measured along the robot's own heading, it counted planks the robot had
-actually driven past at their side.
+measured from the axle's world position (`diag_truth_axle_x_m`, `_y_m`). A
+plank counts only if the axle is within 0.55 m of the course line when it is
+0.15 m past the plank. Earlier scoring, along the robot's own heading and
+then along the course without the sideways check, counted planks the robot
+had driven past beside them. It reported 20 of 20 for checkpoint 1200 and
+chose that checkpoint on it; the per-checkpoint sweep made with it is
+withdrawn.
 
-v1's checkpoints vary a lot. Planks crossed out of 20 (5 seeds × 4 planks):
+`policies/step_climb` (v1, checkpoint 1200), 5 seeds, nominal latency:
 
-| Checkpoint | 500 | 600 | 700 | 800 | 900 | 1000 | 1100 | 1200 | 1300 | 1400 | 1500 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| planks | 14 | 12 | 11 | 0 | 5 | 9 | 6 | **20** | 13 | 4 | 0 |
+| Operator | Planks crossed | Which | Curb | Falls |
+| --- | --- | --- | --- | --- |
+| none (`--heading-hold 0`) | 7 / 20 | 3 cm on 5 seeds, 4 cm on 2 | 0 / 5 | 0 / 5 |
+| steers back to the heading (`--heading-hold 2`) | 7 / 20 | the same | 0 / 5 | 0 / 5 |
 
-`policies/step_climb` is checkpoint 1200, chosen on this course, which makes
-the course a selection set rather than a held-out test. Over 10 seeds it
-crosses all four planks every time and never falls (`steps.mp4`,
-`eval/steps_frames.png`). It crosses them at an angle, with the legs split
-fore and aft, so it seems to lift one wheel at a time rather than hop both.
+With the operator steering it stays on the line and stops at the 4 or 5 cm
+plank, 1.8–2.8 m along the course. Without, it turns after the first
+crossing and drives past the others beside them, which is what
+`steps.mp4` shows.
 
-- **The curb is not solved.** On the steps course it drifts 2.4–2.8 m
-  sideways by the end of the planks and passes beside the curb. With the
-  curb alone at 1.5 m (`--course curb`), it stops at the foot on 5 of 5
-  seeds, as `agile_terrain` does. It learnt to get over obstacles, not to
-  step up onto one and stay there. Only 4 of the 16 training obstacles are
-  hills, with ramps compiled at 10–50°.
+- **The legs are split fore and aft.** In v1 and in `jump` the two legs'
+  fore-aft offsets differ by 60–75 mm while standing (`agile_terrain`:
+  about 1 mm). One wheel ahead of the other makes the robot statically
+  stable in pitch, which pays under the pitch penalties and survives
+  pushes; the `leg_symmetry` penalty (−200 per m², 0.7 per second at 60 mm)
+  is too small to stop it. It is an exploit, not a gait anyone asked for.
+  `constraints.leg_split` (CaT, here 20 mm with 30 mm slack) removes it, as
+  v2 shows.
+- **Why v2 stops.** Rolling a wheel up an edge of height h takes a tyre
+  friction of at least tan θ, with cos θ = (r − h) / r: about 1.5 at 3 cm and
+  2.2 at 4 cm for the 67 mm tyre, against 0.5–1.2 in training. A blind robot
+  gets up a step only on momentum or by unloading the wheel with the legs.
+  v1 did it from the split stance, one wheel at a time; with the legs held
+  together and steep faces that punish a failed try, v2 learnt not to try.
+  Commanding a jump in front of the plank does not help: it reverses away
+  from the face after landing.
+- **Next:** a hop on command. In training the jump command fires
+  automatically just before an obstacle edge, so the policy learns that a
+  jump request means "hop onto what is ahead". On the robot the operator, or
+  a forward range sensor, sends it.
 - **The heading drifts after crossings.** The command is a yaw rate, not a
-  heading, so a crossing that turns the body is not corrected. On the robot,
-  the operator steers back.
-- **The original course at 0.8 m/s** (`--course`): it crosses all four
-  planks, 25 mm included, which `agile_terrain` no longer does on the
-  weighed robot. It then passes 1.0–1.3 m beside the hill.
-- **The standard runs:** it completes all nine (`eval/comparison.md`); the
+  heading. `evaluate.py --heading-hold GAIN` models an operator who steers
+  back to the scenario's heading.
+- **The standard runs:** v1 completes all nine (`eval/comparison.md`); the
   WBC falls in three.
 - **Commanded jumps** still give three hops each, with 90–115 mm of
   clearance.

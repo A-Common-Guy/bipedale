@@ -29,8 +29,11 @@ env:
     imu_height_m: -1.0
 
   constraints:
-    leg_torque: {limit: 9.5, slack: 0.5}
+    # Getting up out of a fold saturates the 10 Nm cap (x 0.85-1.15 drive
+    # spread): the cap is the limit, not a constraint.
+    leg_torque: {limit: 12.0, slack: 0.5}
     tilt: {limit_rad: 3.2, slack: 0.3}
+    stretch: {limit: 0.97, slack: 0.02, upright_rad: 0.5}
     height: {margin_m: 0.2, slack: 0.01}        # folded legs are far below the commandable range
     joint_range: {margin_rad: -3.0, slack: 0.1} # and outside the controller's joint range
     wheel_lift: null
