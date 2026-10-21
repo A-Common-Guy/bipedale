@@ -187,6 +187,8 @@ EXTRA_SCENARIOS = {
     "agile": ["2,0,0", "3,0.6,0", "3,1.0,0", "3,0.8,2.0", "2,0,-3.0", "3,-0.5,0", "3,0,0,-0.1",
               "3,0.5,1.5", "3,0,0,0.1", "2,0,0"],
     "course": ["2,0,0", "3,0.5,0", "6,0.8,0", "2,0,0", "2,0,2.5", "4,0.6,0", "2,0,0"],
+    # The course at the hardware's 0.5 m/s drive limit (controllers.yaml).
+    "course_slow": ["2,0,0", "3,0.5,0", "8,0.5,0", "2,0,0", "2,0,2.5", "4,0.5,0", "2,0,0"],
     # Fields: duration, forward, yaw, height rate, roll. Roll is feasible up
     # to +-0.3 rad only near mid height (0.13 m), so the rolls happen there.
     "expressive": ["2,0,0", "3,0,0,-0.013,0", "3,0,0,0,0.3", "3,0,0,0,-0.3", "2,0,0,0,0",
