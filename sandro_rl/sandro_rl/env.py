@@ -732,6 +732,11 @@ class SandroEnv:
                               truth["heights"] - (self.leg_h_hi + c["height"]["margin_m"]))) / c["height"]["slack"],
             (truth["tilt"] - c["tilt"]["limit_rad"]) / c["tilt"]["slack"],
         ]
+        if c.get("leg_split"):
+            # Legs split fore and aft make the robot statically stable in
+            # pitch: a stance the jump training found and kept (DESIGN.md 8).
+            split = jp.abs(truth["offsets"][0] - truth["offsets"][1])
+            violations.append((split - c["leg_split"]["limit_m"]) / c["leg_split"]["slack"])
         if "wheel_lift" in c and c["wheel_lift"]:
             lift = jp.max(truth["clearance"] - c["wheel_lift"]["limit_m"]) / c["wheel_lift"]["slack"]
             violations.append(lift * (1.0 - self._jumping(info)))

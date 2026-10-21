@@ -332,8 +332,9 @@ class PolicyController:
 
 def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         video: Path | None = None, video_fps: int = 30, seed: int = 1,
-        course: bool | str = False) -> tuple[int, Path]:
-    """`course`: a layout of COURSES, or True for "planks"."""
+        course: bool | str = False, heading_hold: float = 0.0) -> tuple[int, Path]:
+    """`course`: a layout of COURSES, or True for "planks". `heading_hold`: gain
+    (rad/s per rad) of an operator who steers back to the scenario's heading."""
     policy_dir = Path(policy_dir)
     _, meta = checkpoint.load(policy_dir)
     checkpoint.check_model(meta)
@@ -411,6 +412,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     activated = False
     recording_start = phase_start = engaged_at = last_diag = last_publish = -1.0
     published = [0.0] * 6
+    heading_ref = None
     received = [0.0] * 5
     phase_index = 0
     fall_time = -1.0
@@ -461,9 +463,19 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                     elapsed -= phases[index][0]
                     index += 1
                 phase_index = index
-                published = phases[index] if index < len(phases) else [0.0] * 6
+                published = list(phases[index]) if index < len(phases) else [0.0] * 6
             else:
                 published = [0.0] * 6
+            if heading_hold > 0.0:
+                # An operator steering back to the heading the scenario's yaw
+                # rates integrate to, from the true heading.
+                rt = d.site_xmat[imu_site].reshape(3, 3)
+                yaw_now = math.atan2(rt[1, 0], rt[0, 0])
+                if heading_ref is None:
+                    heading_ref = yaw_now
+                heading_ref += published[2] / options.command_rate_hz
+                error = math.remainder(heading_ref - yaw_now, 2.0 * math.pi)
+                published[2] = float(np.clip(published[2] + heading_hold * error, -1.5, 1.5))
             if engaged_at >= 0:
                 received = published[1:6]
         frames = controller.update(quat, gyro, accel, pos, vel, received, period)
@@ -646,6 +658,8 @@ def main() -> int:
     parser.add_argument("--course", nargs="?", const="planks", choices=sorted(COURSES),
                         help="an obstacle course along the start heading (default planks: "
                              f"{COURSE} and a hill {COURSE_HILL}); see COURSES")
+    parser.add_argument("--heading-hold", type=float, default=0.0, metavar="GAIN",
+                        help="steer back to the scenario's heading, GAIN rad/s per rad (an operator)")
     parser.add_argument("--compare", action="store_true",
                         help="policy and WBC on hardware/default/push x nominal/uart_imu/worst")
     args = parser.parse_args()
@@ -659,7 +673,7 @@ def main() -> int:
     sim = {**PROFILES[args.profile], **closed_loop.parse_sim(args.sim)}
     output = Path(args.output) if args.output else Path(tempfile.mkstemp(suffix=".csv")[1])
     code, _ = run(policy_dir, args.scenario, sim, output, Path(args.video) if args.video else None,
-                  course=args.course)
+                  course=args.course, heading_hold=args.heading_hold)
     print(f"{'FELL' if code == 3 else 'completed all phases'}; recording: {output}")
     per_phase = all_metrics(output, args.scenario)
     keys = COMPARE_KEYS

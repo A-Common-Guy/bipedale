@@ -11,15 +11,20 @@
 # (docs/DESIGN.md 8). The wheel-lift constraint allows the clearance a lifted
 # wheel needs over the tallest plank. Fine-tuned from the jump policy:
 #
-#     uv run python -m sandro_rl.train configs/step_climb.yaml --resume policies/jump \
+#     uv run python -m sandro_rl.train configs/step_climb.yaml --resume policies/step_climb \
 #         --set train.learning_rate=1.0e-4
+#
+# (v1, from policies/jump, had 4 hills with 10-50 degree ramps and no
+# leg-split constraint; docs/DESIGN.md 8.)
 inherit: jump.yaml
 
 env:
   terrain:
     # Shapes are compiled at the top of each range; the curriculum sinks them.
     planks: {count: 12, height_m: [0.01, 0.065], depth_m: [0.04, 0.4], width_m: [0.3, 1.2], radius_m: [0.4, 4.0]}
-    hills: {count: 4, height_m: [0.02, 0.08], slope_deg: [10.0, 50.0], plateau_m: [0.3, 0.8],
+    # Step-ups: near-vertical faces and long tops, so the robot has to climb
+    # onto them and stay, rather than get over them as over a plank.
+    hills: {count: 8, height_m: [0.02, 0.065], slope_deg: [70.0, 85.0], plateau_m: [0.6, 2.0],
             width_m: [0.8, 1.6], radius_m: [0.3, 4.0]}
 
   rewards:
@@ -29,21 +34,24 @@ env:
 
   constraints:
     wheel_lift: {limit_m: 0.09, slack: 0.03}
+    # The jump training found a stance with the legs 60-75 mm apart fore and
+    # aft, statically stable in pitch (docs/DESIGN.md 8).
+    leg_split: {limit_m: 0.02, slack: 0.03}
 
 curriculum:
   stages:
     - iteration: 0
       set:
         env.terrain.planks.height_m: [0.005, 0.035]
-        env.terrain.hills.height_m: [0.02, 0.05]
+        env.terrain.hills.height_m: [0.01, 0.03]
     - iteration: 300
       set:
         env.terrain.planks.height_m: [0.01, 0.05]
-        env.terrain.hills.height_m: [0.02, 0.065]
+        env.terrain.hills.height_m: [0.01, 0.045]
     - iteration: 700
       set:
         env.terrain.planks.height_m: [0.01, 0.065]
-        env.terrain.hills.height_m: [0.02, 0.08]
+        env.terrain.hills.height_m: [0.02, 0.065]
 
 train:
-  iterations: 1500
+  iterations: 2000
