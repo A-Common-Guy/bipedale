@@ -103,7 +103,8 @@
     "leg_height_limits_m": [
      0.07,
      0.195
-    ]
+    ],
+    "sample_fraction": 1.0
    },
    "rewards": {
     "scale_by_dt": true,
@@ -240,7 +241,12 @@
      "leg_gain_scale": [
       0.9,
       1.1
-     ]
+     ],
+     "wheel_lag_s": [
+      0.01,
+      0.08
+     ],
+     "nominal_wheel_lag_s": 0.04
     },
     "model": {
      "body_mass_scale": [
@@ -286,8 +292,8 @@
   "train": {
    "num_envs": 8192,
    "steps_per_env": 24,
-   "iterations": 600,
-   "learning_rate": 0.0001,
+   "iterations": 1000,
+   "learning_rate": 0.0003,
    "desired_kl": 0.01,
    "gamma": 0.99,
    "lam": 0.95,
@@ -311,15 +317,51 @@
    "activation": "elu",
    "symmetry_coef": 0.5,
    "checkpoint_every": 100,
-   "eval_every": 50
+   "eval_every": 50,
+   "resume_log_std": -1.2
   },
   "curriculum": {
-   "stages": []
+   "stages": [
+    {
+     "iteration": 0,
+     "set": {
+      "env.commands.sample_fraction": 1.0,
+      "env.terrain.planks.height_m": [
+       0.005,
+       0.03
+      ],
+      "env.terrain.hills.height_m": [
+       0.02,
+       0.1
+      ],
+      "env.pushes.force_n": 25.0,
+      "env.pushes.lateral_force_n": 12.0,
+      "env.pushes.vertical_force_n": 15.0,
+      "env.pushes.torque_nm": [
+       1.0,
+       1.0
+      ],
+      "env.randomization.drives.wheel_lag_s": [
+       0.0,
+       0.03
+      ]
+     }
+    },
+    {
+     "iteration": 300,
+     "set": {
+      "env.randomization.drives.wheel_lag_s": [
+       0.01,
+       0.08
+      ]
+     }
+    }
+   ]
   },
   "name": "agile_terrain"
  },
  "fingerprint": {
-  "sha256": "691c6b7cfd3668ed77daf598b2ca29fd5f25af6034db913d6faa9e0fe5e8ee3e",
+  "sha256": "9fe892901e9dad65110ba80a2ea4859da9eeec5ccd37ea6c1a0f09fff18f2e68",
   "files": {
    "ros2_ws/src/sandro_description/mjcf/assets/bearing_5_2_4_0_7.stl": "ac58e802905c4664921c4473e3e8e3cc11e4d802d8b7c89fa72b67623528173c",
    "ros2_ws/src/sandro_description/mjcf/assets/biella.stl": "de58942a235b4d1f9ed6d6e320452faf6d45870798fd4127a290c8383952757f",
@@ -341,7 +383,7 @@
    "ros2_ws/src/sandro_description/config/sim_identified.yaml": "c8e180acd14806ccee366de5d5c6fdd58b4fcfef221c7c35012c8476977cc04f",
    "ros2_ws/src/sandro_bringup/config/controllers.yaml": "461c172e27a5e853d64d94e715632ba46da7e3b3c01acbe0cd4ad0da32de96b8",
    "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "0c74096985846ff5c9a52ac0dba4cacc5db42fa98949301bd7ea7045b3ef6e58",
-   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "4d2851df4a6a102ac944b3142b6ae9554764c843cae26e2c8d214b56437db839"
+   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "f6cff8ab1d3977eb37c4dedbade7222736fd5223bd22c467cd7cb0206347662d"
   }
  },
  "contract": {
@@ -399,11 +441,11 @@
   "flax": "0.12.10"
  },
  "python": "3.12.15",
- "iteration": 600,
- "env_steps": 117964800,
- "wall_s": 1057.5129017829895,
- "compile_s": 21.393849849700928,
- "curriculum_stage": -1,
+ "iteration": 1000,
+ "env_steps": 196608000,
+ "wall_s": 1724.1856248378754,
+ "compile_s": 22.558826684951782,
+ "curriculum_stage": 1,
  "base_config": {
   "seed": 0,
   "env": {
@@ -645,7 +687,12 @@
      "leg_gain_scale": [
       0.9,
       1.1
-     ]
+     ],
+     "wheel_lag_s": [
+      0.01,
+      0.08
+     ],
+     "nominal_wheel_lag_s": 0.04
     },
     "model": {
      "body_mass_scale": [
@@ -691,8 +738,8 @@
   "train": {
    "num_envs": 8192,
    "steps_per_env": 24,
-   "iterations": 600,
-   "learning_rate": 0.0001,
+   "iterations": 1000,
+   "learning_rate": 0.0003,
    "desired_kl": 0.01,
    "gamma": 0.99,
    "lam": 0.95,
@@ -716,10 +763,46 @@
    "activation": "elu",
    "symmetry_coef": 0.5,
    "checkpoint_every": 100,
-   "eval_every": 50
+   "eval_every": 50,
+   "resume_log_std": -1.2
   },
   "curriculum": {
-   "stages": []
+   "stages": [
+    {
+     "iteration": 0,
+     "set": {
+      "env.commands.sample_fraction": 1.0,
+      "env.terrain.planks.height_m": [
+       0.005,
+       0.03
+      ],
+      "env.terrain.hills.height_m": [
+       0.02,
+       0.1
+      ],
+      "env.pushes.force_n": 25.0,
+      "env.pushes.lateral_force_n": 12.0,
+      "env.pushes.vertical_force_n": 15.0,
+      "env.pushes.torque_nm": [
+       1.0,
+       1.0
+      ],
+      "env.randomization.drives.wheel_lag_s": [
+       0.0,
+       0.03
+      ]
+     }
+    },
+    {
+     "iteration": 300,
+     "set": {
+      "env.randomization.drives.wheel_lag_s": [
+       0.01,
+       0.08
+      ]
+     }
+    }
+   ]
   },
   "name": "agile_terrain"
  }
