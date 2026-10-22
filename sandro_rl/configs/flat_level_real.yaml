@@ -7,15 +7,28 @@
 # while the IMU lags the encoders by only 9 ms (rocking test with the wheel
 # blocked, recordings/imu_rock3_left_2026-10-21.csv): the lag sits in the
 # wheel drive train (backlash, compliance). evaluate.py with wheel_lag
-# reproduces the ringing with this policy: 10 ms 11 Hz, 20 ms 10 Hz,
-# 30 ms 8 Hz at 2 Nm summed, so the robot sits near 30-40 ms.
+# reproduces the ringing with this policy: 35 ms 9.9 Hz, 50 ms 7.3 Hz at
+# 1.3 Nm RMS per wheel. A first-order lag of 50 ms delays a 7.5 Hz signal by
+# 67 degrees, 25 ms: the measured figure. So the robot sits near 50 ms, and
+# the range goes to 80.
+#
+#     uv run python -m sandro_rl.train configs/flat_level_real.yaml --resume policies/flat_level
 inherit: flat_level.yaml
 
 env:
-  randomization:
-    drives:
-      wheel_lag_s: [0.005, 0.05]
   rewards:
     weights:
       action_rate: -0.08
       action_accel: -0.04
+
+curriculum:
+  stages:
+    - iteration: 0
+      set: {env.randomization.drives.wheel_lag_s: [0.0, 0.03]}
+    - iteration: 300
+      set: {env.randomization.drives.wheel_lag_s: [0.01, 0.08]}
+
+train:
+  iterations: 1500
+  learning_rate: 3.0e-4
+  resume_log_std: -1.2          # flat_level's action noise is 0.04

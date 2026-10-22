@@ -123,6 +123,11 @@ env:
     drives:
       torque_scale: [0.85, 1.15]
       leg_gain_scale: [0.9, 1.1]
+      # The wheel drive train (backlash, compliance) lags the commanded
+      # torque: about 50 ms first-order on the robot, where policies trained
+      # without it rang at 7.5 Hz (configs/flat_level_real.yaml).
+      wheel_lag_s: [0.01, 0.08]
+      nominal_wheel_lag_s: 0.04
     model:                      # multiplicative around the identified MJCF unless noted
       body_mass_scale: [0.9, 1.1]
       payload_mass_add_kg: [-0.4, 0.4]

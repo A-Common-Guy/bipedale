@@ -112,7 +112,9 @@ def main() -> int:
 
     print(f"devices: {jax.devices()}")
     stages = curriculum_stages(config)
-    stage_config, stage = config_at(config, stages, 1)
+    # Fine-tunes start a curriculum further on (train.curriculum_offset iterations).
+    offset = int(t.get("curriculum_offset", 0))
+    stage_config, stage = config_at(config, stages, 1 + offset)
     env, agent, reset, autoreset_step, k_init, k_runner = build(stage_config)
     print(f"env: {t['num_envs']} envs, policy {1/env.dt:.0f} Hz, {env.decimation} physics steps per action, "
           f"actor obs {env.actor_obs_size}, critic obs {env.critic_obs_size}")
@@ -141,7 +143,7 @@ def main() -> int:
     compile_s = None
     best = -np.inf
     for i in range(1, t["iterations"] + 1):
-        new_config, new_stage = config_at(config, stages, i)
+        new_config, new_stage = config_at(config, stages, i + offset)
         if new_stage != stage:
             # Rebuild the environment (and its randomised model batch) for the
             # stage; the networks, normalisers and optimiser carry over.
