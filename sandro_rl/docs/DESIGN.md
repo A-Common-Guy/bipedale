@@ -1088,6 +1088,60 @@ tilt below 0.25 rad with the IMU above 0.27 m at some point, and never above
   depends on them, so a photo or a measurement of the real switched-off pose
   would be worth comparing against the bank.
 
+### Wheel drive-train lag: the 7.5 Hz ringing on the robot
+
+On the robot, `flat_level` rang at 7.4–7.5 Hz: both wheels in phase, actions
+±0.7, 2.3 Nm RMS per wheel (docs/HANDOFF_flat_level_real.md). Body pitch
+acceleration lags the reported wheel torque by 24–25 ms, and the IMU lags
+the encoders by only 9 ms, so the lag is in the wheel drive train (backlash
+and compliance), not in sensing. Training had randomised only 0.5–3 ms of
+command delay.
+
+- **Model:** `randomization.drives.wheel_lag_s` (base.yaml, 10–80 ms per
+  episode; `nominal_wheel_lag_s` 40 ms) is a first-order lag on the wheel
+  actuator torque at the physics rate. 50 ms of it is 67° of phase, 25 ms,
+  at 7.5 Hz, which matches the robot. A backlash deadzone is not modelled.
+- **Reproduced:** `evaluate.py --lag-sweep` runs hardware, default and push
+  at 0, 35, 50 and 80 ms (`eval/lag_sweep.md`; the pre-refit sweep is
+  `eval/lag_sweep_before.md`). `flat_level` rings at 7–10 Hz, 1.2–1.4 Nm,
+  and falls at 80 ms; `agile_terrain` rings at 5–8.5 Hz, 1.1–1.6 Nm;
+  `flat_tracking` falls at 35 ms. The 10 Nm policies (`jump`,
+  `step_climb`) do not ring, and `stand_up` wobbles at 3.8 Hz.
+- **Fine-tune** (`scripts/refit_lag.sh`, `sandro_rl/refit.py`): resume
+  each policy with the final stage of its curriculum from iteration 0, the
+  lag at 0–30 ms for 300 iterations and then 10–80 ms, 1000 iterations,
+  learning rate 3e-4, and `train.resume_log_std` −1.2. The resumed action
+  std (about 0.04) otherwise makes the first updates' KL 100× too large: a
+  direct resume onto the full lag fell 16 times per 1000 steps.
+  `flat_level_real` (`configs/flat_level_real.yaml`, 1500 iterations) also
+  doubles the `action_rate` and `action_accel` weights.
+  `scripts/package_refit.sh` replaces `policies/<name>` by the refit and
+  re-evaluates it; the refit's curves are `*_lag`.
+- **Comparison:** `--compare --sim wheel_lag=0.04` runs the policy with
+  40 ms of lag and the WBC without (sandro_sim has no lag model). Each
+  refit at 40 ms against the original at 0 ms (its own conditions), mean
+  over phases:
+
+  | Policy | Ringing at 35–80 ms | At 40 ms against the original at 0 ms |
+  | --- | --- | --- |
+  | `flat_level_real` | none (0.14–0.32 Nm, 5–15 Hz share ≤ 0.18) | Velocity and yaw errors within 10 %, pitch the same. Completes all 9 |
+  | `flat_tracking` | none (0.13–0.32 Nm) | Velocity and yaw errors within 10 %; pitch RMS 0.04 → 0.065 rad in the worst profile. Completes all 9 |
+  | `agile_terrain` | none (0.13–0.33 Nm) | Better: pitch RMS 30–70 % lower; worst profile velocity error 0.21 → 0.07 m/s, wheel torque 1.8 → 0.56 Nm. Same course (planks up to 20 mm). Roll 0.24 rad for 0.3 commanded (0.27 before) |
+  | `jump` | none | Hops 86–116 mm. Lands every hop on 5 of 5 seeds with the UART IMU, where the original at 40 ms falls on 4. Both fall on 5 of 5 in the worst profile. Steady driving 10–50 % worse |
+  | `step_climb` | none | Against the original at 40 ms: 5 of 20 planks either way, 1 fall in 5 instead of 2, a third to a quarter of the wheel torque under slow sensing. Yaw error 0.024 → 0.039 rad/s at nominal latency |
+  | `stand_up` (checkpoint 500) | none | Up and staying up in 18 of 18 falls at 40 and 80 ms, and with the UART IMU and worst profiles at 40 ms. Once up, against the original at 40 ms: wheel torque 3–5 → 0.6–1.0 Nm, velocity error 0.5–0.67 → 0.08–0.12 m/s. Holds the leg height 16 mm off (2 mm before) |
+
+- **`stand_up` checkpoints:** the stand-ups erode with more training under
+  the full lag. On one seed per fall, checkpoint 400 succeeds 6 of 6, 600 5,
+  and 700–1000 4: the 62° nose-up fall fails. Checkpoint 500 is kept.
+- **Zero lag:** `flat_tracking` chatters at 50 Hz (1.0 Nm on one wheel) at
+  exactly 0 ms, which the drive train cannot have; at 5 ms it is clean.
+- **Deploy:** `export_ros policies/flat_level_real:rl_flat_level
+  policies/agile_terrain:rl_agile_terrain` is done. Both were trained at
+  wheel kd 0.4 with no wheel filter, so `wheel_kd_nm_s_rad: 0.4` and
+  `wheel_filter_hz: 0`. `recordings/real_overrides_kd025_f4.yaml` (kd 0.25,
+  4 Hz) was a stopgap; its filter adds lag of its own.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that
@@ -1179,9 +1233,11 @@ interfaces on the wheel drives. The plugin exports them for all six joints
 - **Roll feasibility** uses the per-leg range 0.07–0.195 m and the
   track width from the MJCF. The bounds are mine, chosen inside the
   kinematic reach; they are not measured limits.
-- **No hardware data exists for the policy**, and none was collected
-  (constraint: nothing runs on the robot). The 20 % agreement criterion of
-  S2R §2 is the test to apply first, with a short, gentle sequence.
+- **Hardware data:** the owner's `flat_level` deployment rang at 7.5 Hz
+  (section 8, wheel drive-train lag). The lag refits are untested on the
+  robot. The 20 % agreement criterion of S2R §2 is the test to apply first,
+  with a short, gentle sequence. The lag model is first-order only; if the
+  refits still ring, a backlash deadzone is the next thing to model.
 
 ## 11. Proposed changes to the existing packages (not made)
 

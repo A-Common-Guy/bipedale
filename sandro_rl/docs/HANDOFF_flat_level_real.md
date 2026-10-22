@@ -1,5 +1,12 @@
 # Handoff: retrain flat_level against wheel drive-train lag
 
+Status 2026-10-22: done on the GPU machine. `policies/flat_level_real` meets
+the acceptance below, and every other policy was refitted to the same lag
+(docs/DESIGN.md section 8, "Wheel drive-train lag"). `export_ros` has been
+run for `flat_level_real:rl_flat_level` and the refitted
+`agile_terrain:rl_agile_terrain`. Remaining: `deploy/pi/pi build` and a
+launch with wheel kd 0.4 and `wheel_filter_hz: 0`, on the owner's decision.
+
 Status 2026-10-21. Next step needs a GPU (MuJoCo Warp); the laptop that did
 the hardware work has a 4 GB RTX 500 and cannot train.
 
