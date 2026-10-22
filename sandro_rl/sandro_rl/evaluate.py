@@ -666,8 +666,10 @@ COMPARE_KEYS = ["truth_pitch_rms", "truth_speed_err_rms", "pitch_rms", "pitch_pe
                 "yaw_err_rms", "yaw_rise_s", "height_err", "wheel_tau_rms", "wheel_flip_frac", "leg_eff_rms"]
 
 
-def compare(policy_dir: Path, scenarios: list[str], profiles: list[str], out_dir: Path) -> dict:
-    """Policy and WBC on the same scenarios and latency profiles; returns the table."""
+def compare(policy_dir: Path, scenarios: list[str], profiles: list[str], out_dir: Path,
+            policy_sim: dict[str, str] | None = None) -> dict:
+    """Policy and WBC on the same scenarios and latency profiles; returns the table.
+    `policy_sim`: options for the policy runs only (wheel_lag: sandro_sim has none)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     table = {}
     for scenario in scenarios:
@@ -676,7 +678,8 @@ def compare(policy_dir: Path, scenarios: list[str], profiles: list[str], out_dir
             entry = {}
             for who in ("policy", "wbc"):
                 path = out_dir / f"{who}_{scenario}_{profile}.csv"
-                code = run(policy_dir, scenario, sim, path)[0] if who == "policy" else run_wbc(scenario, sim, path)
+                code = (run(policy_dir, scenario, {**sim, **(policy_sim or {})}, path)[0] if who == "policy"
+                        else run_wbc(scenario, sim, path))
                 entry[who] = {"fell": code == 3, "exit": code,
                               "phases": {str(k): v for k, v in all_metrics(path, scenario).items()} if code in (0, 3) else {}}
             table[f"{scenario}/{profile}"] = entry
@@ -765,9 +768,13 @@ def main() -> int:
                         help=f"hardware/default/push with wheel drive-train lag {LAG_SWEEP} s: eval/lag_sweep.md")
     args = parser.parse_args()
     policy_dir = Path(args.policy_dir)
+    # wheel_lag is emulated here only, not by sandro_sim's closed loop.
+    policy_only = {k: v for k, v in (item.split("=", 1) for item in args.sim) if k == "wheel_lag"}
     if args.compare:
-        table = compare(policy_dir, ["hardware", "default", "push"], list(PROFILES), policy_dir / "eval")
+        table = compare(policy_dir, ["hardware", "default", "push"], list(PROFILES), policy_dir / "eval", policy_only)
         text = markdown(table)
+        if policy_only:
+            text = f"Policy runs with wheel_lag {policy_only['wheel_lag']} s; the WBC without (sandro_sim has no lag).\n" + text
         (policy_dir / "eval" / "comparison.md").write_text(text + "\n")
         print(text)
         return 0
@@ -776,8 +783,6 @@ def main() -> int:
         (policy_dir / "eval" / "lag_sweep.md").write_text(text + "\n")
         print(text)
         return 0
-    # wheel_lag is emulated here only, not by sandro_sim's closed loop.
-    policy_only = {k: v for k, v in (item.split("=", 1) for item in args.sim) if k == "wheel_lag"}
     sim = {**PROFILES[args.profile],
            **closed_loop.parse_sim([s for s in args.sim if not s.startswith("wheel_lag=")]),
            **policy_only}
