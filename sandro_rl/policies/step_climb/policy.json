@@ -1,6 +1,6 @@
 {
  "onnx": "policy.onnx",
- "onnx_max_abs_error_vs_reference": 4.7362944011197783e-07,
+ "onnx_max_abs_error_vs_reference": 6.94539582402065e-07,
  "policy_rate_hz": 100,
  "control_rate_hz": 300.0,
  "observation": {
@@ -124,5 +124,5 @@
   ],
   "track_width_m": 0.304
  },
- "fingerprint": "691c6b7cfd3668ed77daf598b2ca29fd5f25af6034db913d6faa9e0fe5e8ee3e"
+ "fingerprint": "9fe892901e9dad65110ba80a2ea4859da9eeec5ccd37ea6c1a0f09fff18f2e68"
 }
