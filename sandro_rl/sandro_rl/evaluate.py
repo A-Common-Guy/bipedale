@@ -684,6 +684,46 @@ def compare(policy_dir: Path, scenarios: list[str], profiles: list[str], out_dir
     return table
 
 
+def ringing(path: Path, t_from: float = 3.0) -> dict:
+    """Wheel effort after t_from: RMS per wheel (Nm), the dominant frequency and
+    the share of power in 5-15 Hz, where lag-driven ringing sits (7-10 Hz)."""
+    joint = compare_runs.load(str(path))["joint"]
+    keep = joint["t_s"] > t_from
+    t = joint["t_s"][keep]
+    if len(t) < 16:
+        return {side: {"rms": math.nan, "peak_hz": math.nan, "band": math.nan} for side in ("right", "left")}
+    out = {}
+    for side in ("right", "left"):
+        x = joint[f"eff_{side}_wheel"][keep]
+        x0 = x - np.mean(x)
+        f = np.fft.rfftfreq(len(x0), (t[-1] - t[0]) / (len(t) - 1))
+        power = np.abs(np.fft.rfft(x0 * np.hanning(len(x0)))) ** 2
+        band = (f > 5.0) & (f < 15.0)
+        out[side] = {"rms": float(np.std(x)), "peak_hz": float(f[1:][np.argmax(power[1:])]),
+                     "band": float(power[band].sum() / power[1:].sum())}
+    return out
+
+
+LAG_SWEEP = (0.0, 0.035, 0.05, 0.08)
+
+
+def lag_sweep(policy_dir: Path, scenarios: list[str], out_dir: Path, lags=LAG_SWEEP) -> str:
+    """The policy under wheel drive-train lag (nominal latency); a markdown table."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    lines = ["| scenario | wheel lag (s) | result | wheel effort RMS R/L (Nm) | peak (Hz) | 5-15 Hz share |",
+             "|---|---|---|---|---|---|"]
+    for scenario in scenarios:
+        for lag in lags:
+            path = out_dir / f"lag_{scenario}_{lag:.3f}.csv"
+            code = run(policy_dir, scenario, {**PROFILES["nominal"], "wheel_lag": str(lag)}, path)[0]
+            r = ringing(path)
+            lines.append(f"| {scenario} | {lag:.3f} | {'FELL' if code == 3 else 'completed'} | "
+                         f"{r['right']['rms']:.2f} / {r['left']['rms']:.2f} | "
+                         f"{r['right']['peak_hz']:.1f} / {r['left']['peak_hz']:.1f} | "
+                         f"{max(r['right']['band'], r['left']['band']):.2f} |")
+    return "\n".join(lines)
+
+
 def markdown(table: dict) -> str:
     lines = []
     for key, entry in table.items():
@@ -721,12 +761,19 @@ def main() -> int:
                         help="request a jump when the ground ahead rises (hop-on-command policies)")
     parser.add_argument("--compare", action="store_true",
                         help="policy and WBC on hardware/default/push x nominal/uart_imu/worst")
+    parser.add_argument("--lag-sweep", action="store_true",
+                        help=f"hardware/default/push with wheel drive-train lag {LAG_SWEEP} s: eval/lag_sweep.md")
     args = parser.parse_args()
     policy_dir = Path(args.policy_dir)
     if args.compare:
         table = compare(policy_dir, ["hardware", "default", "push"], list(PROFILES), policy_dir / "eval")
         text = markdown(table)
         (policy_dir / "eval" / "comparison.md").write_text(text + "\n")
+        print(text)
+        return 0
+    if args.lag_sweep:
+        text = lag_sweep(policy_dir, ["hardware", "default", "push"], policy_dir / "eval")
+        (policy_dir / "eval" / "lag_sweep.md").write_text(text + "\n")
         print(text)
         return 0
     # wheel_lag is emulated here only, not by sandro_sim's closed loop.
