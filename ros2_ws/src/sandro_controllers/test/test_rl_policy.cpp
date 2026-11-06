@@ -145,7 +145,7 @@ TEST(RlPolicy, ShapingFollowsTheRateLimits) {
   ASSERT_TRUE(core.configure(agile_settings(), 300, &error)) << error;
   core.reset(standing(agile_settings()));
   // Upright and still for engage_hold_s, then the first policy step.
-  for (int i = 0; i < 40 && core.phase() != sc::RlPhase::kPolicy; ++i) {
+  for (int i = 0; i < 100 && core.phase() != sc::RlPhase::kPolicy; ++i) {
     core.update(standing(agile_settings()), sc::RlPolicyCommand{}, 1.0 / 300.0);
   }
   ASSERT_EQ(core.phase(), sc::RlPhase::kPolicy);
@@ -301,6 +301,98 @@ TEST(RlPolicy, WheelFilterSmoothsOnlyTheWheelCommands) {
   }
   filtered_settings.wheel_filter_hz = -1.0;
   EXPECT_FALSE(filtered.configure(filtered_settings, 300, &error));
+}
+
+TEST(RlPolicy, EngagesOnlyInsideTheTrainingStartStates) {
+  sc::RlPolicyCore core;
+  std::string error;
+  const auto s = flat_settings();
+  ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+  core.reset(standing(s));
+  // Held at 0.1 rad, as the old flat_level was when it kicked into ringing.
+  auto leaning = standing(s);
+  leaning.orientation = {0.0, std::sin(0.05), 0.0, std::cos(0.05)};
+  sc::RlPolicyOutput out;
+  for (int i = 0; i < 300; ++i) {
+    out = core.update(leaning, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  EXPECT_EQ(out.phase, sc::RlPhase::kStand);
+  EXPECT_TRUE(out.status & sc::RL_WAITING_UPRIGHT);
+  // Upright but the legs still settling at 0.9 rad/s.
+  auto settling = standing(s);
+  for (const int j : {0, 1, 3, 4}) {
+    settling.velocity[j] = -0.9;
+  }
+  for (int i = 0; i < 300; ++i) {
+    out = core.update(settling, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  EXPECT_EQ(out.phase, sc::RlPhase::kStand);
+  int cycles = 0;
+  for (; cycles < 300 && core.phase() == sc::RlPhase::kStand; ++cycles) {
+    out = core.update(standing(s), sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
+  EXPECT_EQ(cycles, 60);  // engage_hold_s 0.2 s at 300 Hz
+}
+
+TEST(RlPolicy, HandOverAcceptsALeanTheStandPhaseRefuses) {
+  sc::RlPolicyCore core;
+  std::string error;
+  const auto s = flat_settings();
+  ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+  auto leaning = standing(s);
+  leaning.orientation = {0.0, std::sin(0.06), 0.0, std::cos(0.06)};  // 0.12 rad
+  core.reset(leaning);
+  EXPECT_TRUE(core.hand_over(leaning));
+  EXPECT_EQ(core.phase(), sc::RlPhase::kPolicy);
+}
+
+TEST(RlPolicy, OscillationWatchdogTripsOnLegRingingNotOnDriving) {
+  std::string error;
+  const auto s = flat_settings();
+  {
+    sc::RlPolicyCore core;
+    ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+    core.reset(standing(s));
+    ASSERT_TRUE(core.hand_over(standing(s)));
+    // The front leg motors at 7.5 Hz, +-4 rad/s: the robot's ringing.
+    sc::RlPolicyOutput out;
+    int cycles = 0;
+    for (; cycles < 300 && out.phase != sc::RlPhase::kFallen; ++cycles) {
+      auto ringing = standing(s);
+      const double v = 4.0 * std::sin(2.0 * M_PI * 7.5 * cycles / 300.0);
+      ringing.velocity[1] = v;
+      ringing.velocity[3] = v;
+      out = core.update(ringing, sc::RlPolicyCommand{}, 1.0 / 300.0);
+    }
+    EXPECT_EQ(out.phase, sc::RlPhase::kFallen);
+    EXPECT_TRUE(out.status & sc::RL_OSCILLATION);
+    EXPECT_LT(cycles, 150);  // within half a second
+    EXPECT_EQ(out.frame.kp[1], 0.0);
+    out = core.update(standing(s), sc::RlPolicyCommand{}, 1.0 / 300.0);
+    EXPECT_TRUE(out.status & sc::RL_OSCILLATION);  // latched with the fall
+  }
+  {
+    sc::RlPolicyCore core;
+    ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+    core.reset(standing(s));
+    ASSERT_TRUE(core.hand_over(standing(s)));
+    // Driving: wheels swinging +-15 rad/s at 1 Hz, legs moving slowly.
+    sc::RlPolicyOutput out;
+    double largest_wheel = 0.0;
+    for (int i = 0; i < 900; ++i) {
+      auto driving = standing(s);
+      const double t = i / 300.0;
+      driving.velocity[2] = driving.velocity[5] = 15.0 * std::sin(2.0 * M_PI * t);
+      for (const int j : {0, 1, 3, 4}) {
+        driving.velocity[j] = 1.0 * std::sin(2.0 * M_PI * 0.5 * t);
+      }
+      out = core.update(driving, sc::RlPolicyCommand{}, 1.0 / 300.0);
+      largest_wheel = std::max(largest_wheel, out.oscillation_rad_s[1]);
+    }
+    EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
+    EXPECT_LT(largest_wheel, 0.5 * s.oscillation_wheel_rad_s);
+  }
 }
 
 TEST(RlPolicy, StaleImuBeyondTheTimeoutIsAFall) {

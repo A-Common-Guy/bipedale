@@ -143,7 +143,9 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
       !(s.policy_rate_hz > 0.0) || update_rate_hz <= 0 || !(s.forward_m_s > 0.0) ||
       !(s.yaw_rad_s > 0.0) || !(s.height_max_m > s.height_min_m) ||
       (s.command_size == 4 && !(s.roll_rad > 0.0)) || !(s.leg_kp_nm_rad > 0.0) ||
-      !(s.wheel_kd_nm_s_rad > 0.0) || !(s.stand_s > 0.0) || !(s.wheel_filter_hz >= 0.0)) {
+      !(s.wheel_kd_nm_s_rad > 0.0) || !(s.stand_s > 0.0) || !(s.wheel_filter_hz >= 0.0) ||
+      !(s.oscillation_leg_rad_s >= 0.0) || !(s.oscillation_wheel_rad_s >= 0.0) ||
+      !(s.oscillation_window_s > 0.0) || !(s.hand_over_tilt_rad > 0.0)) {
     *error = "inconsistent policy settings";
     return false;
   }
@@ -278,6 +280,7 @@ RlPolicyFrame RlPolicyCore::frames_from_action(const std::array<float, 6> &actio
 
 void RlPolicyCore::reset(const RlPolicyState &state) {
   imu_stale_s_ = 0.0;
+  oscillation_tripped_ = false;
   stand_elapsed_s_ = 0.0;
   still_s_ = 0.0;
   stand_start_ = state.position;
@@ -306,8 +309,42 @@ void RlPolicyCore::engage(const RlPolicyState &state) {
   for (int k = 0; k < settings_.history; ++k) {
     observation_.segment(k * frame_size_, frame_size_) = frame_;
   }
+  // The first high-pass starts at the measured velocity, so engaging while a
+  // joint moves is not a step into the band.
+  oscillation_high_pass_[0] = state.velocity;
+  oscillation_high_pass_[1].fill(0.0);
+  for (auto &stage : oscillation_low_pass_) {
+    stage.fill(0.0);
+  }
+  oscillation_mean_square_.fill(0.0);
+  oscillation_tripped_ = false;
   cycle_ = 0;
   phase_ = RlPhase::kPolicy;
+}
+
+std::array<double, 2> RlPolicyCore::watch_oscillation(const RlPolicyState &state,
+                                                      const double period_s) {
+  constexpr double kLowHz = 5.0;
+  constexpr double kHighHz = 15.0;
+  const double a_low = 1.0 - std::exp(-2.0 * M_PI * kLowHz * period_s);
+  const double a_high = 1.0 - std::exp(-2.0 * M_PI * kHighHz * period_s);
+  const double a_mean = 1.0 - std::exp(-period_s / settings_.oscillation_window_s);
+  std::array<double, 2> rms{};
+  for (std::size_t j = 0; j < 6; ++j) {
+    double x = state.velocity[j];
+    for (auto &stage : oscillation_high_pass_) {
+      stage[j] += a_low * (x - stage[j]);
+      x -= stage[j];
+    }
+    for (auto &stage : oscillation_low_pass_) {
+      stage[j] += a_high * (x - stage[j]);
+      x = stage[j];
+    }
+    oscillation_mean_square_[j] += a_mean * (x * x - oscillation_mean_square_[j]);
+    const bool wheel = j == kWheels[0] || j == kWheels[1];
+    rms[wheel ? 1 : 0] = std::max(rms[wheel ? 1 : 0], std::sqrt(oscillation_mean_square_[j]));
+  }
+  return rms;
 }
 
 bool RlPolicyCore::hand_over(const RlPolicyState &state) {
@@ -315,7 +352,7 @@ bool RlPolicyCore::hand_over(const RlPolicyState &state) {
     return false;
   }
   const Eigen::Matrix3d r = body_rotation(state);
-  if (std::acos(std::clamp(r(2, 2), -1.0, 1.0)) > settings_.engage_tilt_rad) {
+  if (std::acos(std::clamp(r(2, 2), -1.0, 1.0)) > settings_.hand_over_tilt_rad) {
     return false;
   }
   engage(state);
@@ -370,13 +407,22 @@ RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCo
     phase_ = RlPhase::kFallen;
   }
   out.leg_height_m = leg_heights(state);
+  if (phase_ == RlPhase::kPolicy) {
+    out.oscillation_rad_s = watch_oscillation(state, period_s);
+    const auto &osc = out.oscillation_rad_s;
+    if ((s.oscillation_leg_rad_s > 0.0 && osc[0] > s.oscillation_leg_rad_s) ||
+        (s.oscillation_wheel_rad_s > 0.0 && osc[1] > s.oscillation_wheel_rad_s)) {
+      oscillation_tripped_ = true;
+      phase_ = RlPhase::kFallen;
+    }
+  }
 
   if (phase_ == RlPhase::kFallen) {
     // Latched until re-activation: limp with damping, as the WBC on a fall.
     out.frame = RlPolicyFrame{};
     out.frame.kd.fill(s.fallen_kd_nm_s_rad);
     out.phase = phase_;
-    out.status |= RL_FALLEN;
+    out.status |= RL_FALLEN | (oscillation_tripped_ ? RL_OSCILLATION : 0U);
     out.reference = reference_;
     return out;
   }

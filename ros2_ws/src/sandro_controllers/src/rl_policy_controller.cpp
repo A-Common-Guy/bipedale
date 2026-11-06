@@ -92,8 +92,16 @@ const std::vector<DoubleParameter> &double_parameters() {
        "The policy engages only with every joint turning slower than this."},
       {"safety.engage_hold_s", &RlPolicySettings::engage_hold_s,
        "How long the body must be upright and still before the policy engages."},
+      {"safety.hand_over_tilt_rad", &RlPolicySettings::hand_over_tilt_rad,
+       "A hand-over from another balancer engages only with the body tilted less than this."},
       {"safety.fallen_kd_nm_s_rad", &RlPolicySettings::fallen_kd_nm_s_rad,
        "Damping on every joint after a fall."},
+      {"safety.oscillation_leg_rad_s", &RlPolicySettings::oscillation_leg_rad_s,
+       "5-15 Hz leg velocity RMS beyond which the drives go limp; 0 disables it."},
+      {"safety.oscillation_wheel_rad_s", &RlPolicySettings::oscillation_wheel_rad_s,
+       "5-15 Hz wheel velocity RMS beyond which the drives go limp; 0 disables it."},
+      {"safety.oscillation_window_s", &RlPolicySettings::oscillation_window_s,
+       "Averaging time of the oscillation watchdog's RMS."},
   };
   return table;
 }
@@ -391,7 +399,12 @@ controller_interface::return_type RlPolicyController::update(const rclcpp::Time 
 
 void RlPolicyController::report(const RlPolicyState &state, const RlPolicyOutput &output) {
   if (output.phase != last_phase_) {
-    if (output.phase == RlPhase::kFallen) {
+    if (output.phase == RlPhase::kFallen && (output.status & RL_OSCILLATION)) {
+      RCLCPP_ERROR(get_node()->get_logger(),
+                   "Oscillation: 5-15 Hz velocity RMS %.2f rad/s legs, %.2f rad/s wheels: "
+                   "drives limp until re-activation",
+                   output.oscillation_rad_s[0], output.oscillation_rad_s[1]);
+    } else if (output.phase == RlPhase::kFallen) {
       RCLCPP_WARN(get_node()->get_logger(),
                   "Fallen (tilt %.2f rad, status 0x%x): drives limp until re-activation",
                   output.tilt_rad, output.status);
@@ -474,6 +487,8 @@ void RlPolicyController::publish_diagnostics(const rclcpp::Time &time,
   for (std::size_t i = 0; i < 6; ++i) {
     add("action_" + std::to_string(i), output.action[i]);
   }
+  add("oscillation_leg_rad_s", output.oscillation_rad_s[0]);
+  add("oscillation_wheel_rad_s", output.oscillation_rad_s[1]);
   add("inference_us", 1e6 * inference_last_s_);
   add("inference_max_us", 1e6 * inference_max_s_);
   add("command_age_s", command_age_s);

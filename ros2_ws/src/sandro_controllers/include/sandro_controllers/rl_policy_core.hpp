@@ -89,14 +89,31 @@ struct RlPolicySettings {
   // near that pose. It then engages once the body has been within
   // engage_tilt_rad, turning slower than engage_rate_rad_s and every joint
   // slower than engage_joint_velocity_rad_s for engage_hold_s: the first
-  // frame fills the whole observation history.
+  // frame fills the whole observation history. Training episodes start
+  // within 0.05 rad of the stand pose and nearly still; the old flat_level
+  // engaged at 0.12 rad with the legs still moving at 0.9 rad/s and kicked
+  // straight into its 7.5 Hz ringing (recordings/rl_flat_vibration_2026-10-21).
   double stand_s{1.5};
   double stand_tolerance_rad{0.15};
-  double engage_tilt_rad{0.15};
+  double engage_tilt_rad{0.08};
   double engage_rate_rad_s{1.0};
-  double engage_joint_velocity_rad_s{2.0};
-  double engage_hold_s{0.03};
+  double engage_joint_velocity_rad_s{0.3};
+  double engage_hold_s{0.2};
+  // A hand-over from another balancer engages up to this tilt: that robot is
+  // already balancing, possibly leaning into an acceleration, and refusing
+  // leaves it unbalanced.
+  double hand_over_tilt_rad{0.15};
   double fallen_kd_nm_s_rad{0.5};
+  // Oscillation watchdog, while the policy runs: per joint, the joint
+  // velocity band-passed to 5-15 Hz (two first-order high-passes and two
+  // low-passes), RMS over oscillation_window_s. Beyond the leg or the wheel
+  // limit the drives go limp as on a fall. The robot's 7.5 Hz ringing reached
+  // 1.8 (legs) and 3-3.9 rad/s (wheels); the deployed policies in simulation
+  // stay below 0.61 and 3.3 rad/s, pushes and 80 ms of wheel lag included.
+  // 0 disables a limit.
+  double oscillation_leg_rad_s{1.0};
+  double oscillation_wheel_rad_s{5.0};
+  double oscillation_window_s{0.3};
 };
 
 struct RlPolicyState {
@@ -136,6 +153,7 @@ enum RlStatus : std::uint32_t {
   RL_COMMAND_TIMEOUT = 1U << 2,
   RL_WAITING_UPRIGHT = 1U << 4,
   RL_NON_FINITE_ACTION = 1U << 5,
+  RL_OSCILLATION = 1U << 6,
 };
 
 struct RlPolicyOutput {
@@ -149,6 +167,8 @@ struct RlPolicyOutput {
   std::array<double, 4> reference{};  // forward, yaw rate, height, roll
   std::array<double, 2> leg_height_m{};
   std::array<float, 6> action{};
+  // The oscillation watchdog's 5-15 Hz velocity RMS, largest leg and wheel.
+  std::array<double, 2> oscillation_rad_s{};
   double inference_s{};
   bool inferred{false};
 };
@@ -162,7 +182,7 @@ public:
   // Takes over from another balancer holding the robot upright: engages at
   // once from the measured pose, without the stand phase. False (and the
   // stand phase stays) unless the IMU is valid and the body within
-  // engage_tilt_rad.
+  // hand_over_tilt_rad.
   bool hand_over(const RlPolicyState &state);
   RlPolicyOutput update(const RlPolicyState &state,
                         const RlPolicyCommand &command, double period_s);
@@ -180,6 +200,8 @@ private:
   Eigen::Matrix3d body_rotation(const RlPolicyState &state) const;
   void engage(const RlPolicyState &state);
   double feasible_roll(double roll, double height) const;
+  // Advances the watchdog filters; the largest leg and wheel band RMS.
+  std::array<double, 2> watch_oscillation(const RlPolicyState &state, double period_s);
 
   RlPolicySettings settings_{};
   MlpPolicy policy_;
@@ -198,6 +220,10 @@ private:
   double height_command_m_{};
   std::array<float, 6> last_action_{};
   std::array<float, 6> applied_action_{};
+  std::array<std::array<double, 6>, 2> oscillation_high_pass_{};  // the high-passes' low-pass states
+  std::array<std::array<double, 6>, 2> oscillation_low_pass_{};
+  std::array<double, 6> oscillation_mean_square_{};
+  bool oscillation_tripped_{false};
   Eigen::VectorXf observation_;
   Eigen::VectorXf frame_;
   RlPolicyFrame policy_frame_{};

@@ -1187,7 +1187,19 @@ Safety fallbacks reuse the WBC's parameters from controllers.yaml `safety`:
 - `ramp_s` (0.5) on activation: the gains ramp from the measured pose;
 - the hardware plugin's MIT frame-bias check stays in charge (S2R l.436–437).
 
-A non-finite network output also triggers the fallback.
+A non-finite network output also triggers the fallback, and so does the
+oscillation watchdog (`safety.oscillation_*`): each joint velocity
+band-passed to 5–15 Hz, RMS over 0.3 s, beyond 1.0 rad/s on a leg or
+5.0 rad/s on a wheel. On the robot the old `flat_level` rang at 1.8 (legs)
+and 3–3.9 rad/s (wheels) and trips it 0.2 s in; the deployed policies stay
+below 0.61 and 3.3 rad/s in every evaluation, 80 ms of wheel lag included.
+
+From the stand phase the policy engages only inside its training start
+states: tilt within `engage_tilt_rad` 0.08, every joint slower than 0.3 rad/s
+for 0.2 s. The old `flat_level` engaged at 0.12 rad with the legs still
+moving at 0.9 rad/s (2026-10-21), and its first actions kicked the legs and
+wheels straight into the ringing. A hand-over from a balancing controller
+keeps 0.15 rad (`hand_over_tilt_rad`).
 
 The `velocity` wheel mode needs the MIT `velocity` and `kd` command
 interfaces on the wheel drives. The plugin exports them for all six joints
