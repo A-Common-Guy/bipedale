@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Derive the IMU site pose from the roof mesh, and check the model against it.
+"""Derive the IMU site pose from the CAD, and check the model against it.
+
+Since the 2026-11 body the BNO085 sits in its own holder and the CAD carries
+the board: the default `--source board` derives the frame from it with
+onshape_export/imu_mount.py, exactly as compose_robot.py places the site
+(origin at the chip, z the board normal, y the wheel axle, x forward).
+`--source roof` is the earlier roof-plate derivation described below.
 
 The Onshape export gives the torso body a frame inherited from whatever face
 the CAD assembly happened to be built on: its axes are nowhere near the
@@ -38,7 +44,10 @@ import mujoco
 import numpy as np
 
 HERE = pathlib.Path(__file__).resolve().parent
-DEFAULT_MODEL = HERE.parent.parent / "onshape_export" / "robot" / "scene_floating.xml"
+ONSHAPE_EXPORT = HERE.parent.parent / "onshape_export"
+DEFAULT_MODEL = ONSHAPE_EXPORT / "robot" / "scene_floating.xml"
+sys.path.insert(0, str(ONSHAPE_EXPORT))
+import imu_mount  # noqa: E402
 
 # Where the sensor actually sits on the roof face, in metres along the IMU
 # frame's own tangent axes, measured from the centre of the face. The board is
@@ -162,6 +171,18 @@ def derive(model, data, body="torso", roof_mesh="robot_roof", ref_mesh="body_low
     return position, rotation, diagnostics
 
 
+def derive_board(path, model, data):
+    """(position, 3x3 rotation) of the IMU frame in the torso, from the BNO085 board."""
+    spec = mujoco.MjSpec.from_file(str(path))
+    found = imu_mount.imu_from_board(spec, model, data)
+    if found is None:
+        raise SystemExit(f"{path} has no BNO085 board part ({imu_mount.IMU_BOARD_PATTERN!r})")
+    position, quat, _, _ = found
+    rotation = np.zeros(9)
+    mujoco.mju_quat2Mat(rotation, quat)
+    return np.asarray(position), rotation.reshape(3, 3)
+
+
 def _axle_left(model, data, body_id):
     """Wheel axle in `body` coordinates, oriented from the right wheel to the left."""
     joints = {}
@@ -227,52 +248,60 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--mode", choices=("report", "check"), default="report")
     parser.add_argument("--model", default=str(DEFAULT_MODEL))
+    parser.add_argument("--source", choices=("board", "roof"), default="board",
+                        help="the BNO085 board part (default) or the roof plate")
     parser.add_argument(
         "--offset", type=float, nargs=2, metavar=("FORWARD", "LEFT"),
         default=list(MOUNT_OFFSET),
-        help="mount point in metres from the centre of the roof's top face "
-             f"(default {MOUNT_OFFSET[0]} {MOUNT_OFFSET[1]})",
+        help="--source roof: mount point in metres from the centre of the roof's "
+             f"top face (default {MOUNT_OFFSET[0]} {MOUNT_OFFSET[1]})",
     )
     args = parser.parse_args()
 
     model, data = _load(args.model)
-    position, rotation, info = derive(model, data, offset=tuple(args.offset))
+    info = None
+    if args.source == "board":
+        position, rotation = derive_board(args.model, model, data)
+    else:
+        position, rotation, info = derive(model, data, offset=tuple(args.offset))
     drift, angle, have_pos, have_quat = _deviation(model, data, position, rotation)
 
-    # A tangential offset must stay on the face, or the sensor is cantilevered
-    # off the roof edge and "flat on the roof" stops being true.
-    margin = min(
-        info["footprint_x"][1], -info["footprint_x"][0],
-        info["footprint_y"][1], -info["footprint_y"][0],
-    )
-    if margin < 0:
-        print(f"offset {tuple(args.offset)} puts the site {-margin * 1e3:.1f} mm "
-              f"outside the roof's top face", file=sys.stderr)
-        return 2
+    if info is not None:
+        # A tangential offset must stay on the face, or the sensor is cantilevered
+        # off the roof edge and "flat on the roof" stops being true.
+        margin = min(
+            info["footprint_x"][1], -info["footprint_x"][0],
+            info["footprint_y"][1], -info["footprint_y"][0],
+        )
+        if margin < 0:
+            print(f"offset {tuple(args.offset)} puts the site {-margin * 1e3:.1f} mm "
+                  f"outside the roof's top face", file=sys.stderr)
+            return 2
 
     if args.mode == "check":
         if drift <= _POSITION_TOL and angle <= _ANGLE_TOL_DEG:
-            print(f"imu site matches the roof top face "
+            print(f"imu site matches the {args.source} "
                   f"({drift * 1e3:.3f} mm, {angle:.4f} deg)")
             return 0
-        print(f"imu site is off the roof top face: {drift * 1e3:.2f} mm, "
+        print(f"imu site is off the {args.source}: {drift * 1e3:.2f} mm, "
               f"{angle:.2f} deg", file=sys.stderr)
         return 1
 
     torso = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "torso")
     R_wt = data.xmat[torso].reshape(3, 3)
     print(f"model: {args.model}")
-    print(f"roof plate: {info['top_area'] * 1e4:.1f} cm^2 top face, "
-          f"{info['plate_thickness'] * 1e3:.1f} mm thick, "
-          f"face flat to {info['flatness'] * 1e6:.1f} um")
-    print(f"mount offset from the face centre: "
-          f"{info['offset'][0] * 1e3:+.1f} mm forward, "
-          f"{info['offset'][1] * 1e3:+.1f} mm left")
-    print(f"  face spans {info['footprint_x'][0] * 1e3:+.1f} .. "
-          f"{info['footprint_x'][1] * 1e3:+.1f} mm forward, "
-          f"{info['footprint_y'][0] * 1e3:+.1f} .. "
-          f"{info['footprint_y'][1] * 1e3:+.1f} mm left of the site "
-          f"({margin * 1e3:.1f} mm to the nearest edge)")
+    if info is not None:
+        print(f"roof plate: {info['top_area'] * 1e4:.1f} cm^2 top face, "
+              f"{info['plate_thickness'] * 1e3:.1f} mm thick, "
+              f"face flat to {info['flatness'] * 1e6:.1f} um")
+        print(f"mount offset from the face centre: "
+              f"{info['offset'][0] * 1e3:+.1f} mm forward, "
+              f"{info['offset'][1] * 1e3:+.1f} mm left")
+        print(f"  face spans {info['footprint_x'][0] * 1e3:+.1f} .. "
+              f"{info['footprint_x'][1] * 1e3:+.1f} mm forward, "
+              f"{info['footprint_y'][0] * 1e3:+.1f} .. "
+              f"{info['footprint_y'][1] * 1e3:+.1f} mm left of the site "
+              f"({margin * 1e3:.1f} mm to the nearest edge)")
     print("\nderived IMU frame, in torso coordinates")
     print(f"  pos  {_fmt(position, 8)}")
     print(f"  quat {_fmt(_quat(rotation))}")
@@ -282,18 +311,15 @@ def main() -> int:
     print("\nat the stand keyframe")
     print(f"  site origin in world      {_fmt(data.xpos[torso] + R_wt @ position, 5)}")
     tilt = np.degrees(np.arccos(np.clip((R_wt @ rotation[:, 2]) @ [0, 0, 1], -1, 1)))
-    print(f"  roof plane vs. horizontal {tilt:.3f} deg")
+    print(f"  {args.source} plane vs. horizontal {tilt:.3f} deg")
 
     print("\ncurrent site in the model")
     print(f"  pos  {_fmt(have_pos, 8)}")
     print(f"  quat {_fmt(have_quat)}")
     print(f"  off by {drift * 1e3:.2f} mm, {angle:.2f} deg")
 
-    print("\nMJCF, replacing the <site name=\"imu\" .../> line on the torso body:")
-    print(f'      <frame name="imu_mount" pos="{_fmt(position, 8)}" '
-          f'quat="{_fmt(_quat(rotation))}">')
-    print('        <site name="imu" size="0.004" group="2" rgba="1 0.9 0.1 1"/>')
-    print("      </frame>")
+    print("\nonshape_export/compose_robot.py writes the imu_mount frame from the "
+          "board; --imu-pos/--imu-quat override it.")
     return 0
 
 

@@ -56,7 +56,25 @@ exported inertias, equality constraints, contacts, and sensors.
 
 ## Updating the canonical model
 
-After changing `onshape_export/robot`, run:
+The Onshape document holds one assembly per leg and the robot assembly that
+places them. Re-import it from `onshape_export/` with the Onshape API keys in
+`onshape_export/.env` (`ONSHAPE_API`, `ONSHAPE_ACCESS_KEY`,
+`ONSHAPE_SECRET_KEY`; git-ignored) and `onshape-to-robot` plus `mujoco`
+installed:
+
+```bash
+cd onshape_export
+python compose_robot.py --export   # re-export leg, leg_left, robot; compose
+```
+
+`compose_robot.py` attaches the articulated legs, gives the body parts the
+weighed hub masses of `config/sim_identified.yaml` (they carry no material in
+Onshape) with the Raspberry Pi as the jointless `raspberry_pi` body, keeps
+collision only on the outer shell, takes the `imu` frame from the BNO085
+board part (`onshape_export/imu_mount.py`) and writes the stand keyframe.
+The board's own axes are the `imu_chip` site; the real driver's
+`imu_mount_yaw_rad` (`urdf/sandro.urdf.xacro`) must match its yaw, which
+`test/test_description.py` checks. Then run:
 
 ```bash
 ros2_ws/src/sandro_description/tools/sync_model.py sync
@@ -66,4 +84,9 @@ ros2_ws/src/sandro_description/tools/sync_model.py check
 `check` also verifies the six-joint controller contract and IMU site. Both
 commands are deterministic; unchanged files are not rewritten. Then rerun
 `tools/derive_joint_frames.py --check` from an environment with `mujoco`, and
-update `JOINT_FRAMES` if the export moved a joint frame.
+update `JOINT_FRAMES` if the export moved a joint frame. A changed body also
+moves the whole-body controller's model (`model.com_height_per_leg_height`,
+`model.pitch_inertia_*`, `model.yaw_inertia_kgm2` in
+`sandro_bringup/config/controllers.yaml`): evaluate them in `mjcf/scene_ros2.xml`
+over the leg-height range, and refresh the `sandro_rl` policies
+(`sandro_rl/docs/DESIGN.md`, refresh procedure).

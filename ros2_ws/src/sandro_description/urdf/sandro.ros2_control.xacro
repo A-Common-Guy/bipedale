@@ -52,6 +52,7 @@
   <xacro:macro name="sandro_ros2_control"
       params="backend can_interface:='can0' imu_transport:='spi'
               imu_spi_device:='/dev/spidev6.0' imu_port:='/dev/ttyUSB0'
+              imu_mount_yaw_rad:='1.5707963267948966'
               state_source:='encoder' encoder_period_ms:='5'
               simulation_headless:='false' simulation_latency:='true'
               sim_imu_delay_s:='0.010' sim_imu_rate_hz:='200'
@@ -148,6 +149,12 @@
           <param name="read_timeout_ms">5</param>
           <param name="report_interval_us">5000</param>
           <param name="online_timeout_s">0.15</param>
+          <!-- Chip x axis from body x about z: the driver turns the samples
+               into the body frame (x forward, y left, z up) the controllers
+               and the simulated imu site use. The 2026-11 holder mounts the
+               chip as the CAD board, x left and y backward (mjcf site
+               imu_chip); the earlier roof mount had the chip aligned (0). -->
+          <param name="mount_yaw_rad">${imu_mount_yaw_rad}</param>
           <xacro:if value="${imu_transport == 'spi'}">
             <!-- Raspberry Pi 4 hardware SPI6 (dtoverlay=spi6-1cs: SCLK GPIO21,
                  MOSI GPIO20, MISO GPIO19, CE0 GPIO18), INT on GPIO25, RST on

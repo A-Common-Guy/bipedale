@@ -262,4 +262,27 @@ inline std::vector<double> parse_sensor_report(
   }
   return values;
 }
+
+// Re-expresses a BNO085 sample in the body frame (x forward, y left, z up)
+// when the chip is mounted flat but turned by `yaw_rad` about z: the chip's
+// x axis points at yaw_rad from body x. Vectors rotate by +yaw; the
+// orientation (xyzw, chip in world) becomes body in world, q * conj(q_yaw).
+inline void chip_to_body(
+  double yaw_rad, std::array<double, 4> & orientation_xyzw,
+  std::array<double, 3> & angular_velocity, std::array<double, 3> & linear_acceleration)
+{
+  const double c = std::cos(yaw_rad);
+  const double s = std::sin(yaw_rad);
+  for (auto * v : {&angular_velocity, &linear_acceleration}) {
+    const double x = (*v)[0];
+    const double y = (*v)[1];
+    (*v)[0] = c * x - s * y;
+    (*v)[1] = s * x + c * y;
+  }
+  const double hc = std::cos(0.5 * yaw_rad);
+  const double hs = std::sin(0.5 * yaw_rad);
+  const auto [x, y, z, w] = orientation_xyzw;
+  orientation_xyzw = {
+    x * hc - y * hs, y * hc + x * hs, z * hc - w * hs, w * hc + z * hs};
+}
 }  // namespace sandro_hardware::protocol

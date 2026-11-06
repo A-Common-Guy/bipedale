@@ -13,6 +13,7 @@ what a balance controller needs.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import threading
 import time
@@ -88,6 +89,25 @@ class ImuConfigurationError(RuntimeError):
     """The sensor did not end up streaming exactly the requested reports."""
 
 
+def chip_to_body(yaw_rad, quaternion_wxyz, gyro, accel):
+    """A sample of a chip turned by yaw_rad about z, in the body frame.
+
+    Vectors rotate by +yaw; the orientation (chip in world) becomes body in
+    world, q * conj(q_yaw).
+    """
+    if yaw_rad == 0.0:
+        return quaternion_wxyz, gyro, accel
+    c, s = math.cos(yaw_rad), math.sin(yaw_rad)
+
+    def turn(v):
+        return (c * v[0] - s * v[1], s * v[0] + c * v[1], v[2])
+
+    hc, hs = math.cos(0.5 * yaw_rad), math.sin(0.5 * yaw_rad)
+    w, x, y, z = quaternion_wxyz
+    return ((w * hc + z * hs, x * hc - y * hs, y * hc + x * hs, z * hc - w * hs),
+            turn(gyro), turn(accel))
+
+
 class Bno085UartShtp:
     """Read the game rotation vector, calibrated gyro and acceleration."""
 
@@ -97,11 +117,14 @@ class Bno085UartShtp:
         baudrate: int,
         timeout_s: float,
         report_interval_us: int,
+        mount_yaw_rad: float = 0.0,
     ):
         self.port = port
         self.baudrate = baudrate
         self.timeout_s = timeout_s
         self.report_interval_us = report_interval_us
+        # Chip x axis from body x about z, as sandro_hardware's mount_yaw_rad.
+        self.mount_yaw_rad = mount_yaw_rad
         self._serial = None
         self._framer = _ShtpFramer()
         self._tx_sequence: Dict[int, int] = {}
@@ -284,10 +307,12 @@ class Bno085UartShtp:
     def read(self) -> ImuState:
         with self._lock:
             age = time.monotonic() - self._last if self._last else float("inf")
+            quaternion, gyro, accel = chip_to_body(
+                self.mount_yaw_rad, self._quaternion, self._gyro, self._accel)
             return ImuState(
-                quaternion=self._quaternion,
-                gyro=self._gyro,
-                accel=self._accel,
+                quaternion=quaternion,
+                gyro=gyro,
+                accel=accel,
                 online=age < 0.5,
                 age_s=age,
             )

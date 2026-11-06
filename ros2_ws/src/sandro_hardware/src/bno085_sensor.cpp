@@ -101,6 +101,7 @@ struct BNO085Sensor::Impl
   int read_timeout_ms{};
   uint32_t report_interval_us{};
   double online_timeout_s{};
+  double mount_yaw_rad{};
   bool fault_reported{false};
   std::atomic_bool stop{false};
   std::thread receiver;
@@ -442,6 +443,9 @@ CallbackReturn BNO085Sensor::on_init(const hardware_interface::HardwareInfo & in
       throw std::invalid_argument(
               "read_timeout_ms, report_interval_us and online_timeout_s must be positive");
     }
+    if (parameters.count("mount_yaw_rad")) {
+      impl_->mount_yaw_rad = required_number<double>(parameters, "mount_yaw_rad");
+    }
     if (impl_->transport == Impl::Transport::spi) {
       impl_->spi_device = required_string(parameters, "spi_device");
       impl_->spi_speed_hz = required_number<uint32_t>(parameters, "spi_speed_hz");
@@ -571,11 +575,14 @@ hardware_interface::return_type BNO085Sensor::read(
 {
   const auto now = Clock::now();
   std::lock_guard<std::mutex> lock(impl_->mutex);
-  std::copy(impl_->orientation.begin(), impl_->orientation.end(), impl_->exported.begin());
+  auto orientation = impl_->orientation;
+  auto angular_velocity = impl_->angular_velocity;
+  auto linear_acceleration = impl_->linear_acceleration;
+  protocol::chip_to_body(impl_->mount_yaw_rad, orientation, angular_velocity, linear_acceleration);
+  std::copy(orientation.begin(), orientation.end(), impl_->exported.begin());
+  std::copy(angular_velocity.begin(), angular_velocity.end(), impl_->exported.begin() + 4);
   std::copy(
-    impl_->angular_velocity.begin(), impl_->angular_velocity.end(), impl_->exported.begin() + 4);
-  std::copy(
-    impl_->linear_acceleration.begin(), impl_->linear_acceleration.end(), impl_->exported.begin() + 7);
+    linear_acceleration.begin(), linear_acceleration.end(), impl_->exported.begin() + 7);
   impl_->exported[10] = impl_->report_stamps[0].time_since_epoch().count() ?
     std::chrono::duration<double>(now - impl_->report_stamps[0]).count() :
     std::numeric_limits<double>::infinity();

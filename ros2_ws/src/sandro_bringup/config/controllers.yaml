@@ -197,8 +197,9 @@ whole_body_controller:
       left: {base_m: 0.09, upper_m: 0.08, lower_m: 0.13, forward_sign: -1.0,
              wheel_on_outer_link: 0.0}
       # Masses, inertias and CoM height below are the weighed robot
-      # (sandro_description/config/sim_identified.yaml masses, 2026-10-21)
-      # evaluated in the MJCF at the stand keyframe.
+      # (sandro_description/config/sim_identified.yaml masses, 2026-10-21,
+      # hub split 2026-11-06) evaluated in the MJCF of the 2026-11 body at
+      # the stand keyframe; CoM and pitch inertia fitted over 0.16-0.20 m.
       body_mass_kg: 4.485             # weighed 4.825 kg minus two 170 g wheels
       wheel_mass_kg: 0.170
       wheel_inertia_kgm2: 0.00064     # hub, tyre and rotor plus armature
@@ -217,11 +218,11 @@ whole_body_controller:
       # for a 72 ms mode and hunted at 1.9 Hz. Re-identify after changing the
       # leg gains (the overdamped leg responds in about kd / kp).
       leg_lag_s: 0.07
-      com_height_per_leg_height: 0.756  # CoM above axle = 0.756 * leg height
+      com_height_per_leg_height: 0.790  # CoM above axle = 0.790 * leg height
       com_height_offset_m: 0.0
-      pitch_inertia_kgm2: 0.037       # about the CoM at 0.1855 m leg height
+      pitch_inertia_kgm2: 0.042       # about the CoM at 0.1855 m leg height
       pitch_inertia_reference_height_m: 0.1855
-      pitch_inertia_per_m: 0.15
+      pitch_inertia_per_m: 0.18
       gravity_m_s2: 9.81
     balance:
       # LQR weights, 1/(acceptable deviation)^2 in SI units. Raising a state

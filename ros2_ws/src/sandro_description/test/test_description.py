@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 import subprocess
 import sys
@@ -78,6 +79,33 @@ def test_identified_payload_is_a_body_with_inertia():
     assert all(float(v) > 0.0 for v in inertial.attrib["diaginertia"].split())
     assert body.find("./joint") is None  # welded to the torso
     assert root.find(".//geom[@name='identified_payload']").attrib["contype"] == "0"
+
+
+def test_raspberry_pi_carries_its_weighed_mass():
+    """The rear-heavy Raspberry Pi sits at its CAD parts, not in the hub average."""
+    masses = sync_model.load_identified()["masses"]
+    root = ET.parse(PACKAGE / "mjcf" / "robot_ros2.xml").getroot()
+    body = root.find("./worldbody/body[@name='torso']/body[@name='raspberry_pi']")
+    assert body is not None
+    assert body.find("./joint") is None
+    assert abs(float(body.find("./inertial").attrib["mass"]) - masses["raspberry_pi_kg"]) < 1e-9
+
+
+def test_real_imu_mount_yaw_matches_the_cad_chip():
+    """The driver turns the chip's axes into the imu site frame the sim reports.
+
+    imu_chip (in the imu_mount frame, like imu) is the BNO085 board's CAD
+    frame; the real backend's mount_yaw_rad must be its yaw about imu z.
+    """
+    root = ET.parse(PACKAGE / "mjcf" / "robot_full_floating.xml").getroot()
+    frame = root.find(".//frame[@name='imu_mount']")
+    assert "quat" not in frame.find("./site[@name='imu']").attrib
+    w, x, y, z = (float(v) for v in frame.find("./site[@name='imu_chip']").attrib["quat"].split())
+    assert abs(x) < 1e-3 and abs(y) < 1e-3  # flat: a pure yaw
+    chip_yaw = 2.0 * math.atan2(z, w)
+    hardware = _expand("real").find("./ros2_control[@name='SandroImu']/hardware")
+    params = {node.get("name"): node.text for node in hardware.findall("param")}
+    assert abs(math.remainder(float(params["mount_yaw_rad"]) - chip_yaw, 2 * math.pi)) < 1e-3
 
 
 def _worldbody_joints(root):

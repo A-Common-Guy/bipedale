@@ -22,6 +22,9 @@ imu:
   baudrate: 3000000
   timeout_s: 0.05
   report_interval_us: 5000  # 200 Hz game rotation vector, gyro and acceleration
+  # Chip x from body x about z: pi/2 in the 2026-11 holder (chip x left,
+  # y backward), 0 for the earlier roof mount.
+  mount_yaw_rad: 1.5707963267948966
 
 mujoco:
   model: ../onshape_export/robot/scene_floating.xml

@@ -108,6 +108,7 @@ def build_system(cfg: dict, controller=None):
                 int(imu_cfg["baudrate"]),
                 float(imu_cfg["timeout_s"]),
                 int(imu_cfg["report_interval_us"]),
+                float(imu_cfg.get("mount_yaw_rad", 0.0)),
             )
             if imu_cfg["enabled"]
             else None

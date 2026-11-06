@@ -1,5 +1,5 @@
 <mujoco model="robot">
-  <compiler angle="radian" meshdir="assets/"/>
+  <compiler angle="radian" meshdir="assets"/>
 
   <option integrator="implicitfast"/>
 
@@ -8,7 +8,7 @@
   <default>
     <default class="robot">
       <joint armature="0.005" frictionloss="0.1"/>
-      <general biastype="affine" gainprm="50" biasprm="0 -50 1"/>
+      <general input="pos" biastype="affine" gainprm="50" biasprm="0 -50 1"/>
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" group="2"/>
       </default>
@@ -19,7 +19,7 @@
     <default class="right_main">
       <default class="right_leg">
         <joint armature="0.005" frictionloss="0.1"/>
-        <general biastype="affine" gainprm="50" biasprm="0 -50 1"/>
+        <general input="pos" biastype="affine" gainprm="50" biasprm="0 -50 1"/>
         <default class="right_visual">
           <geom type="mesh" contype="0" conaffinity="0" group="2"/>
         </default>
@@ -31,7 +31,7 @@
     <default class="left_main">
       <default class="left_leg_left">
         <joint armature="0.005" frictionloss="0.1"/>
-        <general biastype="affine" gainprm="50" biasprm="0 -50 1"/>
+        <general input="pos" biastype="affine" gainprm="50" biasprm="0 -50 1"/>
         <default class="left_visual">
           <geom type="mesh" contype="0" conaffinity="0" group="2"/>
         </default>
@@ -43,8 +43,19 @@
   </default>
 
   <asset>
-    <material name="robot_roof_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="handle_holder_1_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="handle_holder_2_material" rgba="0.615686 0.811765 0.929412 1"/>
     <material name="body_lower_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="handle_material" rgba="0.231373 0.380392 0.705882 1"/>
+    <material name="power_box_lid_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="imu_holder_material" rgba="0.231373 0.380392 0.705882 1"/>
+    <material name="power_dist_box_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="rpi_holder_material" rgba="0.647059 0.647059 0.647059 1"/>
+    <material name="robot_roof_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="yc164_respack_v1_1__body1_material" rgba="0.94902 0.92549 0.933333 1"/>
+    <material name="capc_0603_t0_9_bn_v1_1__body1_material" rgba="0.827451 0.831373 0.835294 1"/>
+    <material name="capc_0805_t0_95_bn_v1_1__body1_material" rgba="0.827451 0.831373 0.835294 1"/>
+    <material name="printed_circuit_board_1__body1_material" rgba="0.176471 0.176471 0.176471 1"/>
     <material name="bodymotorholder_material" rgba="0 0 1 1"/>
     <material name="wheel_tire_holder_material" rgba="0.615686 0.811765 0.929412 1"/>
     <material name="wheelmotorhub_material" rgba="0.615686 0.811765 0.929412 1"/>
@@ -58,6 +69,207 @@
     <material name="wheelstickcover_material" rgba="0.615686 0.811765 0.929412 1"/>
     <material name="manovella1_material" rgba="0.615686 0.811765 0.929412 1"/>
     <material name="manovella2_material" rgba="0.615686 0.811765 0.929412 1"/>
+    <material name="gigabit_ethernet_port__rpi4modelb__imported1_material" rgba="0.666667 0.698039 0.768627 1"/>
+    <material name="2x_usb2_0_ports__rpi4modelb__imported1_material" rgba="0.666667 0.698039 0.768627 1"/>
+    <material name="female_micro_hdmi_connector__rpi4modelb__imported1_material" rgba="0.968627 0.878431 0.6 1"/>
+    <material name="mxl7704_universal_pmic__rpi4modelb__partnoextended_material"/>
+    <material name="via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp_material" rgba="0.666667 0.698039 0.768627 1"/>
+    <material name="91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional_material"/>
+    <material name="female_usb_type_c_connector__rpi4modelb__imported1_material" rgba="0.898039 0.898039 0.898039 1"/>
+    <material name="pcb__rpi4modelb__cornerradius_material" rgba="0 0.752941 0 1"/>
+    <material name="cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp_material" rgba="0.898039 0.898039 0.898039 1"/>
+    <material name="broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3_material"/>
+    <material name="2x_usb3_0_ports__rpi4modelb__imported1_material" rgba="0.666667 0.698039 0.768627 1"/>
+    <material name="bno085_9axis_imu_v1_1__body19_material"/>
+    <material name="bno085_9axis_imu_v1_1__body29_material"/>
+    <material name="bno085_9axis_imu_v1_1__body30_material" rgba="0.25098 0.25098 0.25098 1"/>
+    <material name="bno085_9axis_imu_v1_1__body3_material"/>
+    <material name="bno085_9axis_imu_v1_1__body27_material"/>
+    <material name="bno085_9axis_imu_v1_1__body18_material"/>
+    <material name="bno085_9axis_imu_v1_1__body8_material"/>
+    <material name="bno085_9axis_imu_v1_1__body10_material"/>
+    <material name="bno085_9axis_imu_v1_1__body1_material"/>
+    <material name="bno085_9axis_imu_v1_1__body31_material"/>
+    <material name="bno085_9axis_imu_v1_1__body21_material"/>
+    <material name="bno085_9axis_imu_v1_1__body11_material"/>
+    <material name="bno085_9axis_imu_v1_1__body24_material"/>
+    <material name="bno085_9axis_imu_v1_1__body17_material"/>
+    <material name="bno085_9axis_imu_v1_1__body6_material"/>
+    <material name="bno085_9axis_imu_v1_1__body26_material"/>
+    <material name="bno085_9axis_imu_v1_1__body12_material"/>
+    <material name="bno085_9axis_imu_v1_1__body2_material"/>
+    <material name="bno085_9axis_imu_v1_1__body25_material"/>
+    <material name="bno085_9axis_imu_v1_1__body22_material"/>
+    <material name="bno085_9axis_imu_v1_1__body9_material"/>
+    <material name="bno085_9axis_imu_v1_1__body15_material"/>
+    <material name="bno085_9axis_imu_v1_1__body14_material"/>
+    <material name="bno085_9axis_imu_v1_1__body20_material"/>
+    <material name="bno085_9axis_imu_v1_1__body4_material"/>
+    <material name="bno085_9axis_imu_v1_1__body13_material"/>
+    <material name="bno085_9axis_imu_v1_1__body16_material"/>
+    <material name="bno085_9axis_imu_v1_1__body7_material"/>
+    <material name="bno085_9axis_imu_v1_1__body28_material"/>
+    <material name="bno085_9axis_imu_v1_1__body5_material"/>
+    <material name="bno085_9axis_imu_v1_1__body23_material"/>
+    <material name="sot23_5_v1_1__body4_material" rgba="0.901961 0.901961 0.901961 1"/>
+    <material name="sot23_5_v1_1__body2_material" rgba="0.901961 0.901961 0.901961 1"/>
+    <material name="sot23_5_v1_1__body5_material" rgba="0.901961 0.901961 0.901961 1"/>
+    <material name="sot23_5_v1_1__body6_material" rgba="0.901961 0.901961 0.901961 1"/>
+    <material name="sot23_5_v1_1__body3_material" rgba="0.901961 0.901961 0.901961 1"/>
+    <material name="sot23_5_v1_1__body1_material" rgba="0.207843 0.207843 0.207843 1"/>
+    <material name="bno055_9axis_imu_v2_1__body28_material"/>
+    <material name="bno055_9axis_imu_v2_1__body8_material"/>
+    <material name="bno055_9axis_imu_v2_1__body13_material"/>
+    <material name="bno055_9axis_imu_v2_1__body24_material"/>
+    <material name="bno055_9axis_imu_v2_1__body29_material"/>
+    <material name="bno055_9axis_imu_v2_1__body6_material"/>
+    <material name="bno055_9axis_imu_v2_1__body2_material"/>
+    <material name="bno055_9axis_imu_v2_1__body17_material"/>
+    <material name="bno055_9axis_imu_v2_1__body7_material"/>
+    <material name="bno055_9axis_imu_v2_1__body18_material"/>
+    <material name="bno055_9axis_imu_v2_1__body22_material"/>
+    <material name="bno055_9axis_imu_v2_1__body5_material"/>
+    <material name="bno055_9axis_imu_v2_1__body12_material"/>
+    <material name="bno055_9axis_imu_v2_1__body30_material" rgba="0.25098 0.25098 0.25098 1"/>
+    <material name="bno055_9axis_imu_v2_1__body27_material"/>
+    <material name="bno055_9axis_imu_v2_1__body26_material"/>
+    <material name="bno055_9axis_imu_v2_1__body20_material"/>
+    <material name="bno055_9axis_imu_v2_1__body31_material"/>
+    <material name="bno055_9axis_imu_v2_1__body19_material"/>
+    <material name="bno055_9axis_imu_v2_1__body10_material"/>
+    <material name="bno055_9axis_imu_v2_1__body25_material"/>
+    <material name="bno055_9axis_imu_v2_1__body14_material"/>
+    <material name="bno055_9axis_imu_v2_1__body15_material"/>
+    <material name="bno055_9axis_imu_v2_1__body3_material"/>
+    <material name="bno055_9axis_imu_v2_1__body21_material"/>
+    <material name="bno055_9axis_imu_v2_1__body1_material"/>
+    <material name="bno055_9axis_imu_v2_1__body23_material"/>
+    <material name="bno055_9axis_imu_v2_1__body4_material"/>
+    <material name="bno055_9axis_imu_v2_1__body11_material"/>
+    <material name="bno055_9axis_imu_v2_1__body16_material"/>
+    <material name="bno055_9axis_imu_v2_1__body9_material"/>
+    <material name="led_0603_single_color_v1_1__body1_material" rgba="0 0.498039 0 1"/>
+    <material name="led_0603_single_color_v1_1__body2_material" rgba="1 0.74902 0 1"/>
+    <material name="led_0603_single_color_v1_1__body4_material" rgba="0.901961 0.901961 0.901961 1"/>
+    <material name="led_0603_single_color_v1_1__body3_material" rgba="1 0.74902 0 1"/>
+    <material name="led_0603_single_color_v1_1__body5_material"/>
+    <material name="qwicc_v1_1__body4_material" rgba="0.960784 0.960784 0.964706 1"/>
+    <material name="qwicc_v1_1__body6_material" rgba="0.960784 0.960784 0.964706 1"/>
+    <material name="qwicc_v1_1__body2_material" rgba="0.960784 0.960784 0.964706 1"/>
+    <material name="qwicc_v1_1__body1_material" rgba="0.960784 0.960784 0.964706 1"/>
+    <material name="qwicc_v1_1__body7_material" rgba="0.152941 0.152941 0.152941 1"/>
+    <material name="qwicc_v1_1__body3_material" rgba="0.960784 0.960784 0.964706 1"/>
+    <material name="qwicc_v1_1__body5_material" rgba="0.960784 0.960784 0.964706 1"/>
+    <material name="lead_tssop_1__body1_material"/>
+    <material name="body_tssop_1__body1_material" rgba="0.27451 0.27451 0.27451 1"/>
+    <material name="crystal_xtal3215_32_768khz_v2_1__body3_material" rgba="1 0.811765 0.501961 1"/>
+    <material name="crystal_xtal3215_32_768khz_v2_1__body4_material" rgba="1 0.811765 0.501961 1"/>
+    <material name="crystal_xtal3215_32_768khz_v2_1__body1_material" rgba="0.960784 0.960784 0.964706 1"/>
+    <material name="crystal_xtal3215_32_768khz_v2_1__body2_material" rgba="0.960784 0.960784 0.964706 1"/>
+    <material name="bss138ps_v2_1__body2_material"/>
+    <material name="bss138ps_v2_1__body4_material"/>
+    <material name="bss138ps_v2_1__body6_material"/>
+    <material name="bss138ps_v2_1__body5_material"/>
+    <material name="bss138ps_v2_1__body3_material"/>
+    <material name="bss138ps_v2_1__body1_material"/>
+    <material name="bss138ps_v2_1__body7_material" rgba="0.25098 0.25098 0.25098 1"/>
+    <material name="camera_connector__rpi4modelb__imported17_material" rgba="0.25098 0.25098 0.25098 1"/>
+    <material name="camera_connector__rpi4modelb__imported12_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported14_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported16_material" rgba="0.901961 0.709804 0.439216 1"/>
+    <material name="camera_connector__rpi4modelb__imported5_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported6_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported1_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported3_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported11_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported2_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported7_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported15_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported8_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported13_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported10_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported4_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="camera_connector__rpi4modelb__imported9_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="microphone_plug__rpi4modelb__imported5_material" rgba="0.752941 0.752941 0.752941 1"/>
+    <material name="microphone_plug__rpi4modelb__imported4_material" rgba="0.101961 0.101961 0.101961 1"/>
+    <material name="microphone_plug__rpi4modelb__imported2_material" rgba="0.752941 0.752941 0.752941 1"/>
+    <material name="microphone_plug__rpi4modelb__imported3_material" rgba="0.752941 0.752941 0.752941 1"/>
+    <material name="microphone_plug__rpi4modelb__imported1_material" rgba="0.647059 0.619608 0.588235 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported7_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported9_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported8_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported3_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported1_material" rgba="0.647059 0.619608 0.588235 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported4_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported5_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported6_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported2_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="sd_card_slot__rpi4modelb__imported10_material" rgba="0.647059 0.619608 0.588235 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1_material" rgba="0.25098 0.25098 0.25098 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported18_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow_material" rgba="0.647059 0.619608 0.588235 1"/>
+    <material name="broadcom_bcm2711b0_cpu__rpi4modelb__top_material" rgba="0.647059 0.619608 0.588235 1"/>
+    <material name="display_connector__rpi4modelb__imported17_material" rgba="0.25098 0.25098 0.25098 1"/>
+    <material name="display_connector__rpi4modelb__imported15_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported14_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported1_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported8_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported11_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported6_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported12_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported4_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported5_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported3_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported13_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported16_material" rgba="0.901961 0.709804 0.439216 1"/>
+    <material name="display_connector__rpi4modelb__imported2_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported7_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported9_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="display_connector__rpi4modelb__imported10_material" rgba="0.647059 0.513725 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1_material" rgba="0.25098 0.25098 0.25098 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2_material" rgba="0.647059 0.517647 0 1"/>
+    <material name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3_material" rgba="0.647059 0.517647 0 1"/>
     <material name="right_bodymotorholder_material" rgba="0 0 1 1"/>
     <material name="right_motor_2_material" rgba="0.207843 0.2 0.2 1"/>
     <material name="right_biella_material" rgba="0.972549 0.529412 0.00392157 1"/>
@@ -84,77 +296,517 @@
     <material name="left_wheel_tire_holder_material" rgba="0.615686 0.811765 0.929412 1"/>
     <material name="left_tire_material" rgba="0.647059 0.647059 0.647059 1"/>
     <material name="left_manovella1_material" rgba="0.615686 0.811765 0.929412 1"/>
-    <mesh name="wheelmotorhub" file="wheelmotorhub.stl"/>
-    <mesh name="bodymotorholder" file="bodymotorholder.stl"/>
-    <mesh name="bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl"/>
-    <mesh name="wheel_tire_holder" file="wheel_tire_holder.stl"/>
-    <mesh name="body_lower" file="body_lower.stl"/>
-    <mesh name="manovella1" file="manovella1.stl"/>
-    <mesh name="biella" file="biella.stl"/>
-    <mesh name="manovella2" file="manovella2.stl"/>
-    <mesh name="robot_roof" file="robot_roof.stl"/>
-    <mesh name="motor_2" file="motor_2.stl"/>
-    <mesh name="motor_shaft_2" file="motor_shaft_2.stl"/>
-    <mesh name="smallplate_manovella2" file="smallplate_manovella2.stl"/>
-    <mesh name="wheelstickcover" file="wheelstickcover.stl"/>
+    <mesh name="handle_holder_2" file="handle_holder_2.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body14" file="bno085_9axis_imu_v1_1__body14.stl"/>
+    <mesh name="via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp" file="via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body30" file="bno085_9axis_imu_v1_1__body30.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported14" file="camera_connector__rpi4modelb__imported14.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported7" file="sd_card_slot__rpi4modelb__imported7.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported4" file="sd_card_slot__rpi4modelb__imported4.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported7" file="camera_connector__rpi4modelb__imported7.stl"/>
+    <mesh name="printed_circuit_board_1__body1" file="printed_circuit_board_1__body1.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8.stl"/>
+    <mesh name="bss138ps_v2_1__body5" file="bss138ps_v2_1__body5.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported4" file="display_connector__rpi4modelb__imported4.stl"/>
     <mesh name="pernobiella" file="pernobiella.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body8" file="bno085_9axis_imu_v1_1__body8.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported17" file="display_connector__rpi4modelb__imported17.stl"/>
+    <mesh name="capc_0603_t0_9_bn_v1_1__body1" file="capc_0603_t0_9_bn_v1_1__body1.stl"/>
+    <mesh name="wheelmotorhub" file="wheelmotorhub.stl"/>
+    <mesh name="power_box_lid" file="power_box_lid.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body28" file="bno085_9axis_imu_v1_1__body28.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported14" file="display_connector__rpi4modelb__imported14.stl"/>
+    <mesh name="imu_holder" file="imu_holder.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body16" file="bno055_9axis_imu_v2_1__body16.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15.stl"/>
+    <mesh name="crystal_xtal3215_32_768khz_v2_1__body3" file="crystal_xtal3215_32_768khz_v2_1__body3.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19.stl"/>
+    <mesh name="smallplate_manovella2" file="smallplate_manovella2.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported3" file="sd_card_slot__rpi4modelb__imported3.stl"/>
+    <mesh name="microphone_plug__rpi4modelb__imported5" file="microphone_plug__rpi4modelb__imported5.stl"/>
+    <mesh name="qwicc_v1_1__body7" file="qwicc_v1_1__body7.stl"/>
+    <mesh name="microphone_plug__rpi4modelb__imported3" file="microphone_plug__rpi4modelb__imported3.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body5" file="bno085_9axis_imu_v1_1__body5.stl"/>
+    <mesh name="2x_usb3_0_ports__rpi4modelb__imported1" file="2x_usb3_0_ports__rpi4modelb__imported1.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body18" file="bno085_9axis_imu_v1_1__body18.stl"/>
+    <mesh name="bss138ps_v2_1__body1" file="bss138ps_v2_1__body1.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported10" file="camera_connector__rpi4modelb__imported10.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body17" file="bno055_9axis_imu_v2_1__body17.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body29" file="bno085_9axis_imu_v1_1__body29.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body14" file="bno055_9axis_imu_v2_1__body14.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body4" file="bno055_9axis_imu_v2_1__body4.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported2" file="sd_card_slot__rpi4modelb__imported2.stl"/>
+    <mesh name="female_usb_type_c_connector__rpi4modelb__imported1" file="female_usb_type_c_connector__rpi4modelb__imported1.stl"/>
+    <mesh name="wheel_tire_holder" file="wheel_tire_holder.stl"/>
+    <mesh name="cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp" file="cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported11" file="camera_connector__rpi4modelb__imported11.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body21" file="bno055_9axis_imu_v2_1__body21.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body23" file="bno055_9axis_imu_v2_1__body23.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported4" file="camera_connector__rpi4modelb__imported4.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body31" file="bno085_9axis_imu_v1_1__body31.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40.stl"/>
+    <mesh name="wheelstickcover" file="wheelstickcover.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported7" file="display_connector__rpi4modelb__imported7.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported6" file="camera_connector__rpi4modelb__imported6.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body20" file="bno085_9axis_imu_v1_1__body20.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body15" file="bno055_9axis_imu_v2_1__body15.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body11" file="bno085_9axis_imu_v1_1__body11.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body22" file="bno055_9axis_imu_v2_1__body22.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body19" file="bno055_9axis_imu_v2_1__body19.stl"/>
+    <mesh name="crystal_xtal3215_32_768khz_v2_1__body4" file="crystal_xtal3215_32_768khz_v2_1__body4.stl"/>
+    <mesh name="bss138ps_v2_1__body3" file="bss138ps_v2_1__body3.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported10" file="sd_card_slot__rpi4modelb__imported10.stl"/>
+    <mesh name="capc_0805_t0_95_bn_v1_1__body1" file="capc_0805_t0_95_bn_v1_1__body1.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported8" file="camera_connector__rpi4modelb__imported8.stl"/>
+    <mesh name="crystal_xtal3215_32_768khz_v2_1__body1" file="crystal_xtal3215_32_768khz_v2_1__body1.stl"/>
+    <mesh name="body_tssop_1__body1" file="body_tssop_1__body1.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported6" file="sd_card_slot__rpi4modelb__imported6.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body27" file="bno085_9axis_imu_v1_1__body27.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported6" file="display_connector__rpi4modelb__imported6.stl"/>
+    <mesh name="sot23_5_v1_1__body3" file="sot23_5_v1_1__body3.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body19" file="bno085_9axis_imu_v1_1__body19.stl"/>
+    <mesh name="manovella2" file="manovella2.stl"/>
+    <mesh name="motor_shaft_2" file="motor_shaft_2.stl"/>
+    <mesh name="handle" file="handle.stl"/>
+    <mesh name="91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional" file="91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body10" file="bno085_9axis_imu_v1_1__body10.stl"/>
+    <mesh name="sot23_5_v1_1__body4" file="sot23_5_v1_1__body4.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported9" file="camera_connector__rpi4modelb__imported9.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29.stl"/>
+    <mesh name="motor_2" file="motor_2.stl"/>
+    <mesh name="led_0603_single_color_v1_1__body3" file="led_0603_single_color_v1_1__body3.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body20" file="bno055_9axis_imu_v2_1__body20.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported16" file="display_connector__rpi4modelb__imported16.stl"/>
+    <mesh name="broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow" file="broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body27" file="bno055_9axis_imu_v2_1__body27.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body26" file="bno055_9axis_imu_v2_1__body26.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported1" file="sd_card_slot__rpi4modelb__imported1.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported16" file="camera_connector__rpi4modelb__imported16.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body30" file="bno055_9axis_imu_v2_1__body30.stl"/>
+    <mesh name="microphone_plug__rpi4modelb__imported2" file="microphone_plug__rpi4modelb__imported2.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported10" file="display_connector__rpi4modelb__imported10.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body13" file="bno085_9axis_imu_v1_1__body13.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body26" file="bno085_9axis_imu_v1_1__body26.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body29" file="bno055_9axis_imu_v2_1__body29.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32.stl"/>
+    <mesh name="manovella1" file="manovella1.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported1" file="display_connector__rpi4modelb__imported1.stl"/>
+    <mesh name="gigabit_ethernet_port__rpi4modelb__imported1" file="gigabit_ethernet_port__rpi4modelb__imported1.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body25" file="bno085_9axis_imu_v1_1__body25.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body9" file="bno085_9axis_imu_v1_1__body9.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34.stl"/>
+    <mesh name="sot23_5_v1_1__body6" file="sot23_5_v1_1__body6.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body12" file="bno085_9axis_imu_v1_1__body12.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body15" file="bno085_9axis_imu_v1_1__body15.stl"/>
+    <mesh name="biella" file="biella.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported15" file="camera_connector__rpi4modelb__imported15.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported5" file="display_connector__rpi4modelb__imported5.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body23" file="bno085_9axis_imu_v1_1__body23.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body24" file="bno085_9axis_imu_v1_1__body24.stl"/>
+    <mesh name="sot23_5_v1_1__body5" file="sot23_5_v1_1__body5.stl"/>
+    <mesh name="body_lower" file="body_lower.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported17" file="camera_connector__rpi4modelb__imported17.stl"/>
+    <mesh name="bodymotorholder" file="bodymotorholder.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported9" file="display_connector__rpi4modelb__imported9.stl"/>
+    <mesh name="led_0603_single_color_v1_1__body4" file="led_0603_single_color_v1_1__body4.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25.stl"/>
+    <mesh name="broadcom_bcm2711b0_cpu__rpi4modelb__top" file="broadcom_bcm2711b0_cpu__rpi4modelb__top.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported12" file="camera_connector__rpi4modelb__imported12.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported2" file="camera_connector__rpi4modelb__imported2.stl"/>
+    <mesh name="mxl7704_universal_pmic__rpi4modelb__partnoextended" file="mxl7704_universal_pmic__rpi4modelb__partnoextended.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body1" file="bno055_9axis_imu_v2_1__body1.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body7" file="bno055_9axis_imu_v2_1__body7.stl"/>
+    <mesh name="bss138ps_v2_1__body6" file="bss138ps_v2_1__body6.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body16" file="bno085_9axis_imu_v1_1__body16.stl"/>
+    <mesh name="microphone_plug__rpi4modelb__imported4" file="microphone_plug__rpi4modelb__imported4.stl"/>
+    <mesh name="handle_holder_1" file="handle_holder_1.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported9" file="sd_card_slot__rpi4modelb__imported9.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4.stl"/>
     <mesh name="tire" file="tire.stl"/>
-    <mesh name="right_bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl"/>
-    <mesh name="right_bodymotorholder" file="bodymotorholder.stl"/>
-    <mesh name="right_manovella1" file="manovella1.stl"/>
-    <mesh name="right_motor_2" file="motor_2.stl"/>
-    <mesh name="right_motor_shaft_2" file="motor_shaft_2.stl"/>
-    <mesh name="right_wheel_tire_holder" file="wheel_tire_holder.stl"/>
-    <mesh name="right_tire" content_type="model/stl" file="tire.stl"/>
-    <mesh name="right_manovella2" file="manovella2.stl"/>
-    <mesh name="right_smallplate_manovella2" file="smallplate_manovella2.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body21" file="bno085_9axis_imu_v1_1__body21.stl"/>
+    <mesh name="power_dist_box" file="power_dist_box.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body6" file="bno085_9axis_imu_v1_1__body6.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body13" file="bno055_9axis_imu_v2_1__body13.stl"/>
+    <mesh name="led_0603_single_color_v1_1__body5" file="led_0603_single_color_v1_1__body5.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body1" file="bno085_9axis_imu_v1_1__body1.stl"/>
+    <mesh name="qwicc_v1_1__body1" file="qwicc_v1_1__body1.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported5" file="sd_card_slot__rpi4modelb__imported5.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body2" file="bno085_9axis_imu_v1_1__body2.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27.stl"/>
+    <mesh name="crystal_xtal3215_32_768khz_v2_1__body2" file="crystal_xtal3215_32_768khz_v2_1__body2.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported3" file="camera_connector__rpi4modelb__imported3.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body25" file="bno055_9axis_imu_v2_1__body25.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body28" file="bno055_9axis_imu_v2_1__body28.stl"/>
+    <mesh name="sot23_5_v1_1__body2" file="sot23_5_v1_1__body2.stl"/>
+    <mesh name="microphone_plug__rpi4modelb__imported1" file="microphone_plug__rpi4modelb__imported1.stl"/>
+    <mesh name="qwicc_v1_1__body2" file="qwicc_v1_1__body2.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body22" file="bno085_9axis_imu_v1_1__body22.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body3" file="bno085_9axis_imu_v1_1__body3.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body2" file="bno055_9axis_imu_v2_1__body2.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body4" file="bno085_9axis_imu_v1_1__body4.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported13" file="display_connector__rpi4modelb__imported13.stl"/>
+    <mesh name="qwicc_v1_1__body4" file="qwicc_v1_1__body4.stl"/>
+    <mesh name="bss138ps_v2_1__body4" file="bss138ps_v2_1__body4.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body8" file="bno055_9axis_imu_v2_1__body8.stl"/>
+    <mesh name="bss138ps_v2_1__body2" file="bss138ps_v2_1__body2.stl"/>
+    <mesh name="sd_card_slot__rpi4modelb__imported8" file="sd_card_slot__rpi4modelb__imported8.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33.stl"/>
+    <mesh name="bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body18" file="bno055_9axis_imu_v2_1__body18.stl"/>
+    <mesh name="broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3" file="broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3.stl"/>
+    <mesh name="sot23_5_v1_1__body1" file="sot23_5_v1_1__body1.stl"/>
+    <mesh name="pcb__rpi4modelb__cornerradius" file="pcb__rpi4modelb__cornerradius.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported18" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported18.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported2" file="display_connector__rpi4modelb__imported2.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported8" file="display_connector__rpi4modelb__imported8.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body31" file="bno055_9axis_imu_v2_1__body31.stl"/>
+    <mesh name="robot_roof" file="robot_roof.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11.stl"/>
+    <mesh name="lead_tssop_1__body1" file="lead_tssop_1__body1.stl"/>
+    <mesh name="yc164_respack_v1_1__body1" file="yc164_respack_v1_1__body1.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body6" file="bno055_9axis_imu_v2_1__body6.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body17" file="bno085_9axis_imu_v1_1__body17.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported13" file="camera_connector__rpi4modelb__imported13.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported11" file="display_connector__rpi4modelb__imported11.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported5" file="camera_connector__rpi4modelb__imported5.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16.stl"/>
+    <mesh name="qwicc_v1_1__body3" file="qwicc_v1_1__body3.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body5" file="bno055_9axis_imu_v2_1__body5.stl"/>
+    <mesh name="led_0603_single_color_v1_1__body1" file="led_0603_single_color_v1_1__body1.stl"/>
+    <mesh name="qwicc_v1_1__body5" file="qwicc_v1_1__body5.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported15" file="display_connector__rpi4modelb__imported15.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body10" file="bno055_9axis_imu_v2_1__body10.stl"/>
+    <mesh name="qwicc_v1_1__body6" file="qwicc_v1_1__body6.stl"/>
+    <mesh name="camera_connector__rpi4modelb__imported1" file="camera_connector__rpi4modelb__imported1.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39.stl"/>
+    <mesh name="bss138ps_v2_1__body7" file="bss138ps_v2_1__body7.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body9" file="bno055_9axis_imu_v2_1__body9.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body12" file="bno055_9axis_imu_v2_1__body12.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body24" file="bno055_9axis_imu_v2_1__body24.stl"/>
+    <mesh name="female_micro_hdmi_connector__rpi4modelb__imported1" file="female_micro_hdmi_connector__rpi4modelb__imported1.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body3" file="bno055_9axis_imu_v2_1__body3.stl"/>
+    <mesh name="bno055_9axis_imu_v2_1__body11" file="bno055_9axis_imu_v2_1__body11.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported12" file="display_connector__rpi4modelb__imported12.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20.stl"/>
+    <mesh name="rpi_holder" file="rpi_holder.stl"/>
+    <mesh name="bno085_9axis_imu_v1_1__body7" file="bno085_9axis_imu_v1_1__body7.stl"/>
+    <mesh name="display_connector__rpi4modelb__imported3" file="display_connector__rpi4modelb__imported3.stl"/>
+    <mesh name="led_0603_single_color_v1_1__body2" file="led_0603_single_color_v1_1__body2.stl"/>
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2.stl"/>
+    <mesh name="2x_usb2_0_ports__rpi4modelb__imported1" file="2x_usb2_0_ports__rpi4modelb__imported1.stl"/>
     <mesh name="right_biella" file="biella.stl"/>
-    <mesh name="right_wheelmotorhub" file="wheelmotorhub.stl"/>
-    <mesh name="right_wheelstickcover" file="wheelstickcover.stl"/>
     <mesh name="right_pernobiella" file="pernobiella.stl"/>
-    <mesh name="left_wheelmotorhub" file="wheelmotorhub.stl"/>
-    <mesh name="left_bodymotorholder" file="bodymotorholder.stl"/>
-    <mesh name="left_motor_shaft_2" file="motor_shaft_2.stl"/>
-    <mesh name="left_wheel_tire_holder" file="wheel_tire_holder.stl"/>
-    <mesh name="left_smallplate_manovella2" file="smallplate_manovella2.stl"/>
-    <mesh name="left_manovella2" file="manovella2.stl"/>
+    <mesh name="right_wheelmotorhub" file="wheelmotorhub.stl"/>
+    <mesh name="right_motor_2" file="motor_2.stl"/>
+    <mesh name="right_manovella2" file="manovella2.stl"/>
+    <mesh name="right_bodymotorholder" file="bodymotorholder.stl"/>
+    <mesh name="right_smallplate_manovella2" file="smallplate_manovella2.stl"/>
+    <mesh name="right_motor_shaft_2" file="motor_shaft_2.stl"/>
+    <mesh name="right_manovella1" file="manovella1.stl"/>
+    <mesh name="right_tire" file="tire.stl"/>
+    <mesh name="right_bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl"/>
+    <mesh name="right_wheel_tire_holder" file="wheel_tire_holder.stl"/>
+    <mesh name="right_wheelstickcover" file="wheelstickcover.stl"/>
     <mesh name="left_wheelstickcover" file="wheelstickcover.stl"/>
-    <mesh name="left_manovella1" file="manovella1.stl"/>
-    <mesh name="left_bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl"/>
-    <mesh name="left_biella" file="biella.stl"/>
     <mesh name="left_pernobiella" file="pernobiella.stl"/>
-    <mesh name="left_tire" content_type="model/stl" file="tire.stl"/>
+    <mesh name="left_bodymotorholder" file="bodymotorholder.stl"/>
+    <mesh name="left_wheelmotorhub" file="wheelmotorhub.stl"/>
+    <mesh name="left_biella" file="biella.stl"/>
+    <mesh name="left_bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl"/>
+    <mesh name="left_tire" file="tire.stl"/>
     <mesh name="left_motor_2" file="motor_2.stl"/>
+    <mesh name="left_wheel_tire_holder" file="wheel_tire_holder.stl"/>
+    <mesh name="left_manovella1" file="manovella1.stl"/>
+    <mesh name="left_manovella2" file="manovella2.stl"/>
+    <mesh name="left_motor_shaft_2" file="motor_shaft_2.stl"/>
+    <mesh name="left_smallplate_manovella2" file="smallplate_manovella2.stl"/>
   </asset>
 
   <worldbody>
     <body name="torso" childclass="robot">
-      <inertial pos="0.00732285 0.140014 -0.322029" quat="0.998727 6.67773e-05 5.54547e-05 -0.0504371" mass="0.148617" diaginertia="0.000414771 0.00036831 0.000236724"/>
-      <joint type="free"/>
-      <geom class="visual" pos="-0.0418686 0.14748 -0.374031" quat="0.630514 0 0 -0.776178" material="robot_roof_material" mesh="robot_roof"/>
-      <geom class="collision" pos="-0.0418686 0.14748 -0.374031" quat="0.630514 0 0 -0.776178" type="mesh" material="robot_roof_material" mesh="robot_roof"/>
-      <geom class="visual" pos="0.0107876 0.136457 -0.382031" quat="0.630514 0 0 -0.776178" material="body_lower_material" mesh="body_lower"/>
-      <geom class="collision" pos="0.0107876 0.136457 -0.382031" quat="0.630514 0 0 -0.776178" type="mesh" material="body_lower_material" mesh="body_lower"/>
-      <!-- The torso frame is inherited from the Onshape assembly, so its axes
-           mean nothing physically: torso z runs along the wheel axle. The IMU
-           therefore gets an explicit frame sitting on the roof plate's top
-           face, x forward, y left, z out of the roof, matching a BNO085 bolted
-           flat to the roof. Origin is 35 mm right of the centre of that
-           162 x 100 mm face, where the board is bolted down.
-           Regenerate with SandroControl/tools/imu_frame.py after a re-export;
-           imu_x/imu_y/imu_z are the drawn triad and carry no dynamics. -->
-      <frame name="imu_mount" pos="-0.052683638 0.1446357 -0.28703048" quat="0.548848255 -0.548848255 -0.445831351 0.445831351">
-        <site name="imu" size="0.005" group="2" rgba="1 0.85 0.1 1"/>
-        <site name="imu_x" type="cylinder" fromto="0 0 0 0.045 0 0" size="0.002" group="2" rgba="0.9 0.12 0.12 1"/>
-        <site name="imu_x_tip" type="ellipsoid" pos="0.0515 0 0" size="0.0075 0.0045 0.0045" group="2" rgba="0.9 0.12 0.12 1"/>
-        <site name="imu_y" type="cylinder" fromto="0 0 0 0 0.045 0" size="0.002" group="2" rgba="0.12 0.8 0.2 1"/>
-        <site name="imu_y_tip" type="ellipsoid" pos="0 0.0515 0" size="0.0045 0.0075 0.0045" group="2" rgba="0.12 0.8 0.2 1"/>
-        <site name="imu_z" type="cylinder" fromto="0 0 0 0 0 0.045" size="0.002" group="2" rgba="0.15 0.4 0.95 1"/>
-        <site name="imu_z_tip" type="ellipsoid" pos="0 0 0.0515" size="0.0045 0.0045 0.0075" group="2" rgba="0.15 0.4 0.95 1"/>
-      </frame>
-      <frame name="right_mount" childclass="robot">
-        <body name="right_bodymotorholder" childclass="right_leg" pos="-0.0233044 -0.00658978 -0.195119" quat="0.999057 0 0 0.0434255">
-          <inertial pos="0.058335 0.135685 0.0193059" quat="0.65109 0.703082 0.0742636 -0.276122" mass="0.808243" diaginertia="0.00208236 0.00198527 0.000485113"/>
+      <inertial pos="0.06574 0.375747 -0.351331" quat="0.544017 0.545487 0.45134 0.450312" mass="1.05" diaginertia="0.00369012 0.00277172 0.00276242"/>
+      <joint class="main" type="free"/>
+      <geom class="visual" pos="0.0261725 0.384364 -0.351331" quat="0.548841 -0.548841 -0.445841 0.445841" material="handle_holder_1_material" mesh="handle_holder_1"/>
+      <geom class="visual" pos="0.0261725 0.384364 -0.351331" quat="0.548841 -0.548841 -0.445841 0.445841" material="handle_holder_2_material" mesh="handle_holder_2"/>
+      <geom class="visual" pos="0.0914954 0.370689 -0.411331" quat="0.630514 0 0 -0.776178" material="body_lower_material" mesh="body_lower"/>
+      <geom class="collision" pos="0.0914954 0.370689 -0.411331" quat="0.630514 0 0 -0.776178" type="mesh" material="body_lower_material" mesh="body_lower"/>
+      <geom class="visual" pos="0.0261725 0.384364 -0.351331" quat="0.445841 0.445841 -0.548841 -0.548841" material="handle_material" mesh="handle"/>
+      <geom class="collision" pos="0.0261725 0.384364 -0.351331" quat="0.445841 0.445841 -0.548841 -0.548841" type="mesh" material="handle_material" mesh="handle"/>
+      <geom class="visual" pos="0.0914954 0.370689 -0.351331" quat="0.548841 -0.548841 -0.445841 0.445841" material="power_box_lid_material" mesh="power_box_lid"/>
+      <geom class="visual" pos="0.013332 0.323028 -0.351329" quat="0.548841 -0.548841 -0.445841 0.445841" material="imu_holder_material" mesh="imu_holder"/>
+      <geom class="visual" pos="0.0914954 0.370689 -0.351331" quat="0.548841 -0.548841 -0.445841 0.445841" material="power_dist_box_material" mesh="power_dist_box"/>
+      <geom class="visual" pos="0.0388391 0.381713 -0.403331" quat="0.630514 0 0 -0.776178" material="rpi_holder_material" mesh="rpi_holder"/>
+      <geom class="collision" pos="0.0388391 0.381713 -0.403331" quat="0.630514 0 0 -0.776178" type="mesh" material="rpi_holder_material" mesh="rpi_holder"/>
+      <geom class="visual" pos="0.0388391 0.381713 -0.403331" quat="0.630514 0 0 -0.776178" material="robot_roof_material" mesh="robot_roof"/>
+      <geom class="collision" pos="0.0388391 0.381713 -0.403331" quat="0.630514 0 0 -0.776178" type="mesh" material="robot_roof_material" mesh="robot_roof"/>
+      <geom class="visual" pos="0.00795818 0.354214 -0.355492" quat="0.548841 -0.548841 -0.445841 0.445841" material="yc164_respack_v1_1__body1_material" mesh="yc164_respack_v1_1__body1"/>
+      <geom class="visual" pos="0.00745972 0.351833 -0.352712" quat="0.548841 -0.548841 -0.445841 0.445841" material="capc_0603_t0_9_bn_v1_1__body1_material" mesh="capc_0603_t0_9_bn_v1_1__body1"/>
+      <geom class="visual" pos="0.007299 0.351066 -0.362752" quat="0.548841 -0.548841 -0.445841 0.445841" material="capc_0603_t0_9_bn_v1_1__body1_material" mesh="capc_0603_t0_9_bn_v1_1__body1"/>
+      <geom class="visual" pos="0.00789113 0.353894 -0.346153" quat="0.072832 -0.703346 0.072832 0.703346" material="capc_0603_t0_9_bn_v1_1__body1_material" mesh="capc_0603_t0_9_bn_v1_1__body1"/>
+      <geom class="visual" pos="0.00714434 0.350327 -0.34647" quat="0.703346 -0.072832 -0.703346 -0.072832" material="yc164_respack_v1_1__body1_material" mesh="yc164_respack_v1_1__body1"/>
+      <geom class="visual" pos="0.00816063 0.355182 -0.346291" quat="0.072832 -0.703346 0.072832 0.703346" material="capc_0603_t0_9_bn_v1_1__body1_material" mesh="capc_0603_t0_9_bn_v1_1__body1"/>
+      <geom class="visual" pos="0.00738993 0.3515 -0.347408" quat="0.548841 -0.548841 -0.445841 0.445841" material="capc_0603_t0_9_bn_v1_1__body1_material" mesh="capc_0603_t0_9_bn_v1_1__body1"/>
+      <geom class="visual" pos="0.00936008 0.360911 -0.341736" quat="0.445841 0.445841 -0.548841 -0.548841" material="capc_0805_t0_95_bn_v1_1__body1_material" mesh="capc_0805_t0_95_bn_v1_1__body1"/>
+      <geom class="visual" pos="0.00767687 0.352871 -0.355055" quat="0.072832 -0.703346 0.072832 0.703346" material="yc164_respack_v1_1__body1_material" mesh="yc164_respack_v1_1__body1"/>
+      <geom class="visual" pos="0.00869151 0.357717 -0.345559" quat="0.445841 0.445841 -0.548841 -0.548841" material="capc_0805_t0_95_bn_v1_1__body1_material" mesh="capc_0805_t0_95_bn_v1_1__body1"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="printed_circuit_board_1__body1_material" mesh="printed_circuit_board_1__body1"/>
+      <geom class="visual" pos="-0.00768688 0.305845 -0.312842" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="gigabit_ethernet_port__rpi4modelb__imported1_material" mesh="gigabit_ethernet_port__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.0296972 0.305068 -0.321277" quat="0.0728321 0.703346 -0.072832 0.703346" material="2x_usb2_0_ports__rpi4modelb__imported1_material" mesh="2x_usb2_0_ports__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.037876 0.303203 -0.361342" quat="0.0728321 0.703346 -0.072832 0.703346" material="female_micro_hdmi_connector__rpi4modelb__imported1_material" mesh="female_micro_hdmi_connector__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.037876 0.303203 -0.374842" quat="0.0728321 0.703346 -0.072832 0.703346" material="female_micro_hdmi_connector__rpi4modelb__imported1_material" mesh="female_micro_hdmi_connector__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.0267301 0.305536 -0.390842" quat="0.0728321 0.703346 -0.072832 0.703346" material="mxl7704_universal_pmic__rpi4modelb__partnoextended_material" mesh="mxl7704_universal_pmic__rpi4modelb__partnoextended"/>
+      <geom class="visual" pos="0.0149847 0.307995 -0.340842" quat="0.0728321 0.703346 -0.072832 0.703346" material="via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp_material" mesh="via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp"/>
+      <geom class="visual" pos="0.00666509 0.309737 -0.356092" quat="0.0728321 0.703346 -0.072832 0.703346" material="91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional_material" mesh="91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional"/>
+      <geom class="visual" pos="0.0370483 0.303376 -0.389642" quat="0.0728321 0.703346 -0.072832 0.703346" material="female_usb_type_c_connector__rpi4modelb__imported1_material" mesh="female_usb_type_c_connector__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.0112335 0.309598 -0.358342" quat="0.0728321 0.703346 -0.072832 0.703346" material="pcb__rpi4modelb__cornerradius_material" mesh="pcb__rpi4modelb__cornerradius"/>
+      <geom class="collision" pos="0.0112335 0.309598 -0.358342" quat="0.0728321 0.703346 -0.072832 0.703346" type="mesh" material="pcb__rpi4modelb__cornerradius_material" mesh="pcb__rpi4modelb__cornerradius"/>
+      <geom class="visual" pos="-0.00312273 0.311786 -0.388842" quat="0.0728321 0.703346 -0.072832 0.703346" material="cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp_material" mesh="cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp"/>
+      <geom class="visual" pos="0.00128179 0.310864 -0.341842" quat="0.0728321 0.703346 -0.072832 0.703346" material="broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3_material" mesh="broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3"/>
+      <geom class="visual" pos="0.0120484 0.30861 -0.321272" quat="0.0728321 0.703346 -0.072832 0.703346" material="2x_usb3_0_ports__rpi4modelb__imported1_material" mesh="2x_usb3_0_ports__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body19_material" mesh="bno085_9axis_imu_v1_1__body19"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body29_material" mesh="bno085_9axis_imu_v1_1__body29"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body30_material" mesh="bno085_9axis_imu_v1_1__body30"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body3_material" mesh="bno085_9axis_imu_v1_1__body3"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body27_material" mesh="bno085_9axis_imu_v1_1__body27"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body18_material" mesh="bno085_9axis_imu_v1_1__body18"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body8_material" mesh="bno085_9axis_imu_v1_1__body8"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body10_material" mesh="bno085_9axis_imu_v1_1__body10"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body1_material" mesh="bno085_9axis_imu_v1_1__body1"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body31_material" mesh="bno085_9axis_imu_v1_1__body31"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body21_material" mesh="bno085_9axis_imu_v1_1__body21"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body11_material" mesh="bno085_9axis_imu_v1_1__body11"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body24_material" mesh="bno085_9axis_imu_v1_1__body24"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body17_material" mesh="bno085_9axis_imu_v1_1__body17"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body6_material" mesh="bno085_9axis_imu_v1_1__body6"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body26_material" mesh="bno085_9axis_imu_v1_1__body26"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body12_material" mesh="bno085_9axis_imu_v1_1__body12"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body2_material" mesh="bno085_9axis_imu_v1_1__body2"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body25_material" mesh="bno085_9axis_imu_v1_1__body25"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body22_material" mesh="bno085_9axis_imu_v1_1__body22"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body9_material" mesh="bno085_9axis_imu_v1_1__body9"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body15_material" mesh="bno085_9axis_imu_v1_1__body15"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body14_material" mesh="bno085_9axis_imu_v1_1__body14"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body20_material" mesh="bno085_9axis_imu_v1_1__body20"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body4_material" mesh="bno085_9axis_imu_v1_1__body4"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body13_material" mesh="bno085_9axis_imu_v1_1__body13"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body16_material" mesh="bno085_9axis_imu_v1_1__body16"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body7_material" mesh="bno085_9axis_imu_v1_1__body7"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body28_material" mesh="bno085_9axis_imu_v1_1__body28"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body5_material" mesh="bno085_9axis_imu_v1_1__body5"/>
+      <geom class="visual" pos="0.00819135 0.355328 -0.351366" quat="0.072832 -0.703346 0.072832 0.703346" material="bno085_9axis_imu_v1_1__body23_material" mesh="bno085_9axis_imu_v1_1__body23"/>
+      <geom class="visual" pos="0.00944311 0.361208 -0.344613" quat="0.703346 -0.072832 -0.703346 -0.072832" material="sot23_5_v1_1__body4_material" mesh="sot23_5_v1_1__body4"/>
+      <geom class="visual" pos="0.00944311 0.361208 -0.344613" quat="0.703346 -0.072832 -0.703346 -0.072832" material="sot23_5_v1_1__body2_material" mesh="sot23_5_v1_1__body2"/>
+      <geom class="visual" pos="0.00944311 0.361208 -0.344613" quat="0.703346 -0.072832 -0.703346 -0.072832" material="sot23_5_v1_1__body5_material" mesh="sot23_5_v1_1__body5"/>
+      <geom class="visual" pos="0.00944311 0.361208 -0.344613" quat="0.703346 -0.072832 -0.703346 -0.072832" material="sot23_5_v1_1__body6_material" mesh="sot23_5_v1_1__body6"/>
+      <geom class="visual" pos="0.00944311 0.361208 -0.344613" quat="0.703346 -0.072832 -0.703346 -0.072832" material="sot23_5_v1_1__body3_material" mesh="sot23_5_v1_1__body3"/>
+      <geom class="visual" pos="0.00944311 0.361208 -0.344613" quat="0.703346 -0.072832 -0.703346 -0.072832" material="sot23_5_v1_1__body1_material" mesh="sot23_5_v1_1__body1"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body28_material" mesh="bno055_9axis_imu_v2_1__body28"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body8_material" mesh="bno055_9axis_imu_v2_1__body8"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body13_material" mesh="bno055_9axis_imu_v2_1__body13"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body24_material" mesh="bno055_9axis_imu_v2_1__body24"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body29_material" mesh="bno055_9axis_imu_v2_1__body29"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body6_material" mesh="bno055_9axis_imu_v2_1__body6"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body2_material" mesh="bno055_9axis_imu_v2_1__body2"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body17_material" mesh="bno055_9axis_imu_v2_1__body17"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body7_material" mesh="bno055_9axis_imu_v2_1__body7"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body18_material" mesh="bno055_9axis_imu_v2_1__body18"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body22_material" mesh="bno055_9axis_imu_v2_1__body22"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body5_material" mesh="bno055_9axis_imu_v2_1__body5"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body12_material" mesh="bno055_9axis_imu_v2_1__body12"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body30_material" mesh="bno055_9axis_imu_v2_1__body30"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body27_material" mesh="bno055_9axis_imu_v2_1__body27"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body26_material" mesh="bno055_9axis_imu_v2_1__body26"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body20_material" mesh="bno055_9axis_imu_v2_1__body20"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body31_material" mesh="bno055_9axis_imu_v2_1__body31"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body19_material" mesh="bno055_9axis_imu_v2_1__body19"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body10_material" mesh="bno055_9axis_imu_v2_1__body10"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body25_material" mesh="bno055_9axis_imu_v2_1__body25"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body14_material" mesh="bno055_9axis_imu_v2_1__body14"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body15_material" mesh="bno055_9axis_imu_v2_1__body15"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body3_material" mesh="bno055_9axis_imu_v2_1__body3"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body21_material" mesh="bno055_9axis_imu_v2_1__body21"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body1_material" mesh="bno055_9axis_imu_v2_1__body1"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body23_material" mesh="bno055_9axis_imu_v2_1__body23"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body4_material" mesh="bno055_9axis_imu_v2_1__body4"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body11_material" mesh="bno055_9axis_imu_v2_1__body11"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body16_material" mesh="bno055_9axis_imu_v2_1__body16"/>
+      <geom class="visual" pos="0.00997735 0.355807 -0.351326" quat="0.072832 -0.703346 0.072832 0.703346" material="bno055_9axis_imu_v2_1__body9_material" mesh="bno055_9axis_imu_v2_1__body9"/>
+      <geom class="visual" pos="0.00751911 0.352154 -0.340216" quat="0.445841 0.445841 -0.548841 -0.548841" material="led_0603_single_color_v1_1__body1_material" mesh="led_0603_single_color_v1_1__body1"/>
+      <geom class="visual" pos="0.00751911 0.352154 -0.340216" quat="0.445841 0.445841 -0.548841 -0.548841" material="led_0603_single_color_v1_1__body2_material" mesh="led_0603_single_color_v1_1__body2"/>
+      <geom class="visual" pos="0.00751911 0.352154 -0.340216" quat="0.445841 0.445841 -0.548841 -0.548841" material="led_0603_single_color_v1_1__body4_material" mesh="led_0603_single_color_v1_1__body4"/>
+      <geom class="visual" pos="0.00751911 0.352154 -0.340216" quat="0.445841 0.445841 -0.548841 -0.548841" material="led_0603_single_color_v1_1__body3_material" mesh="led_0603_single_color_v1_1__body3"/>
+      <geom class="visual" pos="0.00751911 0.352154 -0.340216" quat="0.445841 0.445841 -0.548841 -0.548841" material="led_0603_single_color_v1_1__body5_material" mesh="led_0603_single_color_v1_1__body5"/>
+      <geom class="visual" pos="0.00865648 0.356062 -0.342869" quat="0.776178 0 0 0.630514" material="qwicc_v1_1__body4_material" mesh="qwicc_v1_1__body4"/>
+      <geom class="visual" pos="0.00865648 0.356062 -0.342869" quat="0.776178 0 0 0.630514" material="qwicc_v1_1__body6_material" mesh="qwicc_v1_1__body6"/>
+      <geom class="visual" pos="0.00865648 0.356062 -0.342869" quat="0.776178 0 0 0.630514" material="qwicc_v1_1__body2_material" mesh="qwicc_v1_1__body2"/>
+      <geom class="visual" pos="0.00865648 0.356062 -0.342869" quat="0.776178 0 0 0.630514" material="qwicc_v1_1__body1_material" mesh="qwicc_v1_1__body1"/>
+      <geom class="visual" pos="0.00865648 0.356062 -0.342869" quat="0.776178 0 0 0.630514" material="qwicc_v1_1__body7_material" mesh="qwicc_v1_1__body7"/>
+      <geom class="visual" pos="0.00865648 0.356062 -0.342869" quat="0.776178 0 0 0.630514" material="qwicc_v1_1__body3_material" mesh="qwicc_v1_1__body3"/>
+      <geom class="visual" pos="0.00865648 0.356062 -0.342869" quat="0.776178 0 0 0.630514" material="qwicc_v1_1__body5_material" mesh="qwicc_v1_1__body5"/>
+      <geom class="visual" pos="0.00865715 0.356065 -0.359787" quat="0 0.630514 -0.776178 0" material="qwicc_v1_1__body4_material" mesh="qwicc_v1_1__body4"/>
+      <geom class="visual" pos="0.00865715 0.356065 -0.359787" quat="0 0.630514 -0.776178 0" material="qwicc_v1_1__body6_material" mesh="qwicc_v1_1__body6"/>
+      <geom class="visual" pos="0.00865715 0.356065 -0.359787" quat="0 0.630514 -0.776178 0" material="qwicc_v1_1__body2_material" mesh="qwicc_v1_1__body2"/>
+      <geom class="visual" pos="0.00865715 0.356065 -0.359787" quat="0 0.630514 -0.776178 0" material="qwicc_v1_1__body1_material" mesh="qwicc_v1_1__body1"/>
+      <geom class="visual" pos="0.00865715 0.356065 -0.359787" quat="0 0.630514 -0.776178 0" material="qwicc_v1_1__body7_material" mesh="qwicc_v1_1__body7"/>
+      <geom class="visual" pos="0.00865715 0.356065 -0.359787" quat="0 0.630514 -0.776178 0" material="qwicc_v1_1__body3_material" mesh="qwicc_v1_1__body3"/>
+      <geom class="visual" pos="0.00865715 0.356065 -0.359787" quat="0 0.630514 -0.776178 0" material="qwicc_v1_1__body5_material" mesh="qwicc_v1_1__body5"/>
+      <geom class="visual" pos="0.00847933 0.357924 -0.35342" quat="0 0.630514 -0.776178 0" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00874571 0.359196 -0.35342" quat="0 0.630514 -0.776178 0" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00927846 0.361741 -0.34827" quat="0.776178 0 0 0.630514" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00941165 0.362377 -0.34827" quat="0.776178 0 0 0.630514" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00852462 0.360239 -0.350845" quat="0.548841 -0.445841 0.548841 0.445841" material="body_tssop_1__body1_material" mesh="body_tssop_1__body1"/>
+      <geom class="visual" pos="0.00861252 0.35856 -0.35342" quat="0 0.630514 -0.776178 0" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00861252 0.35856 -0.34827" quat="0.776178 0 0 0.630514" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00901209 0.360469 -0.34827" quat="0.776178 0 0 0.630514" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00941165 0.362377 -0.35342" quat="0 0.630514 -0.776178 0" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00914527 0.361105 -0.35342" quat="0 0.630514 -0.776178 0" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00901209 0.360469 -0.35342" quat="0 0.630514 -0.776178 0" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00914527 0.361105 -0.34827" quat="0.776178 0 0 0.630514" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.0088789 0.359833 -0.35342" quat="0 0.630514 -0.776178 0" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.0088789 0.359833 -0.34827" quat="0.776178 0 0 0.630514" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00927846 0.361741 -0.35342" quat="0 0.630514 -0.776178 0" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00847933 0.357924 -0.34827" quat="0.776178 0 0 0.630514" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.00874571 0.359196 -0.34827" quat="0.776178 0 0 0.630514" material="lead_tssop_1__body1_material" mesh="lead_tssop_1__body1"/>
+      <geom class="visual" pos="0.007361 0.351362 -0.350054" quat="0.072832 -0.703346 0.072832 0.703346" material="crystal_xtal3215_32_768khz_v2_1__body3_material" mesh="crystal_xtal3215_32_768khz_v2_1__body3"/>
+      <geom class="visual" pos="0.007361 0.351362 -0.350054" quat="0.072832 -0.703346 0.072832 0.703346" material="crystal_xtal3215_32_768khz_v2_1__body4_material" mesh="crystal_xtal3215_32_768khz_v2_1__body4"/>
+      <geom class="visual" pos="0.007361 0.351362 -0.350054" quat="0.072832 -0.703346 0.072832 0.703346" material="crystal_xtal3215_32_768khz_v2_1__body1_material" mesh="crystal_xtal3215_32_768khz_v2_1__body1"/>
+      <geom class="visual" pos="0.007361 0.351362 -0.350054" quat="0.072832 -0.703346 0.072832 0.703346" material="crystal_xtal3215_32_768khz_v2_1__body2_material" mesh="crystal_xtal3215_32_768khz_v2_1__body2"/>
+      <geom class="visual" pos="0.00735303 0.35169 -0.360168" quat="0.445841 0.445841 -0.548841 -0.548841" material="bss138ps_v2_1__body2_material" mesh="bss138ps_v2_1__body2"/>
+      <geom class="visual" pos="0.00735303 0.35169 -0.360168" quat="0.445841 0.445841 -0.548841 -0.548841" material="bss138ps_v2_1__body4_material" mesh="bss138ps_v2_1__body4"/>
+      <geom class="visual" pos="0.00735303 0.35169 -0.360168" quat="0.445841 0.445841 -0.548841 -0.548841" material="bss138ps_v2_1__body6_material" mesh="bss138ps_v2_1__body6"/>
+      <geom class="visual" pos="0.00735303 0.35169 -0.360168" quat="0.445841 0.445841 -0.548841 -0.548841" material="bss138ps_v2_1__body5_material" mesh="bss138ps_v2_1__body5"/>
+      <geom class="visual" pos="0.00735303 0.35169 -0.360168" quat="0.445841 0.445841 -0.548841 -0.548841" material="bss138ps_v2_1__body3_material" mesh="bss138ps_v2_1__body3"/>
+      <geom class="visual" pos="0.00735303 0.35169 -0.360168" quat="0.445841 0.445841 -0.548841 -0.548841" material="bss138ps_v2_1__body1_material" mesh="bss138ps_v2_1__body1"/>
+      <geom class="visual" pos="0.00735303 0.35169 -0.360168" quat="0.445841 0.445841 -0.548841 -0.548841" material="bss138ps_v2_1__body7_material" mesh="bss138ps_v2_1__body7"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported17_material" mesh="camera_connector__rpi4modelb__imported17"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported12_material" mesh="camera_connector__rpi4modelb__imported12"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported14_material" mesh="camera_connector__rpi4modelb__imported14"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported16_material" mesh="camera_connector__rpi4modelb__imported16"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported5_material" mesh="camera_connector__rpi4modelb__imported5"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported6_material" mesh="camera_connector__rpi4modelb__imported6"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported1_material" mesh="camera_connector__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported3_material" mesh="camera_connector__rpi4modelb__imported3"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported11_material" mesh="camera_connector__rpi4modelb__imported11"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported2_material" mesh="camera_connector__rpi4modelb__imported2"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported7_material" mesh="camera_connector__rpi4modelb__imported7"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported15_material" mesh="camera_connector__rpi4modelb__imported15"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported8_material" mesh="camera_connector__rpi4modelb__imported8"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported13_material" mesh="camera_connector__rpi4modelb__imported13"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported10_material" mesh="camera_connector__rpi4modelb__imported10"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported4_material" mesh="camera_connector__rpi4modelb__imported4"/>
+      <geom class="visual" pos="0.0272195 0.305434 -0.354342" quat="0.103 2.3651e-08 5.0455e-08 0.994681" material="camera_connector__rpi4modelb__imported9_material" mesh="camera_connector__rpi4modelb__imported9"/>
+      <geom class="visual" pos="0.0322602 0.304378 -0.346842" quat="0.0728321 0.703346 -0.072832 0.703346" material="microphone_plug__rpi4modelb__imported5_material" mesh="microphone_plug__rpi4modelb__imported5"/>
+      <geom class="visual" pos="0.0322602 0.304378 -0.346842" quat="0.0728321 0.703346 -0.072832 0.703346" material="microphone_plug__rpi4modelb__imported4_material" mesh="microphone_plug__rpi4modelb__imported4"/>
+      <geom class="visual" pos="0.0322602 0.304378 -0.346842" quat="0.0728321 0.703346 -0.072832 0.703346" material="microphone_plug__rpi4modelb__imported2_material" mesh="microphone_plug__rpi4modelb__imported2"/>
+      <geom class="visual" pos="0.0322602 0.304378 -0.346842" quat="0.0728321 0.703346 -0.072832 0.703346" material="microphone_plug__rpi4modelb__imported3_material" mesh="microphone_plug__rpi4modelb__imported3"/>
+      <geom class="visual" pos="0.0322602 0.304378 -0.346842" quat="0.0728321 0.703346 -0.072832 0.703346" material="microphone_plug__rpi4modelb__imported1_material" mesh="microphone_plug__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported7_material" mesh="sd_card_slot__rpi4modelb__imported7"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported9_material" mesh="sd_card_slot__rpi4modelb__imported9"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported8_material" mesh="sd_card_slot__rpi4modelb__imported8"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported3_material" mesh="sd_card_slot__rpi4modelb__imported3"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported1_material" mesh="sd_card_slot__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported4_material" mesh="sd_card_slot__rpi4modelb__imported4"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported5_material" mesh="sd_card_slot__rpi4modelb__imported5"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported6_material" mesh="sd_card_slot__rpi4modelb__imported6"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported2_material" mesh="sd_card_slot__rpi4modelb__imported2"/>
+      <geom class="visual" pos="0.0113975 0.310381 -0.393642" quat="2.3651e-08 -0.103 -0.994681 5.0455e-08" material="sd_card_slot__rpi4modelb__imported10_material" mesh="sd_card_slot__rpi4modelb__imported10"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported18_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported18"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33"/>
+      <geom class="visual" pos="-0.0129106 0.313835 -0.368342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11_material" mesh="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11"/>
+      <geom class="visual" pos="0.00666509 0.309737 -0.371592" quat="0.0728321 0.703346 -0.072832 0.703346" material="broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow_material" mesh="broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow"/>
+      <geom class="visual" pos="0.00666509 0.309737 -0.371592" quat="0.0728321 0.703346 -0.072832 0.703346" material="broadcom_bcm2711b0_cpu__rpi4modelb__top_material" mesh="broadcom_bcm2711b0_cpu__rpi4modelb__top"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported17_material" mesh="display_connector__rpi4modelb__imported17"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported15_material" mesh="display_connector__rpi4modelb__imported15"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported14_material" mesh="display_connector__rpi4modelb__imported14"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported1_material" mesh="display_connector__rpi4modelb__imported1"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported8_material" mesh="display_connector__rpi4modelb__imported8"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported11_material" mesh="display_connector__rpi4modelb__imported11"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported6_material" mesh="display_connector__rpi4modelb__imported6"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported12_material" mesh="display_connector__rpi4modelb__imported12"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported4_material" mesh="display_connector__rpi4modelb__imported4"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported5_material" mesh="display_connector__rpi4modelb__imported5"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported3_material" mesh="display_connector__rpi4modelb__imported3"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported13_material" mesh="display_connector__rpi4modelb__imported13"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported16_material" mesh="display_connector__rpi4modelb__imported16"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported2_material" mesh="display_connector__rpi4modelb__imported2"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported7_material" mesh="display_connector__rpi4modelb__imported7"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported9_material" mesh="display_connector__rpi4modelb__imported9"/>
+      <geom class="visual" pos="0.0110696 0.308815 -0.396842" quat="5.0455e-08 0.994681 -0.103 -2.3651e-08" material="display_connector__rpi4modelb__imported10_material" mesh="display_connector__rpi4modelb__imported10"/>
+      <geom class="visual" pos="-0.00690083 0.312577 -0.339342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4_material" mesh="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4"/>
+      <geom class="visual" pos="-0.00690083 0.312577 -0.339342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1_material" mesh="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1"/>
+      <geom class="visual" pos="-0.00690083 0.312577 -0.339342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5_material" mesh="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5"/>
+      <geom class="visual" pos="-0.00690083 0.312577 -0.339342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2_material" mesh="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2"/>
+      <geom class="visual" pos="-0.00690083 0.312577 -0.339342" quat="0.0728321 0.703346 -0.072832 0.703346" material="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3_material" mesh="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3"/>
+      <frame name="right_mount" pos="0.0574033 0.227643 -0.224419" quat="0.999057 0 0 0.0434255">
+        <body name="right_bodymotorholder" childclass="right_leg">
+          <inertial pos="0.058335 0.135685 0.0193059" quat="0.65109 0.703082 0.0742638 -0.276122" mass="0.808243" diaginertia="0.00208236 0.00198527 0.000485113"/>
           <geom class="right_visual" pos="0.0460054 0.0924467 -0.0519126" quat="0 -0.802826 -0.596213 0" material="right_bodymotorholder_material" mesh="right_bodymotorholder"/>
           <geom class="right_collision" pos="0.0460054 0.0924467 -0.0519126" quat="0 -0.802826 -0.596213 0" type="mesh" contype="0" conaffinity="0" material="right_bodymotorholder_material" mesh="right_bodymotorholder"/>
           <geom class="right_visual" pos="0.0458557 0.0925686 0.0225874" quat="0.596213 0 0 -0.802826" material="right_motor_2_material" mesh="right_motor_2"/>
@@ -163,14 +815,14 @@
           <geom class="right_collision" pos="0.0720384 0.178412 0.0225874" quat="0.971133 0 0 0.238537" type="mesh" contype="0" conaffinity="0" material="right_motor_2_material" mesh="right_motor_2"/>
           <body name="right_motor_shaft_2" pos="0.0460054 0.0924467 -0.0259126" quat="0 -0.689287 0.724489 0">
             <inertial pos="0.0238056 -0.0378871 -0.0108017" quat="0.337264 0.628443 -0.34812 0.608379" mass="0.0210838" diaginertia="3.91846e-05 3.17349e-05 8.16783e-06"/>
-            <joint name="right_motor_inner" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+            <joint name="right_motor_inner" armature="0.00016832" damping="0.01"/>
             <geom class="right_visual" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" material="right_biella_material" mesh="right_biella"/>
             <geom class="right_collision" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" type="mesh" contype="0" conaffinity="0" material="right_biella_material" mesh="right_biella"/>
             <geom class="right_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
             <geom class="right_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
             <body name="right_bearing_5_2_4_0_7" pos="0.0425666 -0.067881 -0.0035" quat="0.96821 0 0 -0.250137">
               <inertial pos="0 -0.0405227 0.00117769" quat="0.54222 0.45387 -0.45387 0.54222" mass="0.176318" diaginertia="0.000719116 0.000686113 5.54955e-05"/>
-              <joint name="right_passive_biella_inner" pos="0 0 0" axis="0 0 1" armature="1e-05" damping="0.001" frictionloss="0.005"/>
+              <joint name="right_passive_biella_inner" armature="1e-05" damping="0.001" frictionloss="0.005"/>
               <geom class="right_visual" quat="0 1 0 0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
               <geom class="right_collision" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
               <geom class="right_visual" pos="0 0 -0.011" quat="0 0.707107 -0.707107 0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
@@ -187,7 +839,7 @@
           </body>
           <body name="right_motor_shaft_2_2" pos="0.0720208 0.178605 -0.0259126" quat="0 0.756284 0.654243 0">
             <inertial pos="0.0324126 0.0612196 -0.00816622" quat="0.601266 0.367095 -0.610795 0.361455" mass="0.0687299" diaginertia="8.30945e-05 6.32511e-05 2.14075e-05"/>
-            <joint name="right_motor_outer" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+            <joint name="right_motor_outer" armature="0.00016832" damping="0.01"/>
             <geom class="right_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
             <geom class="right_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="right_motor_shaft_2_material" mesh="right_motor_shaft_2"/>
             <geom class="right_visual" pos="0.0375033 0.0708042 -0.0105" quat="1 0 0 0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
@@ -195,8 +847,8 @@
             <geom class="right_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="right_biella_material" mesh="right_biella"/>
             <geom class="right_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="right_biella_material" mesh="right_biella"/>
             <body name="right_bearing_5_2_4_0_7_2" pos="0.0375033 0.0708042 -0.0215" quat="0 -0.942361 -0.334598 0">
-              <inertial pos="-0.00788446 -0.110314 0.0556437" quat="0.884961 0.46437 -0.017924 -0.0297108" mass="0.493267" diaginertia="0.00180902 0.00168048 0.000356521"/>
-              <joint name="right_passive_biella_outer" pos="0 0 0" axis="0 0 1" armature="1e-05" damping="0.001" frictionloss="0.005"/>
+              <inertial pos="-0.00788446 -0.110314 0.0556437" quat="0.884961 0.46437 -0.017924 -0.0297109" mass="0.493267" diaginertia="0.00180902 0.00168048 0.000356521"/>
+              <joint name="right_passive_biella_outer" armature="1e-05" damping="0.001" frictionloss="0.005"/>
               <geom class="right_visual" pos="-0.00936367 -0.129662 0.001" quat="0 0.707107 0.707107 0" material="right_wheelmotorhub_material" mesh="right_wheelmotorhub"/>
               <geom class="right_collision" pos="-0.00936367 -0.129662 0.001" quat="0 0.707107 0.707107 0" type="mesh" contype="0" conaffinity="0" material="right_wheelmotorhub_material" mesh="right_wheelmotorhub"/>
               <geom class="right_visual" quat="0 1 0 0" material="right_bearing_5_2_4_0_7_material" mesh="right_bearing_5_2_4_0_7"/>
@@ -205,8 +857,8 @@
               <geom class="right_collision" pos="0 0 -0.018" quat="0 -1 0 0" type="mesh" contype="0" conaffinity="0" material="right_smallplate_manovella2_material" mesh="right_smallplate_manovella2"/>
               <geom class="right_visual" pos="-0.00936367 -0.129662 -0.039" quat="0 -1 0 0" material="right_wheelstickcover_material" mesh="right_wheelstickcover"/>
               <geom class="right_collision" pos="-0.00936367 -0.129662 -0.039" quat="0 -1 0 0" type="mesh" contype="0" conaffinity="0" material="right_wheelstickcover_material" mesh="right_wheelstickcover"/>
-              <geom class="right_visual" material="right_pernobiella_material" mesh="right_pernobiella"/>
-              <geom class="right_collision" type="mesh" contype="0" conaffinity="0" material="right_pernobiella_material" mesh="right_pernobiella"/>
+              <geom class="right_visual" quat="1 0 0 0" material="right_pernobiella_material" mesh="right_pernobiella"/>
+              <geom class="right_collision" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" material="right_pernobiella_material" mesh="right_pernobiella"/>
               <geom class="right_visual" pos="0 0 -0.018" quat="0 -1 0 0" material="right_manovella2_material" mesh="right_manovella2"/>
               <geom class="right_collision" pos="0 0 -0.018" quat="0 -1 0 0" type="mesh" contype="0" conaffinity="0" material="right_manovella2_material" mesh="right_manovella2"/>
               <geom class="right_visual" pos="-0.00929025 -0.129484 0.0742" quat="0 0 0 1" material="right_motor_2_material" mesh="right_motor_2"/>
@@ -215,7 +867,7 @@
               <site name="right_closing_manovelle_meeting_r_2_z" pos="-0.00936367 -0.129662 0.0706" group="3"/>
               <body name="right_motor_shaft_2_3" pos="-0.00936367 -0.129662 0.0257" quat="0 0 1 0">
                 <inertial pos="9.066e-09 1.3242e-08 0.0082226" quat="0.653281 0.270598 -0.653281 0.270598" mass="0.0583748" diaginertia="0.000160953 8.58914e-05 8.58914e-05"/>
-                <joint name="right_wheel" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+                <joint name="right_wheel" armature="0.00016832" damping="0.01"/>
                 <geom class="right_visual" pos="0 0 -0.0035" quat="0 -0.899696 0.436517 0" material="right_wheel_tire_holder_material" mesh="right_wheel_tire_holder"/>
                 <geom class="right_collision" pos="0 0 -0.0035" quat="0 -0.899696 0.436517 0" type="mesh" contype="0" conaffinity="0" material="right_wheel_tire_holder_material" mesh="right_wheel_tire_holder"/>
                 <geom class="right_visual" pos="0 0 -0.0035" quat="0 -0.899696 0.436517 0" material="right_tire_material" mesh="right_tire"/>
@@ -228,9 +880,9 @@
           </body>
         </body>
       </frame>
-      <frame name="left_mount" childclass="robot">
-        <body name="left_bodymotorholder" childclass="left_leg_left" pos="0.0368956 0.280972 -0.448944" quat="0 0.968961 -0.247215 0">
-          <inertial pos="0.058335 0.135685 0.0193059" quat="0.65109 0.703082 0.0742636 -0.276122" mass="0.808243" diaginertia="0.00208236 0.00198527 0.000485113"/>
+      <frame name="left_mount" pos="0.117603 0.515205 -0.478244" quat="0 0.968961 -0.247215 0">
+        <body name="left_bodymotorholder" childclass="left_leg_left">
+          <inertial pos="0.058335 0.135685 0.0193059" quat="0.65109 0.703082 0.0742638 -0.276122" mass="0.808243" diaginertia="0.00208236 0.00198527 0.000485113"/>
           <geom class="left_visual" pos="0.0460054 0.0924467 -0.0519126" quat="0 -0.802826 -0.596213 0" material="left_bodymotorholder_material" mesh="left_bodymotorholder"/>
           <geom class="left_collision" pos="0.0460054 0.0924467 -0.0519126" quat="0 -0.802826 -0.596213 0" type="mesh" contype="0" conaffinity="0" material="left_bodymotorholder_material" mesh="left_bodymotorholder"/>
           <geom class="left_visual" pos="0.0458557 0.0925686 0.0225874" quat="0.596213 0 0 -0.802826" material="left_motor_2_material" mesh="left_motor_2"/>
@@ -239,14 +891,14 @@
           <geom class="left_collision" pos="0.0720384 0.178412 0.0225874" quat="0.971133 0 0 0.238537" type="mesh" contype="0" conaffinity="0" material="left_motor_2_material" mesh="left_motor_2"/>
           <body name="left_motor_shaft_2" pos="0.0460054 0.0924467 -0.0259126" quat="0 0.488069 -0.872805 0">
             <inertial pos="0.0238056 -0.0378871 -0.0108017" quat="0.337264 0.628443 -0.34812 0.608379" mass="0.0210838" diaginertia="3.91846e-05 3.17349e-05 8.16783e-06"/>
-            <joint name="left_motor_inner" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+            <joint name="left_motor_inner" armature="0.00016832" damping="0.01"/>
             <geom class="left_visual" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" material="left_biella_material" mesh="left_biella"/>
             <geom class="left_collision" pos="0.000191355 -2.57004e-05 -0.0485" quat="0 0.5 -0.866025 0" type="mesh" contype="0" conaffinity="0" material="left_biella_material" mesh="left_biella"/>
             <geom class="left_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
             <geom class="left_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
             <body name="left_bearing_5_2_4_0_7" pos="0.0425666 -0.067881 -0.0112" quat="0 0.997484 0.070887 0">
               <inertial pos="-0.100597 0.00718996 0.0604651" quat="0.346492 0.643725 0.602235 0.320741" mass="0.540913" diaginertia="0.00256725 0.00244671 0.000374148"/>
-              <joint name="left_passive_biella_outer" pos="0 0 0" axis="0 0 1" armature="1e-05" damping="0.001" frictionloss="0.005"/>
+              <joint name="left_passive_biella_outer" armature="1e-05" damping="0.001" frictionloss="0.005"/>
               <geom class="left_visual" pos="-0.129662 0.00936367 0.012" quat="0 -1 0 0" material="left_wheelmotorhub_material" mesh="left_wheelmotorhub"/>
               <geom class="left_collision" pos="-0.129662 0.00936367 0.012" quat="0 -1 0 0" type="mesh" contype="0" conaffinity="0" material="left_wheelmotorhub_material" mesh="left_wheelmotorhub"/>
               <geom class="left_visual" pos="0 0 0.011" quat="0 0.707107 -0.707107 0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
@@ -267,7 +919,7 @@
               <site name="left_closing_manovelle_meeting_l_2_z" pos="-0.129662 0.00936367 0.0816" quat="0.707107 0 0 -0.707107" group="3"/>
               <body name="left_motor_shaft_2_2" pos="-0.129662 0.00936367 0.0367" quat="0 -0.707107 -0.707107 0">
                 <inertial pos="1.455e-09 -1.5982e-08 0.0082226" quat="0.559572 0.432296 -0.559572 0.432296" mass="0.0583748" diaginertia="0.000160953 8.58915e-05 8.58914e-05"/>
-                <joint name="left_wheel" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+                <joint name="left_wheel" armature="0.00016832" damping="0.01"/>
                 <geom class="left_visual" pos="0 0 -0.0035" quat="0 -0.105959 -0.994371 0" material="left_wheel_tire_holder_material" mesh="left_wheel_tire_holder"/>
                 <geom class="left_collision" pos="0 0 -0.0035" quat="0 -0.105959 -0.994371 0" type="mesh" contype="0" conaffinity="0" material="left_wheel_tire_holder_material" mesh="left_wheel_tire_holder"/>
                 <geom class="left_visual" pos="0 0 -0.0035" quat="0 -0.105959 -0.994371 0" material="left_tire_material" mesh="left_tire"/>
@@ -280,14 +932,14 @@
           </body>
           <body name="left_motor_shaft_2_3" pos="0.0720208 0.178605 -0.0259126" quat="0 0.584286 0.811548 0">
             <inertial pos="0.0209083 0.0395598 -0.0108017" quat="0.615702 0.35824 -0.596268 0.370188" mass="0.0210838" diaginertia="3.91846e-05 3.17349e-05 8.16788e-06"/>
-            <joint name="left_motor_outer" pos="0 0 0" axis="0 0 1" armature="0.00016832" damping="0.01"/>
+            <joint name="left_motor_outer" armature="0.00016832" damping="0.01"/>
             <geom class="left_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
             <geom class="left_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="left_motor_shaft_2_material" mesh="left_motor_shaft_2"/>
             <geom class="left_visual" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" material="left_biella_material" mesh="left_biella"/>
             <geom class="left_collision" pos="-7.34202e-05 0.000178568 -0.0485" quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" material="left_biella_material" mesh="left_biella"/>
             <body name="left_bearing_5_2_4_0_7_2" pos="0.0375033 0.0708042 -0.0112" quat="0 0.698198 -0.715905 0">
               <inertial pos="0 0.0405227 -0.00817769" quat="0.54222 0.45387 -0.45387 0.54222" mass="0.176318" diaginertia="0.000719116 0.000686113 5.54955e-05"/>
-              <joint name="left_passive_biella_inner" pos="0 0 0" axis="0 0 1" armature="1e-05" damping="0.001" frictionloss="0.005"/>
+              <joint name="left_passive_biella_inner" armature="1e-05" damping="0.001" frictionloss="0.005"/>
               <geom class="left_visual" pos="0 0 -0.007" quat="1 0 0 0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
               <geom class="left_collision" pos="0 0 -0.007" quat="1 0 0 0" type="mesh" contype="0" conaffinity="0" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
               <geom class="left_visual" pos="0 0 0.004" quat="0.707107 0 0 0.707107" material="left_bearing_5_2_4_0_7_material" mesh="left_bearing_5_2_4_0_7"/>
@@ -303,6 +955,19 @@
             </body>
           </body>
         </body>
+      </frame>
+      <body name="raspberry_pi" pos="0.010242 0.314045 -0.352678">
+        <inertial pos="0 0 0" quat="0.818308 0.0583643 -0.0495217 0.56966" mass="0.095" diaginertia="7.24653e-05 6.14623e-05 2.8303e-05"/>
+      </body>
+      <frame name="imu_mount" pos="0.00761387 0.355449 -0.351366" quat="0.548841 -0.548841 -0.445841 0.445841">
+        <site name="imu" group="2" rgba="1 0.85 0.1 1"/>
+        <site name="imu_chip" size="0.003" quat="0.707107 0 0 0.707107" group="3"/>
+        <site name="imu_x" size="0.002 0.0225" pos="0.0225 0 0" quat="0.707107 0 -0.707107 0" type="cylinder" group="2" rgba="0.9 0.12 0.12 1"/>
+        <site name="imu_x_tip" size="0.0075 0.0045 0.0045" pos="0.0515 0 0" type="ellipsoid" group="2" rgba="0.9 0.12 0.12 1"/>
+        <site name="imu_y" size="0.002 0.0225" pos="0 0.0225 0" quat="0.707107 0.707107 0 0" type="cylinder" group="2" rgba="0.12 0.8 0.2 1"/>
+        <site name="imu_y_tip" size="0.0045 0.0075 0.0045" pos="0 0.0515 0" type="ellipsoid" group="2" rgba="0.12 0.8 0.2 1"/>
+        <site name="imu_z" size="0.002 0.0225" pos="0 0 0.0225" quat="0 1 0 0" type="cylinder" group="2" rgba="0.15 0.4 0.95 1"/>
+        <site name="imu_z_tip" size="0.0045 0.0045 0.0075" pos="0 0 0.0515" type="ellipsoid" group="2" rgba="0.15 0.4 0.95 1"/>
       </frame>
     </body>
   </worldbody>
@@ -342,6 +1007,6 @@
   </sensor>
 
   <keyframe>
-    <key name="stand" qpos="-0.134593 -0.322381 0.249151 0.561392 0.561392 0.42993 -0.42993 0.094699 0.123066 0.41877 0.424165 -1.48937 -0.60266 -1.10098 -0.438598 0.690265 1.0894" ctrl="0.094699 0.41877 0 -0.60266 0.690265 0"/>
+    <key name="stand" qpos="-0.378823 -0.351681 0.271795 0.55811 0.55811 0.434181 -0.434181 0.094699 0.123066 0.41877 0.424165 -1.48937 -0.602666 -1.10099 -2.14299 0.690268 1.0894" ctrl="0.094699 0.41877 0 -0.602666 0.690268 0"/>
   </keyframe>
 </mujoco>

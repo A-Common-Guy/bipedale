@@ -125,3 +125,52 @@ TEST(ShtpProtocol, SplitsTimestampAndParsesQuaternionInXyzwOrder)
   EXPECT_DOUBLE_EQ(xyzw[2], 0.5);
   EXPECT_DOUBLE_EQ(xyzw[3], 1.0);
 }
+
+namespace
+{
+std::array<std::array<double, 3>, 3> rotation(const std::array<double, 4> & q)
+{
+  const auto [x, y, z, w] = q;
+  return {{
+    {1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)},
+    {2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)},
+    {2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)}}};
+}
+}  // namespace
+
+TEST(ShtpProtocol, ChipToBodyUndoesAYawedMounting)
+{
+  // Chip x along body left (the 2026-11 holder): a roll rate about the
+  // chip's x is a body pitch rate, gravity on chip -y is body +x.
+  const double yaw = M_PI / 2;
+  const double n = std::sqrt(0.1 * 0.1 + 0.2 * 0.2 + 0.3 * 0.3 + 0.9 * 0.9);
+  std::array<double, 4> q{0.1 / n, -0.2 / n, 0.3 / n, 0.9 / n};
+  const auto chip_in_world = rotation(q);
+  std::array<double, 3> gyro{1.0, 0.0, 0.5};
+  std::array<double, 3> accel{0.0, -9.81, 0.0};
+  p::chip_to_body(yaw, q, gyro, accel);
+  EXPECT_NEAR(gyro[0], 0.0, 1e-12);
+  EXPECT_NEAR(gyro[1], 1.0, 1e-12);
+  EXPECT_NEAR(gyro[2], 0.5, 1e-12);
+  EXPECT_NEAR(accel[0], 9.81, 1e-12);
+  EXPECT_NEAR(accel[1], 0.0, 1e-12);
+  // chip in world = body in world * chip in body
+  const auto body_in_world = rotation(q);
+  const auto chip_in_body = rotation({0.0, 0.0, std::sin(yaw / 2), std::cos(yaw / 2)});
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      double sum = 0.0;
+      for (int k = 0; k < 3; ++k) {
+        sum += body_in_world[i][k] * chip_in_body[k][j];
+      }
+      EXPECT_NEAR(sum, chip_in_world[i][j], 1e-12) << i << "," << j;
+    }
+  }
+
+  std::array<double, 4> same{0.1, 0.2, 0.3, 0.9};
+  std::array<double, 3> unchanged{1.0, 2.0, 3.0};
+  std::array<double, 3> also{4.0, 5.0, 6.0};
+  p::chip_to_body(0.0, same, unchanged, also);
+  EXPECT_EQ(same, (std::array<double, 4>{0.1, 0.2, 0.3, 0.9}));
+  EXPECT_EQ(unchanged, (std::array<double, 3>{1.0, 2.0, 3.0}));
+}

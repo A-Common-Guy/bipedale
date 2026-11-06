@@ -33,7 +33,7 @@ from controllers.two_wheel_balancer import (
 )
 
 if mujoco is not None:
-    from imu_frame import derive
+    from imu_frame import derive_board
 from controller import ManualMitController
 from identified import load_identified, model_sha256
 from imu import (
@@ -43,6 +43,7 @@ from imu import (
     _parse_report,
     _split_reports,
     _unescape,
+    chip_to_body,
 )
 from kinematics import forward, inverse, jacobian, map_legs
 from models import (
@@ -931,8 +932,9 @@ class ImuMountTests(unittest.TestCase):
         """Columns are the site's x, y, z expressed in world coordinates."""
         return self.data.site_xmat[self.site].reshape(3, 3)
 
-    def test_site_matches_the_frame_derived_from_the_roof_mesh(self):
-        position, rotation, info = derive(self.model, self.data)
+    def test_site_matches_the_frame_derived_from_the_imu_board(self):
+        cfg = load_config(ROOT / "config.yaml")
+        position, rotation = derive_board(cfg["mujoco"]["model"], self.model, self.data)
         self.assertLess(
             float(np.linalg.norm(position - self.model.site_pos[self.site])), 1e-4
         )
@@ -940,8 +942,6 @@ class ImuMountTests(unittest.TestCase):
         np.testing.assert_allclose(
             self._world_axes(), torso_axes @ rotation, atol=1e-6
         )
-        # A plate face this flat means the centroid really is on the surface.
-        self.assertLess(info["flatness"], 1e-4)
 
     def test_y_axis_is_the_wheel_axle(self):
         joint = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "left_wheel")
@@ -961,9 +961,54 @@ class ImuMountTests(unittest.TestCase):
             for site in range(self.model.nsite)
         }
         self.assertLessEqual({"imu_x", "imu_y", "imu_z"}, names)
-        # Sites never carry mass; the exported <inertial> must survive intact.
-        self.assertAlmostEqual(float(self.model.body_mass[self.torso]), 0.148617,
+        # Sites never carry mass; the torso keeps the weighed hub share the
+        # export gave it (sim_identified.yaml masses, minus the Raspberry Pi).
+        identified = ROOT.parent / "ros2_ws/src/sandro_description/config/sim_identified.yaml"
+        masses = yaml.safe_load(identified.read_text())["masses"]
+        self.assertAlmostEqual(float(self.model.body_mass[self.torso]),
+                               masses["central_hub_kg"] - masses["raspberry_pi_kg"],
                                places=6)
+
+
+class ImuMountRotationTests(unittest.TestCase):
+    @staticmethod
+    def _matrix(q):
+        w, x, y, z = q
+        return np.array([
+            [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+            [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+            [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]])
+
+    def test_chip_turned_left_reads_in_the_body_frame(self):
+        yaw = math.pi / 2  # chip x along body left (2026-11 holder)
+        q = np.array([0.9, 0.1, -0.2, 0.3])
+        q /= np.linalg.norm(q)
+        body_q, gyro, accel = chip_to_body(yaw, tuple(q), (1.0, 0.0, 0.5), (0.0, -9.81, 0.0))
+        np.testing.assert_allclose(gyro, (0.0, 1.0, 0.5), atol=1e-12)
+        np.testing.assert_allclose(accel, (9.81, 0.0, 0.0), atol=1e-12)
+        chip_in_body = self._matrix((math.cos(yaw / 2), 0.0, 0.0, math.sin(yaw / 2)))
+        np.testing.assert_allclose(self._matrix(body_q) @ chip_in_body, self._matrix(q), atol=1e-12)
+
+
+@unittest.skipIf(mujoco is None, "MuJoCo is not installed")
+class StandKeyframeTests(unittest.TestCase):
+    def test_stand_rests_on_the_tyres(self):
+        # The export grounds the stand pose on its lowest collider; skipping
+        # the tyre cylinders once sank the wheels 0.23 m into the floor.
+        cfg = load_config(ROOT / "config.yaml")
+        model = mujoco.MjModel.from_xml_path(str(cfg["mujoco"]["model"]))
+        data = mujoco.MjData(model)
+        mujoco.mj_resetDataKeyframe(
+            model, data, mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "stand"))
+        mujoco.mj_forward(model, data)
+        wheels = [model.joint(f"{side}_wheel").id for side in ("right", "left")]
+        for joint in wheels:
+            tyre = next(g for g in range(model.ngeom)
+                        if model.geom_bodyid[g] == model.jnt_bodyid[joint]
+                        and model.geom_type[g] == mujoco.mjtGeom.mjGEOM_CYLINDER)
+            self.assertAlmostEqual(float(data.xanchor[joint][2]),
+                                   float(model.geom_size[tyre, 0]), delta=0.002)
+        self.assertTrue(all(c.dist > -0.002 for c in data.contact[:data.ncon]))
 
 
 @unittest.skipIf(mujoco is None, "MuJoCo is not installed")

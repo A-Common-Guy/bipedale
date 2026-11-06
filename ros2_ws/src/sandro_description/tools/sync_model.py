@@ -352,7 +352,13 @@ def apply_masses(worldbody: ET.Element, masses: dict, payload_kg: float) -> None
     torso = worldbody.find("./body[@name='torso']")
     if torso is None:
         raise ValueError("torso body not found for the measured masses")
-    set_mass([torso], float(masses["central_hub_kg"]) - payload_kg)
+    rpi_kg = float(masses.get("raspberry_pi_kg", 0.0))
+    if rpi_kg > 0.0:
+        rpi = torso.find("./body[@name='raspberry_pi']")
+        if rpi is None or rpi.find("joint") is not None:
+            raise ValueError("raspberry_pi_kg needs a jointless raspberry_pi child of the torso")
+        set_mass([rpi], rpi_kg)
+    set_mass([torso], float(masses["central_hub_kg"]) - rpi_kg - payload_kg)
 
     holders: dict[ET.Element, int] = {}
     for name in leg_motors:

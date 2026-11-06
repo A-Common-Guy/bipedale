@@ -1,0 +1,14 @@
+{
+    "configuration": "default",
+    "documentId": "e5cda129f952f5ca0f29e636",
+    "documentMicroversion": "0d636e53b734a520ff50827e",
+    "documentVersion": "b46eaf3fa6afb9994d79820f",
+    "elementId": "105b90d881e39b877bd2af55",
+    "fullConfiguration": "default",
+    "id": "M6DbxV6O8NUIWNa6Y",
+    "isStandardContent": false,
+    "name": "Broadcom BCM2711B0 CPU, RPi4ModelB__LocatingArrow <1>",
+    "partId": "KFvG",
+    "suppressed": false,
+    "type": "Part"
+}

@@ -57,8 +57,17 @@ actuators:
 # replaced by these; each CAD body keeps its centre of mass and its inertia is
 # scaled by the same ratio. Components are found through the joints, not CAD
 # body names, so a re-exported CAD keeps them:
-#   central_hub_kg           torso body: frame, electronics, cabling, every
-#                            bracket; everything but the four leg motors
+#   central_hub_kg           everything rigid on the body but the four leg
+#                            motors: the torso body plus raspberry_pi_kg. Of
+#                            it (2026-11-06): 0.530 central body (shell, roof,
+#                            handle, power distribution box, IMU), 0.095
+#                            Raspberry Pi with its holder, and the remaining
+#                            0.520 is cabling, spread over the body. The CAD
+#                            body parts carry no material, so
+#                            onshape_export/compose_robot.py places each
+#                            group at the volume centroid of its parts
+#   raspberry_pi_kg          Raspberry Pi and holder: the jointless
+#                            raspberry_pi body, at those parts
 #   leg_motor_kg             each of the four, on the jointless holder bodies
 #                            that carry the leg motor joints (assumed, not
 #                            weighed individually)
@@ -74,6 +83,7 @@ actuators:
 masses:
   total_kg: 4.825
   central_hub_kg: 1.145
+  raspberry_pi_kg: 0.095
   leg_motor_kg: 0.388
   upper_crank_kg: 0.112
   lower_links_per_side_kg: 0.670
@@ -84,18 +94,20 @@ masses:
 # --write). It is taken out of central_hub_kg, so the total stays the weighed
 # one; it also carries the training's payload mass and offset randomisation.
 # Zero disables it (and then the hub is the CAD torso body alone).
-# The hub was reported slightly rear-heavy: until the tilt weighing, 0.4 kg
-# sits 20 mm behind the CAD torso's centre of mass.
+# Since the 2026-11 body the rear-heaviness is the raspberry_pi body at its
+# CAD place, so until the tilt weighing 0.4 kg sits exactly at the torso
+# body's centre of mass and moves nothing.
 payload:
   mass_kg: 0.4
-  position_m: [-0.012, 0.038, -0.058]
+  position_m: [0.0318, 0.0, -0.0527]
   half_size_m: [0.04, 0.06, 0.03]
 
 # IMU mounting. Both hardware recordings show the leg kinematics 14 mm
 # asymmetric while the IMU reads the body level, i.e. the IMU roll is biased
 # by about -0.049 rad (right-side-down positive). The simulated IMU is
 # rotated by the same amount so tasks.roll.imu_offset_rad in the per-robot
-# overrides means the same thing on both backends.
+# overrides means the same thing on both backends. Identified on the earlier
+# roof mount; the 2026-11 IMU holder needs a new standing recording.
 imu_mount:
   roll_offset_rad: -0.049
 

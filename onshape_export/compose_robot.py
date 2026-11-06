@@ -9,9 +9,11 @@ rigid sub-assembly instances with their articulated exports:
      occurrence carries its path (= which sub-assembly instance it belongs
      to) and its world transform, giving an exact per-instance, per-link
      pose -- including the joint angles the assembly is posed at
-  3. rebuild: torso body = robot geoms that are not sub-assembly parts, with
-     inertia = total robot inertia minus the sub-assemblies (parallel-axis
-     subtraction at the actual link poses)
+  3. rebuild: torso body = robot geoms that are not sub-assembly parts. Its
+     parts carry no material in Onshape, so the weighed hub masses
+     (sim_identified.yaml) are spread over their volumes (set_hub_inertials);
+     only the outer shell keeps collision geoms (TORSO_COLLIDERS); the IMU
+     frame comes from the BNO085 board part (imu_mount.py)
   4. mjSpec.attach() each sub-assembly model at its base-link frame (joints,
      actuators, sites, equalities are prefixed automatically with the
      Onshape instance name) and store the recovered assembly joint angles
@@ -41,16 +43,28 @@ from onshape_to_robot.config import Config
 from onshape_to_robot.onshape_api.client import Client
 
 import stand_pose
+from imu_mount import IMU_BOARD_PATTERN, imu_from_board
 
 HERE = Path(__file__).parent
 POS_TOL = 1e-3  # m, matching exported geoms <-> API occurrences
 
-# Physical BNO085 mount derived from the roof geometry by
-# SandroControl/tools/imu_frame.py. Keeping these as the compose defaults
-# prevents a CAD re-export from silently moving the simulated IMU back to the
-# CAD torso origin. Re-run that tool and update these values if the board moves.
+# The IMU frame comes from the BNO085 board part on the torso (imu_mount.py).
+# Fallback when the CAD has no board part: the pre-2026-11 roof mount that
+# SandroControl/tools/imu_frame.py derived from the roof plate.
 IMU_MOUNT_POS = (-0.052683638, 0.1446357, -0.28703048)
 IMU_MOUNT_QUAT = (0.548848255, -0.548848255, -0.445831351, 0.445831351)
+# Torso parts that collide: the outer shell and what sticks out of it. The
+# electronics and brackets inside keep their visual geom only; hundreds of
+# convex-hull colliders would swamp the contact pipeline (GPU training too).
+TORSO_COLLIDERS = r"^(body_lower|robot_roof|handle|rpi_holder|pcb__rpi4modelb__cornerradius)$"
+# The body parts carry no material in Onshape, so the hub's weighed masses
+# (sim_identified.yaml masses) are spread uniformly over the volume of their
+# parts: the Raspberry Pi and its holder in a jointless child body, the
+# central body (shell, roof, handle, power box, IMU) and the cables on the
+# torso itself.
+IDENTIFIED_YAML = HERE.parent / "ros2_ws" / "src" / "sandro_description" / "config" / "sim_identified.yaml"
+RPI_BODY = "raspberry_pi"
+RPI_PARTS = r"rpi4modelb|^rpi_holder$"
 
 # ---------------------------------------------------------------------------
 # Hardware constants -- verify against the datasheets before trusting results.
@@ -167,6 +181,78 @@ def inertia_about_origin(mass, com, I_com):
     return I_com + mass * (np.dot(c, c) * np.eye(3) - np.outer(c, c))
 
 
+def load_hub_masses():
+    """(torso kg, Raspberry Pi kg) from sim_identified.yaml masses."""
+    import yaml
+
+    masses = (yaml.safe_load(IDENTIFIED_YAML.read_text()) or {}).get("masses") or {}
+    rpi = float(masses["raspberry_pi_kg"])
+    return float(masses["central_hub_kg"]) - rpi, rpi
+
+
+def solid_properties(verts, faces):
+    """Volume, centroid and inertia about the centroid of a closed mesh at unit density."""
+    a, b, c = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+    v = np.einsum("ij,ij->i", a, np.cross(b, c)) / 6.0
+    s = a + b + c
+    covariance = sum(np.einsum("i,ij,ik->jk", v, p, p) for p in (a, b, c, s)) / 20.0
+    volume = v.sum()
+    if volume < 0:  # inward-facing triangles
+        volume, v, covariance = -volume, -v, -covariance
+    centroid = (v[:, None] * s).sum(0) / 4.0 / volume
+    covariance -= volume * np.outer(centroid, centroid)
+    return volume, centroid, np.trace(covariance) * np.eye(3) - covariance
+
+
+def set_hub_inertials(spec: mujoco.MjSpec, masses):
+    """Torso and Raspberry Pi inertials from their parts' volumes (uniform density each)."""
+    torso_kg, rpi_kg = masses
+    torso = spec.bodies[1]
+    model = spec.compile()
+    tid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, torso.name)
+    totals = {}
+    for g in range(model.ngeom):
+        if (model.geom_bodyid[g] != tid or model.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH
+                or model.geom_group[g] != 2):
+            continue
+        mid = model.geom_dataid[g]
+        name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_MESH, mid)
+        R = np.empty(9)
+        mujoco.mju_quat2Mat(R, model.geom_quat[g])
+        R = R.reshape(3, 3)
+        verts = model.mesh_vert[model.mesh_vertadr[mid]:model.mesh_vertadr[mid]
+                                + model.mesh_vertnum[mid]] @ R.T + model.geom_pos[g]
+        faces = model.mesh_face[model.mesh_faceadr[mid]:model.mesh_faceadr[mid]
+                                + model.mesh_facenum[mid]]
+        vol, com, inertia = solid_properties(verts.astype(float), faces)
+        group = RPI_BODY if re.search(RPI_PARTS, name) else torso.name
+        V, S, I = totals.get(group, (0.0, np.zeros(3), np.zeros((3, 3))))
+        totals[group] = (V + vol, S + vol * com,
+                         I + inertia_about_origin(vol, com, inertia))
+    if set(totals) != {torso.name, RPI_BODY}:
+        raise SystemExit(f"hub parts not found on the torso: {sorted(totals)}")
+
+    def inertial(group, kg):
+        V, S, I = totals[group]
+        com = S / V
+        I_com = (I - inertia_about_origin(V, com, np.zeros((3, 3)))) * kg / V
+        return com, I_com
+
+    com, I = inertial(torso.name, torso_kg)
+    torso.explicitinertial = True
+    torso.mass, torso.ipos, torso.iquat = torso_kg, com, [1, 0, 0, 0]
+    torso.fullinertia = [I[0, 0], I[1, 1], I[2, 2], I[0, 1], I[0, 2], I[1, 2]]
+    com_rpi, I_rpi = inertial(RPI_BODY, rpi_kg)
+    rpi = torso.add_body(name=RPI_BODY, pos=com_rpi)
+    rpi.explicitinertial = True
+    rpi.mass, rpi.ipos, rpi.iquat = rpi_kg, [0, 0, 0], [1, 0, 0, 0]
+    rpi.fullinertia = [I_rpi[0, 0], I_rpi[1, 1], I_rpi[2, 2],
+                       I_rpi[0, 1], I_rpi[0, 2], I_rpi[1, 2]]
+    print(f"hub: torso {torso_kg:.3f} kg at {np.round(com, 4)} "
+          f"({totals[torso.name][0] * 1e6:.0f} cm3), {RPI_BODY} {rpi_kg:.3f} kg at "
+          f"{np.round(com_rpi, 4)} ({totals[RPI_BODY][0] * 1e6:.0f} cm3)")
+
+
 def strip_side_suffix(spec: mujoco.MjSpec):
     """Drop trailing _r/_l on joint and actuator names (mates were named per side)."""
     ren = {}
@@ -268,10 +354,30 @@ def add_actuators(spec: mujoco.MjSpec, sides, kp: float, kv: float, wheel_kv: fl
                     forcerange=[-tmax, tmax])
 
 
-def add_imu(spec: mujoco.MjSpec, torso, pos, quat):
-    torso.add_site(name="imu", pos=pos, quat=quat, size=[0.008, 0.008, 0.008],
-                   group=3, rgba=[1, 0, 0, 1])
-    S, O = mujoco.mjtSensor, mujoco.mjtObj
+def add_imu(spec: mujoco.MjSpec, torso, pos, quat, chip_quat=None):
+    """The BNO085 frame (`imu_mount`) with the `imu` site and an RGB triad.
+
+    `imu` is the body frame the controllers expect (x forward, y left, z up);
+    `imu_chip`, when the board's CAD axes are known, is the chip's own frame
+    in it, which the real driver's mount rotation must undo.
+    """
+    frame = torso.add_frame(name="imu_mount", pos=pos, quat=quat)
+    S, O, G = mujoco.mjtSensor, mujoco.mjtObj, mujoco.mjtGeom
+    frame.add_site(name="imu", size=[0.005, 0.005, 0.005], group=2, rgba=[1, 0.85, 0.1, 1])
+    if chip_quat is not None:
+        frame.add_site(name="imu_chip", quat=chip_quat, size=[0.003, 0.003, 0.003], group=3)
+    # imu_x/imu_y/imu_z draw the frame (red x, green y, blue z); no dynamics.
+    for axis, rgba in enumerate(([0.9, 0.12, 0.12, 1], [0.12, 0.8, 0.2, 1],
+                                 [0.15, 0.4, 0.95, 1])):
+        name = "imu_" + "xyz"[axis]
+        tip = np.zeros(3)
+        tip[axis] = 0.045
+        frame.add_site(name=name, type=G.mjGEOM_CYLINDER, fromto=[0, 0, 0, *tip],
+                       size=[0.002, 0.005, 0.005], group=2, rgba=rgba)
+        half = np.full(3, 0.0045)
+        half[axis] = 0.0075
+        frame.add_site(name=f"{name}_tip", type=G.mjGEOM_ELLIPSOID, pos=tip * 0.0515 / 0.045,
+                       size=half, group=2, rgba=rgba)
     for name, stype, noise in (
             ("imu_quat", S.mjSENS_FRAMEQUAT, BNO085["quat_noise"]),
             ("imu_gyro", S.mjSENS_GYRO, BNO085["gyro_noise"]),
@@ -322,12 +428,13 @@ def main():
     ap.add_argument("--stand-extension", type=float, default=0.7,
                     help="stand keyframe ride height as a fraction of max leg "
                          "extension (0 keeps the CAD assembly pose)")
-    ap.add_argument("--imu-pos", type=float, nargs=3, default=IMU_MOUNT_POS,
-                    help="BNO085 site position in the torso frame (default: "
-                         "roof mount derived by SandroControl/tools/imu_frame.py)")
-    ap.add_argument("--imu-quat", type=float, nargs=4, default=IMU_MOUNT_QUAT,
-                    help="BNO085 site orientation (w x y z) in the torso frame "
-                         "(default: physical roof mount)")
+    ap.add_argument("--imu-board", default=IMU_BOARD_PATTERN,
+                    help="regex of the BNO085 board's mesh name on the torso; the "
+                         "IMU frame is derived from that part")
+    ap.add_argument("--imu-pos", type=float, nargs=3, default=None,
+                    help="override: BNO085 frame position in the torso frame")
+    ap.add_argument("--imu-quat", type=float, nargs=4, default=None,
+                    help="override: BNO085 frame orientation (w x y z) in the torso frame")
     args = ap.parse_args()
     out = args.out or args.robot_dir / "robot_full.xml"
     sub_dirs = args.sub or [d for d in (HERE / "leg", HERE / "leg_left") if d.is_dir()]
@@ -430,39 +537,9 @@ def main():
                 sub_part_pos.append(Rw[:3, 3])
     sub_meshes = {g[0] for s in subs.values() for g in s.geoms}
 
-    # -- torso inertia = whole robot minus every attached link at its actual pose
     m_robot = mujoco.MjModel.from_xml_path(str(robot_xml))
     d_robot = mujoco.MjData(m_robot)
     mujoco.mj_kinematics(m_robot, d_robot)
-    mujoco.mj_comPos(m_robot, d_robot)
-    M_t = m_robot.body_mass[1]
-    c = d_robot.xipos[1]
-    R = d_robot.ximat[1].reshape(3, 3)
-    S_t = M_t * c
-    I_t = inertia_about_origin(M_t, c, R @ np.diag(m_robot.body_inertia[1]) @ R.T)
-    for sub, _, T_by_body, _ in instances:
-        for b in range(1, sub.model.nbody):
-            T = T_by_body[b]
-            mb = sub.model.body_mass[b]
-            cb = T[:3, :3] @ sub.data.xipos[b] + T[:3, 3]
-            Rb = T[:3, :3] @ sub.data.ximat[b].reshape(3, 3)
-            M_t -= mb
-            S_t -= mb * cb
-            I_t -= inertia_about_origin(mb, cb, Rb @ np.diag(sub.model.body_inertia[b]) @ Rb.T)
-    torso_inertial = None
-    if M_t < 1e-4:
-        print(f"WARNING: torso mass from CAD is ~zero ({M_t:.2e} kg) -- the torso parts "
-              f"probably have no material assigned in Onshape. Falling back to "
-              f"compiler-computed inertia from the torso geoms (density 1000 kg/m^3). "
-              f"Assign materials in Onshape and re-run for correct dynamics.")
-    else:
-        c_t = S_t / M_t
-        I_ct = I_t - M_t * (np.dot(c_t, c_t) * np.eye(3) - np.outer(c_t, c_t))
-        eig = np.linalg.eigvalsh(I_ct)
-        if eig.min() <= 0:
-            raise SystemExit(f"torso inertia not positive definite ({eig}) -- exports inconsistent")
-        torso_inertial = (M_t, c_t, I_ct)
-        print(f"torso: mass={M_t:.4f} kg  com={np.round(c_t, 4)}")
 
     # -- build the composed spec
     spec = mujoco.MjSpec.from_file(str(robot_xml))
@@ -472,18 +549,6 @@ def main():
     spec.option.integrator = mujoco.mjtIntegrator.mjINT_IMPLICITFAST
     torso = spec.bodies[1]
     torso.name = "torso"
-    if torso_inertial is not None:
-        M_t, c_t, I_ct = torso_inertial
-        torso.explicitinertial = True
-        torso.mass = M_t
-        torso.ipos = c_t
-        torso.iquat = [1, 0, 0, 0]
-        torso.fullinertia = [I_ct[0, 0], I_ct[1, 1], I_ct[2, 2],
-                             I_ct[0, 1], I_ct[0, 2], I_ct[1, 2]]
-    else:
-        torso.explicitinertial = False
-        torso.mass = 0
-        torso.inertia = [0, 0, 0]
 
     # drop the rigid copies of the attached parts; the torso body frame is
     # identity so spec-level pos are world coordinates
@@ -494,6 +559,14 @@ def main():
             spec.delete(g)
             dropped += 1
     print(f"dropped {dropped} rigid geoms from the torso")
+    kept = set()
+    for g in list(torso.geoms):
+        if g.classname.name == "collision":
+            if re.search(TORSO_COLLIDERS, g.meshname):
+                kept.add(g.meshname)
+            else:
+                spec.delete(g)
+    print(f"torso colliders: {', '.join(sorted(kept))}")
 
     # attached models resolve mesh files against the robot meshdir
     for sub in subs.values():
@@ -528,9 +601,32 @@ def main():
     # polygonal mesh tires make the rolling contact hop facet to facet;
     # swap them for analytic cylinders of the same radius/width
     stand_pose.replace_tire_collision(spec)
+    set_hub_inertials(spec, load_hub_masses())
 
     add_actuators(spec, sides, args.kp, args.kv, args.wheel_kv)
-    add_imu(spec, torso, args.imu_pos, args.imu_quat)
+
+    model = spec.compile()
+    data = mujoco.MjData(model)
+    for _, side, _, qs in instances:  # the CAD assembly pose
+        for jname, q in qs.items():
+            j = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, f"{side}_{jname}")
+            data.qpos[model.jnt_qposadr[j]] = q
+    mujoco.mj_kinematics(model, data)
+    mujoco.mj_comPos(model, data)
+    board = imu_from_board(spec, model, data, args.imu_board)
+    chip_quat = None
+    if args.imu_pos is not None or args.imu_quat is not None:
+        if args.imu_pos is None or args.imu_quat is None:
+            raise SystemExit("--imu-pos and --imu-quat go together")
+        imu_pos, imu_quat = args.imu_pos, args.imu_quat
+        print("IMU from --imu-pos/--imu-quat")
+    elif board is not None:
+        imu_pos, imu_quat, chip_quat, report = board
+        print(report)
+    else:
+        imu_pos, imu_quat = IMU_MOUNT_POS, IMU_MOUNT_QUAT
+        print(f"WARNING: no torso mesh matches {args.imu_board!r}; IMU at the old roof mount")
+    add_imu(spec, torso, imu_pos, imu_quat, chip_quat)
     add_encoders(spec, sides)
 
     model = spec.compile()

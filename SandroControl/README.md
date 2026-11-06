@@ -254,28 +254,38 @@ site rotation before writing a physical orientation onto the free joint, and
 `rl_env.py` derives its forward/axle/up reference axes from `site_xmat` rather
 than from the keyframe's free-joint quaternion.
 
-`tools/imu_frame.py` recomputes the pose straight from the roof mesh — z is the
-outward normal of the plate's upper face, y is the wheel axle oriented right to
-left, x is `y × z` — so the numbers in the MJCF are reproducible rather than
-magic:
+Since the 2026-11 body the BNO085 sits in its own holder and the CAD carries
+the board: `onshape_export/compose_robot.py` places the site on the chip, z
+the board normal, y the wheel axle, x forward (`onshape_export/imu_mount.py`),
+and `tools/imu_frame.py` checks the model against the same derivation. The
+chip itself is turned 90° in that holder (its x points left), which
+`imu.mount_yaw_rad` in `config.yaml` undoes before any controller sees a
+sample, as `sandro_hardware`'s `mount_yaw_rad` does for the ROS stack.
 
 ```bash
-python tools/imu_frame.py                     # pose, MJCF snippet, deviation
+python tools/imu_frame.py                     # pose and deviation (board)
 python tools/imu_frame.py --mode check        # non-zero exit when it drifts
-python tools/imu_frame.py --offset 0 -0.035   # try another mount point
+python tools/imu_frame.py --source roof       # the earlier roof-plate mount
 ```
 
-The mount point lives in the tool's `MOUNT_OFFSET`, as `(forward, left)` metres
-from the centre of the top face; `--mode check` validates the model against it,
-so move the board in that constant rather than by editing coordinates. The
-shift is tangential, so the frame stays flat on the roof wherever it goes, and
+The roof-plate derivation (`--source roof`) recomputes the pose straight from
+the roof mesh — z is the outward normal of the plate's upper face, y is the
+wheel axle oriented right to left, x is `y × z`:
+
+```bash
+python tools/imu_frame.py --source roof --offset 0 -0.035   # a roof mount point
+```
+
+For the roof, the mount point lives in the tool's `MOUNT_OFFSET`, as
+`(forward, left)` metres from the centre of the top face. The shift is
+tangential, so the frame stays flat on the roof wherever it goes, and
 the tool refuses an offset that would hang the site off the plate edge. Note
 that only `imu.accel` is sensitive to the offset — a sensor off the rotation
 centre picks up centrifugal and tangential terms — while the quaternion and
 gyro depend purely on the orientation.
 
-Run it after every Onshape re-export; the export overwrites the MJCF and will
-drop the site back onto the torso origin. The model also draws the frame as an
+`compose_robot.py` writes the frame on every re-export, and `--mode check`
+confirms it. The model also draws the frame as an
 RGB triad (`imu_x`, `imu_y`, `imu_z`: red x, green y, blue z), visible in the
 dashboard's 3D view and in `mujoco.viewer`. They are sites, so they add no mass
 and no collisions; hide them with the site-group toggle in the viewer.

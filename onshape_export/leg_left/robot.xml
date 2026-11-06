@@ -129,19 +129,19 @@
     </body>
   </worldbody>
   <asset>
-    <mesh file="wheelmotorhub.stl"/>
-    <mesh file="bodymotorholder.stl"/>
-    <mesh file="motor_shaft_2.stl"/>
-    <mesh file="wheel_tire_holder.stl"/>
-    <mesh file="smallplate_manovella2.stl"/>
-    <mesh file="manovella2.stl"/>
     <mesh file="wheelstickcover.stl"/>
-    <mesh file="manovella1.stl"/>
-    <mesh file="bearing_5_2_4_0_7.stl"/>
-    <mesh file="biella.stl"/>
     <mesh file="pernobiella.stl"/>
+    <mesh file="bodymotorholder.stl"/>
+    <mesh file="wheelmotorhub.stl"/>
+    <mesh file="biella.stl"/>
+    <mesh file="bearing_5_2_4_0_7.stl"/>
     <mesh file="tire.stl"/>
     <mesh file="motor_2.stl"/>
+    <mesh file="wheel_tire_holder.stl"/>
+    <mesh file="manovella1.stl"/>
+    <mesh file="manovella2.stl"/>
+    <mesh file="motor_shaft_2.stl"/>
+    <mesh file="smallplate_manovella2.stl"/>
     <material name="bodymotorholder_material" rgba="0 0 1 1"/>
     <material name="motor_2_material" rgba="0.207843 0.2 0.2 1"/>
     <material name="biella_material" rgba="0.972549 0.529412 0.00392157 1"/>

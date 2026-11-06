@@ -188,7 +188,8 @@ def collidable_min_z(model, data):
             verts = model.mesh_vert[va:va + vn]
             zs = (data.geom_xmat[g].reshape(3, 3) @ verts.T)[2] + data.geom_xpos[g][2]
             minz = min(minz, float(zs.min()))
-        elif t in (mujoco.mjtGeom.mjGEOM_CYLINDER, mujoco.mjtGeom.mjGEOM_CAPSULE):
+        # `t in (enum, ...)` is always False: the enum's __eq__ refuses numpy ints.
+        elif t == mujoco.mjtGeom.mjGEOM_CYLINDER or t == mujoco.mjtGeom.mjGEOM_CAPSULE:
             az = data.geom_xmat[g].reshape(3, 3)[2, 2]
             r, h = model.geom_size[g, 0], model.geom_size[g, 1]
             drop = h * abs(az) + (r * np.sqrt(max(0.0, 1 - az * az))
