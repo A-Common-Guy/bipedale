@@ -48,6 +48,17 @@ env:
       upright: 6.0              # (1 + cos tilt) / 2
       stand_height: 10.0        # IMU height from 0.15 m to standing, 0 to 1
 
+# RlPolicyController settings for this policy (export_ros.py; start_lying
+# follows from env.init.fallen). After getting up the legs swing at up to
+# 1.9 rad/s and the wheels 5.9 rad/s in the watchdog's 5-15 Hz band for about
+# 3 s, 0.8 and 2.3 afterwards, driving and 80 ms of wheel lag included
+# (checkpoint 500 of runs/stand_up_body2611, every fall of the evaluation).
+deploy:
+  safety:
+    oscillation_arm_delay_s: 3.0
+    oscillation_leg_rad_s: 1.2
+    oscillation_wheel_rad_s: 5.0
+
 curriculum:
   stages:
     - iteration: 0

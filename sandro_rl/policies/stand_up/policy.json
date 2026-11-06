@@ -1,6 +1,6 @@
 {
  "onnx": "policy.onnx",
- "onnx_max_abs_error_vs_reference": 5.324573587595083e-07,
+ "onnx_max_abs_error_vs_reference": 4.4095727902426773e-07,
  "policy_rate_hz": 100,
  "control_rate_hz": 300.0,
  "observation": {
@@ -90,9 +90,9 @@
    0.41133484,
    0.21714621,
    -1.48937,
-   0.21523191,
-   0.41288111,
-   0.438598
+   0.21522591,
+   0.41287811,
+   2.14299
   ],
   "torque_limits_nm": [
    10.0,
@@ -108,5 +108,5 @@
   "yaw_time_constant_s": 0.15,
   "height_rate_m_s": 0.05
  },
- "fingerprint": "9fe892901e9dad65110ba80a2ea4859da9eeec5ccd37ea6c1a0f09fff18f2e68"
+ "fingerprint": "52ef810edae758e8a097260ef13223255a2e0dc5e23f4b4a74315974aef9aac6"
 }

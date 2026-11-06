@@ -247,7 +247,8 @@ def generate_launch_description():
             description=(
                 "Controller to spawn, or none: whole_body_controller, "
                 "driving_balancer (cascade), lqr_balancer (full state feedback), "
-                "rl_flat_level or rl_agile_terrain (sandro_rl policies)"
+                "rl_flat_level or rl_agile_terrain (sandro_rl policies), "
+                "rl_stand_up (engages lying down, gets up, then balances)"
             ),
         ),
         DeclareLaunchArgument("can_interface", default_value="can0"),

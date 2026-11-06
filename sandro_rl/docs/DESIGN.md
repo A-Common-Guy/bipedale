@@ -1087,6 +1087,41 @@ tilt below 0.25 rad with the IMU above 0.27 m at some point, and never above
   depends on them, so a photo or a measurement of the real switched-off pose
   would be worth comparing against the bank.
 
+**Refit on the 2026-11 body** (`runs/stand_up_body2611`, checkpoint 500 of
+1000, now `policies/stand_up`). The new body collides through its handle and
+the Raspberry Pi as well, and lies flatter: in the regenerated bank
+(`data/fallen_states.npz`, 882 of 1024 drops) 47 % rest beyond 70° (39 %
+before) and the IMU sits at 0.18 m (0.26). Resumed from the lag-refitted
+`stand_up` with the curriculum's final stage (no lift assist), 10-80 ms of
+wheel lag, the SPI IMU ranges, learning rate 3e-4 and action noise reset to
+e^-1.2, at 3072 environments × 64 steps (the same batch; 4096 do not fit
+next to a desktop session). The previous policy got up from 117 of 120 falls
+of the evaluation below on the new body.
+
+- **Checkpoints**, on pitches ±0.3, ±0.5, ±0.8, ±1.4, 2 seeds, 40 ms of lag:
+  300 and 500 get up from 16 of 16; 400, 600 and 700 from 12; 800-1000 from
+  4-7. The later ones lose the flat-on-the-back rest (1.46 rad) and stand
+  crouched, as the original's checkpoints eroded.
+- **Checkpoint 500** gets up from 120 of 120: pitches ±0.3 to ±1.4 (10),
+  2 seeds, nominal, `spi_slow` and `worst` latency, 40 and 80 ms of wheel
+  lag (300: 118, the previous policy: 117). It is up in 0.56 s at the median
+  and 1.8 s at most (3.1 s before), and tilts at most 0.07 rad while driving
+  and turning afterwards (0.10). The standard runs complete all nine; no
+  wheel ringing from 0 to 80 ms of lag (`eval/lag_sweep.md`; the old body's
+  sweep is `eval/lag_sweep_oldbody.md`). Frames:
+  `eval/stand_up_{front,back}_frames.png`, videos `stand_up_{front,back}.mp4`.
+
+**Deployment** (`rl_stand_up` in `sandro_bringup/config/rl_policies.yaml`,
+`controller:=rl_stand_up`). `export_ros.py` sets `safety.start_lying` for
+policies trained from the bank: `RlPolicyController` leaves the drives limp
+(kd 0.5) where the robot lies, engages once it has rested 0.2 s at any tilt,
+and arms the fall cut-off only once the body has been within 0.25 rad of
+upright. The oscillation watchdog arms 3 s later with 1.2 rad/s for the legs
+(`deploy.safety` in `configs/stand_up.yaml`): in its last push and the
+settling after it the legs swing at up to 1.9 rad/s in the 5-15 Hz band,
+0.8 rad/s afterwards. Getting up takes the 10 Nm the drives allow
+(`mit_torque_limit_nm`), with leg kp 20 and kd 0.6.
+
 ### Wheel drive-train lag: the 7.5 Hz ringing on the robot
 
 On the robot, `flat_level` rang at 7.4–7.5 Hz: both wheels in phase, actions
@@ -1284,8 +1319,7 @@ interfaces on the wheel drives. The plugin exports them for all six joints
    the tyres collide. Leg-link collision shapes (`sandro_rl/collision.py`
    fits boxes to the CAD meshes) would make falls and the switched-off pose
    physical in every simulation, not only in `stand_up`.
-9. **Starting a policy lying down** (`stand_up`): `RlPolicyController` would
-   need a mode that engages with the robot fallen. The WBC's fall cut-off
-   (`safety.fall_angle_rad`) must not apply until the policy is upright. The
-   folded legs sit at up to 2.2 rad, outside the ±2.09 rad joint range.
-   Pushing up takes the 10 Nm drive limits, against 3 Nm today.
+9. **Starting a policy lying down** (`stand_up`): done, `safety.start_lying`
+   (section 8, stand_up deployment). The folded legs sit at up to 2.2 rad,
+   outside the ±2.09 rad target range; the targets are clamped to it in
+   training as on the robot.

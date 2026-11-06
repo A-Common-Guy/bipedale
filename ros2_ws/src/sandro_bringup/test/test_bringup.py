@@ -161,7 +161,8 @@ def test_real_robot_overrides_only_touch_known_parameters():
     shipped = yaml.safe_load((ROOT / "config" / "controllers.yaml").read_text())
     shipped.update(yaml.safe_load((ROOT / "config" / "rl_policies.yaml").read_text()))
     overrides = yaml.safe_load((ROOT / "config" / "sandro_real_overrides.yaml").read_text())
-    assert set(overrides) == {"whole_body_controller", "rl_flat_level", "rl_agile_terrain"}
+    assert set(overrides) == {"whole_body_controller", "rl_flat_level", "rl_agile_terrain",
+                              "rl_stand_up"}
     base = shipped["whole_body_controller"]["ros__parameters"]
 
     def check(subset, reference, path=""):
@@ -177,7 +178,7 @@ def test_real_robot_overrides_only_touch_known_parameters():
     # A rearward neutral shift eats the front pivot's stretch margin at height.
     assert tasks["fore_aft"]["neutral_offset_m"] < 0.0
     assert tasks["height"]["max_m"] <= 0.19
-    for name in ("rl_flat_level", "rl_agile_terrain"):
+    for name in ("rl_flat_level", "rl_agile_terrain", "rl_stand_up"):
         check(overrides[name]["ros__parameters"], shipped[name]["ros__parameters"], f"{name}.")
         # One physical IMU mounting for every controller.
         assert (overrides[name]["ros__parameters"]["observation"]["imu_offset_rad"]
@@ -188,7 +189,10 @@ def test_rl_policies_are_complete():
     config = yaml.safe_load((ROOT / "config" / "rl_policies.yaml").read_text())
     manager = config["controller_manager"]["ros__parameters"]
     controllers = ROOT.parent / "sandro_controllers"
-    assert set(manager) == {"rl_flat_level", "rl_agile_terrain"}
+    assert set(manager) == {"rl_flat_level", "rl_agile_terrain", "rl_stand_up"}
+    # Only the stand-up policy engages lying down.
+    assert {name for name in manager
+            if (config[name]["ros__parameters"].get("safety") or {}).get("start_lying")} == {"rl_stand_up"}
     for name, entry in manager.items():
         assert entry["type"] == "sandro_controllers/RlPolicyController"
         parameters = config[name]["ros__parameters"]
