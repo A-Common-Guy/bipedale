@@ -102,6 +102,10 @@ const std::vector<DoubleParameter> &double_parameters() {
        "5-15 Hz wheel velocity RMS beyond which the drives go limp; 0 disables it."},
       {"safety.oscillation_window_s", &RlPolicySettings::oscillation_window_s,
        "Averaging time of the oscillation watchdog's RMS."},
+      {"safety.upright_tilt_rad", &RlPolicySettings::upright_tilt_rad,
+       "start_lying: the fall cut-off arms below this tilt."},
+      {"safety.oscillation_arm_delay_s", &RlPolicySettings::oscillation_arm_delay_s,
+       "The oscillation watchdog arms this long after the fall cut-off."},
   };
   return table;
 }
@@ -166,6 +170,9 @@ void RlPolicyController::declare_parameters() {
   node->declare_parameter("observation.command_size", 3,
                           read_only("Command terms: 3, or 4 with a roll command."));
   node->declare_parameter("action.wheel_mode", "velocity", read_only("velocity or torque."));
+  node->declare_parameter("safety.start_lying", false,
+                          read_only("Stand-up policy: engage limp where the robot lies, arm the "
+                                    "fall cut-off once upright."));
   node->declare_parameter("action.stand_q", std::vector<double>(6, 0.0),
                           read_only("Joint pose the leg actions are relative to."));
   const LegGeometry geometry;
@@ -191,6 +198,7 @@ bool RlPolicyController::read_settings(RlPolicySettings &s, std::string *error) 
     return false;
   }
   s.wheel_velocity_mode = mode == "velocity";
+  s.start_lying = node->get_parameter("safety.start_lying").as_bool();
   const auto stand = node->get_parameter("action.stand_q").as_double_array();
   if (stand.size() != 6) {
     *error = "action.stand_q needs six values";
@@ -423,9 +431,27 @@ void RlPolicyController::report(const RlPolicyState &state, const RlPolicyOutput
     }
     last_phase_ = output.phase;
   }
-  constexpr std::uint32_t kReported = RL_IMU_STALE | RL_WAITING_UPRIGHT | RL_NON_FINITE_ACTION;
+  constexpr std::uint32_t kReported = RL_IMU_STALE | RL_WAITING_UPRIGHT | RL_NON_FINITE_ACTION |
+                                      RL_WAITING_STILL | RL_DISARMED;
   const std::uint32_t reported = output.status & kReported;
   if (reported != last_reported_status_) {
+    if ((reported & RL_WAITING_STILL) && !(last_reported_status_ & RL_WAITING_STILL)) {
+      RCLCPP_INFO(get_node()->get_logger(),
+                  "Limp; the stand-up policy engages once the robot rests (tilt %.2f rad)",
+                  output.tilt_rad);
+    }
+    if (output.phase == RlPhase::kPolicy && !(reported & RL_DISARMED) &&
+        (last_reported_status_ & RL_DISARMED)) {
+      RCLCPP_INFO(get_node()->get_logger(),
+                  "Upright (tilt %.2f rad): fall cut-off and oscillation watchdog armed "
+                  "(the watchdog after safety.oscillation_arm_delay_s)",
+                  output.tilt_rad);
+    }
+    if ((reported & RL_DISARMED) && !(last_reported_status_ & RL_DISARMED) &&
+        output.phase == RlPhase::kPolicy) {
+      RCLCPP_INFO(get_node()->get_logger(),
+                  "Stand-up policy engaged lying down: no fall cut-off until upright");
+    }
     if (reported & RL_WAITING_UPRIGHT) {
       RCLCPP_INFO(get_node()->get_logger(),
                   "Legs at the stand pose; waiting for the body to be upright (tilt %.2f rad)",

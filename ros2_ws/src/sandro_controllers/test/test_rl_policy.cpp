@@ -47,7 +47,7 @@ sc::RlPolicyState standing(const sc::RlPolicySettings &s) {
 
 // The C++ actor reproduces onnxruntime on the exported policy.onnx.
 TEST(RlPolicy, ActorMatchesOnnxReference) {
-  for (const std::string name : {"flat_level", "agile_terrain"}) {
+  for (const std::string name : {"flat_level", "agile_terrain", "stand_up"}) {
     sc::MlpPolicy policy;
     std::string error;
     ASSERT_TRUE(policy.load(kSource + "/policies/" + name + ".bin", &error)) << error;
@@ -393,6 +393,88 @@ TEST(RlPolicy, OscillationWatchdogTripsOnLegRingingNotOnDriving) {
     EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
     EXPECT_LT(largest_wheel, 0.5 * s.oscillation_wheel_rad_s);
   }
+}
+
+TEST(RlPolicy, StandUpPolicyEngagesLyingDownAndArmsOnceUpright) {
+  sc::RlPolicyCore core;
+  std::string error;
+  auto s = flat_settings();
+  s.start_lying = true;
+  ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+  // Lying at 1.2 rad with the legs folded far from the stand pose.
+  auto lying = standing(s);
+  lying.orientation = {0.0, std::sin(0.6), 0.0, std::cos(0.6)};
+  for (const int j : {0, 1, 3, 4}) {
+    lying.position[j] += 1.0;
+  }
+  core.reset(lying);
+  // Still settling: limp, no stand-up move.
+  auto settling = lying;
+  settling.velocity[1] = 1.0;
+  sc::RlPolicyOutput out;
+  for (int i = 0; i < 120; ++i) {
+    out = core.update(settling, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  EXPECT_EQ(out.phase, sc::RlPhase::kStand);
+  EXPECT_TRUE(out.status & sc::RL_WAITING_STILL);
+  EXPECT_EQ(out.frame.kp[0], 0.0);
+  EXPECT_EQ(out.frame.kd[0], s.fallen_kd_nm_s_rad);
+  int cycles = 0;
+  for (; cycles < 300 && core.phase() == sc::RlPhase::kStand; ++cycles) {
+    out = core.update(lying, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
+  EXPECT_EQ(cycles, 60);  // engage_hold_s
+  EXPECT_TRUE(out.inferred);
+  // Lying is no fall, and getting up swings the legs past the watchdog.
+  for (int i = 0; i < 150; ++i) {
+    auto pushing = lying;
+    const double v = 4.0 * std::sin(2.0 * M_PI * 7.5 * i / 300.0);
+    pushing.velocity[1] = pushing.velocity[3] = v;
+    out = core.update(pushing, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
+  EXPECT_TRUE(out.status & sc::RL_DISARMED);
+  // Upright arms both: then a fall latches.
+  out = core.update(standing(s), sc::RlPolicyCommand{}, 1.0 / 300.0);
+  EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
+  EXPECT_FALSE(out.status & sc::RL_DISARMED);
+  out = core.update(lying, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  EXPECT_EQ(out.phase, sc::RlPhase::kFallen);
+}
+
+TEST(RlPolicy, WatchdogArmsOnlyAfterTheDelayOnceUpright) {
+  sc::RlPolicyCore core;
+  std::string error;
+  auto s = flat_settings();
+  s.start_lying = true;
+  s.oscillation_arm_delay_s = 1.0;
+  ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+  core.reset(standing(s));
+  sc::RlPolicyOutput out;
+  for (int i = 0; i < 61; ++i) {
+    out = core.update(standing(s), sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  ASSERT_EQ(out.phase, sc::RlPhase::kPolicy);
+  // The settling swing right after standing up does not trip it...
+  const auto ringing = [&](int i) {
+    auto state = standing(s);
+    state.velocity[1] = state.velocity[3] = 4.0 * std::sin(2.0 * M_PI * 7.5 * i / 300.0);
+    return state;
+  };
+  int i = 0;
+  for (; i < 270; ++i) {
+    out = core.update(ringing(i), sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
+  EXPECT_TRUE(out.status & sc::RL_DISARMED);
+  // ...ringing that lasts past it does.
+  for (; i < 600 && out.phase == sc::RlPhase::kPolicy; ++i) {
+    out = core.update(ringing(i), sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  EXPECT_EQ(out.phase, sc::RlPhase::kFallen);
+  EXPECT_TRUE(out.status & sc::RL_OSCILLATION);
+  EXPECT_LT(i, 300 + 150);
 }
 
 TEST(RlPolicy, StaleImuBeyondTheTimeoutIsAFall) {

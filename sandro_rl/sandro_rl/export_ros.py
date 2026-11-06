@@ -126,7 +126,28 @@ def initial_height_m() -> float:
     return float(config["whole_body_controller"]["ros__parameters"]["tasks"]["height"]["target_m"])
 
 
-def parameter_block(name: str, policy: str, contract: dict, actor: dict) -> str:
+def safety_settings(policy_dir: Path) -> dict:
+    """RlPolicyController `safety.*` for this policy: start_lying for policies
+    trained from limp rest poses (env.init.fallen), then the task config's
+    deploy.safety (configs/<policy>.yaml)."""
+    import yaml
+
+    safety = {}
+    meta = json.loads((policy_dir / "meta.json").read_text()) if (policy_dir / "meta.json").is_file() else {}
+    fallen = ((meta.get("config") or {}).get("env", {}).get("init", {}) or {}).get("fallen") or {}
+    if float(fallen.get("fraction", 0.0)) > 0.0:
+        safety["start_lying"] = True
+    task = REPO / "sandro_rl" / "configs" / f"{policy_dir.name}.yaml"
+    if task.is_file():
+        safety.update(((yaml.safe_load(task.read_text()) or {}).get("deploy") or {}).get("safety") or {})
+    return safety
+
+
+def _value(value) -> str:
+    return ("true" if value else "false") if isinstance(value, bool) else _f(float(value))
+
+
+def parameter_block(name: str, policy: str, contract: dict, actor: dict, safety: dict | None = None) -> str:
     obs = contract["observation"]
     frame = dict((k, n) for k, n in obs["frame"])
     unsupported = set(frame) - {"gravity", "gyro", "leg_pos", "leg_vel", "wheel_vel", "last_action", "command"}
@@ -187,7 +208,7 @@ def parameter_block(name: str, policy: str, contract: dict, actor: dict) -> str:
       wheel_kd_nm_s_rad: {_f(wheels["kd_nm_s_rad"])}
       wheel_scale_nm: {_f(wheels["scale_nm"])}
       stand_q: {_list(action["stand_q"])}
-"""
+""" + ("    safety:\n" + "".join(f"      {k}: {_value(v)}\n" for k, v in safety.items()) if safety else "")
 
 
 def main() -> int:
@@ -213,7 +234,7 @@ def main() -> int:
         if args.frames:
             write_frames(policy_dir, ref_dir / f"{policy}_frames.txt")
         types.append(f"    {name}:\n      type: sandro_controllers/RlPolicyController\n")
-        blocks.append(parameter_block(name, policy, contract, actor))
+        blocks.append(parameter_block(name, policy, contract, actor, safety_settings(policy_dir)))
         print(f"{policy} -> {name}: {actor['mean'].size} inputs, layers "
               f"{[k.shape[1] for k, _ in actor['layers']]}")
     yaml_path = ROS_SRC / "sandro_bringup" / "config" / "rl_policies.yaml"

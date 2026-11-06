@@ -114,6 +114,18 @@ struct RlPolicySettings {
   double oscillation_leg_rad_s{1.0};
   double oscillation_wheel_rad_s{5.0};
   double oscillation_window_s{0.3};
+  // Stand-up policies, trained from limp rest poses: the drives wait limp
+  // (fallen_kd_nm_s_rad) instead of moving to stand_q, the policy engages
+  // once every joint and the body have been still for engage_hold_s at any
+  // tilt, and the fall cut-off and the watchdog arm only once the body has
+  // been within upright_tilt_rad. Getting up swings the legs harder than the
+  // watchdog allows a balancing robot.
+  bool start_lying{false};
+  double upright_tilt_rad{0.25};
+  // The watchdog arms this long after the fall cut-off: a stand-up policy's
+  // last push and settling swing the legs at up to 1.9 rad/s in the band for
+  // about 3 s (0.8 afterwards, driving included).
+  double oscillation_arm_delay_s{0.0};
 };
 
 struct RlPolicyState {
@@ -154,6 +166,8 @@ enum RlStatus : std::uint32_t {
   RL_WAITING_UPRIGHT = 1U << 4,
   RL_NON_FINITE_ACTION = 1U << 5,
   RL_OSCILLATION = 1U << 6,
+  RL_WAITING_STILL = 1U << 7,  // start_lying: limp, waiting for the robot to rest
+  RL_DISARMED = 1U << 8,       // oscillation watchdog not armed yet (start_lying: nor the fall cut-off before upright)
 };
 
 struct RlPolicyOutput {
@@ -202,6 +216,7 @@ private:
   double feasible_roll(double roll, double height) const;
   // Advances the watchdog filters; the largest leg and wheel band RMS.
   std::array<double, 2> watch_oscillation(const RlPolicyState &state, double period_s);
+  void reset_oscillation(const RlPolicyState &state);
 
   RlPolicySettings settings_{};
   MlpPolicy policy_;
@@ -224,6 +239,8 @@ private:
   std::array<std::array<double, 6>, 2> oscillation_low_pass_{};
   std::array<double, 6> oscillation_mean_square_{};
   bool oscillation_tripped_{false};
+  bool armed_{true};  // fall cut-off active
+  double armed_s_{};  // time since the fall cut-off armed
   Eigen::VectorXf observation_;
   Eigen::VectorXf frame_;
   RlPolicyFrame policy_frame_{};

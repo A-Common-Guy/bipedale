@@ -145,7 +145,8 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
       (s.command_size == 4 && !(s.roll_rad > 0.0)) || !(s.leg_kp_nm_rad > 0.0) ||
       !(s.wheel_kd_nm_s_rad > 0.0) || !(s.stand_s > 0.0) || !(s.wheel_filter_hz >= 0.0) ||
       !(s.oscillation_leg_rad_s >= 0.0) || !(s.oscillation_wheel_rad_s >= 0.0) ||
-      !(s.oscillation_window_s > 0.0) || !(s.hand_over_tilt_rad > 0.0)) {
+      !(s.oscillation_window_s > 0.0) || !(s.hand_over_tilt_rad > 0.0) ||
+      !(s.upright_tilt_rad > 0.0)) {
     *error = "inconsistent policy settings";
     return false;
   }
@@ -309,7 +310,16 @@ void RlPolicyCore::engage(const RlPolicyState &state) {
   for (int k = 0; k < settings_.history; ++k) {
     observation_.segment(k * frame_size_, frame_size_) = frame_;
   }
-  // The first high-pass starts at the measured velocity, so engaging while a
+  reset_oscillation(state);
+  oscillation_tripped_ = false;
+  armed_ = !settings_.start_lying;
+  armed_s_ = 0.0;
+  cycle_ = 0;
+  phase_ = RlPhase::kPolicy;
+}
+
+void RlPolicyCore::reset_oscillation(const RlPolicyState &state) {
+  // The first high-pass starts at the measured velocity, so arming while a
   // joint moves is not a step into the band.
   oscillation_high_pass_[0] = state.velocity;
   oscillation_high_pass_[1].fill(0.0);
@@ -317,9 +327,6 @@ void RlPolicyCore::engage(const RlPolicyState &state) {
     stage.fill(0.0);
   }
   oscillation_mean_square_.fill(0.0);
-  oscillation_tripped_ = false;
-  cycle_ = 0;
-  phase_ = RlPhase::kPolicy;
 }
 
 std::array<double, 2> RlPolicyCore::watch_oscillation(const RlPolicyState &state,
@@ -398,8 +405,13 @@ RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCo
     out.rate_rad_s = std::hypot(state.angular_velocity[0], state.angular_velocity[1],
                                 state.angular_velocity[2]);
     // Before engaging the body is held, or still settling from a reset; the
-    // stand phase only waits for it to be upright.
-    if (phase_ == RlPhase::kPolicy && out.tilt_rad > s.fall_angle_rad) {
+    // stand phase only waits for it to be upright. A stand-up policy arms
+    // the cut-off once it has got the body upright.
+    if (phase_ == RlPhase::kPolicy && !armed_ && out.tilt_rad < s.upright_tilt_rad) {
+      armed_ = true;
+      armed_s_ = 0.0;
+    }
+    if (phase_ == RlPhase::kPolicy && armed_ && out.tilt_rad > s.fall_angle_rad) {
       phase_ = RlPhase::kFallen;
     }
   }
@@ -407,7 +419,17 @@ RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCo
     phase_ = RlPhase::kFallen;
   }
   out.leg_height_m = leg_heights(state);
-  if (phase_ == RlPhase::kPolicy) {
+  const bool watching = armed_ && armed_s_ >= s.oscillation_arm_delay_s - 1e-9;
+  if (phase_ == RlPhase::kPolicy && !watching) {
+    out.status |= RL_DISARMED;
+  }
+  if (phase_ == RlPhase::kPolicy && armed_) {
+    if (!watching && armed_s_ + period_s >= s.oscillation_arm_delay_s - 1e-9) {
+      reset_oscillation(state);  // the watchdog starts on the next cycle
+    }
+    armed_s_ += period_s;
+  }
+  if (phase_ == RlPhase::kPolicy && watching) {
     out.oscillation_rad_s = watch_oscillation(state, period_s);
     const auto &osc = out.oscillation_rad_s;
     if ((s.oscillation_leg_rad_s > 0.0 && osc[0] > s.oscillation_leg_rad_s) ||
@@ -427,7 +449,22 @@ RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCo
     return out;
   }
 
-  if (phase_ == RlPhase::kStand) {
+  if (phase_ == RlPhase::kStand && s.start_lying) {
+    // Limp where it lies, as the policy's training episodes start.
+    policy_frame_ = RlPolicyFrame{};
+    policy_frame_.kd.fill(s.fallen_kd_nm_s_rad);
+    bool joints_still = true;
+    for (const double v : state.velocity) {
+      joints_still = joints_still && std::abs(v) <= s.engage_joint_velocity_rad_s;
+    }
+    const bool still = fresh && joints_still && out.rate_rad_s <= s.engage_rate_rad_s;
+    still_s_ = still ? still_s_ + period_s : 0.0;
+    if (still && still_s_ >= s.engage_hold_s - 1e-9) {
+      engage(state);
+    } else {
+      out.status |= RL_WAITING_STILL;
+    }
+  } else if (phase_ == RlPhase::kStand) {
     bool near_stand = true;
     for (const auto j : kLegs) {
       near_stand = near_stand && std::abs(state.position[j] - s.stand_q[j]) <= s.stand_tolerance_rad;
