@@ -105,10 +105,11 @@ env:
   randomization:
     enabled: true
     latency:
-      imu_delay_s: [0.003, 0.025]
-      imu_rate_hz: [100.0, 400.0]
-      degraded_imu_probability: 0.25
-      degraded_imu_rate_hz: [25.0, 60.0]
+      # BNO085 over SPI on the Pi: 241-243 Hz, 9 ms behind the encoders, i.e.
+      # 10 ms with the joint delay (recordings/imu_rock*_2026-10-21.csv,
+      # tools/imu_delay.py); the launch defaults are 10 ms / 240 Hz.
+      imu_delay_s: [0.005, 0.015]
+      imu_rate_hz: [180.0, 300.0]
       joint_delay_s: [0.0005, 0.006]
       joint_rate_hz: [150.0, 300.0]
       synchronous_joints_probability: 0.2

@@ -281,7 +281,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument("sim_imu_delay_s", default_value="0.010",
                               description="MuJoCo only: IMU latency from sample to host, seconds"),
-        DeclareLaunchArgument("sim_imu_rate_hz", default_value="200",
+        DeclareLaunchArgument("sim_imu_rate_hz", default_value="240",
                               description="MuJoCo only: IMU sample rate in Hz (0 = every cycle)"),
         DeclareLaunchArgument("sim_joint_delay_s", default_value="0.001",
                               description="MuJoCo only: encoder latency from sample to host "

@@ -14,7 +14,7 @@ drive_test.py's layout, so compare_runs.py reads them next to hardware runs.
     python3 ../../sandro_bringup/tools/compare_runs.py sim.csv ../../../../recordings/real4_2026-09-20.csv
 
     # which latencies does the shipped controller survive?
-    python3 closed_loop.py sweep --scenario hardware --grid imu_rate=30,100,200 \\
+    python3 closed_loop.py sweep --scenario hardware --grid imu_rate=180,240,300 \\
         --grid joint_delay=0.001,0.005
 
     # the gates a parameter or model change must pass before the robot
@@ -245,19 +245,23 @@ def command_sweep(args, binary: Path) -> int:
 # it goes on the robot; none may fall. They encode what is known about the
 # physical robot, not only the nominal simulation (SIM_TO_REAL.md,
 # "Closed-loop simulation without ROS").
-UART_IMU = {"imu_rate": "30"}  # what the BNO085 UART path delivered on every hardware run
+# The slow end of the BNO085 SPI link: 241-243 Hz, 9 ms on the robot
+# (recordings/imu_rock*_2026-10-21.csv), with margin.
+SPI_IMU_SLOW = {"imu_rate": "180", "imu_delay": "0.015"}
 
 
 def gates():
     return [
         ("hardware sequence, nominal latency: stands within 0.035 rad RMS, tracks 0.2 m/s",
          "hardware", {}, lambda m: m[0]["pitch_rms"] < 0.035 and m[1]["vel_err_rms"] < 0.12),
-        ("hardware sequence, IMU at 30 Hz (UART)", "hardware", UART_IMU, lambda m: True),
+        ("hardware sequence, IMU at 180 Hz / 15 ms (slow SPI)", "hardware", SPI_IMU_SLOW,
+         lambda m: True),
         ("hardware sequence, drive law once per control cycle (no MitDrivePlugin)",
          "hardware", {"drive_plugin": "false"}, lambda m: True),
         ("8 N shoves for 0.1 s, forward and back", "push", {}, lambda m: True),
         ("drive_test default sequence, nominal latency", "default", {}, lambda m: True),
-        ("drive_test default sequence, IMU at 30 Hz (UART)", "default", UART_IMU, lambda m: True),
+        ("drive_test default sequence, IMU at 180 Hz / 15 ms (slow SPI)", "default", SPI_IMU_SLOW,
+         lambda m: True),
     ]
 
 

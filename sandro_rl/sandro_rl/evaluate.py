@@ -62,13 +62,14 @@ TRUTH_KEYS = ["truth_forward_m_s", "truth_yaw_rate_rad_s", "truth_height_m", "tr
               "truth_imu_height_m"]
 IMU_COLUMNS = ["imu_qx", "imu_qy", "imu_qz", "imu_qw", "imu_gx", "imu_gy", "imu_gz", "imu_ax", "imu_ay", "imu_az"]
 
-# Latency profiles of the comparison. "uart_imu" is the gate closed_loop.py
-# uses for the BNO085 UART path; "worst" stacks the far ends of the training
-# ranges that were measured on the robot (SIM_TO_REAL.md).
+# Latency profiles of the comparison. "spi_slow" is the gate closed_loop.py
+# uses for the slow end of the BNO085 SPI link; "worst" stacks it with the
+# far ends of the joint and command delays measured on the robot
+# (SIM_TO_REAL.md).
 PROFILES = {
     "nominal": {},
-    "uart_imu": dict(closed_loop.UART_IMU),
-    "worst": {"imu_rate": "30", "imu_delay": "0.025", "joint_delay": "0.005", "command_delay": "0.003"},
+    "spi_slow": dict(closed_loop.SPI_IMU_SLOW),
+    "worst": {**closed_loop.SPI_IMU_SLOW, "joint_delay": "0.005", "command_delay": "0.003"},
 }
 
 
@@ -763,7 +764,7 @@ def main() -> int:
     parser.add_argument("--hop", action="store_true",
                         help="request a jump when the ground ahead rises (hop-on-command policies)")
     parser.add_argument("--compare", action="store_true",
-                        help="policy and WBC on hardware/default/push x nominal/uart_imu/worst")
+                        help="policy and WBC on hardware/default/push x nominal/spi_slow/worst")
     parser.add_argument("--lag-sweep", action="store_true",
                         help=f"hardware/default/push with wheel drive-train lag {LAG_SWEEP} s: eval/lag_sweep.md")
     args = parser.parse_args()

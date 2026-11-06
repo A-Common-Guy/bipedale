@@ -284,8 +284,7 @@ class SandroEnv:
         if randomize and r.get("enabled", True):
             L = r["latency"]
             imu_delay = u(keys[0], L["imu_delay_s"])
-            degraded = jax.random.uniform(keys[1]) < L["degraded_imu_probability"]
-            imu_rate = jp.where(degraded, u(keys[2], L["degraded_imu_rate_hz"]), u(keys[3], L["imu_rate_hz"]))
+            imu_rate = u(keys[3], L["imu_rate_hz"])
             joint_delay = u(keys[4], L["joint_delay_s"])
             joint_rate = u(keys[5], L["joint_rate_hz"])
             sync = jax.random.uniform(keys[6]) < L["synchronous_joints_probability"]

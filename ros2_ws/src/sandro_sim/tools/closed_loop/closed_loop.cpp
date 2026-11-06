@@ -77,7 +77,7 @@ struct Options {
   int update_rate_hz{300};
   double timestep_s{0.0};  // 0: the model's
   double imu_delay_s{0.010};
-  double imu_rate_hz{200.0};
+  double imu_rate_hz{240.0};
   double joint_delay_s{0.001};
   double joint_rate_hz{200.0};
   bool joint_stagger{true};

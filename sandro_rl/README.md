@@ -60,8 +60,8 @@ uv run python -m sandro_rl.train configs/agile_terrain.yaml --out runs/terrain
 uv run python -m sandro_rl.export runs/flat
 
 # evaluate in CPU MuJoCo with latency emulation
-uv run python -m sandro_rl.evaluate runs/flat --compare            # vs WBC: hardware/default/push x nominal/uart_imu/worst
-uv run python -m sandro_rl.evaluate runs/flat --scenario default --profile uart_imu --video default.mp4
+uv run python -m sandro_rl.evaluate runs/flat --compare            # vs WBC: hardware/default/push x nominal/spi_slow/worst
+uv run python -m sandro_rl.evaluate runs/flat --scenario default --profile spi_slow --video default.mp4
 uv run python -m sandro_rl.evaluate runs/terrain --scenario course --course --video course.mp4   # planks + a hill
 uv run python -m sandro_rl.evaluate policies/step_climb --scenario steps --course steps --video steps.mp4  # 3-6 cm planks, curb
 uv run python -m sandro_rl.evaluate runs/terrain --scenario expressive --video expressive.mp4  # roll and height

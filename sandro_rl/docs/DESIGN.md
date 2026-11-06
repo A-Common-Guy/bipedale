@@ -346,9 +346,8 @@ value.
 
 | Parameter | Range | Source of the range |
 | --- | --- | --- |
-| IMU delay | 3–25 ms | Launch default 10 ms (`sim_imu_delay_s`). The WBC survives up to 15–20 ms at 30–200 Hz (S2R l.479–484). The upper bound sits past the WBC's limit, so the policy is trained where the WBC fails. |
-| IMU rate | 100–400 Hz | BNO085 asked for 200 Hz (S2R l.13). |
-| Degraded IMU rate | 25–60 Hz, in 25 % of episodes | Every hardware run so far got 29.9 Hz over the UART (S2R l.469, l.473–475). SPI is unmeasured (S2R l.57–60). |
+| IMU delay | 5–15 ms | Launch default 10 ms (`sim_imu_delay_s`): the SPI IMU lags the encoders by 9 ms, plus the 1 ms joint delay (S2R l.57–61). Policies trained before 2026-11 saw 3–25 ms. |
+| IMU rate | 180–300 Hz | 241–243 Hz measured over SPI (S2R l.57–61), launch default 240 Hz. Policies trained before 2026-11 saw 100–400 Hz, and in 25 % of episodes 25–60 Hz for the UART path (29.9 Hz on every UART run), which the robot no longer uses. |
 | Joint delay | 0.5–6 ms | Encoder data is 1–6 ms old on the robot (S2R l.50–52). |
 | Joint rate | 150–300 Hz | 199.9 Hz measured (S2R l.470). 300 Hz is `state_source:=mit` (S2R l.144–150). |
 | Joints synchronised | 20 % of episodes, otherwise random phases | 0.66 of joints update together on the robot (S2R l.471). `mit` mode is synchronous (S2R l.62–63). |
@@ -1202,8 +1201,9 @@ interfaces on the wheel drives. The plugin exports them for all six joints
 - **The 0.31–0.46 velocity gain of one left drive** (S2R l.248, l.283) is
   outside the randomised 0.75–1.05. A policy that relies on leg velocity
   would be hurt by that fault. Check that drive first, as S2R advises.
-- **IMU rate on SPI** is unmeasured. Both 30 Hz and 200 Hz are in training
-  and in the evaluation profiles.
+- **IMU rate on SPI** is 241–243 Hz with 9 ms of lag (measured 2026-10-21).
+  Policies trained before 2026-11 also saw the 30 Hz UART rate; the
+  evaluation profiles now bracket the SPI link (`spi_slow`, 180 Hz / 15 ms).
 - **Encoder noise, gyro bias and kp scale** are assumptions (section 5).
 - **Sim-to-sim gap.** The GPU environment and the CPU evaluation share the
   MJCF and the observation code (tested), but differ in two ways:
@@ -1245,9 +1245,9 @@ interfaces on the wheel drives. The plugin exports them for all six joints
    midpoint in the heading frame, as `evaluate.py` does with
    `diag_truth_forward_m_s`. At the torso origin it includes ω × 0.35 m
    while turning, and pitch motion as well (section 7).
-2. **`closed_loop.py check`**: the `default/uart_imu` gate fails today
-   (S2R l.518–519). Before raising `balance.effort_weights.wheel_torque`, a
-   SPI IMU-rate measurement is the cheaper fix (S2R l.493–495).
+2. **`closed_loop.py check`**: the `default/uart_imu` gate failed
+   (S2R l.518–519). The SPI rate is now measured (241–243 Hz), and the gate
+   is the slow end of that link (180 Hz / 15 ms, `spi_slow`).
 3. **`sandro_controllers`**: add the `RlPolicyController` of section 9 as a
    separate plugin, so the WBC stays untouched and selectable with
    `controller:=`.

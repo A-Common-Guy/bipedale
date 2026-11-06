@@ -55,10 +55,10 @@ the numbers above were obtained with:
   now applied per physics step (1 ms by default, about one 3-frame CAN
   burst plus the gs_usb round trip).
 
-The IMU stays at 10 ms / 200 Hz until the SPI path on the Raspberry Pi
-(`imu_transport:=spi`, the launch default) is measured with
-`compare_runs.py imu_update_hz`; the UART path delivered only 30 Hz (`sim_imu_rate_hz:=30`
-reproduces it, eighth comparison). Recheck the shipped gains against these settings before relying on
+The IMU is 10 ms / 240 Hz: the SPI path on the Pi, the only one in use since 2026-10, gives
+241–243 Hz, 9 ms behind the encoders (`tools/imu_delay.py`, `recordings/imu_rock*_2026-10-21.csv`),
+i.e. `sim_imu_delay_s` 0.010 with the 1 ms joint delay. The UART path gave only 30 Hz
+(`sim_imu_rate_hz:=30` reproduces it, eighth comparison). Recheck the shipped gains against these settings before relying on
 the margins quoted above: the loop is less delayed than the one they were
 tuned for. `sim_joint_stagger:=false` puts all drives on one clock, as
 `state_source:=mit` does.
