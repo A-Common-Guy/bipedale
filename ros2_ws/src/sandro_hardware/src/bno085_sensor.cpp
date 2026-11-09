@@ -101,6 +101,8 @@ struct BNO085Sensor::Impl
   int read_timeout_ms{};
   uint32_t report_interval_us{};
   double online_timeout_s{};
+  // How long activation waits for the first of every report.
+  double activation_timeout_s{1.0};
   double mount_yaw_rad{};
   bool fault_reported{false};
   std::atomic_bool stop{false};
@@ -251,6 +253,9 @@ struct BNO085Sensor::Impl
       if (int_asserted()) {
         return true;
       }
+      if (stop) {
+        return false;
+      }
       const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(
         deadline - Clock::now()).count();
       if (left <= 0) {
@@ -326,33 +331,48 @@ struct BNO085Sensor::Impl
     ::tcdrain(descriptor);
   }
 
-  void consume_packet(const std::vector<uint8_t> & packet, Clock::time_point now)
+  void enable_reports()
   {
-    for (const auto & [id, report] : protocol::split_reports(packet)) {
-      if (id == 0x08) {
-        const auto value = protocol::parse_sensor_report(report, 4, std::ldexp(1.0, -14));
-        orientation = {value[0], value[1], value[2], value[3]};
-        report_stamps[0] = now;
-      } else if (id == 0x02) {
-        const auto value = protocol::parse_sensor_report(report, 3, std::ldexp(1.0, -9));
-        angular_velocity = {value[0], value[1], value[2]};
-        report_stamps[1] = now;
-      } else if (id == 0x01) {
-        const auto value = protocol::parse_sensor_report(report, 3, std::ldexp(1.0, -8));
-        linear_acceleration = {value[0], value[1], value[2]};
-        report_stamps[2] = now;
-      }
+    for (const auto report : {0x08, 0x02, 0x01}) {
+      send_report(static_cast<uint8_t>(report), report_interval_us);
+    }
+  }
+
+  // Decoded outside the lock shared with read(); only the copy is inside.
+  void store(const protocol::ImuReports & reports, Clock::time_point now)
+  {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (reports.present[0]) {
+      orientation = reports.orientation;
+      report_stamps[0] = now;
+    }
+    if (reports.present[1]) {
+      angular_velocity = reports.angular_velocity;
+      report_stamps[1] = now;
+    }
+    if (reports.present[2]) {
+      linear_acceleration = reports.linear_acceleration;
+      report_stamps[2] = now;
     }
   }
 
   void consume(const uint8_t * data, std::size_t size)
   {
-    auto packets = framer.feed(data, size);
+    const auto packets = framer.feed(data, size);
     const auto now = Clock::now();
-    std::lock_guard<std::mutex> lock(mutex);
     for (const auto & packet : packets) {
-      consume_packet(packet, now);
+      store(protocol::decode_imu_reports(packet), now);
     }
+  }
+
+  // False when stopped during the pause.
+  bool pause(std::chrono::milliseconds duration) const
+  {
+    const auto until = Clock::now() + duration;
+    while (!stop && Clock::now() < until) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return !stop;
   }
 
   void receive_loop()
@@ -381,19 +401,69 @@ struct BNO085Sensor::Impl
     }
   }
 
+  // An SPI/GPIO failure, or one of the three reports going missing (the
+  // chip reset itself and came back with every report disabled), resets the
+  // chip and re-enables the reports, with a growing pause between attempts
+  // that fail.
   void receive_spi()
   {
-    try {
-      while (!stop) {
-        const auto packet = read_spi_packet(std::chrono::milliseconds(read_timeout_ms));
-        if (packet.size() > 4 && packet[2] == protocol::kShtpReportChannel) {
-          const auto now = Clock::now();
-          std::lock_guard<std::mutex> lock(mutex);
-          consume_packet(packet, now);
+    const auto watchdog = std::chrono::duration<double>(std::max(0.5, 3.0 * online_timeout_s));
+    constexpr std::chrono::milliseconds first_backoff{100}, last_backoff{2000};
+    auto backoff = first_backoff;
+    std::array<Clock::time_point, 3> seen{};
+    seen.fill(Clock::now());
+    bool failed = false;
+    while (!stop) {
+      if (failed) {
+        if (!pause(backoff)) {
+          break;
         }
+        backoff = std::min(2 * backoff, last_backoff);
+        try {
+          sequence.clear();
+          boot_spi();
+          enable_reports();
+        } catch (const std::exception & error) {
+          if (!stop) {
+            RCLCPP_ERROR(
+              rclcpp::get_logger("BNO085Sensor"), "BNO085 recovery failed: %s", error.what());
+          }
+          continue;
+        }
+        RCLCPP_WARN(rclcpp::get_logger("BNO085Sensor"), "BNO085 reset, reports re-enabled");
+        failed = false;
+        seen.fill(Clock::now());
       }
-    } catch (const std::exception & error) {
-      RCLCPP_ERROR(rclcpp::get_logger("BNO085Sensor"), "%s", error.what());
+      try {
+        const auto packet = read_spi_packet(std::chrono::milliseconds(read_timeout_ms));
+        const auto now = Clock::now();
+        if (packet.size() > 4 && packet[2] == protocol::kShtpReportChannel) {
+          const auto reports = protocol::decode_imu_reports(packet);
+          store(reports, now);
+          for (std::size_t i = 0; i < seen.size(); ++i) {
+            if (reports.present[i]) {
+              seen[i] = now;
+              backoff = first_backoff;
+            }
+          }
+        }
+        const auto missing = now - *std::min_element(seen.begin(), seen.end());
+        if (missing > watchdog) {
+          RCLCPP_ERROR(
+            rclcpp::get_logger("BNO085Sensor"),
+            "BNO085 report missing for %.0f ms; resetting the chip",
+            1e3 * std::chrono::duration<double>(missing).count());
+          failed = true;
+        }
+      } catch (const std::exception & error) {
+        if (stop) {
+          break;
+        }
+        RCLCPP_ERROR(
+          rclcpp::get_logger("BNO085Sensor"), "BNO085 SPI failure: %s; resetting the chip",
+          error.what());
+        failed = true;
+      }
     }
   }
 
@@ -442,6 +512,12 @@ CallbackReturn BNO085Sensor::on_init(const hardware_interface::HardwareInfo & in
     {
       throw std::invalid_argument(
               "read_timeout_ms, report_interval_us and online_timeout_s must be positive");
+    }
+    if (parameters.count("activation_timeout_s")) {
+      impl_->activation_timeout_s = required_number<double>(parameters, "activation_timeout_s");
+      if (impl_->activation_timeout_s <= 0.0) {
+        throw std::invalid_argument("activation_timeout_s must be positive");
+      }
     }
     if (parameters.count("mount_yaw_rad")) {
       impl_->mount_yaw_rad = required_number<double>(parameters, "mount_yaw_rad");
@@ -505,6 +581,7 @@ CallbackReturn BNO085Sensor::on_activate(const rclcpp_lifecycle::State &)
       std::lock_guard<std::mutex> lock(impl_->mutex);
       impl_->report_stamps = {};
     }
+    impl_->stop = false;
     if (impl_->transport == Impl::Transport::spi) {
       // The reset leaves every report disabled.
       impl_->sequence.clear();
@@ -516,12 +593,10 @@ CallbackReturn BNO085Sensor::on_activate(const rclcpp_lifecycle::State &)
         impl_->send_report(static_cast<uint8_t>(report), 0);
       }
     }
-    for (const auto report : {0x08, 0x02, 0x01}) {
-      impl_->send_report(static_cast<uint8_t>(report), impl_->report_interval_us);
-    }
-    impl_->stop = false;
+    impl_->enable_reports();
     impl_->receiver = std::thread([this] {impl_->receive_loop();});
-    const auto deadline = Clock::now() + std::chrono::duration<double>(impl_->online_timeout_s);
+    const auto deadline =
+      Clock::now() + std::chrono::duration<double>(impl_->activation_timeout_s);
     while (Clock::now() < deadline) {
       {
         std::lock_guard<std::mutex> lock(impl_->mutex);
@@ -583,9 +658,7 @@ hardware_interface::return_type BNO085Sensor::read(
   std::copy(angular_velocity.begin(), angular_velocity.end(), impl_->exported.begin() + 4);
   std::copy(
     linear_acceleration.begin(), linear_acceleration.end(), impl_->exported.begin() + 7);
-  impl_->exported[10] = impl_->report_stamps[0].time_since_epoch().count() ?
-    std::chrono::duration<double>(now - impl_->report_stamps[0]).count() :
-    std::numeric_limits<double>::infinity();
+  impl_->exported[10] = protocol::oldest_age(impl_->report_stamps, now);
   impl_->exported[11] = impl_->exported[10] < impl_->online_timeout_s ? 1.0 : 0.0;
   if (impl_->exported[11] == 0.0) {
     // Standard IMU interfaces have no age field. A NaN orientation makes

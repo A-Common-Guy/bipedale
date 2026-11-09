@@ -2,6 +2,9 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <vector>
 
@@ -58,6 +61,75 @@ TEST(CanProtocol, JointConversionsPreserveMapping)
   EXPECT_NEAR(
     p::wire_position(p::logical_position(rotor, 1.0, 8.0, offset), 1.0, 8.0, offset),
     logical + offset / 8.0 * p::kTwoPi, 1e-12);
+}
+
+TEST(CanProtocol, MitReplyPositionMatchesTheEncoderConvention)
+{
+  const double limit = 12.5;
+  for (const double sign : {1.0, -1.0}) {
+    for (const double offset : {0.0, 0.37, -2.6}) {
+      for (const double bias : {0.0, 0.05, -0.12}) {
+        const double rotor = 1.9;  // revolutions, as broadcast
+        const double logical = p::logical_position(rotor, sign, 8.0, offset);
+        // What the drive reports for that pose: the frame commands are sent in.
+        const double reply = p::wire_position(logical, sign, 8.0, offset) + bias;
+        EXPECT_NEAR(
+          p::mit_logical_position(reply, bias, sign, 8.0, offset, limit, logical + 0.3),
+          logical, 1e-12) << sign << " " << offset << " " << bias;
+        // Without the bias and offset the reply is not the logical position.
+        if (bias != 0.0 || offset != 0.0) {
+          EXPECT_GT(std::abs(sign * reply - logical), 1e-3);
+        }
+      }
+    }
+  }
+}
+
+TEST(CanProtocol, MitReplyPositionTakesTheSpanNearestTheBroadcast)
+{
+  // A wheel 30 rad out on the wire wraps to 30 - 25 in a +-12.5 rad field.
+  const double limit = 12.5;
+  const double rotor = 30.0 * 8.0 / p::kTwoPi;
+  const double logical = p::logical_position(rotor, -1.0, 8.0, 0.0);
+  const double reply = 30.0 - 2.0 * limit;
+  EXPECT_NEAR(
+    p::mit_logical_position(reply, 0.0, -1.0, 8.0, 0.0, limit, logical - 0.5), logical, 1e-12);
+  EXPECT_NEAR(
+    p::mit_logical_position(reply, 0.0, -1.0, 8.0, 0.0, limit, 0.0), -reply, 1e-12);
+}
+
+TEST(CanProtocol, SdoRequestLayout)
+{
+  const std::array<uint8_t, 8> write{1, 73, 0, 0, 0x2c, 0x01, 0, 0};
+  EXPECT_EQ(p::sdo_request(1, 73, 300), write);
+  const std::array<uint8_t, 8> read{0, 0x4f, 0x01, 0, 0, 0, 0, 0};
+  EXPECT_EQ(p::sdo_request(0, 335), read);
+}
+
+TEST(CanProtocol, OnlyQueueFullSendErrorsAreTransient)
+{
+  EXPECT_TRUE(p::transient_send_error(EAGAIN));
+  EXPECT_TRUE(p::transient_send_error(EWOULDBLOCK));
+  EXPECT_TRUE(p::transient_send_error(ENOBUFS));
+  EXPECT_FALSE(p::transient_send_error(ENETDOWN));
+  EXPECT_FALSE(p::transient_send_error(EBADF));
+  EXPECT_FALSE(p::transient_send_error(EIO));
+}
+
+TEST(CanProtocol, DropBudgetToleratesAShortRunOfLossyCycles)
+{
+  p::DropBudget budget(3);
+  EXPECT_TRUE(budget.end_cycle(true));
+  EXPECT_TRUE(budget.end_cycle(true));
+  EXPECT_TRUE(budget.end_cycle(false));  // a clean cycle ends the run
+  EXPECT_EQ(budget.run(), 0u);
+  for (int cycle = 0; cycle < 3; ++cycle) {
+    EXPECT_TRUE(budget.end_cycle(true));
+  }
+  EXPECT_FALSE(budget.end_cycle(true));
+  EXPECT_EQ(budget.run(), 4u);
+  budget.reset();
+  EXPECT_TRUE(budget.end_cycle(true));
 }
 
 TEST(ShtpProtocol, EscapingAndChunkedFraming)
@@ -124,6 +196,38 @@ TEST(ShtpProtocol, SplitsTimestampAndParsesQuaternionInXyzwOrder)
   EXPECT_DOUBLE_EQ(xyzw[1], -0.5);
   EXPECT_DOUBLE_EQ(xyzw[2], 0.5);
   EXPECT_DOUBLE_EQ(xyzw[3], 1.0);
+}
+
+TEST(ShtpProtocol, DecodesTheThreeEnabledReports)
+{
+  std::vector<uint8_t> packet{0, 0, 3, 0};
+  packet.insert(packet.end(), {0xfb, 0, 0, 0, 0});
+  packet.insert(packet.end(), {0x08, 0, 0, 0, 0x00, 0x10, 0x00, 0xe0, 0x00, 0x20, 0x00, 0x40});
+  packet.insert(packet.end(), {0x02, 0, 0, 0, 0x00, 0x02, 0x00, 0xfe, 0x00, 0x04});
+  const auto first = p::decode_imu_reports(packet);
+  EXPECT_EQ(first.present, (std::array<bool, 3>{true, true, false}));
+  EXPECT_DOUBLE_EQ(first.orientation[1], -0.5);
+  EXPECT_DOUBLE_EQ(first.angular_velocity[0], 1.0);
+  EXPECT_DOUBLE_EQ(first.angular_velocity[1], -1.0);
+  EXPECT_DOUBLE_EQ(first.angular_velocity[2], 2.0);
+
+  std::vector<uint8_t> acceleration{0, 0, 3, 0};
+  acceleration.insert(acceleration.end(), {0x01, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09});
+  const auto second = p::decode_imu_reports(acceleration);
+  EXPECT_EQ(second.present, (std::array<bool, 3>{false, false, true}));
+  EXPECT_DOUBLE_EQ(second.linear_acceleration[2], 9.0);
+}
+
+TEST(ShtpProtocol, AgeIsThatOfTheOldestReport)
+{
+  using Clock = std::chrono::steady_clock;
+  const Clock::time_point now{std::chrono::seconds(100)};
+  std::array<Clock::time_point, 3> stamps{
+    now - std::chrono::milliseconds(2), now - std::chrono::milliseconds(40),
+    now - std::chrono::milliseconds(5)};
+  EXPECT_NEAR(p::oldest_age(stamps, now), 0.040, 1e-9);
+  stamps[2] = Clock::time_point{};
+  EXPECT_TRUE(std::isinf(p::oldest_age(stamps, now)));
 }
 
 namespace

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -112,6 +114,59 @@ inline double wire_position(double logical_radians, double sign, double ratio, d
 {
   return sign * logical_radians + offset / ratio * kTwoPi;
 }
+
+// MIT reply position in the convention of logical_position(). The reply is
+// in the frame MIT commands are sent in, wire_position() + bias; its field
+// spans [-limit, limit] while the broadcast counts turns, so the result is
+// taken on the span nearest `near_logical` (the broadcast's position).
+inline double mit_logical_position(
+  double reply, double bias, double sign, double ratio, double offset, double limit,
+  double near_logical)
+{
+  const double span = 2.0 * limit;
+  const double wire = reply - bias;
+  const double turns =
+    std::round((wire_position(near_logical, sign, ratio, offset) - wire) / span);
+  return sign * (wire + turns * span - offset / ratio * kTwoPi);
+}
+
+// RxSdo payload: opcode (0 read, 1 write), endpoint id, reserved, value.
+inline std::array<uint8_t, 8> sdo_request(uint8_t opcode, uint16_t endpoint, uint32_t value = 0)
+{
+  return {
+    opcode, static_cast<uint8_t>(endpoint), static_cast<uint8_t>(endpoint >> 8), 0,
+    static_cast<uint8_t>(value), static_cast<uint8_t>(value >> 8),
+    static_cast<uint8_t>(value >> 16), static_cast<uint8_t>(value >> 24)};
+}
+
+// Errors of a non-blocking CAN send that only mean the frame was not queued
+// (socket send buffer or interface queue full); anything else is a fault.
+inline bool transient_send_error(int error)
+{
+  return error == EAGAIN || error == EWOULDBLOCK || error == ENOBUFS || error == EINTR;
+}
+
+// Run of consecutive control cycles that lost at least one frame. A short
+// run is harmless, the drives' deadman being far longer than a cycle; a
+// longer one means the bus is not draining.
+class DropBudget
+{
+public:
+  explicit DropBudget(unsigned limit)
+  : limit_(limit) {}
+  // False once more than `limit` cycles in a row have dropped a frame.
+  bool end_cycle(bool dropped)
+  {
+    run_ = dropped ? run_ + 1 : 0;
+    return run_ <= limit_;
+  }
+  unsigned run() const {return run_;}
+  void reset() {run_ = 0;}
+
+private:
+  unsigned limit_;
+  unsigned run_{0};
+};
 
 inline std::vector<uint8_t> escape(const std::vector<uint8_t> & input)
 {
@@ -261,6 +316,52 @@ inline std::vector<double> parse_sensor_report(
     values.push_back(raw * scale);
   }
   return values;
+}
+
+// The three reports the IMU plugin enables, decoded from one SHTP packet.
+struct ImuReports
+{
+  std::array<double, 4> orientation{};  // game rotation vector, x y z w
+  std::array<double, 3> angular_velocity{};
+  std::array<double, 3> linear_acceleration{};
+  // Which of orientation, angular velocity and acceleration the packet carried.
+  std::array<bool, 3> present{};
+};
+
+inline ImuReports decode_imu_reports(const std::vector<uint8_t> & packet)
+{
+  ImuReports out;
+  for (const auto & [id, report] : split_reports(packet)) {
+    if (id == 0x08) {
+      const auto value = parse_sensor_report(report, 4, std::ldexp(1.0, -14));
+      out.orientation = {value[0], value[1], value[2], value[3]};
+      out.present[0] = true;
+    } else if (id == 0x02) {
+      const auto value = parse_sensor_report(report, 3, std::ldexp(1.0, -9));
+      out.angular_velocity = {value[0], value[1], value[2]};
+      out.present[1] = true;
+    } else if (id == 0x01) {
+      const auto value = parse_sensor_report(report, 3, std::ldexp(1.0, -8));
+      out.linear_acceleration = {value[0], value[1], value[2]};
+      out.present[2] = true;
+    }
+  }
+  return out;
+}
+
+// Age in seconds of the oldest stamp; infinite until every one has been set
+// (a default-constructed time point means never).
+template<typename TimePoint, std::size_t N>
+double oldest_age(const std::array<TimePoint, N> & stamps, TimePoint now)
+{
+  double age = 0.0;
+  for (const auto & stamp : stamps) {
+    if (stamp.time_since_epoch().count() == 0) {
+      return std::numeric_limits<double>::infinity();
+    }
+    age = std::max(age, std::chrono::duration<double>(now - stamp).count());
+  }
+  return age;
 }
 
 // Re-expresses a BNO085 sample in the body frame (x forward, y left, z up)

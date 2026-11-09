@@ -22,6 +22,7 @@
 #include <string>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <thread>
 #include <type_traits>
 #include <unistd.h>
@@ -71,17 +72,40 @@ std::string required_string(
   return it->second;
 }
 
-void put_u32(can_frame & frame, std::size_t at, uint32_t value)
-{
-  std::memcpy(frame.data + at, &value, sizeof(value));
-}
-
 }  // namespace
 
 struct GIM6010System::Impl
 {
   struct Joint
   {
+    // Written by the receiver thread under the mutex; read() copies it into
+    // the exported fields once per cycle, so a controller sees one joint's
+    // position and velocity from the same frame and the age that goes with it.
+    struct Received
+    {
+      double position{};
+      double velocity{};
+      double effort{};
+      double raw_position_rev{};
+      double raw_velocity_rev_s{};
+      double iq{};
+      double temperature{};
+      // Logical position from the encoder broadcast alone, whichever frame
+      // feeds `position`.
+      double encoder_position{};
+      // Position the drive reports in its MIT reply (its own frame, output
+      // radians).
+      double mit_reply_position{std::numeric_limits<double>::quiet_NaN()};
+      uint32_t axis_error{};
+      uint8_t fault_flags{};
+      uint8_t axis_state{};
+      // Of position and velocity.
+      std::chrono::steady_clock::time_point stamp{};
+      std::chrono::steady_clock::time_point encoder_stamp{};
+      std::chrono::steady_clock::time_point heartbeat_stamp{};
+      std::chrono::steady_clock::time_point mit_reply_stamp{};
+    };
+
     std::string name;
     uint8_t node{};
     double sign{};
@@ -106,13 +130,12 @@ struct GIM6010System::Impl
     bool has_velocity_command{false};
     bool has_kp_command{false};
     bool has_kd_command{false};
-    // Position the drive reports in its MIT reply (its own frame, output
-    // radians) and the bias of that frame against the encoder broadcast,
+    // Bias of the drive's MIT position frame against the encoder broadcast,
     // measured at activation with zero gains and added to every position
-    // reference so the drive-side PD acts on the logical reference.
-    double mit_reply_position{std::numeric_limits<double>::quiet_NaN()};
-    std::chrono::steady_clock::time_point mit_reply_stamp{};
+    // reference so the drive-side PD acts on the logical reference; the
+    // receiver removes it from the replies. Written under the mutex.
     double mit_frame_bias{};
+    bool mit_bias_measured{false};
     double age{std::numeric_limits<double>::infinity()};
     double online{};
     double iq{};
@@ -121,11 +144,8 @@ struct GIM6010System::Impl
     double requested_effort{};
     double applied_effort{};
     double saturation_count{};
-    uint32_t axis_error{};
-    uint8_t fault_flags{};
-    uint8_t axis_state{};
-    std::chrono::steady_clock::time_point encoder_stamp{};
-    std::chrono::steady_clock::time_point heartbeat_stamp{};
+    double dropped_frames{};
+    Received received;
   };
 
   std::vector<Joint> joints;
@@ -158,6 +178,12 @@ struct GIM6010System::Impl
   // command, i.e. synchronous with the control cycle and one cycle old at
   // most. The broadcast then only keeps the wheels' multi-turn position.
   bool mit_state{false};
+  // SO_SNDBUF request (the kernel doubles it): bounds how many of our frames
+  // can wait in the kernel, so torque commands cannot pile up behind a
+  // stalled bus and go out stale. 0 keeps the kernel default.
+  int send_buffer_bytes{16384};
+  // Control cycles in a row that may lose a frame before write() fails.
+  protocol::DropBudget drop_budget{5};
   int socket{-1};
   std::string interface_name;
   std::atomic_bool stop{false};
@@ -170,27 +196,21 @@ struct GIM6010System::Impl
   std::mutex mutex;
   std::condition_variable reply_cv;
   std::vector<uint8_t> sdo_reply;
+  uint8_t awaited_node{};
   uint16_t awaited_endpoint{std::numeric_limits<uint16_t>::max()};
 
   ~Impl()
   {
     // Best effort if the component is torn down while still active (a
-    // shutdown that skipped deactivation): zero torque and idle every drive
-    // before the socket goes; the CAN deadman covers whatever this misses.
+    // shutdown that skipped deactivation); the CAN deadman covers whatever
+    // this misses.
     if (active && socket >= 0) {
-      active = false;
-      for (auto & joint : joints) {
-        try {
-          mit(joint, 0.0);
-          send_u32(joint.node, CanCommand::set_axis_state, 1);
-        } catch (...) {
-        }
-      }
+      stop_all();
     }
     close_socket();
   }
 
-  void send(uint8_t node, CanCommand command, const uint8_t * data, uint8_t length)
+  static can_frame make_frame(uint8_t node, CanCommand command, const uint8_t * data, uint8_t length)
   {
     can_frame frame{};
     frame.can_id = protocol::can_id(node, command);
@@ -198,6 +218,13 @@ struct GIM6010System::Impl
     if (length) {
       std::memcpy(frame.data, data, length);
     }
+    return frame;
+  }
+
+  // Configuration traffic, outside the control loop: blocks for buffer space.
+  void send(uint8_t node, CanCommand command, const uint8_t * data, uint8_t length)
+  {
+    const auto frame = make_frame(node, command, data, length);
     if (::write(socket, &frame, sizeof(frame)) != sizeof(frame)) {
       throw std::runtime_error("SocketCAN write failed: " + std::string(std::strerror(errno)));
     }
@@ -205,12 +232,79 @@ struct GIM6010System::Impl
 
   void send_u32(uint8_t node, CanCommand command, uint32_t value)
   {
-    can_frame frame{};
-    frame.can_id = protocol::can_id(node, command);
-    frame.can_dlc = 4;
-    put_u32(frame, 0, value);
-    if (::write(socket, &frame, sizeof(frame)) != sizeof(frame)) {
-      throw std::runtime_error("SocketCAN write failed: " + std::string(std::strerror(errno)));
+    uint8_t data[4]{};
+    std::memcpy(data, &value, 4);
+    send(node, command, data, 4);
+  }
+
+  // Control-loop traffic: never blocks. False when the frame was dropped
+  // because the send buffer or the interface queue is full.
+  bool try_send(uint8_t node, CanCommand command, const uint8_t * data, uint8_t length)
+  {
+    const auto frame = make_frame(node, command, data, length);
+    const auto written = ::send(socket, &frame, sizeof(frame), MSG_DONTWAIT);
+    if (written == static_cast<ssize_t>(sizeof(frame))) {
+      return true;
+    }
+    const int error = written < 0 ? errno : EIO;
+    if (protocol::transient_send_error(error)) {
+      return false;
+    }
+    throw std::runtime_error("SocketCAN send failed: " + std::string(std::strerror(error)));
+  }
+
+  // Zero gains, zero torque: the drive applies no torque whatever the
+  // controller last commanded.
+  bool try_send_zero_torque(Joint & joint)
+  {
+    const auto bytes = protocol::pack_mit(0.0, 0.0, 0.0, 0.0, 0.0, joint.limits);
+    return try_send(joint.node, CanCommand::mit_control, bytes.data(), bytes.size());
+  }
+
+  // Zero torque and idle for every drive, then the deadman off for each one
+  // whose idle request was queued. Plain non-blocking frames only, so it may
+  // run on the control thread (on_error does). A drive that misses a frame
+  // keeps its deadman armed and, with no more frames coming, idles by itself
+  // within deadman_ms, latching an error that arming clears.
+  bool stop_all()
+  {
+    active = false;
+    bool ok = true;
+    std::string missed;
+    for (auto & joint : joints) {
+      bool sent = false;
+      try {
+        const bool zeroed = try_send_zero_torque(joint);
+        uint8_t idle[4]{1, 0, 0, 0};
+        const bool idled = try_send(joint.node, CanCommand::set_axis_state, idle, 4);
+        const auto deadman_off = protocol::sdo_request(1, deadman_endpoint, 0);
+        const bool disarmed = idled &&
+          try_send(joint.node, CanCommand::rx_sdo, deadman_off.data(), deadman_off.size());
+        sent = zeroed && disarmed;
+      } catch (const std::exception &) {
+      }
+      if (!sent) {
+        ok = false;
+        missed += (missed.empty() ? "" : ", ") + joint.name;
+      }
+    }
+    if (!ok) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("GIM6010System"),
+        "stop frames not sent to %s; their CAN deadman idles them within %d ms",
+        missed.c_str(), deadman_ms);
+    }
+    return ok;
+  }
+
+  void reset_commands()
+  {
+    for (auto & joint : joints) {
+      joint.command = 0.0;
+      joint.command_position = std::numeric_limits<double>::quiet_NaN();
+      joint.command_velocity = std::numeric_limits<double>::quiet_NaN();
+      joint.command_kp = std::numeric_limits<double>::quiet_NaN();
+      joint.command_kd = std::numeric_limits<double>::quiet_NaN();
     }
   }
 
@@ -223,6 +317,26 @@ struct GIM6010System::Impl
     if (socket < 0) {
       throw std::runtime_error("cannot create SocketCAN socket: " + std::string(std::strerror(errno)));
     }
+    if (send_buffer_bytes > 0) {
+      if (::setsockopt(
+          socket, SOL_SOCKET, SO_SNDBUF, &send_buffer_bytes, sizeof(send_buffer_bytes)) < 0)
+      {
+        RCLCPP_WARN(
+          rclcpp::get_logger("GIM6010System"), "cannot set SO_SNDBUF to %d: %s",
+          send_buffer_bytes, std::strerror(errno));
+      }
+      int effective = 0;
+      socklen_t size = sizeof(effective);
+      if (::getsockopt(socket, SOL_SOCKET, SO_SNDBUF, &effective, &size) == 0) {
+        RCLCPP_INFO(
+          rclcpp::get_logger("GIM6010System"), "CAN send buffer %d bytes (kernel accounting)",
+          effective);
+      }
+    }
+    // Configuration writes block for buffer space; a bus that does not drain
+    // must fail them instead of hanging the controller manager.
+    const timeval send_timeout{0, 200000};
+    ::setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
     ifreq request{};
     std::strncpy(request.ifr_name, interface.c_str(), IFNAMSIZ - 1);
     interface_name = interface;
@@ -280,47 +394,61 @@ struct GIM6010System::Impl
       const auto now = std::chrono::steady_clock::now();
       std::lock_guard<std::mutex> lock(mutex);
       auto & joint = joints[found->second];
+      auto & received = joint.received;
       if (command == static_cast<uint8_t>(CanCommand::heartbeat) && frame.can_dlc >= 8) {
-        std::memcpy(&joint.axis_error, frame.data, 4);
-        joint.axis_state = frame.data[4];
-        joint.fault_flags = frame.data[5] & 0x0f;
-        joint.temperature = static_cast<int8_t>(frame.data[6]);
-        joint.error = joint.axis_error || joint.fault_flags ? 1.0 : 0.0;
-        joint.heartbeat_stamp = now;
+        std::memcpy(&received.axis_error, frame.data, 4);
+        received.axis_state = frame.data[4];
+        received.fault_flags = frame.data[5] & 0x0f;
+        received.temperature = static_cast<int8_t>(frame.data[6]);
+        received.heartbeat_stamp = now;
       } else if (command == static_cast<uint8_t>(CanCommand::encoder) && frame.can_dlc >= 8) {
         float position = 0.0F, velocity = 0.0F;
         std::memcpy(&position, frame.data, 4);
         std::memcpy(&velocity, frame.data + 4, 4);
-        joint.raw_position_rev = position;
-        joint.raw_velocity_rev_s = velocity;
-        joint.position = protocol::logical_position(position, joint.sign, joint.ratio, joint.offset);
-        joint.velocity = protocol::logical_velocity(velocity, joint.sign, joint.ratio);
-        joint.encoder_stamp = now;
+        received.raw_position_rev = position;
+        received.raw_velocity_rev_s = velocity;
+        received.encoder_position =
+          protocol::logical_position(position, joint.sign, joint.ratio, joint.offset);
+        received.encoder_stamp = now;
+        // With state_source mit the replies carry the state while they
+        // arrive; the broadcast stands in before the first one (inactive) and
+        // after they stop, and keeps the position the reply cannot give.
+        const bool replies = mit_state &&
+          received.mit_reply_stamp.time_since_epoch().count() != 0 &&
+          now - received.mit_reply_stamp <= std::chrono::duration<double>(stale_state_s);
+        if (!replies) {
+          received.position = received.encoder_position;
+          received.velocity = protocol::logical_velocity(velocity, joint.sign, joint.ratio);
+          received.stamp = now;
+        } else if (!reply_position_usable(joint, received.mit_reply_position)) {
+          received.position = received.encoder_position;
+        }
       } else if (command == static_cast<uint8_t>(CanCommand::iq) && frame.can_dlc >= 8) {
         float measured = 0.0F;
         std::memcpy(&measured, frame.data + 4, 4);
-        joint.iq = measured;
+        received.iq = measured;
       } else if (command == static_cast<uint8_t>(CanCommand::mit_control) && frame.can_dlc >= 6) {
         const auto [reply_node, position, velocity, torque] =
           protocol::unpack_mit(frame.data, frame.can_dlc, joint.limits);
         (void)reply_node;
-        joint.effort = joint.sign * torque;
-        joint.mit_reply_position = position;
-        joint.mit_reply_stamp = now;
+        received.effort = joint.sign * torque;
+        received.mit_reply_position = position;
+        received.mit_reply_stamp = now;
         if (mit_state) {
-          // Output-shaft radians and rad/s straight from the reply. The
-          // position field saturates at +-mit_max_position, so a wheel that
-          // has turned further keeps the broadcast's multi-turn position.
-          joint.velocity = joint.sign * velocity;
-          if (std::abs(position) < 0.9 * joint.limits.position) {
-            joint.position = joint.sign * position;
+          // Output-shaft rad/s straight from the reply; the position in the
+          // encoder's logical frame, the broadcast's otherwise.
+          received.velocity = joint.sign * velocity;
+          if (reply_position_usable(joint, position)) {
+            received.position = protocol::mit_logical_position(
+              position, joint.mit_frame_bias, joint.sign, joint.ratio, joint.offset,
+              joint.limits.position, received.encoder_position);
           }
-          joint.encoder_stamp = now;
+          received.stamp = now;
         }
       } else if (command == static_cast<uint8_t>(CanCommand::tx_sdo) && frame.can_dlc >= 4) {
         uint16_t endpoint{};
         std::memcpy(&endpoint, frame.data + 1, 2);
-        if (endpoint == awaited_endpoint) {
+        if (node == awaited_node && endpoint == awaited_endpoint) {
           sdo_reply.assign(frame.data, frame.data + frame.can_dlc);
           reply_cv.notify_all();
         }
@@ -328,47 +456,66 @@ struct GIM6010System::Impl
     }
   }
 
+  // The reply's position is used only in a frame measured against the
+  // broadcast at this activation, and away from the field's ends: it
+  // saturates at +-mit_max_position, so a wheel that has turned further
+  // keeps the broadcast's multi-turn position.
+  static bool reply_position_usable(const Joint & joint, double reply)
+  {
+    return joint.mit_bias_measured && std::isfinite(reply) &&
+           std::abs(reply) < 0.9 * joint.limits.position;
+  }
+
+  // The drive answers reads, not writes. The read-back queued right behind
+  // the write replaces a fixed settling delay; a stale answer repeats the
+  // (idempotent) write before the verification fails.
   void sdo_write_verified(uint8_t node, uint16_t endpoint, uint32_t value)
   {
-    uint8_t request[8]{1, static_cast<uint8_t>(endpoint), static_cast<uint8_t>(endpoint >> 8), 0};
-    std::memcpy(request + 4, &value, 4);
-    send(node, CanCommand::rx_sdo, request, 8);
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    request[0] = 0;
-    std::memset(request + 4, 0, 4);
-    std::unique_lock<std::mutex> lock(mutex);
-    awaited_endpoint = endpoint;
-    sdo_reply.clear();
-    bool received = false;
-    // A drive that has just cleared its errors can drop the first read.
-    for (int attempt = 0; attempt < 3 && !received; ++attempt) {
-      lock.unlock();
-      send(node, CanCommand::rx_sdo, request, 8);
-      lock.lock();
-      received = reply_cv.wait_for(
-        lock, std::chrono::milliseconds(300), [this] {return !sdo_reply.empty();});
-    }
-    awaited_endpoint = std::numeric_limits<uint16_t>::max();
-    if (!received || sdo_reply.size() < 8) {
-      throw std::runtime_error("node " + std::to_string(node) + ": SDO verification timed out");
-    }
+    const auto write = protocol::sdo_request(1, endpoint, value);
+    const auto read = protocol::sdo_request(0, endpoint);
     uint32_t actual{};
-    std::memcpy(&actual, sdo_reply.data() + 4, 4);
-    if (actual != value) {
-      throw std::runtime_error(
-              "node " + std::to_string(node) + ": SDO verification mismatch at endpoint " +
-              std::to_string(endpoint));
+    for (int check = 0; check < 3; ++check) {
+      if (check) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      send(node, CanCommand::rx_sdo, write.data(), write.size());
+      std::unique_lock<std::mutex> lock(mutex);
+      awaited_node = node;
+      awaited_endpoint = endpoint;
+      sdo_reply.clear();
+      bool received = false;
+      // A drive that has just cleared its errors can drop the first read.
+      for (int attempt = 0; attempt < 3 && !received; ++attempt) {
+        lock.unlock();
+        send(node, CanCommand::rx_sdo, read.data(), read.size());
+        lock.lock();
+        received = reply_cv.wait_for(
+          lock, std::chrono::milliseconds(300), [this] {return !sdo_reply.empty();});
+      }
+      awaited_endpoint = std::numeric_limits<uint16_t>::max();
+      if (!received || sdo_reply.size() < 8) {
+        throw std::runtime_error("node " + std::to_string(node) + ": SDO verification timed out");
+      }
+      std::memcpy(&actual, sdo_reply.data() + 4, 4);
+      if (actual == value) {
+        return;
+      }
     }
+    throw std::runtime_error(
+            "node " + std::to_string(node) + ": SDO verification mismatch at endpoint " +
+            std::to_string(endpoint) + " (wrote " + std::to_string(value) + ", read " +
+            std::to_string(actual) + ")");
   }
 
   std::vector<uint8_t> sdo_read(uint8_t node, uint16_t endpoint)
   {
-    uint8_t request[8]{0, static_cast<uint8_t>(endpoint), static_cast<uint8_t>(endpoint >> 8), 0};
+    const auto request = protocol::sdo_request(0, endpoint);
     std::unique_lock<std::mutex> lock(mutex);
+    awaited_node = node;
     awaited_endpoint = endpoint;
     sdo_reply.clear();
     lock.unlock();
-    send(node, CanCommand::rx_sdo, request, 8);
+    send(node, CanCommand::rx_sdo, request.data(), request.size());
     lock.lock();
     const auto received = reply_cv.wait_for(
       lock, std::chrono::milliseconds(500), [this] {return !sdo_reply.empty();});
@@ -400,8 +547,8 @@ struct GIM6010System::Impl
   // position reference is pulled toward the measured position so that the
   // torque the drive will compute from the latest known state also stays
   // within the limit (the same bound SandroControl applied); the drive's own
-  // MIT torque limit is the last line.
-  void mit(Joint & joint, double torque)
+  // MIT torque limit is the last line. False when the frame was dropped.
+  bool mit(Joint & joint, double torque)
   {
     joint.requested_effort = torque;
     const double limit = std::min(hard_effort_limit_nm, joint.limits.torque);
@@ -434,7 +581,11 @@ struct GIM6010System::Impl
       joint.mit_frame_bias,
       joint.sign * velocity_reference, kp, kd, joint.sign * joint.applied_effort,
       joint.limits);
-    send(joint.node, CanCommand::mit_control, bytes.data(), bytes.size());
+    if (try_send(joint.node, CanCommand::mit_control, bytes.data(), bytes.size())) {
+      return true;
+    }
+    joint.dropped_frames += 1.0;
+    return false;
   }
 
   // One line naming every drive that is not healthy, at most once a second,
@@ -505,6 +656,13 @@ CallbackReturn GIM6010System::on_init(const hardware_interface::HardwareInfo & i
         impl_->mit_state = true;
       } else if (state_source->second != "encoder") {
         throw std::invalid_argument("state_source must be 'encoder' or 'mit'");
+      }
+    }
+    if (info.hardware_parameters.count("can_send_buffer_bytes")) {
+      impl_->send_buffer_bytes = required_number<int>(
+        info.hardware_parameters, "can_send_buffer_bytes");
+      if (impl_->send_buffer_bytes < 0) {
+        throw std::invalid_argument("can_send_buffer_bytes must be >= 0");
       }
     }
     if (impl_->encoder_period_ms <= 0 || impl_->iq_period_ms <= 0 ||
@@ -578,6 +736,7 @@ std::vector<hardware_interface::StateInterface> GIM6010System::export_state_inte
     interfaces.emplace_back(joint.name, "requested_effort", &joint.requested_effort);
     interfaces.emplace_back(joint.name, "applied_effort", &joint.applied_effort);
     interfaces.emplace_back(joint.name, "saturation_count", &joint.saturation_count);
+    interfaces.emplace_back(joint.name, "dropped_frames", &joint.dropped_frames);
   }
   return interfaces;
 }
@@ -613,12 +772,38 @@ CallbackReturn GIM6010System::on_configure(const rclcpp_lifecycle::State &)
     RCLCPP_ERROR(rclcpp::get_logger("GIM6010System"), "%s", error.what());
     return CallbackReturn::ERROR;
   }
+  // Configured but inactive must mean no torque, whatever another tool left
+  // a drive in. Best effort: an unpowered drive boots idle anyway.
+  for (const auto & joint : impl_->joints) {
+    const uint8_t idle[4]{1, 0, 0, 0};
+    try {
+      impl_->try_send(joint.node, CanCommand::set_axis_state, idle, 4);
+    } catch (const std::exception & error) {
+      RCLCPP_WARN(
+        rclcpp::get_logger("GIM6010System"), "%s node %u: idle request failed: %s",
+        joint.name.c_str(), joint.node, error.what());
+    }
+  }
   return CallbackReturn::SUCCESS;
 }
 
 CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
 {
   try {
+    // Nothing from an earlier activation carries over: the frames below must
+    // have zero gains whatever a controller last wrote, and the frame bias
+    // and closed-loop state are measured afresh.
+    impl_->reset_commands();
+    impl_->drop_budget.reset();
+    {
+      std::lock_guard<std::mutex> lock(impl_->mutex);
+      for (auto & joint : impl_->joints) {
+        joint.mit_frame_bias = 0.0;
+        joint.mit_bias_measured = false;
+        joint.received.mit_reply_position = std::numeric_limits<double>::quiet_NaN();
+        joint.received.mit_reply_stamp = {};
+      }
+    }
     const auto deadline = std::chrono::steady_clock::now() +
       std::chrono::duration<double>(impl_->activation_timeout_s);
     for (;;) {
@@ -627,9 +812,12 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
         std::lock_guard<std::mutex> lock(impl_->mutex);
         const auto now = std::chrono::steady_clock::now();
         for (const auto & joint : impl_->joints) {
-          ready &= joint.encoder_stamp.time_since_epoch().count() != 0 &&
-            joint.heartbeat_stamp.time_since_epoch().count() != 0 &&
-            now - joint.encoder_stamp <= std::chrono::duration<double>(impl_->stale_state_s);
+          const auto & received = joint.received;
+          ready &= received.encoder_stamp.time_since_epoch().count() != 0 &&
+            received.heartbeat_stamp.time_since_epoch().count() != 0 &&
+            now - received.encoder_stamp <= std::chrono::duration<double>(impl_->stale_state_s) &&
+            now - received.heartbeat_stamp <=
+            std::chrono::duration<double>(impl_->heartbeat_stale_s);
         }
       }
       if (ready) {break;}
@@ -642,9 +830,12 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
           std::lock_guard<std::mutex> lock(impl_->mutex);
           const auto now = std::chrono::steady_clock::now();
           for (const auto & joint : impl_->joints) {
-            const bool heartbeat = joint.heartbeat_stamp.time_since_epoch().count() != 0;
-            const bool encoder = joint.encoder_stamp.time_since_epoch().count() != 0 &&
-              now - joint.encoder_stamp <= std::chrono::duration<double>(impl_->stale_state_s);
+            const auto & received = joint.received;
+            const bool heartbeat = received.heartbeat_stamp.time_since_epoch().count() != 0 &&
+              now - received.heartbeat_stamp <=
+              std::chrono::duration<double>(impl_->heartbeat_stale_s);
+            const bool encoder = received.encoder_stamp.time_since_epoch().count() != 0 &&
+              now - received.encoder_stamp <= std::chrono::duration<double>(impl_->stale_state_s);
             if (!heartbeat || !encoder) {
               silent += (silent.empty() ? "" : ", ") + joint.name + " (node " +
                 std::to_string(joint.node) + (!heartbeat ? ": no heartbeat" : ": no encoder broadcast") + ")";
@@ -662,13 +853,15 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    for (auto & joint : impl_->joints) {
+    std::vector<std::chrono::steady_clock::time_point> closed_loop_requested(impl_->joints.size());
+    for (std::size_t index = 0; index < impl_->joints.size(); ++index) {
+      auto & joint = impl_->joints[index];
       uint32_t axis_error{};
       uint8_t fault_flags{};
       {
         std::lock_guard<std::mutex> lock(impl_->mutex);
-        axis_error = joint.axis_error;
-        fault_flags = joint.fault_flags;
+        axis_error = joint.received.axis_error;
+        fault_flags = joint.received.fault_flags;
       }
       if (axis_error && !protocol::operator_clearable_error(axis_error, fault_flags)) {
         throw std::runtime_error(
@@ -696,14 +889,16 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
       impl_->sdo_write_verified(joint.node, impl_->iq_rate_endpoint, impl_->iq_period_ms);
       impl_->sdo_write_verified(
         joint.node, impl_->heartbeat_rate_endpoint, impl_->heartbeat_period_ms);
-      joint.limits.position = impl_->sdo_read_float(
-        joint.node, impl_->mit_max_position_endpoint);
-      joint.limits.velocity = impl_->sdo_read_float(
-        joint.node, impl_->mit_max_velocity_endpoint);
-      joint.limits.torque = impl_->sdo_read_float(
-        joint.node, impl_->mit_max_torque_endpoint);
-      joint.limits.kp = impl_->sdo_read_float(joint.node, impl_->mit_max_kp_endpoint);
-      joint.limits.kd = impl_->sdo_read_float(joint.node, impl_->mit_max_kd_endpoint);
+      protocol::MitLimits limits;
+      limits.position = impl_->sdo_read_float(joint.node, impl_->mit_max_position_endpoint);
+      limits.velocity = impl_->sdo_read_float(joint.node, impl_->mit_max_velocity_endpoint);
+      limits.torque = impl_->sdo_read_float(joint.node, impl_->mit_max_torque_endpoint);
+      limits.kp = impl_->sdo_read_float(joint.node, impl_->mit_max_kp_endpoint);
+      limits.kd = impl_->sdo_read_float(joint.node, impl_->mit_max_kd_endpoint);
+      {
+        std::lock_guard<std::mutex> lock(impl_->mutex);
+        joint.limits = limits;
+      }
       RCLCPP_INFO(
         rclcpp::get_logger("GIM6010System"),
         "%s node %u drive limits: position=%.3f rad velocity=%.3f rad/s "
@@ -716,45 +911,49 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
       std::memcpy(mode + 4, &input, 4);
       impl_->send(joint.node, CanCommand::set_controller_mode, mode, 8);
       impl_->mit(joint, 0.0);
+      closed_loop_requested[index] = std::chrono::steady_clock::now();
       impl_->send_u32(joint.node, CanCommand::set_axis_state, 8);
     }
+    // Only a heartbeat newer than the request counts: an older one can still
+    // show the closed loop of the previous activation.
+    const auto in_closed_loop = [&] {
+      std::lock_guard<std::mutex> lock(impl_->mutex);
+      for (std::size_t index = 0; index < impl_->joints.size(); ++index) {
+        const auto & received = impl_->joints[index].received;
+        if (received.axis_state != 8 || received.heartbeat_stamp <= closed_loop_requested[index]) {
+          return false;
+        }
+      }
+      return true;
+    };
     const auto closed_loop_deadline = std::chrono::steady_clock::now() +
       std::chrono::duration<double>(impl_->activation_timeout_s);
     while (std::chrono::steady_clock::now() < closed_loop_deadline) {
-      {
-        std::lock_guard<std::mutex> lock(impl_->mutex);
-        if (std::all_of(
-            impl_->joints.begin(), impl_->joints.end(),
-            [](const auto & joint) {return joint.axis_state == 8;}))
-        {
-          break;
-        }
+      if (in_closed_loop()) {
+        break;
       }
       for (auto & joint : impl_->joints) {impl_->mit(joint, 0.0);}
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    if (!std::all_of(
-        impl_->joints.begin(), impl_->joints.end(),
-        [](const auto & joint) {return joint.axis_state == 8;}))
-    {
+    if (!in_closed_loop()) {
       throw std::runtime_error("not all drives entered closed-loop control");
     }
     // The drive-side PD acts in the drive's own MIT position frame. The
     // zero-gain frames above were answered with that position; compare it
     // with the encoder broadcast for every joint a controller may stiffen,
-    // correct a small bias, refuse a large one (a wrong zero would pin the
-    // joint against the torque limit while the controller sees a small
-    // error). Saturated replies (multi-turn wheels) are skipped.
+    // and with state_source mit for every joint (the reply is then its
+    // state), correct a small bias, refuse a large one (a wrong zero would
+    // pin the joint against the torque limit while the controller sees a
+    // small error). Saturated replies (multi-turn wheels) are skipped.
     for (auto & joint : impl_->joints) {
-      joint.mit_frame_bias = 0.0;
-      if (!joint.has_kp_command) {
+      if (!joint.has_kp_command && !impl_->mit_state) {
         continue;
       }
       double reply{}, logical{};
       {
         std::lock_guard<std::mutex> lock(impl_->mutex);
-        reply = joint.mit_reply_position;
-        logical = joint.position;
+        reply = joint.received.mit_reply_position;
+        logical = joint.received.encoder_position;
       }
       if (!std::isfinite(reply) || std::abs(reply) >= 0.9 * joint.limits.position) {
         RCLCPP_WARN(
@@ -781,7 +980,9 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
                 "); a drive-side stiffness would pull the joint to the wrong place. Check the "
                 "drive's zero (zero_load_encoder.py) and sign before arming");
       }
+      std::lock_guard<std::mutex> lock(impl_->mutex);
       joint.mit_frame_bias = bias;
+      joint.mit_bias_measured = true;
     }
     // The communication watchdog is intentionally the final activation write.
     for (auto & joint : impl_->joints) {
@@ -799,34 +1000,8 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
 
 CallbackReturn GIM6010System::on_deactivate(const rclcpp_lifecycle::State &)
 {
-  impl_->active = false;
-  bool ok = true;
-  // Zero torque and idle first, every drive, whatever happens to the rest.
-  for (auto & joint : impl_->joints) {
-    try {
-      impl_->mit(joint, 0.0);
-      impl_->send_u32(joint.node, CanCommand::set_axis_state, 1);
-    } catch (const std::exception & error) {
-      RCLCPP_ERROR(
-        rclcpp::get_logger("GIM6010System"), "%s node %u: idle failed: %s",
-        joint.name.c_str(), joint.node, error.what());
-      ok = false;
-    }
-  }
-  // Then disable the deadman, per drive, without letting one unreachable
-  // node (a dead bus during a failed activation) stall the others.
-  for (auto & joint : impl_->joints) {
-    try {
-      impl_->sdo_write_verified(joint.node, impl_->deadman_endpoint, 0);
-      for (auto & keepalive : impl_->joints) {impl_->mit(keepalive, 0.0);}
-    } catch (const std::exception & error) {
-      RCLCPP_WARN(
-        rclcpp::get_logger("GIM6010System"), "%s node %u: deadman not disabled (%s); "
-        "it will trip by itself without frames", joint.name.c_str(), joint.node, error.what());
-      ok = false;
-    }
-  }
-  return ok ? CallbackReturn::SUCCESS : CallbackReturn::ERROR;
+  // Also reached from on_error on the control thread: nothing here waits.
+  return impl_->stop_all() ? CallbackReturn::SUCCESS : CallbackReturn::ERROR;
 }
 
 CallbackReturn GIM6010System::on_cleanup(const rclcpp_lifecycle::State &)
@@ -846,14 +1021,15 @@ CallbackReturn GIM6010System::on_shutdown(const rclcpp_lifecycle::State & previo
   return CallbackReturn::SUCCESS;
 }
 
-CallbackReturn GIM6010System::on_error(const rclcpp_lifecycle::State & previous)
+CallbackReturn GIM6010System::on_error(const rclcpp_lifecycle::State &)
 {
-  if (impl_->active) {
-    on_deactivate(previous);
+  // Runs on the control thread when read() or write() fails, so only
+  // non-blocking frames. Error handling ends in unconfigured; the socket and
+  // receiver stay up until the next configure reopens them (joining the
+  // receiver there), or cleanup/shutdown closes them.
+  if (impl_->socket >= 0) {
+    impl_->stop_all();
   }
-  // Error handling ends in unconfigured: release what configure opened, so
-  // re-arming (configure, activate) starts from a clean socket.
-  impl_->close_socket();
   return CallbackReturn::SUCCESS;
 }
 
@@ -864,11 +1040,20 @@ hardware_interface::return_type GIM6010System::read(
   std::lock_guard<std::mutex> lock(impl_->mutex);
   std::string offenders;
   for (auto & joint : impl_->joints) {
-    joint.age = joint.encoder_stamp.time_since_epoch().count() ?
-      std::chrono::duration<double>(now - joint.encoder_stamp).count() :
+    const auto & received = joint.received;
+    joint.position = received.position;
+    joint.velocity = received.velocity;
+    joint.effort = received.effort;
+    joint.raw_position_rev = received.raw_position_rev;
+    joint.raw_velocity_rev_s = received.raw_velocity_rev_s;
+    joint.iq = received.iq;
+    joint.temperature = received.temperature;
+    joint.error = received.axis_error || received.fault_flags ? 1.0 : 0.0;
+    joint.age = received.stamp.time_since_epoch().count() ?
+      std::chrono::duration<double>(now - received.stamp).count() :
       std::numeric_limits<double>::infinity();
-    const auto heartbeat_age = joint.heartbeat_stamp.time_since_epoch().count() ?
-      std::chrono::duration<double>(now - joint.heartbeat_stamp).count() :
+    const auto heartbeat_age = received.heartbeat_stamp.time_since_epoch().count() ?
+      std::chrono::duration<double>(now - received.heartbeat_stamp).count() :
       std::numeric_limits<double>::infinity();
     joint.online =
       joint.age < impl_->stale_state_s && heartbeat_age < impl_->heartbeat_stale_s ? 1.0 : 0.0;
@@ -886,10 +1071,10 @@ hardware_interface::return_type GIM6010System::read(
       if (joint.error != 0.0) {
         char code[64];
         std::snprintf(
-          code, sizeof(code), "0x%X%s%s flags=%u", joint.axis_error,
-          (joint.axis_error & protocol::kAxisErrorEstopRequested) ? " estop_requested" : "",
-          (joint.axis_error & protocol::kAxisErrorCanBusFailed) ? " can_watchdog" : "",
-          joint.fault_flags);
+          code, sizeof(code), "0x%X%s%s flags=%u", received.axis_error,
+          (received.axis_error & protocol::kAxisErrorEstopRequested) ? " estop_requested" : "",
+          (received.axis_error & protocol::kAxisErrorCanBusFailed) ? " can_watchdog" : "",
+          received.fault_flags);
         std::strncat(detail, code, sizeof(detail) - std::strlen(detail) - 1);
       }
       offenders += (offenders.empty() ? "" : " | ") + std::string(detail);
@@ -906,18 +1091,39 @@ hardware_interface::return_type GIM6010System::write(
   if (!impl_->active) {
     return hardware_interface::return_type::OK;
   }
-  try {
-    for (auto & joint : impl_->joints) {
-      if (!std::isfinite(joint.command)) {
-        throw std::runtime_error(joint.name + ": effort command is not finite");
-      }
-      impl_->mit(joint, joint.command);
+  bool ok = true;
+  bool dropped = false;
+  // One joint's bad command or failed send does not cost the others their
+  // frame this cycle.
+  for (auto & joint : impl_->joints) {
+    if (!std::isfinite(joint.command)) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("GIM6010System"), "command failed: %s: effort command is not finite",
+        joint.name.c_str());
+      ok = false;
+      continue;
     }
-  } catch (const std::exception & error) {
-    RCLCPP_ERROR(rclcpp::get_logger("GIM6010System"), "command failed: %s", error.what());
-    return hardware_interface::return_type::ERROR;
+    try {
+      if (!impl_->mit(joint, joint.command)) {
+        dropped = true;
+      }
+    } catch (const std::exception & error) {
+      RCLCPP_ERROR(rclcpp::get_logger("GIM6010System"), "command failed: %s", error.what());
+      ok = false;
+    }
   }
-  return hardware_interface::return_type::OK;
+  if (!impl_->drop_budget.end_cycle(dropped)) {
+    RCLCPP_ERROR(
+      rclcpp::get_logger("GIM6010System"),
+      "command failed: CAN frames dropped in %u consecutive cycles, the bus is not draining",
+      impl_->drop_budget.run());
+    ok = false;
+  } else if (dropped) {
+    RCLCPP_WARN_THROTTLE(
+      rclcpp::get_logger("GIM6010System"), impl_->steady_clock, 1000,
+      "CAN send buffer full, MIT frame dropped (per-joint dropped_frames counts them)");
+  }
+  return ok ? hardware_interface::return_type::OK : hardware_interface::return_type::ERROR;
 }
 }  // namespace sandro_hardware
 
