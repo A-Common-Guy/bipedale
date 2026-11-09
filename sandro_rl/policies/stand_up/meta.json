@@ -25,11 +25,7 @@
      "kd_nm_s_rad": 0.4,
      "scale_nm": 3.0
     },
-    "clip": 1.0,
-    "torque_limit_nm": {
-     "legs": 10.0,
-     "wheels": 10.0
-    }
+    "clip": 1.0
    },
    "observation": {
     "history": 4,
@@ -97,6 +93,9 @@
      "limit": 12.0,
      "slack": 0.5
     },
+    "thermal": {
+     "enabled": true
+    },
     "stretch": {
      "limit": 0.97,
      "slack": 0.02,
@@ -152,7 +151,7 @@
       0.015
      ],
      "imu_rate_hz": [
-      180.0,
+      150.0,
       300.0
      ],
      "joint_delay_s": [
@@ -164,6 +163,11 @@
       300.0
      ],
      "synchronous_joints_probability": 0.2,
+     "mit_joints_probability": 0.0,
+     "mit_joint_delay_s": [
+      0.0015,
+      0.0035
+     ],
      "command_delay_s": [
       0.0005,
       0.003
@@ -243,9 +247,9 @@
    }
   },
   "train": {
-   "num_envs": 3072,
-   "steps_per_env": 64,
-   "iterations": 1000,
+   "num_envs": 4096,
+   "steps_per_env": 48,
+   "iterations": 800,
    "learning_rate": 0.0003,
    "desired_kl": 0.01,
    "gamma": 0.995,
@@ -271,12 +275,32 @@
    "symmetry_coef": 0.5,
    "checkpoint_every": 100,
    "eval_every": 50,
-   "resume_log_std": -1.2
+   "resume_log_std": -1.0,
+   "curriculum_offset": 1200
+  },
+  "deploy": {
+   "safety": {
+    "oscillation_arm_delay_s": 3.0,
+    "oscillation_leg_rad_s": 1.2,
+    "oscillation_wheel_rad_s": 5.0
+   }
   },
   "curriculum": {
    "stages": [
     {
      "iteration": 0,
+     "set": {
+      "env.init.fallen.assist_n": 30.0
+     }
+    },
+    {
+     "iteration": 600,
+     "set": {
+      "env.init.fallen.assist_n": 15.0
+     }
+    },
+    {
+     "iteration": 1200,
      "set": {
       "env.init.fallen.assist_n": 0.0
      }
@@ -286,7 +310,7 @@
   "name": "stand_up"
  },
  "fingerprint": {
-  "sha256": "52ef810edae758e8a097260ef13223255a2e0dc5e23f4b4a74315974aef9aac6",
+  "sha256": "2d775171eefb5f79d5617b35e0b0528a4ea6f971c1501fc1c56a1a52f32c8a4f",
   "files": {
    "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1.stl": "dc31d825807ed8c6731135aae6093f10ea96855d574d54af002f33c4cbf0d5ef",
    "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10.stl": "25c6e315616bae15415a7c1deecca4e9a67d375d6e9c9c4f11828fef5de07be2",
@@ -518,9 +542,10 @@
    "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "0677f7ace56a142b040c1f6894ea2a5c27e7a4bfb7d5c170da1342b4e518aa09",
    "ros2_ws/src/sandro_description/mjcf/scene_ros2.xml": "aec6f8d0f526e4a62374753c4f9dbbf2493eeee961bc7077043737c0378952c8",
    "ros2_ws/src/sandro_description/config/sim_identified.yaml": "5b1e9e35ef19311ba4c6ddda50cd9b7a5852fcc1a1c5dd836cd5cc204b43b6db",
-   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "ae57add24ea770d121333372c5608c206b24175509560dddd325b97a2b925e1c",
-   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "0c74096985846ff5c9a52ac0dba4cacc5db42fa98949301bd7ea7045b3ef6e58",
-   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "1e3a3bf8f86bd17c9da5a606f3b206945b3c7645b7aceba0c70820658c3131d7"
+   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "2b508225377e2424b8dd5d1045a767e72deca4c96ce535042033eac7a3cf4479",
+   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "bfbcd1ebb3ce5cbc9a4ed5efa07359f55b96ed481b1659fc2a59b6373b2af4ef",
+   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "8b778debde0edcb0b5c2412b115fd92eba3ceb6b9046c5aed9c796f99f2570b5",
+   "ros2_ws/src/sandro_description/urdf/sandro.ros2_control.xacro": "b548e21779f45d8932dbbd58b2924087bdffb2b4999eb797bc96dd83d233ae9b"
   }
  },
  "contract": {
@@ -578,11 +603,11 @@
   "flax": "0.12.10"
  },
  "python": "3.12.15",
- "iteration": 1000,
- "env_steps": 196608000,
- "wall_s": 2462.8229813575745,
- "compile_s": 20.989585399627686,
- "curriculum_stage": 0,
+ "iteration": 800,
+ "env_steps": 157286400,
+ "wall_s": 1862.5598304271698,
+ "compile_s": 21.921420574188232,
+ "curriculum_stage": 2,
  "base_config": {
   "seed": 0,
   "env": {
@@ -609,11 +634,7 @@
      "kd_nm_s_rad": 0.4,
      "scale_nm": 3.0
     },
-    "clip": 1.0,
-    "torque_limit_nm": {
-     "legs": 10.0,
-     "wheels": 10.0
-    }
+    "clip": 1.0
    },
    "observation": {
     "history": 4,
@@ -681,6 +702,9 @@
      "limit": 12.0,
      "slack": 0.5
     },
+    "thermal": {
+     "enabled": true
+    },
     "stretch": {
      "limit": 0.97,
      "slack": 0.02,
@@ -736,7 +760,7 @@
       0.015
      ],
      "imu_rate_hz": [
-      180.0,
+      150.0,
       300.0
      ],
      "joint_delay_s": [
@@ -748,6 +772,11 @@
       300.0
      ],
      "synchronous_joints_probability": 0.2,
+     "mit_joints_probability": 0.0,
+     "mit_joint_delay_s": [
+      0.0015,
+      0.0035
+     ],
      "command_delay_s": [
       0.0005,
       0.003
@@ -827,9 +856,9 @@
    }
   },
   "train": {
-   "num_envs": 3072,
-   "steps_per_env": 64,
-   "iterations": 1000,
+   "num_envs": 4096,
+   "steps_per_env": 48,
+   "iterations": 800,
    "learning_rate": 0.0003,
    "desired_kl": 0.01,
    "gamma": 0.995,
@@ -855,12 +884,32 @@
    "symmetry_coef": 0.5,
    "checkpoint_every": 100,
    "eval_every": 50,
-   "resume_log_std": -1.2
+   "resume_log_std": -1.0,
+   "curriculum_offset": 1200
+  },
+  "deploy": {
+   "safety": {
+    "oscillation_arm_delay_s": 3.0,
+    "oscillation_leg_rad_s": 1.2,
+    "oscillation_wheel_rad_s": 5.0
+   }
   },
   "curriculum": {
    "stages": [
     {
      "iteration": 0,
+     "set": {
+      "env.init.fallen.assist_n": 30.0
+     }
+    },
+    {
+     "iteration": 600,
+     "set": {
+      "env.init.fallen.assist_n": 15.0
+     }
+    },
+    {
+     "iteration": 1200,
      "set": {
       "env.init.fallen.assist_n": 0.0
      }

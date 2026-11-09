@@ -90,6 +90,9 @@
      "limit": "ros",
      "slack": 0.5
     },
+    "thermal": {
+     "enabled": true
+    },
     "stretch": {
      "limit": 0.97,
      "slack": 0.02
@@ -232,7 +235,7 @@
   "train": {
    "num_envs": 8192,
    "steps_per_env": 72,
-   "iterations": 1000,
+   "iterations": 600,
    "learning_rate": 0.0001,
    "desired_kl": 0.01,
    "gamma": 0.996655,
@@ -286,7 +289,7 @@
   "name": "flat_level_fast"
  },
  "fingerprint": {
-  "sha256": "d800b6a757999ec2a5c51eba6ef1ef7961398bc96b502f3b0ee16236489fd561",
+  "sha256": "2d775171eefb5f79d5617b35e0b0528a4ea6f971c1501fc1c56a1a52f32c8a4f",
   "files": {
    "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1.stl": "dc31d825807ed8c6731135aae6093f10ea96855d574d54af002f33c4cbf0d5ef",
    "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10.stl": "25c6e315616bae15415a7c1deecca4e9a67d375d6e9c9c4f11828fef5de07be2",
@@ -518,9 +521,10 @@
    "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "0677f7ace56a142b040c1f6894ea2a5c27e7a4bfb7d5c170da1342b4e518aa09",
    "ros2_ws/src/sandro_description/mjcf/scene_ros2.xml": "aec6f8d0f526e4a62374753c4f9dbbf2493eeee961bc7077043737c0378952c8",
    "ros2_ws/src/sandro_description/config/sim_identified.yaml": "5b1e9e35ef19311ba4c6ddda50cd9b7a5852fcc1a1c5dd836cd5cc204b43b6db",
-   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "ccea030152a3eeaf1914ba98015f2ef6d640bf03ddb880472fd0cf11a76f4975",
+   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "2b508225377e2424b8dd5d1045a767e72deca4c96ce535042033eac7a3cf4479",
    "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "bfbcd1ebb3ce5cbc9a4ed5efa07359f55b96ed481b1659fc2a59b6373b2af4ef",
-   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "8b778debde0edcb0b5c2412b115fd92eba3ceb6b9046c5aed9c796f99f2570b5"
+   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "8b778debde0edcb0b5c2412b115fd92eba3ceb6b9046c5aed9c796f99f2570b5",
+   "ros2_ws/src/sandro_description/urdf/sandro.ros2_control.xacro": "b548e21779f45d8932dbbd58b2924087bdffb2b4999eb797bc96dd83d233ae9b"
   }
  },
  "contract": {
@@ -578,10 +582,10 @@
   "flax": "0.12.10"
  },
  "python": "3.12.15",
- "iteration": 1000,
- "env_steps": 589824000,
- "wall_s": 2387.1080100536346,
- "compile_s": 19.63316822052002,
+ "iteration": 600,
+ "env_steps": 353894400,
+ "wall_s": 1420.0582797527313,
+ "compile_s": 20.455084085464478,
  "curriculum_stage": 1,
  "base_config": {
   "seed": 0,
@@ -673,6 +677,9 @@
     "leg_torque": {
      "limit": "ros",
      "slack": 0.5
+    },
+    "thermal": {
+     "enabled": true
     },
     "stretch": {
      "limit": 0.97,
@@ -816,7 +823,7 @@
   "train": {
    "num_envs": 8192,
    "steps_per_env": 72,
-   "iterations": 1000,
+   "iterations": 600,
    "learning_rate": 0.0001,
    "desired_kl": 0.01,
    "gamma": 0.996655,

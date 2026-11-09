@@ -112,7 +112,7 @@ rl_stand_up:
     imu_name: imu
     command_topic: /cmd_vel
     policy_file: package://sandro_controllers/policies/stand_up.bin
-    policy_fingerprint: 52ef810edae758e8a097260ef13223255a2e0dc5e23f4b4a74315974aef9aac6
+    policy_fingerprint: 2d775171eefb5f79d5617b35e0b0528a4ea6f971c1501fc1c56a1a52f32c8a4f
     policy_rate_hz: 100.0
     observation:
       history: 4
@@ -164,7 +164,7 @@ rl_flat_level_fast:
     imu_name: imu
     command_topic: /cmd_vel
     policy_file: package://sandro_controllers/policies/flat_level_fast.bin
-    policy_fingerprint: d800b6a757999ec2a5c51eba6ef1ef7961398bc96b502f3b0ee16236489fd561
+    policy_fingerprint: 2d775171eefb5f79d5617b35e0b0528a4ea6f971c1501fc1c56a1a52f32c8a4f
     policy_rate_hz: 300.0
     observation:
       history: 4

@@ -1,9 +1,9 @@
 {
- "env_steps": 589824000,
- "wall_s": 5719.100303649902,
- "env_steps_per_s": 103132.30555225219,
- "physics_steps_per_s": 1237587.6666270262,
- "compile_s": 17.64480495452881,
+ "env_steps": 157286400,
+ "wall_s": 1862.8254525661469,
+ "env_steps_per_s": 84434.3198034626,
+ "physics_steps_per_s": 1013211.8376415512,
+ "compile_s": 21.921420574188232,
  "num_envs": 4096,
  "gpu": "cuda:0"
 }
