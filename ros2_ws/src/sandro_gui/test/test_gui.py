@@ -107,6 +107,19 @@ def test_stack_command_preloads_the_controller_and_never_arms():
     assert "controller:=rl_flat_level" in quiet and "teleop:=false" in quiet
 
 
+def test_state_source_leaves_the_joint_timing_to_the_launch():
+    mit = build_command({"state_source": "mit", "encoder_period_ms": ""}, settings())
+    assert "state_source:=mit" in mit
+    assert not any(a.startswith("encoder_period_ms") for a in mit)  # auto: 20 ms with mit
+    pinned = build_command({"state_source": "mit", "encoder_period_ms": 10}, settings())
+    assert "encoder_period_ms:=10" in pinned
+    sim = build_command({"hardware": "mujoco", "state_source": "mit", "encoder_period_ms": 10},
+                        settings())
+    assert "state_source:=mit" in sim and not any(a.startswith("encoder_period_ms") for a in sim)
+    with pytest.raises(ValueError):
+        build_command({"state_source": "can"}, settings())
+
+
 def test_imu_check_simulation_and_validation():
     imu = build_command({"mode": "imu", "extra": "imu_mount_yaw_rad:=0"}, settings())
     assert imu == ["ros2", "launch", "sandro_bringup", "imu_check.launch.py",

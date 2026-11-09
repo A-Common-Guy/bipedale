@@ -6,9 +6,11 @@ let ctx;
 const STORE = "sandro.run.form";
 const form = Object.assign({
   hardware: null, mode: "stack", controller: "whole_body_controller", teleop: true, overrides: true,
-  state_source: "encoder", encoder_period_ms: 5, extra: "",
+  state_source: "encoder", encoder_period_ms: "", extra: "",
 }, JSON.parse(localStorage.getItem(STORE) || "{}"));
 if (!["stack", "imu"].includes(form.mode)) form.mode = "stack";
+// 5 was the stored default before the launch chose the period from the state source.
+if (form.encoder_period_ms === 5) form.encoder_period_ms = "";
 const filter = { level: "info", text: "", follow: true };
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 };
 let previewTimer = null;
@@ -179,11 +181,15 @@ function renderForm() {
         segmented([["stack", "Robot stack", "The whole stack, drives not armed"],
           ["imu", "IMU check", "Only the BNO085 plugin: no drive plugin is loaded"]],
         form.mode, (v) => { form.mode = v; changed(true); })),
-      sim ? null : h("div", { class: "field" }, h("span", { class: "field-label" }, "State source"),
-        segmented([["encoder", "encoder broadcast"], ["mit", "MIT reply"]], form.state_source, (v) => { form.state_source = v; changed(true); })),
-      sim ? null : h("div", { class: "field" }, h("span", { class: "field-label" }, "Encoder period"),
+      imu ? null : h("div", { class: "field" }, h("span", { class: "field-label" }, "State source"),
+        segmented([["encoder", "encoder broadcast", "Joint state from the drives' 5 ms broadcast"],
+          ["mit", "MIT reply", "Joint state from each drive's reply to every 300 Hz command, about 2.3 ms old; the broadcast slows to 20 ms"]],
+        form.state_source, (v) => { form.state_source = v; changed(true); })),
+      sim || imu ? null : h("div", { class: "field" }, h("span", { class: "field-label" }, "Encoder period"),
         h("input", { type: "number", min: 1, max: 100, value: form.encoder_period_ms, class: "narrow",
-          onchange: (e) => { form.encoder_period_ms = Number(e.target.value); changed(); } }), h("span", { class: "unit" }, "ms")),
+          placeholder: form.state_source === "mit" ? "auto, 20" : "auto, 5",
+          onchange: (e) => { form.encoder_period_ms = e.target.value === "" ? "" : Number(e.target.value); changed(); } }),
+        h("span", { class: "unit" }, "ms")),
       h("div", { class: "field" }, h("span", { class: "field-label" }, "Extra arguments"),
         h("input", { type: "text", value: form.extra, placeholder: "name:=value …", spellcheck: false,
           oninput: (e) => { form.extra = e.target.value; changed(); } }))),

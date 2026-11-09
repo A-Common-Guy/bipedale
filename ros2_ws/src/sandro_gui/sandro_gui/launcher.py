@@ -78,18 +78,23 @@ def build_command(request: dict, settings: LaunchSettings) -> list[str]:
         return ["ros2", "launch", "sandro_bringup", "imu_check.launch.py", *imu, *extra]
 
     command = ["ros2", "launch", "sandro_bringup", "sandro.launch.py", f"hardware:={hardware}"]
+    state_source = request.get("state_source", "encoder")
+    if state_source not in ("encoder", "mit"):
+        raise ValueError("state_source must be encoder or mit")
     if hardware == "real":
         command += list(settings.args)
         command.append("arm_hardware:=false")
-        state_source = request.get("state_source", "encoder")
-        if state_source not in ("encoder", "mit"):
-            raise ValueError("state_source must be encoder or mit")
-        period = int(request.get("encoder_period_ms", 5))
-        if not 1 <= period <= 100:
-            raise ValueError("encoder_period_ms must be within 1-100")
-        command += [f"state_source:={state_source}", f"encoder_period_ms:={period}"]
     else:
         command += list(settings.simulation_args)
+    # Both backends take their joint timing from state_source (JOINT_TIMING in
+    # sandro.launch.py); an explicit period overrides only the real broadcast.
+    command.append(f"state_source:={state_source}")
+    period = request.get("encoder_period_ms")
+    if hardware == "real" and period not in (None, "", "auto"):
+        period = int(period)
+        if not 1 <= period <= 100:
+            raise ValueError("encoder_period_ms must be within 1-100")
+        command.append(f"encoder_period_ms:={period}")
     teleop = bool(request.get("teleop", True))
     command += [f"controller:={controller}", f"teleop:={'true' if teleop else 'false'}"]
     if request.get("overrides", True) and settings.overrides_path:
