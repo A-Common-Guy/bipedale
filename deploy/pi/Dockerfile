@@ -4,9 +4,12 @@
 # so day-to-day development never rebuilds this image.
 FROM ros:jazzy-ros-base-noble
 
+# ROS_LOG_DIR: deploy/pi/pi mounts a size-capped tmpfs there, so node logs do
+# not wear the SD card.
 ENV DEBIAN_FRONTEND=noninteractive \
     ROS_DISTRO=jazzy \
     RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+    ROS_LOG_DIR=/var/log/ros \
     CCACHE_DIR=/workspaces/sandro/.ccache \
     CCACHE_MAXSIZE=2G
 

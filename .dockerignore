@@ -3,12 +3,22 @@
 **/venv
 **/__pycache__
 **/*.pyc
+**/.pytest_cache
 ros2_ws/build
 ros2_ws/install
 ros2_ws/log
+ros2_ws/src/sandro_sim/tools/closed_loop/build
 build
 install
 log
-sysid_runs
+gui_runs
+**/sysid_runs
 *.bag
 *.db3
+# Multi-GB training output, recordings and CAD: nothing in the image builds or
+# runs from them (sync_model.py falls back to the packaged MJCF).
+sandro_rl/runs
+sandro_rl/policies
+recordings
+onshape_export
+3d_models

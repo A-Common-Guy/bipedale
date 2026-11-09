@@ -34,7 +34,7 @@ gui-sim:
 	  bash -lc 'ros2 run sandro_gui sandro_gui --hardware mujoco'
 
 real:
-	@printf '%s\n' 'REAL MODE DOES NOT ARM DRIVES. Verify lifted robot, E-stop, CAN mapping, signs, zeros, and limits.'
+	@printf '%s\n' 'REAL MODE DOES NOT ARM DRIVES: they start inactive. Verify lifted robot, E-stop, CAN mapping, signs, zeros, and limits before arming.'
 	docker compose --profile real run --rm real
 
 test:
@@ -44,7 +44,7 @@ shell: xauth
 	docker compose --profile shell run --rm shell
 
 hardware-shell: xauth
-	@printf '%s\n' 'Shell WITH the IMU attached. Launching the balancer here arms the drives.'
+	@printf '%s\n' 'Shell WITH the IMU attached. Launching with arm_hardware:=true here arms the drives.'
 	docker compose --profile hardware run --rm hardware-shell
 
 # Raspberry Pi deployment (see deploy/pi/README.md)

@@ -32,20 +32,42 @@ shows that run as external and can stop it.
 
 ## Why it is fast
 
-| Change                          | Cost on the next `launch`                         |
-|---------------------------------|---------------------------------------------------|
-| Python, YAML, URDF, launch file | rsync only (~1 s), live through `--symlink-install` |
-| One C++ file                    | recompiles that file and relinks (ccache, Release) |
-| Header used everywhere          | recompiles its dependents                          |
-| Dockerfile / system packages    | `pi setup` again (minutes, rare)                   |
+| Change                                     | Cost on the next `launch`                          |
+|--------------------------------------------|----------------------------------------------------|
+| Edit to a Python, YAML, URDF, launch file  | rsync only (~1 s), live through `--symlink-install` |
+| New `.py` in a package's module directory  | rsync only (the directory is linked as a whole)     |
+| Other new or deleted file                  | re-runs that package only (`--packages-select`)    |
+| One C++ file                               | rebuilds that package: recompiles the file, relinks (ccache, Release) |
+| Header or `CMakeLists.txt`                 | that package and the ones depending on it          |
+| Dockerfile / system packages / `panel.sh`  | `pi setup` then `pi reset` (minutes, rare)         |
 
 Sources are bind-mounted into the container; `build/`, `install/` and the ccache live on
-the Pi, so nothing is rebuilt from scratch. The first `pi build` compiles everything once.
+the Pi, so nothing is rebuilt from scratch. The first `pi build` compiles everything once;
+afterwards `pi build` builds only what the sync changed (`pi build --all` the whole
+workspace, `pi build --packages-select <pkg>` exactly that). Builds on the Pi are
+`CMAKE_BUILD_TYPE=Release` with `BUILD_TESTING=OFF`: run the tests on the development
+machine (`make test`).
 
 `launch` defaults to `hardware:=real imu_transport:=spi imu_spi_device:=/dev/spidev6.0 rviz:=false`
 plus the per-robot `config/sandro_real_overrides.yaml`, and the controller defaults to
 `whole_body_controller`; extra arguments are appended, e.g.
 `deploy/pi/pi launch arm_hardware:=true` or `deploy/pi/pi launch controller:=lqr_balancer`.
+
+## One launch per session
+
+Without `arm_hardware:=true` the launch is the whole session: the controller manager starts
+with the IMU active and the drives (`SandroSystem`) configured but inactive, at zero torque
+and with nothing written to them, the broadcasters publish, and the controller (with the
+other gamepad-switch policy, for an RL policy) is loaded inactive. Arming is
+`set_hardware_component_state SandroSystem active` and then activating the controller, from
+the panel or by hand (`ros2_ws/src/sandro_bringup/docs/HARDWARE_COMMISSIONING.md`). Teleop
+runs in both modes. The gamepad re-arm (Create + Options) re-activates the drives only after
+they have been armed once in the running launch; the first arming is the operator's.
+`arm_hardware:=true` arms the drives and starts the controller at launch, as before.
+
+The panel reads drive and IMU health at 10 Hz on `/health_broadcaster/dynamic_joint_states`;
+`/joint_states` stays at 300 Hz, and the 300 Hz `/dynamic_joint_states` is no longer
+published.
 
 ## Gamepad (PS5 DualSense over Bluetooth)
 
@@ -64,8 +86,8 @@ If `bluetoothctl show` reports `PowerState: off-blocked`, the radio is rfkill so
 The button and axis indices in `config/teleop.yaml` are SDL's gamepad layout, which is what
 `joy` reports for the DualSense here: L1 = button 9 is the deadman, L2 + R2 (axes 4 and 5)
 the software E-stop.
-As always, `arm_hardware:=true` is a deliberate extra step; see
-`ros2_ws/src/sandro_bringup/docs/HARDWARE_COMMISSIONING.md`.
+As always, arming (`arm_hardware:=true`, or arming from the panel) is a deliberate extra
+step; see `ros2_ws/src/sandro_bringup/docs/HARDWARE_COMMISSIONING.md`.
 
 ## Pi hardware wiring (Raspberry Pi 4)
 
@@ -101,5 +123,36 @@ dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=23
 
 * The CPU governor is pinned to `performance` (`sandro-perf.service`); `ondemand` adds
   frequency-scaling jitter to a 300 Hz loop.
-* The container is privileged with `rtprio=99`, so the controller manager can request
-  `SCHED_FIFO`. Check `deploy/pi/pi status` for throttling (`get_throttled` should be 0x0).
+* The container is privileged with `rtprio=99` and `memlock=-1`, so the controller manager
+  can request `SCHED_FIFO` and lock its memory. Check `deploy/pi/pi status` for throttling
+  (`get_throttled` should be 0x0).
+* On the robot the launch sets the controller manager's `thread_priority: 50`,
+  `cpu_affinity: 3` and `lock_memory: true` (`REALTIME` in `sandro.launch.py`): its control
+  loop thread runs `SCHED_FIFO` at priority 50 pinned to core 3, and the whole process is
+  locked in RAM. The kernel is the stock one; nothing is isolated, so other processes can
+  still be scheduled on core 3, below the FIFO thread. Verify on a running launch:
+
+  ```bash
+  deploy/pi/pi shell "ps -eLo tid,cls,rtprio,psr,comm | awk 'NR == 1 || /ros2_control/'"
+  # the control loop thread: CLS FF, RTPRIO 50, PSR 3; the executor and DDS
+  # threads of the same process stay TS (normal) on any core
+  deploy/pi/pi shell "grep VmLck /proc/\$(pgrep -f -o ros2_control_node)/status"   # non-zero
+  ```
+
+  The launch log must show `Successful set up FIFO RT scheduling policy with priority 50.`
+  `Could not enable FIFO RT scheduling policy`, `Unable to set the CPU affinity` or
+  `Unable to lock the memory` mean the container lacks the privileges above
+  (`deploy/pi/pi reset` recreates it with them).
+
+## Logs and stopping
+
+* ROS logs (`ROS_LOG_DIR`) go to a 64 MB tmpfs at `/var/log/ros` in the container, so they
+  are lost at a container restart; files nothing wrote for a day are pruned. `joy_node` logs
+  warnings only.
+* `gui_runs/panel.log` is truncated into `panel.log.1` once it passes 5 MB (checked every
+  minute).
+* `docker stop` (and a Pi shutdown) sends the panel a SIGTERM; it Ctrl-Cs the launch and waits
+  up to 25 s for it to exit, so the controller manager idles the drives. The container is
+  created with `--stop-timeout 30`, so docker does not SIGKILL it sooner.
+* These come from the image and the `docker run` flags: after updating, run
+  `deploy/pi/pi setup && deploy/pi/pi reset` once.

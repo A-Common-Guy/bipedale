@@ -44,6 +44,11 @@ services:
     devices:
       - ${SANDRO_IMU_DEVICE:-/dev/spidev6.0}
       - ${SANDRO_GPIO_CHIP:-/dev/gpiochip0}
+    # The real-hardware launch asks for SCHED_FIFO and locked memory for the
+    # controller manager (sandro.launch.py REALTIME).
+    ulimits: &realtime
+      rtprio: 99
+      memlock: -1
     # SocketCAN uses the host network namespace; configure can0 on the host.
     command: >
       bash -lc 'source /opt/ros/jazzy/setup.bash;
@@ -78,6 +83,7 @@ services:
     devices:
       - ${SANDRO_IMU_DEVICE:-/dev/spidev6.0}
       - ${SANDRO_GPIO_CHIP:-/dev/gpiochip0}
+    ulimits: *realtime
     stdin_open: true
     tty: true
     command: bash

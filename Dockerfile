@@ -41,15 +41,18 @@ RUN apt-get update \
     && rosdep install --from-paths ros2_ws/src /opt/sandro_deps --ignore-src -r -y \
     && . /opt/ros/jazzy/setup.sh \
     && colcon build --base-paths ros2_ws/src /opt/sandro_deps --symlink-install \
+         --cmake-args -DCMAKE_BUILD_TYPE=Release \
     && rm -rf /var/lib/apt/lists/*
 
 FROM base AS development
+# .dockerignore keeps training runs, recordings, CAD and virtualenvs out.
 COPY . .
 # install/ already holds mujoco_ros2_control from the base stage; sandro_sim
 # builds a plugin against it, so it has to be on the prefix path.
 RUN . /opt/ros/jazzy/setup.sh \
     && . install/setup.sh \
-    && colcon build --base-paths ros2_ws/src --symlink-install
+    && colcon build --base-paths ros2_ws/src --symlink-install \
+         --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 RUN printf '%s\n' \
     'source /opt/ros/jazzy/setup.bash' \
