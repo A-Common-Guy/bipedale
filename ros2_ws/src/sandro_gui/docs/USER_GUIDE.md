@@ -61,7 +61,7 @@ every policy.
 | L1 + right stick up/down | Body height up and down (a height rate: the body stays where you leave it). |
 | L1 + right stick left/right | Body roll, stick right puts the right side down. Only policies with a roll command (rl_agile_terrain) use it. |
 | L1 + R3 | Height back to the running policy's initial height. |
-| L1 + Triangle | Switch to the next policy (rl_flat_level → rl_agile_terrain). The robot first settles at 0.17 m with zero speed and roll, then the incoming policy takes over in one control cycle. Releasing L1 or the E-stop aborts the switch (gives up after 8 s). |
+| L1 + Triangle | Switch to the next policy (rl_flat_level → rl_agile_terrain → rl_flat_level_fast). The robot first settles at 0.17 m with zero speed and roll, then the incoming policy takes over in one control cycle. Releasing L1 or the E-stop aborts the switch (gives up after 8 s). |
 | Circle | Rumble the running policy's number: one pulse for the first, two for the second. One long rumble means a switch was refused or aborted. |
 | L2 + R2 | Software E-stop: squeeze both triggers past 75%. Deactivates every controller (all torques to zero) and sends the CAN E-stop to the drives. It is not a substitute for the power cut-off. |
 | hold Create + Options | Re-arm after an E-stop, in two holds of 2 s each; only once the drives have been armed in this launch (the first arming is the operator's, on the panel). First hold: the drives are armed at zero torque with no controller. Hold the robot upright, then hold again: the controller that ran last starts again (or whole_body_controller). A fallen controller restarts with a single hold. |
@@ -70,6 +70,7 @@ Light bar colour:
 
 - rgb(0, 255, 0): rl_flat_level
 - rgb(255, 100, 0): rl_agile_terrain
+- rgb(0, 80, 255): rl_flat_level_fast
 - rgb(255, 0, 0): no controller running
 - rgb(255, 255, 255): a controller outside the switch list
 

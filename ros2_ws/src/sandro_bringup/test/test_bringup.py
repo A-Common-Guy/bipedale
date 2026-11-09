@@ -236,7 +236,7 @@ def test_real_robot_overrides_only_touch_known_parameters():
     shipped.update(yaml.safe_load((ROOT / "config" / "rl_policies.yaml").read_text()))
     overrides = yaml.safe_load((ROOT / "config" / "sandro_real_overrides.yaml").read_text())
     assert set(overrides) == {"whole_body_controller", "rl_flat_level", "rl_agile_terrain",
-                              "rl_stand_up"}
+                              "rl_stand_up", "rl_flat_level_fast"}
     base = shipped["whole_body_controller"]["ros__parameters"]
 
     def check(subset, reference, path=""):
@@ -252,7 +252,7 @@ def test_real_robot_overrides_only_touch_known_parameters():
     # A rearward neutral shift eats the front pivot's stretch margin at height.
     assert tasks["fore_aft"]["neutral_offset_m"] < 0.0
     assert tasks["height"]["max_m"] <= 0.19
-    for name in ("rl_flat_level", "rl_agile_terrain", "rl_stand_up"):
+    for name in ("rl_flat_level", "rl_agile_terrain", "rl_stand_up", "rl_flat_level_fast"):
         check(overrides[name]["ros__parameters"], shipped[name]["ros__parameters"], f"{name}.")
         # One physical IMU mounting for every controller.
         assert (overrides[name]["ros__parameters"]["observation"]["imu_offset_rad"]
@@ -263,7 +263,7 @@ def test_rl_policies_are_complete():
     config = yaml.safe_load((ROOT / "config" / "rl_policies.yaml").read_text())
     manager = config["controller_manager"]["ros__parameters"]
     controllers = ROOT.parent / "sandro_controllers"
-    assert set(manager) == {"rl_flat_level", "rl_agile_terrain", "rl_stand_up"}
+    assert set(manager) == {"rl_flat_level", "rl_agile_terrain", "rl_stand_up", "rl_flat_level_fast"}
     # Only the stand-up policy engages lying down.
     assert {name for name in manager
             if (config[name]["ros__parameters"].get("safety") or {}).get("start_lying")} == {"rl_stand_up"}
@@ -285,6 +285,30 @@ def test_cyclone_configuration_is_well_formed():
 def test_launch_modules_import(ros_stubs):
     for path in sorted((ROOT / "launch").glob("*.launch.py")):
         assert _load(path).generate_launch_description() is not None
+
+
+def test_joint_timing_follows_the_state_source(ros_stubs, monkeypatch):
+    module = _load(ROOT / "launch" / "sandro.launch.py")
+    assert set(module.JOINT_TIMING["mit"]) == set(module.JOINT_TIMING["encoder"])
+
+    def configuration(values):
+        class Configuration:
+            def __init__(self, name):
+                self.name = name
+
+            def perform(self, _context):
+                return values[self.name]
+        return Configuration
+
+    monkeypatch.setattr(module, "LaunchConfiguration",
+                        configuration({"state_source": "mit", "encoder_period_ms": "auto",
+                                       "sim_joint_rate_hz": "250"}))
+    assert module._joint_timing(None, "encoder_period_ms") == "20"
+    assert module._joint_timing(None, "sim_joint_rate_hz") == "250"
+    monkeypatch.setattr(module, "LaunchConfiguration",
+                        configuration({"state_source": "can", "encoder_period_ms": "auto"}))
+    with pytest.raises(ValueError):
+        module._joint_timing(None, "encoder_period_ms")
 
 
 def test_real_hardware_never_defaults_to_arm():
@@ -357,7 +381,8 @@ def test_real_launch_starts_one_session_with_the_drives_inactive(monkeypatch, ro
     # One spawner activates every broadcaster, the IMU's last (the spawner stops at the
     # first failure); one loads the controller and its switch partner inactive.
     assert [(names, inactive) for names, inactive, _ in spawners] == [
-        (list(module.BROADCASTERS), False), (["rl_flat_level", "rl_agile_terrain"], True)]
+        (list(module.BROADCASTERS), False),
+        (["rl_flat_level", "rl_agile_terrain", "rl_flat_level_fast"], True)]
     assert module.BROADCASTERS[-1] == "imu_broadcaster"
     assert "REAL SAFE STATE" in logs and "not armed" in logs
     # Teleop starts too: nothing moves before the operator arms.
@@ -385,7 +410,7 @@ def test_armed_real_launch_keeps_everything_active(monkeypatch, ros_stubs):
     assert module.REALTIME in manager.kwargs["parameters"]
     assert [(names, inactive) for names, inactive, _ in spawners] == [
         (list(module.BROADCASTERS), False), (["rl_agile_terrain"], False),
-        (["rl_flat_level"], True)]
+        (["rl_flat_level", "rl_flat_level_fast"], True)]
     assert "REAL SAFE STATE" not in logs
 
 

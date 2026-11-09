@@ -205,6 +205,38 @@ fast without a fast policy, as on Ascento with its low-level PD (RESEARCH.md
 three control cycles. `policy.json` states the rate so a deployment can
 check it.
 
+`flat_level_fast` runs at 300 Hz, one step per control cycle. Inference
+costs 0.3–0.6 ms on the Pi, and acting on each joint state as it arrives
+cuts 3.3–6.7 ms from the sensing-to-action path, which matters most with the
+synchronous joint state of `state_source:=mit`. A faster policy must not
+change what the rewards mean per second, so:
+
+- `observation.history_stride` (policy steps between stacked frames): 3 at
+  300 Hz keeps four frames 10 ms apart, so the input layout is the 100 Hz
+  one and a 100 Hz policy can be fine-tuned;
+- `action_rate` and `action_accel` take differences per 10 ms (scaled by
+  `0.01 / dt` and its square), so a smooth action costs the same at any rate
+  while 300 Hz chatter costs more;
+- the constraint termination probability `p_max` is per 10 ms;
+- event terms (`termination`) are weighted per 10 ms step, not per `dt`;
+- γ and λ are set per step in the config (0.99 and 0.95 per 10 ms are
+  0.996655 and 0.983048 at 300 Hz), and `steps_per_env` is tripled so a
+  rollout still covers 0.24 s.
+
+All of these reduce to the old values at 100 Hz.
+
+`flat_level_fast` is `flat_level_real` fine-tuned 1000 iterations at 300 Hz
+(40 min), with MIT joint timing in half the episodes. In `evaluate.py
+--compare` the body pitch RMS, averaged over the phases, halves against
+`flat_level_real` in every scenario and latency profile (0.026–0.032 to
+0.012–0.016 rad; WBC 0.016–0.019). Speed error and wheel torque drop a
+little, and yaw error rises from 0.011 to 0.020 rad/s on the hardware
+sequence (WBC 0.12). In the wheel-lag sweep the 5–15 Hz share at 80 ms is
+0.04 against 0.19 on the hardware sequence. Part of the gain may be the
+model: `flat_level_real` predates the 2026-11 CAD re-import, which
+`flat_level_fast` trained on. Inference every cycle costs 0.3–0.6 ms of
+the 3.3 ms budget on the Pi.
+
 ### Latency emulation
 
 The GPU environment keeps a ring buffer of raw sensor channels at physics
@@ -351,6 +383,7 @@ value.
 | Joint delay | 0.5–6 ms | Encoder data is 1–6 ms old on the robot (S2R l.50–52). |
 | Joint rate | 150–300 Hz | 199.9 Hz measured (S2R l.470). 300 Hz is `state_source:=mit` (S2R l.144–150). |
 | Joints synchronised | 20 % of episodes, otherwise random phases | 0.66 of joints update together on the robot (S2R l.471). `mit` mode is synchronous (S2R l.62–63). |
+| MIT joint state | `mit_joints_probability` of episodes (0 by default, 0.5 in `flat_level_fast`): synchronous at the control rate, 1.5–3.5 ms old | `state_source:=mit`, 2.3 ms nominal (S2R l.144–150, `JOINT_TIMING` in `sandro.launch.py`). |
 | Command delay | 0.5–3 ms | Default 1 ms, a 3-frame CAN burst plus the gs_usb round trip (S2R l.53–55). A 6 ms command delay makes the WBC fall at 30 Hz (S2R l.486). |
 | IMU noise | 0.5–2 × the MJCF sensor noise | mujoco_ros2_control's noise (S2R l.456–457). The real BNO085 noise is unmeasured, hence the wide factor. |
 | Joint velocity gain | 0.75–1.05 per drive | Drives report 0.84–0.87 of the position derivative. One drive reported 0.46 and 0.31 (S2R l.248–250, l.283). The lower outlier is left out deliberately and is listed in section 10. |

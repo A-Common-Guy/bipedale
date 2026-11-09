@@ -31,7 +31,7 @@ joy_teleop:
     estop_pressed_below: -0.5
     # Policies the switch cycles through, in rumble order (1 pulse, 2 ...).
     # The launch loads the ones it does not start as inactive.
-    policies: [rl_flat_level, rl_agile_terrain]
+    policies: [rl_flat_level, rl_agile_terrain, rl_flat_level_fast]
     # The switch settles here first: both policies' initial height, so the
     # incoming one engages at the height it would start from anyway.
     handover_height_m: 0.17
@@ -46,8 +46,9 @@ joy_teleop:
     # forward m/s, yaw rad/s, height rate m/s, roll rad.
     default_limits: [0.5, 1.5, 0.05, 0.0]
     # Lightbar colour of each policy, r g b in `policies` order: flat_level
-    # green, agile_terrain orange. Red means no controller is running.
-    policy_colors: [0, 255, 0, 255, 100, 0]
+    # green, agile_terrain orange, flat_level_fast blue. Red means no
+    # controller is running.
+    policy_colors: [0, 255, 0, 255, 100, 0, 0, 80, 255]
 
 # Gamepad E-stop: squeeze both triggers together. PS5 L2 and R2 are axes 4 and
 # 5; a trigger counts as pressed at or below axis_pressed_below. It deactivates every
@@ -69,7 +70,7 @@ joy_estop:
     rearm_buttons: [4, 6]
     rearm_hold_s: 2.0
     rearm_controller: whole_body_controller
-    switch_policies: [rl_flat_level, rl_agile_terrain]  # joy_teleop's policies
+    switch_policies: [rl_flat_level, rl_agile_terrain, rl_flat_level_fast]  # joy_teleop's policies
     hardware_component: SandroSystem
     # Broadcasters reading the drives, which a drive read error deactivates.
     rearm_broadcasters: [joint_state_broadcaster, health_broadcaster]

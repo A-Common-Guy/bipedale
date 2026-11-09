@@ -47,7 +47,7 @@ sc::RlPolicyState standing(const sc::RlPolicySettings &s) {
 
 // The C++ actor reproduces onnxruntime on the exported policy.onnx.
 TEST(RlPolicy, ActorMatchesOnnxReference) {
-  for (const std::string name : {"flat_level", "agile_terrain", "stand_up"}) {
+  for (const std::string name : {"flat_level", "agile_terrain", "stand_up", "flat_level_fast"}) {
     sc::MlpPolicy policy;
     std::string error;
     ASSERT_TRUE(policy.load(kSource + "/policies/" + name + ".bin", &error)) << error;

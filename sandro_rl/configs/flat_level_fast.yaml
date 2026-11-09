@@ -1,0 +1,36 @@
+# flat_level_real with one policy step per 300 Hz control cycle instead of
+# every third. Inference costs 0.3-0.6 ms on the Pi, so the policy can act on
+# each joint state as it arrives: 3.3 ms instead of 10 ms between a sample
+# and the action it could change, which matters most with the synchronous
+# 300 Hz joint state of state_source:=mit, trained here in half the episodes.
+#
+# The observation keeps four frames 10 ms apart (history_stride 3), the
+# layout of flat_level_real, so this fine-tunes it. Per-second quantities
+# carry over: rewards scale by dt, action_rate/action_accel are differences
+# per 10 ms and the constraint termination probability is per 10 ms
+# (env.py), gamma and lam are the 100 Hz ones per 10 ms, and a rollout still
+# covers 0.24 s.
+#
+#     uv run python -m sandro_rl.train configs/flat_level_fast.yaml --resume policies/flat_level_real
+inherit: flat_level_real.yaml
+
+env:
+  policy_rate_hz: 300
+  observation:
+    history_stride: 3
+  randomization:
+    latency:
+      mit_joints_probability: 0.5
+
+train:
+  steps_per_env: 72
+  gamma: 0.996655               # 0.99 ** (1 / 3)
+  lam: 0.983048                 # 0.95 ** (1 / 3)
+  iterations: 1000
+  # With 0.05 action noise a small mean shift is a large KL: the first
+  # update at 3e-4 reached KL 5 before the adaptive rate caught it.
+  learning_rate: 1.0e-4
+  curriculum_offset: 300        # flat_level_real's full wheel lag range from the start
+  # flat_level_real's action noise is 0.04. The smoothness terms charge per-step
+  # noise 81 times more at 300 Hz, so exploration starts low.
+  resume_log_std: -3.0
