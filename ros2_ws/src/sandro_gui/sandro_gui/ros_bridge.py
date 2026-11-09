@@ -183,9 +183,9 @@ class RosBridge:
         self._sampled: list[tuple[_Topic, object]] = []
         self._sample_lock = threading.Lock()
         self._dynamic_cache: tuple[float, dict] = (0.0, {})
-        self.controllers: list[dict] = []
+        self.polled_controllers: list[dict] = []
         self.controllers_time = None
-        self.hardware: list[dict] = []
+        self.polled_hardware: list[dict] = []
         self.active_controller = self.selected_policy = None
         self._diag_raw: dict[str, tuple[bytes, float]] = {}
         self._diag_subs: dict[str, object] = {}
@@ -341,7 +341,7 @@ class RosBridge:
 
     def _poll_manager(self) -> None:
         if not self.cm["list"].service_is_ready():
-            self.controllers, self.hardware = [], []
+            self.polled_controllers, self.polled_hardware = [], []
             self._forget_diagnostics(set())
             return
         now = time.monotonic()
@@ -365,7 +365,7 @@ class RosBridge:
             listed = future.result().controller
         except Exception:  # noqa: BLE001 - manager going away
             return
-        self.controllers = [{
+        self.polled_controllers = [{
             "name": c.name, "type": c.type, "state": c.state,
             "claimed": list(c.claimed_interfaces),
             "owns_commands": c.state == "active" and len(c.claimed_interfaces) > 0,
@@ -385,7 +385,7 @@ class RosBridge:
             components = future.result().component
         except Exception:  # noqa: BLE001
             return
-        self.hardware = [{
+        self.polled_hardware = [{
             "name": h.name, "type": h.type, "plugin": h.plugin_name,
             "state": h.state.label, "state_id": h.state.id,
             "command_interfaces": len(h.command_interfaces),
@@ -465,8 +465,8 @@ class RosBridge:
                                      "message": status.message, "values": values,
                                      "age_s": now - stamp}
         manager = self.cm["list"].service_is_ready()
-        return {"manager": manager, "controllers": self.controllers if manager else [],
-                "hardware": self.hardware if manager else [], "dynamic": dynamic,
+        return {"manager": manager, "controllers": self.polled_controllers if manager else [],
+                "hardware": self.polled_hardware if manager else [], "dynamic": dynamic,
                 "dynamic_topic": health,
                 "dynamic_age_s": None if health is None else now - self.streams[health].last,
                 "diagnostics": diagnostics, "nodes": self.nodes,
