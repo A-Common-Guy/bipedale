@@ -7,6 +7,8 @@
 #   deploy/pi/pi launch [args]    sync + build + launch the real-hardware stack
 #   deploy/pi/pi shell [cmd...]   shell (or one command) inside the robot container
 #   deploy/pi/pi can [args]       candump on can0 (default: all frames, timestamped)
+#   deploy/pi/pi gui [restart|log] the control panel on http://<pi>:8080 (sandro_gui)
+#   deploy/pi/pi imu-cal [--clear] re-calibrate the BNO085 and save it in its flash (stack stopped)
 #   deploy/pi/pi status           container, CAN, SPI and CPU state at a glance
 #   deploy/pi/pi reset            recreate the container (after editing the Dockerfile/flags)
 #
@@ -59,15 +61,50 @@ ensure_container() {
   remote "docker rm -f $CONTAINER >/dev/null 2>&1 || true"
   # Privileged on purpose: spidev, gpiochip, gamepads and realtime scheduling all
   # need device access, and this box exists only to run the robot. Host networking
-  # exposes can0 and keeps DDS discovery working with the development machine.
+  # exposes can0 and the panel's port and keeps DDS discovery working with the
+  # development machine. The D-Bus socket lets the panel pair the gamepad through
+  # the host's bluetoothd; --init reaps the launches the panel leaves behind when
+  # it restarts. The image's main process is the panel (deploy/pi/panel.sh).
+  # No core dumps: each crash wrote 300+ MB to the SD card, stalling it for
+  # seconds while the robot was running.
   remote "mkdir -p ~/$DIR/ros2_ws/src && docker run -d --name $CONTAINER --restart unless-stopped \
-    --privileged --network host --ipc host \
-    --ulimit rtprio=99 --ulimit memlock=-1 \
+    --init --privileged --network host --ipc host \
+    --ulimit rtprio=99 --ulimit memlock=-1 --ulimit core=0 \
     -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
     -e CYCLONEDDS_URI=file:///workspaces/sandro/ros2_ws/src/sandro_bringup/config/cyclonedds.xml \
-    -v /home/\$USER/$DIR:/workspaces/sandro -v /dev:/dev \
+    -v /home/\$USER/$DIR:/workspaces/sandro -v /dev:/dev -v /run/dbus:/run/dbus \
     $IMAGE >/dev/null"
   echo "Started container $CONTAINER."
+}
+
+PANEL_PATTERN='lib/sandro_gui/sandro_gui'
+
+cmd_gui() {
+  ensure_container
+  local host=${PI#*@}
+  case "${1:-status}" in
+    status)
+      if ! remote "docker exec $CONTAINER test -x /usr/local/bin/sandro-panel"; then
+        echo "This container predates the panel: run 'deploy/pi/pi setup' then 'deploy/pi/pi reset'."
+        exit 1
+      fi
+      if remote "docker exec $CONTAINER pgrep -f $PANEL_PATTERN >/dev/null"; then
+        echo "panel running: http://$host:8080"
+      elif ! remote "[ -f ~/$DIR/install/sandro_gui/share/sandro_gui/package.xml ]"; then
+        echo "panel not built yet: deploy/pi/pi build"
+      else
+        echo "panel not running; it restarts within seconds (deploy/pi/pi gui log)"
+      fi ;;
+    restart)
+      # The container's main process starts it again; a running launch keeps running.
+      remote "docker exec $CONTAINER pkill -f $PANEL_PATTERN" || true
+      echo "panel restarting: http://$host:8080" ;;
+    log)
+      remote_tty "docker exec -it $CONTAINER tail -n 80 -f /workspaces/sandro/gui_runs/panel.log" ;;
+    *)
+      echo "usage: deploy/pi/pi gui [status|restart|log]" >&2
+      exit 2 ;;
+  esac
 }
 
 # Sets NEEDS_BUILD when the sync touched anything colcon must act on: C++ sources,
@@ -117,9 +154,20 @@ cmd_can() {
   remote_tty candump -t A "${@:-can0}"
 }
 
+cmd_imu_cal() {
+  # The tool drives the SPI bus and the INT/RST lines itself, outside ROS.
+  if remote "docker exec $CONTAINER pgrep -f 'ros2 launch' >/dev/null 2>&1"; then
+    echo "A launch is running and owns the IMU: stop it first (panel Run page, or Ctrl-C)." >&2
+    exit 1
+  fi
+  rsync -az -e "ssh ${SSH_OPTS[*]}" "$HERE/tools/" "$PI:$DIR/tools/"
+  remote_tty "cd ~/$DIR/tools && python3 bno085_calibrate.py $*"
+}
+
 cmd_status() {
   remote "
     echo '== container'; docker ps -a --filter name=$CONTAINER --format '{{.Names}}  {{.Status}}'
+    echo '== panel';     docker exec $CONTAINER pgrep -f $PANEL_PATTERN >/dev/null 2>&1 && echo 'running on :8080' || echo 'not running'
     echo '== can0';      ip -br link show can0; ip -details -statistics link show can0 | grep -E 'bitrate|state|RX:|TX:' -A1 | head -12
     echo '== spi/gpio';  ls /dev/spidev* /dev/gpiochip0 2>&1
     echo '== cpu';       cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor; vcgencmd measure_temp; vcgencmd get_throttled
@@ -144,7 +192,7 @@ cmd_setup() {
   # Copy the provisioning inputs, then run everything privileged in one sudo session.
   remote "mkdir -p ~/$DIR/docker ~/$DIR/ros2_ws/src"
   rsync -az -e "ssh ${SSH_OPTS[*]}" \
-    "$HERE/Dockerfile" "$HERE/can0.service" "$HERE/sandro-perf.service" "$PI:$DIR/docker/"
+    "$HERE/Dockerfile" "$HERE/panel.sh" "$HERE/can0.service" "$HERE/sandro-perf.service" "$PI:$DIR/docker/"
   # PI_SUDO_PASS lets this run without a terminal; otherwise sudo prompts as usual.
   local script="set -e
     ${PI_SUDO_PASS:+read -r PW; sudo() { command sudo -S -p '' \"\$@\" <<<\"\$PW\"; }}
@@ -175,6 +223,7 @@ cmd_setup() {
 cmd=${1:-help}
 shift || true
 case "$cmd" in
-  setup|sync|build|launch|shell|can|status|reset) "cmd_$cmd" "$@" ;;
-  *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' ;;
+  setup|sync|build|launch|shell|can|gui|status|reset) "cmd_$cmd" "$@" ;;
+  imu-cal) cmd_imu_cal "$@" ;;
+  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac

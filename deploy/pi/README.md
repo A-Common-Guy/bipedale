@@ -11,6 +11,25 @@ deploy/pi/pi launch    # every time: sync + incremental build + launch (hardware
 
 Also available as `make pi-launch`, `make pi-build`, `make pi-shell`, `make pi-can`.
 
+## Control panel
+
+The container's main process is the control panel (`ros2_ws/src/sandro_gui`), so
+after a build the robot is driven from a browser on **http://10.42.0.169:8080**:
+check the bus, drives, IMU and gamepad, start the stack (IMU check, drives off,
+armed), start controllers, tune parameters, pair the pad. It comes up with the Pi.
+The procedure and every gamepad combination are in
+[the user guide](../../ros2_ws/src/sandro_gui/docs/USER_GUIDE.md).
+
+```bash
+deploy/pi/pi setup && deploy/pi/pi reset   # once: image with bluetoothctl, panel as main process
+deploy/pi/pi build                          # builds sandro_gui with the rest
+deploy/pi/pi gui                            # address and state; `gui restart`, `gui log`
+```
+
+A launch the panel started keeps running when the panel restarts, and its output is
+kept in `~/sandro/gui_runs/run-*.log`. `deploy/pi/pi launch` still works; the panel
+shows that run as external and can stop it.
+
 ## Why it is fast
 
 | Change                          | Cost on the next `launch`                         |
@@ -32,8 +51,8 @@ plus the per-robot `config/sandro_real_overrides.yaml`, and the controller defau
 
 Paired and trusted once; afterwards pressing PS reconnects it and `/dev/input/js0` appears
 inside the container (it bind-mounts `/dev`). To pair a new pad, hold PS + Create until the
-light bar flashes fast, then on the Pi (BlueZ forgets a scanned device once the scan stops,
-so pair while scanning):
+light bar flashes fast, then Scan and Pair on the panel's Gamepad page, or by hand on the Pi
+(BlueZ forgets a scanned device once the scan stops, so pair while scanning):
 
 ```bash
 bluetoothctl --timeout 60 scan on &   # wait until the pad shows up in `bluetoothctl devices`
