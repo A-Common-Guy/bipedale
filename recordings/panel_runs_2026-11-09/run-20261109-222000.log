@@ -171,3 +171,34 @@
 [ros2_control_node-3] [INFO] [1794263340.028169878] [controller_manager]: Requested controller switch from non-realtime loop
 [ros2_control_node-3] [INFO] [1794263340.031237374] [rl_flat_level_fast]: Activated: legs move to the stand pose, the policy engages once upright
 [ros2_control_node-3] [INFO] [1794263340.031490373] [controller_manager]: Successfully switched controllers!
+[ros2_control_node-3] [INFO] [1794263341.497927526] [rl_flat_level_fast]: Legs at the stand pose; waiting for the body to be upright (tilt 0.03 rad)
+[ros2_control_node-3] [INFO] [1794263341.804841453] [rl_flat_level_fast]: Phase: policy (pitch +0.018 rad, gyro +0.00 -0.08 +0.01 rad/s, leg velocity -0.02 +0.02 -0.02 +0.02, wheel velocity -0.05 +0.02 rad/s, action -0.03 +0.05 -0.06 +0.04 -0.04 -0.01)
+[ros2_control_node-3] [ERROR] [1794263343.397911556] [rl_flat_level_fast]: Oscillation: 5-15 Hz velocity RMS 1.00 rad/s legs, 1.21 rad/s wheels: drives limp until re-activation
+[ros2_control_node-3] [INFO] [1794263349.507162426] [controller_manager]: Activating controllers: [ rl_flat_level ]
+[ros2_control_node-3] [INFO] [1794263349.507260148] [controller_manager]: Deactivating controllers: [ rl_flat_level_fast ]
+[ros2_control_node-3] [INFO] [1794263349.507935662] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-3] [INFO] [1794263349.508084698] [rl_flat_level_fast]: Deactivated; longest inference 351 us
+[ros2_control_node-3] [INFO] [1794263349.510021110] [rl_flat_level]: Activated: took over the running balancer, policy engaged
+[ros2_control_node-3] [INFO] [1794263349.510234590] [controller_manager]: Successfully switched controllers!
+[joy_teleop-7] [WARN] [1794263350.137491845] [joy_teleop]: running controller: rl_flat_level
+[joy_estop-8] [INFO] [1794263350.139841032] [joy_estop]: re-arm now starts rl_flat_level
+[joy_teleop-7] [WARN] [1794263350.140275547] [joy_teleop]: running policy 1: rl_flat_level
+[ros2_control_node-3] [INFO] [1794263365.974197472] [controller_manager]: Activating controllers: [ rl_agile_terrain ]
+[ros2_control_node-3] [INFO] [1794263365.974384156] [controller_manager]: Deactivating controllers: [ rl_flat_level ]
+[ros2_control_node-3] [INFO] [1794263365.977938168] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-3] [INFO] [1794263365.978708032] [rl_flat_level]: Deactivated; longest inference 403 us
+[ros2_control_node-3] [INFO] [1794263365.979303213] [rl_agile_terrain]: Activated: took over the running balancer, policy engaged
+[ros2_control_node-3] [INFO] [1794263365.979459120] [controller_manager]: Successfully switched controllers!
+[joy_teleop-7] [WARN] [1794263366.144326482] [joy_teleop]: running controller: rl_agile_terrain
+[joy_estop-8] [INFO] [1794263366.147396145] [joy_estop]: re-arm now starts rl_agile_terrain
+[joy_teleop-7] [WARN] [1794263366.149829294] [joy_teleop]: running policy 2: rl_agile_terrain
+[joy_teleop-7] [INFO] [1794263366.162380168] [joy_teleop]: rl_agile_terrain: full stick 1.00 m/s, 3.00 rad/s, 0.15 m/s height, 0.30 rad roll
+[ros2_control_node-3] [INFO] [1794263381.595009954] [controller_manager]: Deactivating controllers: [ rl_agile_terrain ]
+[ros2_control_node-3] [INFO] [1794263381.598511040] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-3] [INFO] [1794263381.598714964] [rl_agile_terrain]: Deactivated; longest inference 370 us
+[ros2_control_node-3] [INFO] [1794263381.598875500] [controller_manager]: Deactivated controllers: [ rl_agile_terrain ]
+[ros2_control_node-3] [INFO] [1794263381.598906537] [controller_manager]: Successfully switched controllers!
+[ros2_control_node-3] [INFO] [1794263381.607105016] [resource_manager]: 'deactivate' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794263381.607364977] [resource_manager]: Successful 'deactivate' of hardware 'SandroSystem'
+[joy_teleop-7] [WARN] [1794263382.138617689] [joy_teleop]: running controller: none
+[joy_teleop-7] [WARN] [1794263382.140607989] [joy_teleop]: running: nothing (selected policy rl_agile_terrain)
