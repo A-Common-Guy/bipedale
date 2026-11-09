@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>sandro_gui</name>
+  <version>0.1.0</version>
+  <description>Browser control panel for Sandro, served from the robot: launch, controllers, parameters, sensor health, 3D state and gamepad pairing.</description>
+  <maintainer email="giuseppe.festa@example.com">Giuseppe Festa</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>control_msgs</exec_depend>
+  <exec_depend>controller_manager_msgs</exec_depend>
+  <exec_depend>diagnostic_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>lifecycle_msgs</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>rosidl_runtime_py</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>sandro_bringup</exec_depend>
+  <exec_depend>sandro_description</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

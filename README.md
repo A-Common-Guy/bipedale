@@ -68,6 +68,15 @@ run with one command, `make pi-launch` (or `deploy/pi/pi launch`): Python/YAML c
 live after a ~1 s rsync, C++ changes recompile incrementally on the Pi. See
 `deploy/pi/README.md` for setup, wiring and the fast-loop details.
 
+## Control panel
+
+The Pi serves a browser panel on port 8080 (`ros2_ws/src/sandro_gui`) that replaces the
+terminal routine: bus, drives, IMU and gamepad checks before anything is armed, Start and
+Stop of the stack, controllers, live parameter tuning, rates and errors, the robot in 3D,
+gamepad pairing, and the user guide with every button combination
+([USER_GUIDE.md](ros2_ws/src/sandro_gui/docs/USER_GUIDE.md)). `make gui-sim` runs it against
+the simulation on the development machine.
+
 PS5 teleoperation uses L1 as a deadman and publishes standard
 `geometry_msgs/msg/TwistStamped` on `/cmd_vel`: left stick vertical is forward
 speed, right stick horizontal is yaw rate, and right stick vertical is a body

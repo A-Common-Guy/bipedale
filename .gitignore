@@ -14,6 +14,7 @@ ros2_ws/src/sandro_sim/tools/closed_loop/build/
 # Local credentials and generated run data
 **/.env
 SandroControl/sysid_runs/
+gui_runs/
 
 # Editor / OS
 .vscode/

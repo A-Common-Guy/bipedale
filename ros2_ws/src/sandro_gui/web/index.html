@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sandro</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+  <header class="bar">
+    <div class="brand"><span class="wordmark">SANDRO</span><span id="host" class="host"></span></div>
+    <nav id="tabs">
+      <button data-page="overview">Overview</button>
+      <button data-page="run">Run</button>
+      <button data-page="tune">Tune</button>
+      <button data-page="imu">IMU</button>
+      <button data-page="pad">Gamepad</button>
+      <button data-page="guide">Guide</button>
+    </nav>
+    <div id="chips" class="chips"></div>
+    <button id="estop" class="estop" title="Deactivate every controller and send the CAN E-stop">E-STOP</button>
+  </header>
+  <div class="offline-banner">Connection to the robot lost. Retrying…</div>
+
+  <main>
+    <section id="page-overview" class="page" hidden>
+      <div class="grid overview-top">
+        <div class="panel viewer-panel">
+          <div class="panel-head"><h2>Robot</h2><div id="viewer-tools" class="tools"></div></div>
+          <div class="viewer-wrap">
+            <div id="viewer" class="viewer"></div>
+            <div id="pose-overlay" class="pose-overlay"></div>
+            <div id="viewer-note" class="viewer-note"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Pre-flight</h2></div>
+          <ul id="checks" class="checks"></ul>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Drives</h2><span id="drives-source" class="muted small"></span></div>
+        <div class="scroll-x"><table id="drives" class="table drives"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Streams</h2><span class="muted small">topic rate against what a healthy stack delivers · sample age at the driver</span></div>
+        <div class="scroll-x"><table id="streams" class="table drives"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Problems</h2><button id="problems-clear" class="small">Clear</button></div>
+        <div id="problems"></div>
+      </div>
+    </section>
+
+    <section id="page-run" class="page" hidden>
+      <div class="grid run-top">
+        <div class="panel">
+          <div class="panel-head"><h2>Stack</h2>
+            <div class="tools"><button id="launch-start" class="primary">Start</button><button id="launch-stop" class="danger">Stop</button></div>
+          </div>
+          <div id="launch-status" class="launch-status"></div>
+          <div id="start-form" class="start-form"></div>
+        </div>
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-head"><h2>Hardware</h2><button id="clear-errors" class="small" title="Clear_Errors to every drive, without arming">Clear drive errors</button></div>
+            <div id="hardware"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Controllers</h2></div>
+            <div id="controllers"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Controller status</h2></div>
+            <div id="diagnostics"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel log-panel">
+        <div class="panel-head"><h2>Log</h2>
+          <div class="tools">
+            <select id="log-level">
+              <option value="debug">everything</option>
+              <option value="info">info and up</option>
+              <option value="warn">warnings and errors</option>
+              <option value="error">errors</option>
+            </select>
+            <input id="log-filter" type="search" placeholder="filter" spellcheck="false">
+            <label class="check small"><input id="log-follow" type="checkbox" checked>follow</label>
+            <details id="runs-toggle" class="runs"><summary class="button small">Past runs</summary><div id="runs" class="runs-list"></div></details>
+          </div>
+        </div>
+        <div id="log" class="log"></div>
+      </div>
+    </section>
+
+    <section id="page-tune" class="page" hidden>
+      <div class="grid tune">
+        <div class="panel">
+          <div class="panel-head"><h2>Nodes</h2></div>
+          <ul id="nodes" class="node-list"></ul>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2 id="param-node">Parameters</h2>
+            <div class="tools">
+              <input id="param-filter" type="search" placeholder="filter" spellcheck="false">
+              <span id="param-changed" class="changed"></span>
+              <button id="param-export" class="small" disabled title="The changed parameters as a ros__parameters file">Export changes</button>
+              <button id="param-reload" class="small">Reload</button>
+            </div>
+          </div>
+          <p id="param-note" class="hint">Values apply on Enter. Changes last until the controller is reloaded; export them to keep them.</p>
+          <div id="params"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-imu" class="page" hidden>
+      <div class="page-head"><p class="hint">Body frame: x forward, y left, z up. The driver rotates the BNO085's own axes into it before any controller reads a sample. Still and level, acceleration reads about (0, 0, +9.81).</p>
+        <button id="imu-pause" class="small">Pause</button></div>
+      <div id="imu-readings" class="grid readings"></div>
+      <div id="chart-attitude" class="panel chart"></div>
+      <div id="chart-gyro" class="panel chart"></div>
+      <div id="chart-accel" class="panel chart"></div>
+    </section>
+
+    <section id="page-pad" class="page" hidden>
+      <div class="grid pad-grid">
+        <div class="panel">
+          <div class="panel-head"><h2>Bluetooth</h2></div>
+          <div id="bt"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Live input</h2><span id="pad-battery" class="muted small"></span></div>
+          <div id="pad-live" class="pad-live"></div>
+          <div id="pad-live-status" class="status-line"></div>
+          <p id="pad-device" class="muted small"></p>
+          <div id="pad-command" class="pad-command"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-guide" class="page" hidden>
+      <div class="grid guide">
+        <div class="stack">
+          <div class="panel"><div class="panel-head"><h2>Every start</h2></div><div id="guide-steps"></div></div>
+          <div class="panel"><div class="panel-head"><h2>Gamepad</h2></div><div id="guide-combos"></div></div>
+          <div class="panel"><div class="panel-head"><h2>E-stop and re-arm</h2></div><div id="guide-estop"></div></div>
+          <div class="panel"><div class="panel-head"><h2>When something is off</h2></div><div id="guide-trouble"></div></div>
+        </div>
+        <div class="stack sticky">
+          <div class="panel"><div id="guide-pad" class="pad-live"></div><p class="hint center">Point at a row to see its buttons.</p></div>
+          <div class="panel"><div id="guide-lights"></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toasts" class="toasts"></div>
+  <dialog id="dialog"></dialog>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

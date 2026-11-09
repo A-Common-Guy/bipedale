@@ -1,4 +1,4 @@
-.PHONY: build sim sim-cascade real test shell hardware-shell xauth pi-build pi-launch pi-shell pi-can
+.PHONY: build sim sim-cascade gui-sim real test shell hardware-shell xauth pi-build pi-launch pi-shell pi-can pi-gui
 
 XAUTH ?= /tmp/.sandro.xauth
 
@@ -28,6 +28,11 @@ sim-cascade: xauth
 	SANDRO_LAUNCH_ARGS="controller:=driving_balancer $(SANDRO_LAUNCH_ARGS)" \
 	  docker compose --profile sim run --rm sim
 
+# The control panel on http://localhost:8080, launching the simulation from its Run page.
+gui-sim:
+	docker compose --profile shell run --rm shell \
+	  bash -lc 'ros2 run sandro_gui sandro_gui --hardware mujoco'
+
 real:
 	@printf '%s\n' 'REAL MODE DOES NOT ARM DRIVES. Verify lifted robot, E-stop, CAN mapping, signs, zeros, and limits.'
 	docker compose --profile real run --rm real
@@ -54,3 +59,6 @@ pi-shell:
 
 pi-can:
 	deploy/pi/pi can
+
+pi-gui:
+	deploy/pi/pi gui $(ARGS)

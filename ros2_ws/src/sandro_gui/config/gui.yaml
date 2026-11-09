@@ -1,0 +1,68 @@
+# sandro_gui: the control panel the robot serves on http://<pi>:8080.
+# Command-line flags of `ros2 run sandro_gui sandro_gui` override these.
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  fast_rate_hz: 20     # joints, IMU, gamepad and rates to the browser
+  slow_rate_hz: 2      # controllers, hardware, CAN, system, Bluetooth
+
+launch:
+  # real on the robot. On a development machine run the GUI with
+  # --hardware mujoco to drive the simulation instead.
+  hardware: real
+  # Passed to every real-hardware launch, as deploy/pi/pi launch does
+  # (its LAUNCH_DEFAULTS); keep the two in step.
+  args: [imu_transport:=spi, imu_spi_device:=/dev/spidev6.0, rviz:=false]
+  simulation_args: [headless:=true, rviz:=false]
+  # sandro_bringup/config file applied as extra_params when "robot overrides"
+  # is ticked: the identified per-robot values.
+  overrides: sandro_real_overrides.yaml
+  # Stop is one SIGINT, as Ctrl-C: the controller manager deactivates the
+  # drives before it exits. SIGTERM after this long, SIGKILL 5 s later.
+  stop_timeout_s: 20.0
+  runs_dir: gui_runs   # launch output, relative to the working directory
+  keep_runs: 30
+
+can:
+  interface: can0
+  # Passive listener (read only): per-drive frame rates, axis state, errors
+  # and encoder angles, also before the drives are armed.
+  monitor: true
+
+robot:
+  hardware_component: SandroSystem
+  imu_component: SandroImu
+  estop_service: /gim6010_estop/trigger
+  clear_errors_service: /gim6010_estop/clear_errors
+  # Broadcasters restarted after the hardware component is armed again
+  # (its read error deactivates them, as joy_estop does).
+  broadcasters: [joint_state_broadcaster, imu_broadcaster]
+  # Controllers the Run page offers, in this order.
+  controllers: [whole_body_controller, rl_flat_level, rl_agile_terrain, rl_stand_up,
+                lqr_balancer, driving_balancer]
+
+# Topics watched for rate and freshness. expect_hz is what a healthy running
+# stack delivers (the 300 Hz control loop publishes the sensors every cycle).
+topics:
+  - {name: /joint_states, type: sensor_msgs/msg/JointState, expect_hz: 300}
+  - {name: /imu_broadcaster/imu, type: sensor_msgs/msg/Imu, expect_hz: 300}
+  - {name: /dynamic_joint_states, type: control_msgs/msg/DynamicJointState, expect_hz: 300}
+  - {name: /joy, type: sensor_msgs/msg/Joy, expect_hz: 20}
+  - {name: /cmd_vel, type: geometry_msgs/msg/TwistStamped, expect_hz: 50, while: deadman}
+# Oldest sample the drivers may hand the controllers (their imu/age and
+# feedback_age state interfaces): the BNO085 reports every 5 ms, the drives
+# broadcast their encoders every 5 ms.
+expect:
+  imu_max_age_ms: 25
+  encoder_max_age_ms: 25
+
+log:
+  # Launch output lines containing any of these are dropped. joy_node logs
+  # every DualSense touchpad and motion event SDL does not map.
+  ignore: ["Unknown event type"]
+
+model:
+  mjcf: robot_full_floating.xml   # in sandro_description/mjcf
+  cell_mm: 1.0                    # vertex clustering grid for the browser meshes
+  min_part_mm: 10.0               # parts smaller than this are left out
