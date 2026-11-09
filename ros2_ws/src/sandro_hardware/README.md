@@ -51,9 +51,10 @@ bias to every position reference, and refuses to arm beyond
 otherwise pull the joint against the torque limit while the controller sees a
 small error. A saturated reply (multi-turn wheel) is skipped.
 
-`state_source` is `encoder` (default: position and velocity from the 0x09
-broadcast) or `mit`: velocity, and position, from the reply to every MIT
-command. The reply position is converted to the encoder's logical frame (bias
+`state_source` is `mit` (the launch default since 2026-11-09, after the
+robot ran every balancer on it): velocity, and position, from the reply to
+every MIT command; or `encoder`: position and velocity from the 0x09
+broadcast. The reply position is converted to the encoder's logical frame (bias
 and `offset_rev` removed, taken on the MIT span nearest the broadcast), and is
 used only for a joint whose bias was measured at this activation (with `mit`
 every joint is checked, not only those with `kp`) and inside 90 % of the MIT

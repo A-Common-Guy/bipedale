@@ -299,14 +299,15 @@ def generate_launch_description():
         DeclareLaunchArgument("imu_port", default_value="/dev/ttyUSB0",
                               description="UART device, used with imu_transport:=uart"),
         DeclareLaunchArgument(
-            "state_source", default_value="encoder",
-            description="joint state from the 0x09 'encoder' broadcast or the synchronous 'mit' reply; "
-                        "in MuJoCo it selects the matching emulated joint timing",
+            "state_source", default_value="mit",
+            description="joint state from the synchronous 'mit' reply (default since 2026-11-09) or "
+                        "the 0x09 'encoder' broadcast; in MuJoCo it selects the matching emulated "
+                        "joint timing",
         ),
         DeclareLaunchArgument(
             "encoder_period_ms", default_value="auto",
-            description="real only: period of the drives' encoder broadcast; auto is 5, or 20 with "
-                        "state_source:=mit",
+            description="real only: period of the drives' encoder broadcast; auto is 20, or 5 with "
+                        "state_source:=encoder",
         ),
         DeclareLaunchArgument("teleop", default_value="true"),
         DeclareLaunchArgument("rviz", default_value="true"),

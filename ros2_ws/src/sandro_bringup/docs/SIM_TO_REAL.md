@@ -153,7 +153,13 @@ alone selects both, on either backend: `encoder_period_ms` and the
 `sim_joint_*` arguments default to `auto`, resolved from `JOINT_TIMING` in
 `sandro.launch.py`. The WBC passes the closed-loop gates with it
 (`closed_loop.py check`, "joint state from MIT replies"), and
-`rl_flat_level_fast` trained on it in half its episodes.
+`rl_flat_level_fast` trained on it in half its episodes. On 2026-11-09 the
+robot ran the WBC and all three RL balancers on it: joint state 1.4–2.3 ms
+old at about 260 Hz, against 1–6 ms at 200 Hz from the broadcast
+(`recordings/buzz_2026-11-09/`), and it became the launch default. The
+simulators' nominal timing stays the broadcast's (`closed_loop.cpp`,
+`sandro_rl`'s `Latency`); MIT is their `MIT_JOINTS` / "mit" profile, and
+MuJoCo under `sandro.launch.py` follows `state_source`.
 
 ### Third comparison (2026-09-20, identified simulation with the override)
 

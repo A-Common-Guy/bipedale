@@ -6,7 +6,7 @@ let ctx;
 const STORE = "sandro.run.form";
 const form = Object.assign({
   hardware: null, mode: "stack", controller: "whole_body_controller", teleop: true, overrides: true,
-  state_source: "encoder", encoder_period_ms: "", extra: "",
+  state_source: "mit", encoder_period_ms: "", extra: "",
 }, JSON.parse(localStorage.getItem(STORE) || "{}"));
 if (!["stack", "imu"].includes(form.mode)) form.mode = "stack";
 // 5 was the stored default before the launch chose the period from the state source.
@@ -182,8 +182,8 @@ function renderForm() {
           ["imu", "IMU check", "Only the BNO085 plugin: no drive plugin is loaded"]],
         form.mode, (v) => { form.mode = v; changed(true); })),
       imu ? null : h("div", { class: "field" }, h("span", { class: "field-label" }, "State source"),
-        segmented([["encoder", "encoder broadcast", "Joint state from the drives' 5 ms broadcast"],
-          ["mit", "MIT reply", "Joint state from each drive's reply to every 300 Hz command, about 2.3 ms old; the broadcast slows to 20 ms"]],
+        segmented([["mit", "MIT reply", "Joint state from each drive's reply to every 300 Hz command, about 2.3 ms old; the broadcast slows to 20 ms"],
+          ["encoder", "encoder broadcast", "Joint state from the drives' 5 ms broadcast"]],
         // A period typed for one source is wrong for the other (20 ms of encoder
         // broadcast is 50 Hz joint feedback), so a switch goes back to auto.
         form.state_source, (v) => { form.state_source = v; form.encoder_period_ms = ""; changed(true); })),

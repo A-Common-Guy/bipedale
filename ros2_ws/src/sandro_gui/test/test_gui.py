@@ -108,6 +108,7 @@ def test_stack_command_preloads_the_controller_and_never_arms():
 
 
 def test_state_source_leaves_the_joint_timing_to_the_launch():
+    assert "state_source:=mit" in build_command({}, settings())
     mit = build_command({"state_source": "mit", "encoder_period_ms": ""}, settings())
     assert "state_source:=mit" in mit
     assert not any(a.startswith("encoder_period_ms") for a in mit)  # auto: 20 ms with mit

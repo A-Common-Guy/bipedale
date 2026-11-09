@@ -78,7 +78,7 @@ def build_command(request: dict, settings: LaunchSettings) -> list[str]:
         return ["ros2", "launch", "sandro_bringup", "imu_check.launch.py", *imu, *extra]
 
     command = ["ros2", "launch", "sandro_bringup", "sandro.launch.py", f"hardware:={hardware}"]
-    state_source = request.get("state_source", "encoder")
+    state_source = request.get("state_source", "mit")
     if state_source not in ("encoder", "mit"):
         raise ValueError("state_source must be encoder or mit")
     if hardware == "real":

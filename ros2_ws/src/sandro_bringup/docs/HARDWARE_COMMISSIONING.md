@@ -136,11 +136,12 @@ ros2 control set_hardware_component_state SandroSystem inactive
      std_msgs/msg/Float64MultiArray "{data: [0.1]}"
    ```
 
-8. The plugin reads joint position and velocity from the drives' 0x09
-   broadcast (`encoder_period_ms`, 5 ms). `state_source:=mit` takes velocity,
-   and leg position, from the reply to every MIT command instead, synchronous
-   with the 300 Hz loop; the broadcast then only keeps the wheels' multi-turn
-   position and `encoder_period_ms:=20` frees about 15 % of the bus.
+8. By default (`state_source:=mit`) the plugin takes velocity, and leg
+   position, from the reply to every MIT command, synchronous with the 300 Hz
+   loop; the drives' 0x09 broadcast then only keeps the wheels' multi-turn
+   position and runs at 20 ms, which frees about 15 % of the bus.
+   `state_source:=encoder` reads position and velocity from the broadcast at
+   5 ms instead.
 9. Inspect `/joint_states` and `/health_broadcaster/dynamic_joint_states`
    (10 Hz); the latter includes raw requested/applied effort, saturation count
    and the drives' iq (broadcast every 100 ms, `iq_period_ms`). Verify disable, E-stop, stale

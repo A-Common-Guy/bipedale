@@ -53,7 +53,7 @@
       params="backend can_interface:='can0' imu_transport:='spi'
               imu_spi_device:='/dev/spidev6.0' imu_port:='/dev/ttyUSB0'
               imu_mount_yaw_rad:='1.5707963267948966'
-              state_source:='encoder' encoder_period_ms:='5'
+              state_source:='mit' encoder_period_ms:='20'
               simulation_headless:='false' simulation_latency:='true'
               sim_imu_delay_s:='0.010' sim_imu_rate_hz:='200'
               sim_joint_delay_s:='0.001' sim_joint_rate_hz:='200'

@@ -85,7 +85,9 @@ class RobotSpec:
         except ValueError as error:
             raise ModelContractError(f"cannot load {scene}: {error}") from error
         limits = sources.RobotLimits.from_ros(overrides)
-        latency = sources.Latency.from_launch()
+        # The encoder timing, as closed_loop.cpp's nominal: the robot's default is
+        # state_source:=mit, which the evaluation runs as its "mit" profile.
+        latency = sources.Latency.from_launch("encoder")
         identified = sources.identified()
         errors: list[str] = []
 
