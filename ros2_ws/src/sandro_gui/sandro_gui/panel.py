@@ -186,9 +186,15 @@ def health(slow: dict, fast: dict, expect: dict, simulation: bool,
             if values.get("online") == 0.0 and not any(name in s for s in silent):
                 silent.append(name)
         temps = [n["temperature"] for n in nodes if n.get("temperature") is not None]
-        level = ERR if silent else WARN if faults else OK
+        # The hardware's torque envelope folding a drive back from its peak:
+        # it ran hot or near its heat budget.
+        peak = expect.get("drive_peak_nm", 9.0)
+        folded = [f"{name} {values['effort_limit']:.1f} Nm" for name, values in sorted(dynamic.items())
+                  if values.get("effort_limit") is not None and values["effort_limit"] < 0.98 * peak]
+        level = ERR if silent else WARN if faults or folded else OK
         detail = "; ".join(filter(None, ["silent: " + ", ".join(silent) if silent else "",
                                          "errors: " + ", ".join(faults) if faults else "",
+                                         "torque folded back (hot): " + ", ".join(folded) if folded else "",
                                          f"max {max(temps)} °C" if temps else ""]))
         checks.append(_check("drives", "Drives", level, f"{len(heard)}/{len(nodes)} heard", detail,
                              f"{len(heard)}/{len(nodes)}" + (" error" if faults else "")))

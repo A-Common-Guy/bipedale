@@ -48,8 +48,12 @@ class PolicyInterface:
         self.leg_scale = float(a["legs"]["scale_rad"])
         self.wheels = a["wheels"]
         tl = a.get("torque_limit_nm", {})
-        self.torque_limit = np.array([float(_ros(tl.get("wheels", "ros"), lim.wheel_torque_nm))
-                                      if j in sources.WHEEL_JOINTS else float(_ros(tl.get("legs", "ros"), lim.leg_torque_nm))
+        # "ros": the drives' envelope peak (spec.envelope), folding back with heat.
+        self.envelope = spec.envelope
+        self.thermal = bool(a.get("torque_envelope", True))
+        peak = spec.envelope.peak_nm
+        self.torque_limit = np.array([float(_ros(tl.get("wheels", "ros"), peak))
+                                      if j in sources.WHEEL_JOINTS else float(_ros(tl.get("legs", "ros"), peak))
                                       for j in JOINTS])
         self.q_lo, self.q_hi = spec.leg_joint_range
         offset = cfg["observation"].get("imu_offset_correction", "ros")

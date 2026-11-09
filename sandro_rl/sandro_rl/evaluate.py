@@ -39,7 +39,7 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-from . import checkpoint, kinematics, sources
+from . import checkpoint, kinematics, sources, torque_envelope
 from .interface import PolicyInterface, quat_to_mat
 from .robot import RobotSpec, rotation_x
 from .sources import JOINTS
@@ -408,6 +408,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     bus = DriveBus(len(JOINTS), options.command_delay_s)
     staged = np.zeros(m.nu)
     limits = iface.torque_limit
+    heat = np.zeros(len(JOINTS))  # the drives' thermal envelope, from cold
 
     phases = [[float(x) for x in p.split(",")] + [0.0] * (6 - len(p.split(","))) for p in SCENARIOS[scenario]]
     pushes = [[float(x) for x in p.split(",")] for p in closed_loop.SCENARIO_PUSHES.get(scenario, [])]
@@ -433,9 +434,12 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         nonlocal last_frame_t
         d.ctrl[:] = staged
         frames = bus.due(d.time)
+        limit = (np.minimum(limits, torque_envelope.limit(heat, iface.envelope, np)) if iface.thermal
+                 else limits)
         for i in range(len(JOINTS)):
             if frames[i] is not None:
-                d.ctrl[act[i]] = iface.mit_torque(frames[i], d.qpos[qadr[i]], d.qvel[dadr[i]], limits[i])
+                d.ctrl[act[i]] = iface.mit_torque(frames[i], d.qpos[qadr[i]], d.qvel[dadr[i]], limit[i])
+        heat[:] = torque_envelope.account(heat, d.ctrl[act] ** 2, m.opt.timestep, iface.envelope)
         for a in wheel_act:
             wheel_tau[a] += wheel_blend * (d.ctrl[a] - wheel_tau[a])
             d.ctrl[a] = wheel_tau[a]

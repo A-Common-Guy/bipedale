@@ -70,8 +70,12 @@ SCENARIOS = {
     "stand": ["10,0,0"],
     # Standing with forward and backward shoves on the torso (pushes below).
     "push": ["10,0,0"],
+    # Standing with shoves growing from 15 to 25 N, where the leg torque
+    # limit starts to matter.
+    "shove": ["14,0,0"],
 }
-SCENARIO_PUSHES = {"push": ["2,8,0.1", "6,-8,0.1"]}
+SCENARIO_PUSHES = {"push": ["2,8,0.1", "6,-8,0.1"],
+                   "shove": ["2,15,0.15", "5,-15,0.15", "8,25,0.15", "11,-25,0.15"]}
 
 # Simulation options of closed_loop.cpp and their sandro.launch.py names.
 SIM_OPTIONS = {

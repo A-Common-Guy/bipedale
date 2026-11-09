@@ -7,9 +7,9 @@
            effort is the torque field; position, velocity, kp and kd are
            optional for a controller (unset or zero = pure torque source). -->
       <command_interface name="effort">
-        <!-- Absolute transport boundary; policy limits are 3 Nm legs / 6 Nm wheels. -->
-        <param name="min">-10.0</param>
-        <param name="max">10.0</param>
+        <!-- Absolute transport boundary: the drives' 9 Nm peak (hard_effort_limit_nm). -->
+        <param name="min">-9.0</param>
+        <param name="max">9.0</param>
       </command_interface>
       <command_interface name="position"/>
       <command_interface name="velocity"/>
@@ -72,7 +72,7 @@
                keeps the drive emulation and sets every delay to zero. -->
           <plugin>sandro_sim/LatencySystem</plugin>
           <param name="inner_plugin">mujoco_ros2_control/MujocoSystemInterface</param>
-          <param name="mit_torque_limit_nm">10.0</param>
+          <param name="mit_torque_limit_nm">9.0</param>
           <xacro:if value="${simulation_latency}">
             <param name="imu_delay_s">${sim_imu_delay_s}</param>
             <param name="imu_rate_hz">${sim_imu_rate_hz}</param>
@@ -112,7 +112,19 @@
           <param name="stale_state_s">0.1</param>
           <param name="heartbeat_stale_s">1.0</param>
           <param name="activation_timeout_s">1.5</param>
-          <param name="hard_effort_limit_nm">10.0</param>
+          <!-- Torque envelope of every drive (GIM6010-8: 5 Nm rated, 11 Nm
+               peak on the datasheet): the peak in bursts, folding back to the
+               rated torque as the heating budget (torque squared over the
+               thermal time constant) runs out, and derated to the rated
+               torque between derate_start_c and derate_end_c of the drive's
+               reported temperature (sandro_hardware/torque_envelope.hpp;
+               sandro_rl trains with the same law). -->
+          <param name="hard_effort_limit_nm">9.0</param>
+          <param name="rated_effort_nm">5.0</param>
+          <param name="thermal_time_constant_s">10.0</param>
+          <param name="thermal_knee">0.7</param>
+          <param name="derate_start_c">65.0</param>
+          <param name="derate_end_c">80.0</param>
           <!-- Firmware endpoint IDs from endpoints_v3.json. -->
           <param name="deadman_endpoint">73</param>
           <param name="heartbeat_rate_endpoint">182</param>

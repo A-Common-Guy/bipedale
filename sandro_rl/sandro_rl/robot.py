@@ -46,6 +46,7 @@ class RobotSpec:
     scene: Path
     limits: sources.RobotLimits
     latency: sources.Latency
+    envelope: sources.DriveEnvelope
     identified: dict
     physics_dt: float
     steps_per_control: int
@@ -182,7 +183,8 @@ class RobotSpec:
         mirror = np.array([JOINTS.index(MIRROR_JOINT[j]) for j in JOINTS])
         bal = sources.controller_parameters(True, "driving_balancer")["legs"]
         return cls(
-            model=m, scene=scene, limits=limits, latency=latency, identified=identified,
+            model=m, scene=scene, limits=limits, latency=latency,
+            envelope=sources.DriveEnvelope.from_description(), identified=identified,
             physics_dt=float(m.opt.timestep), steps_per_control=int(round(steps)),
             joint_qpos=np.array(qpos), joint_dof=np.array(dof), joint_actuator=np.array(act),
             actuator_gear=np.array(gear), sensor_adr=sensor_adr, sensor_noise=sensor_noise,

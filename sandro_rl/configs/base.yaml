@@ -83,7 +83,11 @@ env:
   constraints:                  # Constraints as Terminations (Chane-Sane et al. 2024)
     enabled: true
     p_max: 0.25
-    leg_torque: {limit: ros, slack: 0.5}          # |tau| above the controllers.yaml limit, Nm
+    leg_torque: {limit: ros, slack: 0.5}          # |tau| at the drives' peak (ros: the envelope's 9 Nm)
+    # The drives' heat budget running out, where the robot's envelope starts
+    # folding the peak back to the rated torque: bursts are free, living on
+    # the peak is not.
+    thermal: {enabled: true}
     stretch: {limit: 0.97, slack: 0.02}           # reach / (upper + lower) from the farther pivot (1 = singular)
     joint_range: {margin_rad: 0.1, slack: 0.1}
     height: {margin_m: 0.008, slack: 0.01}

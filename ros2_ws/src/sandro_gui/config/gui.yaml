@@ -69,6 +69,9 @@ legacy_topics:
 expect:
   imu_max_age_ms: 25
   encoder_max_age_ms: 25
+  # The drives' torque envelope peak (hard_effort_limit_nm); a drive whose
+  # effort_limit is below it is being protected from heat.
+  drive_peak_nm: 9.0
 
 log:
   # Launch output lines containing any of these are dropped. joy_node logs

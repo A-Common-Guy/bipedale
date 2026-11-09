@@ -34,8 +34,10 @@ ros2 control switch_controllers \
 
 New controllers (a learned policy, for example) can use the same interfaces directly; see
 `WHOLE_BODY_CONTROLLER.md` for the leg-exploiting balancer that ships here. Keep
-final policy limits in each controller; the separate 10 Nm hardware boundary is
-fault containment, not a tuning value.
+final policy limits in each controller; the hardware's torque envelope (9 Nm
+peak folding back to the 5 Nm rated torque as the drive heats,
+`sandro_hardware/README.md`) is fault and thermal containment, not a tuning
+value. The balancers' leg limits are its 9 Nm peak.
 
 Both backends present one joint convention (zero-down five-bar angles,
 forward-positive wheels; `sandro_description` README). A controller must not

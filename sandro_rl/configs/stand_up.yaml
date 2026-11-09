@@ -20,7 +20,6 @@ env:
     leg_boxes: true
 
   action:
-    torque_limit_nm: {legs: 10.0, wheels: 10.0}
     legs: {kp: 20.0, kd: 0.6, scale_rad: 0.8}
 
   init:
@@ -31,7 +30,7 @@ env:
     imu_height_m: -1.0
 
   constraints:
-    # Getting up out of a fold saturates the 10 Nm cap (x 0.85-1.15 drive
+    # Getting up out of a fold saturates the 9 Nm peak (x 0.85-1.15 drive
     # spread): the cap is the limit, not a constraint.
     leg_torque: {limit: 12.0, slack: 0.5}
     tilt: {limit_rad: 3.2, slack: 0.3}

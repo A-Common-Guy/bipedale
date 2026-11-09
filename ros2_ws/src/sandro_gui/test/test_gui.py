@@ -226,6 +226,17 @@ def _snapshot(**slow):
     return base
 
 
+def test_checks_warn_when_a_drive_torque_folds_back():
+    nodes = [{"node": n, "joint": f"j{n}", "heartbeat_age_s": 0.05, "error_text": "", "temperature": 70}
+             for n in range(1, 7)]
+    dynamic = {"j1": {"online": 1.0, "effort_limit": 9.0}, "j2": {"online": 1.0, "effort_limit": 6.2}}
+    checks = {c["id"]: c for c in health(_snapshot(can={"frames_hz": 2000.0, "nodes": nodes},
+                                                   ros={"manager": True, "dynamic": dynamic}), {},
+                                         {"drive_peak_nm": 9.0}, False)}
+    assert checks["drives"]["level"] == "warn"
+    assert "j2 6.2 Nm" in checks["drives"]["detail"] and "j1" not in checks["drives"]["detail"]
+
+
 def test_checks_flag_a_silent_drive_and_a_bus_off():
     nodes = [{"node": n, "joint": f"j{n}", "heartbeat_age_s": 0.05, "error_text": ""} for n in range(5)]
     nodes.append({"node": 6, "joint": "left_wheel", "heartbeat_age_s": None, "error_text": ""})

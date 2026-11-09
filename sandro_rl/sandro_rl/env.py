@@ -29,7 +29,7 @@ import numpy as np
 from flax import struct
 from mujoco import mjx
 
-from . import kinematics, latency, terrain
+from . import kinematics, latency, terrain, torque_envelope
 from .robot import RobotSpec, rotation_x
 from .sources import JOINTS
 
@@ -144,9 +144,13 @@ class SandroEnv:
         self.leg_kd = float(_ros(a["legs"]["kd"], lim.leg_kd_nm_s_rad))
         self.leg_scale = float(a["legs"]["scale_rad"])
         self.wheel_mode = a["wheels"]["mode"]
+        # "ros": the drives' envelope (its peak, folding back with heat as on
+        # the robot); a number caps it further.
+        self.envelope = s.envelope
+        self.thermal = bool(a.get("torque_envelope", True))
         tl = a.get("torque_limit_nm", {})
-        self.leg_torque_nm = float(_ros(tl.get("legs", "ros"), lim.leg_torque_nm))
-        self.wheel_torque_nm = float(_ros(tl.get("wheels", "ros"), lim.wheel_torque_nm))
+        self.leg_torque_nm = float(_ros(tl.get("legs", "ros"), self.envelope.peak_nm))
+        self.wheel_torque_nm = float(_ros(tl.get("wheels", "ros"), self.envelope.peak_nm))
         self.torque_limit = jp.array([self.leg_torque_nm if j not in ("right_wheel", "left_wheel")
                                       else self.wheel_torque_nm for j in JOINTS], dtype=jp.float32)
         self.q_lo, self.q_hi = s.leg_joint_range
@@ -177,7 +181,7 @@ class SandroEnv:
 
         ct = cfg["constraints"]
         self.cat_torque_limit = jp.array(
-            [float(_ros(ct["leg_torque"]["limit"], lim.leg_torque_nm))] * 4, dtype=jp.float32)
+            [float(_ros(ct["leg_torque"]["limit"], self.envelope.peak_nm))] * 4, dtype=jp.float32)
 
         self.n_actions = N_JOINTS
         self.batch_size = 1   # set by the caller before vmapping reset (contact buffer size)
@@ -438,13 +442,18 @@ class SandroEnv:
             raise ValueError(f"unknown wheel action mode {self.wheel_mode}")
         return jp.stack([q_ref, v_ref, kp, kd, ff])
 
-    def _mit_torque(self, frame, data, params):
+    def _mit_torque(self, frame, data, params, limit):
         q = data.qpos[self.qadr]
         v = data.qvel[self.dadr]
         q_ref = jp.where(frame[2] > 0, frame[0], q)
         tau = frame[2] * (q_ref - q) + frame[3] * (frame[1] - v) + frame[4]
-        tau = jp.clip(tau, -self.torque_limit, self.torque_limit)
+        tau = jp.clip(tau, -limit, limit)
         return tau
+
+    def _torque_limit(self, heat):
+        if not self.thermal:
+            return self.torque_limit
+        return jp.minimum(self.torque_limit, torque_envelope.limit(heat, self.envelope, jp))
 
     def _body_frame(self, data):
         r_imu = data.site_xmat[self.spec.imu_site].reshape(3, 3)
@@ -580,6 +589,9 @@ class SandroEnv:
             "push_force_sample": push_force, "push_force": jp.zeros(self.push_dim),
             "last_action": jp.zeros(N_JOINTS), "last_action2": jp.zeros(N_JOINTS),
             "frame": zero_frame, "drive_tau": jp.zeros(N_JOINTS), "axle_prev": self._axle_mid(data),
+            # As if the robot had been working: up to half the heat budget.
+            "heat": jax.random.uniform(jax.random.fold_in(k[9], 3), (N_JOINTS,), maxval=0.5)
+                    * self.envelope.rated_nm ** 2,
             "obs_history": jp.zeros((self.history_frames, self.actor_layout.size)),
         }
         if self.has_jump:
@@ -671,13 +683,14 @@ class SandroEnv:
         lag = params["wheel_lag"]
         blend = jp.where(lag > 0, 1.0 - jp.exp(-self.dt_physics / jp.maximum(lag, 1e-6)), 1.0)
         blend = jp.ones(N_JOINTS).at[self.wheel_idx].set(blend)
+        limit = self._torque_limit(info["heat"])
 
         def substep(carry, inputs):
             data, history, pstep, drive_tau = carry
             j, key = inputs
             due = j.astype(jp.float32) * self.dt_physics >= delay - 1e-9
             frame = jp.where(due, new_frame, old_frame)
-            tau = self._mit_torque(frame, data, params) * params["torque_scale"]
+            tau = self._mit_torque(frame, data, params, limit) * params["torque_scale"]
             drive_tau = drive_tau + blend * (tau - drive_tau)
             ctrl = jp.zeros(self.mj_model.nu).at[self.act_ids].set(drive_tau)
             data = data.replace(ctrl=ctrl, xfrc_applied=xfrc)
@@ -690,6 +703,10 @@ class SandroEnv:
             substep, (state.data, info["history"], info["physics_step"], info["drive_tau"]),
             (jp.arange(self.decimation), noise_keys))
         info["drive_tau"] = drive_tau
+        # The heat of the torque each drive was asked for (the spread in
+        # torque_scale is the torque constant's, not the current's).
+        info["heat"] = torque_envelope.account(
+            info["heat"], jp.mean((taus / params["torque_scale"]) ** 2, axis=0), self.dt, self.envelope)
         info["history"] = history
         info["physics_step"] = pstep
         info["frame"] = new_frame
@@ -750,6 +767,7 @@ class SandroEnv:
         terms = {k: jp.where(diverged, 0.0, v) for k, v in terms.items()}
         cat_delta = jp.where(diverged, 0.0, cat_delta)
         info["obs_history"] = jp.where(diverged, 0.0, info["obs_history"])
+        info["heat"] = jp.where(diverged | ~jp.isfinite(info["heat"]), 0.0, info["heat"])
         metrics = dict(terms)
         if self.has_jump:
             metrics["jump_active"] = (info["jump_timer"] > 0.0).astype(jp.float32)
@@ -813,6 +831,9 @@ class SandroEnv:
         if "wheel_lift" in c and c["wheel_lift"]:
             lift = jp.max(truth["clearance"] - c["wheel_lift"]["limit_m"]) / c["wheel_lift"]["slack"]
             violations.append(lift * (1.0 - self._jumping(info)))
+        if c.get("thermal", {}).get("enabled", False):
+            # The heat budget running out: 0 until the fold-back starts.
+            violations.append(1.0 - torque_envelope.budget(jp.max(info["heat"]), self.envelope, jp))
         v = jp.clip(jp.stack(violations), 0.0, 1.0)
         # p_max is per 10 ms; a faster policy terminates as often per second.
         return 1.0 - (1.0 - c["p_max"] * jp.max(v)) ** (self.dt / 0.01)

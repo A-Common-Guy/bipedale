@@ -82,7 +82,7 @@ struct Options {
   double joint_rate_hz{200.0};
   bool joint_stagger{true};
   double command_delay_s{0.001};
-  double mit_torque_limit_nm{10.0};
+  double mit_torque_limit_nm{9.0};  // hard_effort_limit_nm, the drives' envelope peak
   bool drive_plugin{true};
   bool imu_noise{true};
   double unpowered_s{0.03};

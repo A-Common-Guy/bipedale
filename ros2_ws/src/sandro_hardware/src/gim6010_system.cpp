@@ -1,6 +1,7 @@
 #include "sandro_hardware/gim6010_system.hpp"
 
 #include "sandro_hardware/protocol.hpp"
+#include "sandro_hardware/torque_envelope.hpp"
 
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
 #include <pluginlib/class_list_macros.hpp>
@@ -145,6 +146,11 @@ struct GIM6010System::Impl
     double applied_effort{};
     double saturation_count{};
     double dropped_frames{};
+    // Torque the drive will apply this cycle as far as the host can predict
+    // it, which the thermal envelope accounts; and the envelope's limit.
+    double predicted_effort{};
+    double effort_limit{};
+    TorqueEnvelope envelope;
     Received received;
   };
 
@@ -172,6 +178,8 @@ struct GIM6010System::Impl
   uint16_t mit_max_kp_endpoint{};
   uint16_t mit_max_kd_endpoint{};
   double hard_effort_limit_nm{};
+  // hard_effort_limit_nm is the envelope's peak.
+  TorqueEnvelopeSettings envelope_settings;
   // "encoder": position and velocity from the drives' periodic 0x09
   // broadcast (encoder_period_ms). "mit": velocity, and position while it is
   // inside the MIT range, from the reply each drive sends to every MIT
@@ -551,8 +559,9 @@ struct GIM6010System::Impl
   bool mit(Joint & joint, double torque)
   {
     joint.requested_effort = torque;
-    const double limit = std::min(hard_effort_limit_nm, joint.limits.torque);
+    const double limit = std::min(joint.effort_limit, joint.limits.torque);
     joint.applied_effort = std::clamp(torque, -limit, limit);
+    joint.predicted_effort = joint.applied_effort;
     if (joint.applied_effort != torque) {
       joint.saturation_count += 1.0;
     }
@@ -570,6 +579,7 @@ struct GIM6010System::Impl
       const double predicted =
         kp * (position_reference - joint.position) + damping + joint.applied_effort;
       const double bounded = std::clamp(predicted, -limit, limit);
+      joint.predicted_effort = bounded;
       if (bounded != predicted) {
         position_reference =
           joint.position + (bounded - damping - joint.applied_effort) / kp;
@@ -665,6 +675,23 @@ CallbackReturn GIM6010System::on_init(const hardware_interface::HardwareInfo & i
         throw std::invalid_argument("can_send_buffer_bytes must be >= 0");
       }
     }
+    impl_->envelope_settings.peak_nm = impl_->hard_effort_limit_nm;
+    for (const auto & [name, field] : {
+        std::pair{"rated_effort_nm", &TorqueEnvelopeSettings::rated_nm},
+        std::pair{"thermal_time_constant_s", &TorqueEnvelopeSettings::time_constant_s},
+        std::pair{"thermal_knee", &TorqueEnvelopeSettings::knee},
+        std::pair{"derate_start_c", &TorqueEnvelopeSettings::derate_start_c},
+        std::pair{"derate_end_c", &TorqueEnvelopeSettings::derate_end_c}})
+    {
+      if (info.hardware_parameters.count(name)) {
+        impl_->envelope_settings.*field = required_number<double>(info.hardware_parameters, name);
+      }
+    }
+    if (!impl_->envelope_settings.valid()) {
+      throw std::invalid_argument(
+              "torque envelope: need 0 < rated_effort_nm <= hard_effort_limit_nm, "
+              "thermal_time_constant_s > 0, 0 <= thermal_knee < 1, derate_end_c > derate_start_c");
+    }
     if (impl_->encoder_period_ms <= 0 || impl_->iq_period_ms <= 0 ||
       impl_->heartbeat_period_ms <= 0 || impl_->deadman_ms <= 0 ||
       impl_->stale_state_s <= 0.0 || impl_->heartbeat_stale_s <= 0.0 ||
@@ -710,6 +737,8 @@ CallbackReturn GIM6010System::on_init(const hardware_interface::HardwareInfo & i
         throw std::invalid_argument("duplicate node_id " + std::to_string(joint.node));
       }
       impl_->by_node[joint.node] = impl_->joints.size();
+      joint.envelope = TorqueEnvelope(impl_->envelope_settings);
+      joint.effort_limit = impl_->envelope_settings.peak_nm;
       impl_->joints.push_back(std::move(joint));
     }
   } catch (const std::exception & error) {
@@ -737,6 +766,7 @@ std::vector<hardware_interface::StateInterface> GIM6010System::export_state_inte
     interfaces.emplace_back(joint.name, "applied_effort", &joint.applied_effort);
     interfaces.emplace_back(joint.name, "saturation_count", &joint.saturation_count);
     interfaces.emplace_back(joint.name, "dropped_frames", &joint.dropped_frames);
+    interfaces.emplace_back(joint.name, "effort_limit", &joint.effort_limit);
   }
   return interfaces;
 }
@@ -902,9 +932,12 @@ CallbackReturn GIM6010System::on_activate(const rclcpp_lifecycle::State &)
       RCLCPP_INFO(
         rclcpp::get_logger("GIM6010System"),
         "%s node %u drive limits: position=%.3f rad velocity=%.3f rad/s "
-        "torque=%.3f Nm kp=%.3f kd=%.3f; hardware effort boundary=%.3f Nm",
+        "torque=%.3f Nm kp=%.3f kd=%.3f; torque envelope %.1f Nm peak, %.1f Nm rated, "
+        "%.0f s thermal time constant, derated %.0f-%.0f C",
         joint.name.c_str(), joint.node, joint.limits.position, joint.limits.velocity,
-        joint.limits.torque, joint.limits.kp, joint.limits.kd, impl_->hard_effort_limit_nm);
+        joint.limits.torque, joint.limits.kp, joint.limits.kd, impl_->envelope_settings.peak_nm,
+        impl_->envelope_settings.rated_nm, impl_->envelope_settings.time_constant_s,
+        impl_->envelope_settings.derate_start_c, impl_->envelope_settings.derate_end_c);
       uint8_t mode[8]{};
       const uint32_t control = 3, input = 9;
       std::memcpy(mode, &control, 4);
@@ -1086,9 +1119,15 @@ hardware_interface::return_type GIM6010System::read(
 }
 
 hardware_interface::return_type GIM6010System::write(
-  const rclcpp::Time &, const rclcpp::Duration &)
+  const rclcpp::Time &, const rclcpp::Duration & period)
 {
+  const double dt = period.seconds();
   if (!impl_->active) {
+    // No torque while inactive: the windings cool.
+    for (auto & joint : impl_->joints) {
+      joint.envelope.account(0.0, dt);
+      joint.effort_limit = joint.envelope.limit(joint.temperature);
+    }
     return hardware_interface::return_type::OK;
   }
   bool ok = true;
@@ -1103,10 +1142,12 @@ hardware_interface::return_type GIM6010System::write(
       ok = false;
       continue;
     }
+    joint.effort_limit = joint.envelope.limit(joint.temperature);
     try {
       if (!impl_->mit(joint, joint.command)) {
         dropped = true;
       }
+      joint.envelope.account(joint.predicted_effort, dt);
     } catch (const std::exception & error) {
       RCLCPP_ERROR(rclcpp::get_logger("GIM6010System"), "command failed: %s", error.what());
       ok = false;

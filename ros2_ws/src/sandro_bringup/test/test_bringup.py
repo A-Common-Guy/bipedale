@@ -31,12 +31,18 @@ def test_controller_limits_and_commissioning_watchdogs_are_explicit():
     )
 
     balance = config["driving_balancer"]["ros__parameters"]
-    assert balance["legs"]["torque_limit_nm"] == 3.0
+    # The legs may use the drives' envelope peak (hard_effort_limit_nm); the
+    # hardware folds it back to the rated torque as a drive heats.
+    xacro = (ROOT.parent / "sandro_description" / "urdf" / "sandro.ros2_control.xacro").read_text()
+    peak = float(re.search(r'name="hard_effort_limit_nm">([0-9.]+)<', xacro).group(1))
+    rated = float(re.search(r'name="rated_effort_nm">([0-9.]+)<', xacro).group(1))
+    assert (peak, rated) == (9.0, 5.0)
+    assert balance["legs"]["torque_limit_nm"] == peak
     assert balance["wheels"]["torque_limit_nm"] == 6.0
     assert balance["drive"]["command_timeout_s"] == 0.3
 
     whole_body = config["whole_body_controller"]["ros__parameters"]
-    assert whole_body["limits"]["leg_torque_nm"] == 3.0
+    assert whole_body["limits"]["leg_torque_nm"] == peak
     assert whole_body["limits"]["wheel_torque_nm"] == 6.0
     assert whole_body["safety"]["command_timeout_s"] == 0.3
 

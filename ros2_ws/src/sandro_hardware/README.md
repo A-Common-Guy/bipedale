@@ -25,9 +25,21 @@ optional command interfaces (declare them per joint); while a controller
 leaves them unset (NaN) or at zero the drive is a pure torque source, as
 before. When a stiffness is commanded the plugin pulls the position reference
 toward the measured position so that the torque the drive will compute from
-the latest state stays within `hard_effort_limit_nm` and the drive's MIT torque
+the latest state stays within the torque envelope and the drive's MIT torque
 limit (the bound SandroControl applied); gains are clipped to the drive's
-`mit_max_kp` / `mit_max_kd`. A controller that claims `kp`/`kd` must zero them
+`mit_max_kp` / `mit_max_kd`.
+
+The torque envelope (`include/sandro_hardware/torque_envelope.hpp`) protects
+each drive's winding: `hard_effort_limit_nm` (9 Nm, against the GIM6010-8's
+11 Nm datasheet peak) in bursts, folding back to `rated_effort_nm` (5 Nm) as
+the heat, the commanded torque squared low-passed over
+`thermal_time_constant_s` (10 s), passes `thermal_knee` (0.7) of rated².
+From cold the full peak lasts about 2.4 s; the rated torque is available
+forever. The drive's heartbeat temperature derates the peak to the rated
+torque between `derate_start_c` and `derate_end_c` (65 and 80 °C). The heat
+decays while the drives are inactive. Each joint's limit is the
+`effort_limit` state interface (on `/health_broadcaster`). sandro_rl trains
+with the same law (`sandro_rl/torque_envelope.py`, without the temperature). A controller that claims `kp`/`kd` must zero them
 on deactivation, which the whole-body controller does.
 
 The drive-side PD acts in the drive's own MIT position frame. At activation,
@@ -94,7 +106,9 @@ Configuration writes block for buffer space for at most 200 ms.
 
 System parameters are `can_interface`, `encoder_period_ms`, `iq_period_ms`,
 `heartbeat_period_ms`, `deadman_ms`, `stale_state_s`, `heartbeat_stale_s`,
-`activation_timeout_s`, `hard_effort_limit_nm`, optional `state_source`,
+`activation_timeout_s`, `hard_effort_limit_nm`, optional `rated_effort_nm`,
+`thermal_time_constant_s`, `thermal_knee`, `derate_start_c`, `derate_end_c`,
+`state_source`,
 `mit_frame_bias_tolerance_rad` and `can_send_buffer_bytes`,
 and the numeric firmware endpoint IDs `encoder_rate_endpoint`,
 `iq_rate_endpoint`, `heartbeat_rate_endpoint`, `deadman_endpoint`. Endpoint IDs

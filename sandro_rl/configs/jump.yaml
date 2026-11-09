@@ -7,8 +7,8 @@
 # steady-height terms and the wheel-lift constraint are off from the window's
 # start until landing_s after it.
 #
-# The torque limits are the drives' 10 Nm (hard_effort_limit_nm in
-# sandro.ros2_control.xacro) instead of controllers.yaml's 3 / 6 Nm, and the
+# The torque limits are the drives' envelope (9 Nm peak folding back to the
+# 5 Nm rated, sandro.ros2_control.xacro), as for every policy, and the
 # legs are stiffer with a wider action range, so a full extension can be
 # commanded in one step. The deployment controller (RlPolicyController) has
 # no jump input yet.
@@ -16,7 +16,6 @@ inherit: agile_terrain.yaml
 
 env:
   action:
-    torque_limit_nm: {legs: 10.0, wheels: 10.0}
     legs: {kp: 20.0, kd: 0.6, scale_rad: 0.8}
 
   commands:

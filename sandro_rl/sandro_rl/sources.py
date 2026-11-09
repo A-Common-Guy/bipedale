@@ -27,6 +27,7 @@ IDENTIFIED = DESCRIPTION / "config" / "sim_identified.yaml"
 CONTROLLERS = SRC / "sandro_bringup" / "config" / "controllers.yaml"
 ROBOT_OVERRIDES = SRC / "sandro_bringup" / "config" / "sandro_real_overrides.yaml"
 LAUNCH = SRC / "sandro_bringup" / "launch" / "sandro.launch.py"
+ROS2_CONTROL = DESCRIPTION / "urdf" / "sandro.ros2_control.xacro"
 CONTROLLER = "whole_body_controller"
 
 # ros2_control description order (sandro.ros2_control.xacro), which is also
@@ -130,6 +131,32 @@ class Latency:
 
 
 @dataclass(frozen=True)
+class DriveEnvelope:
+    """The drives' torque envelope, the real backend's GIM6010System parameters
+    (sandro.ros2_control.xacro, sandro_hardware/torque_envelope.hpp)."""
+
+    peak_nm: float
+    rated_nm: float
+    time_constant_s: float
+    knee: float
+
+    @classmethod
+    def from_description(cls, path: Path = ROS2_CONTROL) -> "DriveEnvelope":
+        root = ET.fromstring(path.read_text())
+        params = {}
+        for hardware in root.iter("hardware"):
+            if any((plugin.text or "").strip() == "sandro_hardware/GIM6010System"
+                   for plugin in hardware.iter("plugin")):
+                params = {p.get("name"): (p.text or "").strip() for p in hardware.iter("param")}
+        if "hard_effort_limit_nm" not in params:
+            raise ValueError(f"{path}: no GIM6010System hard_effort_limit_nm")
+        return cls(peak_nm=float(params["hard_effort_limit_nm"]),
+                   rated_nm=float(params.get("rated_effort_nm", params["hard_effort_limit_nm"])),
+                   time_constant_s=float(params.get("thermal_time_constant_s", 10.0)),
+                   knee=float(params.get("thermal_knee", 0.7)))
+
+
+@dataclass(frozen=True)
 class RobotLimits:
     """Limits and rates the ROS stack enforces (controllers.yaml + overrides)."""
 
@@ -211,7 +238,7 @@ def mjcf_files(scene: Path = SCENE) -> list[Path]:
 
 def fingerprint(scene: Path = SCENE) -> dict:
     """sha256 of every file that defines the simulated robot and its interface."""
-    files = mjcf_files(scene) + [IDENTIFIED, CONTROLLERS, ROBOT_OVERRIDES, LAUNCH]
+    files = mjcf_files(scene) + [IDENTIFIED, CONTROLLERS, ROBOT_OVERRIDES, LAUNCH, ROS2_CONTROL]
     per_file = {}
     for path in files:
         if path.is_file():
