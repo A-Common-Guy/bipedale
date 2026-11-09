@@ -10,7 +10,7 @@ const form = Object.assign({
 }, JSON.parse(localStorage.getItem(STORE) || "{}"));
 if (!["stack", "imu"].includes(form.mode)) form.mode = "stack";
 // 5 was the stored default before the launch chose the period from the state source.
-if (form.encoder_period_ms === 5) form.encoder_period_ms = "";
+if (form.encoder_period_ms === 5 || form.encoder_period_ms === 20) form.encoder_period_ms = "";
 const filter = { level: "info", text: "", follow: true };
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 };
 let previewTimer = null;
@@ -184,7 +184,9 @@ function renderForm() {
       imu ? null : h("div", { class: "field" }, h("span", { class: "field-label" }, "State source"),
         segmented([["encoder", "encoder broadcast", "Joint state from the drives' 5 ms broadcast"],
           ["mit", "MIT reply", "Joint state from each drive's reply to every 300 Hz command, about 2.3 ms old; the broadcast slows to 20 ms"]],
-        form.state_source, (v) => { form.state_source = v; changed(true); })),
+        // A period typed for one source is wrong for the other (20 ms of encoder
+        // broadcast is 50 Hz joint feedback), so a switch goes back to auto.
+        form.state_source, (v) => { form.state_source = v; form.encoder_period_ms = ""; changed(true); })),
       sim || imu ? null : h("div", { class: "field" }, h("span", { class: "field-label" }, "Encoder period"),
         h("input", { type: "number", min: 1, max: 100, value: form.encoder_period_ms, class: "narrow",
           placeholder: form.state_source === "mit" ? "auto, 20" : "auto, 5",
