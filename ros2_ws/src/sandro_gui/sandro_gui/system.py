@@ -75,13 +75,56 @@ def can_link(interface: str) -> dict:
     }
 
 
+COUNTERS = ("rx_packets", "tx_packets", "rx_errors", "tx_errors", "rx_dropped", "tx_dropped")
+
+
+def link_counters(interface: str, root: str = "/sys/class/net") -> dict | None:
+    """operstate and packet counters from sysfs, or None when the interface does not exist."""
+    base = os.path.join(root, interface)
+    operstate = _read(os.path.join(base, "operstate"))
+    if operstate is None:
+        return None
+    out: dict = {"operstate": operstate.upper()}
+    for name in COUNTERS:
+        value = _read(os.path.join(base, "statistics", name))
+        out[name] = int(value) if value and value.isdigit() else None
+    flags = _read(os.path.join(base, "flags"))
+    if flags:
+        try:
+            out["admin_up"] = bool(int(flags, 16) & 0x1)
+        except ValueError:
+            pass
+    return out
+
+
 class SystemInfo:
+    # `ip -details` is a process start; bit timing and bus state change rarely,
+    # the counters come from sysfs on every snapshot.
+    IP_PERIOD_S = 5.0
+
     def __init__(self, can_interface: str, devices: list[str]) -> None:
         self.can_interface = can_interface
         self.devices = devices
         self._cpu = None
         self._throttled = (0.0, None)
         self._packets = None
+        self._link = (-1e9, None)
+
+    def _can(self) -> dict:
+        stamp, details = self._link
+        now = time.monotonic()
+        if now - stamp > self.IP_PERIOD_S:
+            details = can_link(self.can_interface)
+            self._link = (now, details)
+        counters = link_counters(self.can_interface)
+        if counters is None:
+            return details if not details.get("present") else \
+                {"present": False, "error": f"{self.can_interface} is gone"}
+        can = dict(details)
+        can.update({k: v for k, v in counters.items() if v is not None and k != "admin_up"})
+        if can.get("present") and "admin_up" in counters:
+            can["up"] = counters["admin_up"] and counters["operstate"] != "DOWN"
+        return can
 
     def _throttled_cached(self) -> dict | None:
         # vcgencmd costs a process start; the flags change rarely.
@@ -112,7 +155,7 @@ class SystemInfo:
                 mem[key] = int(value.split()[0]) * 1024
         uptime = (_read("/proc/uptime") or "0").split()[0]
         freq = _read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
-        can = can_link(self.can_interface)
+        can = self._can()
         if can.get("present") and can.get("rx_packets") is not None:
             now = time.monotonic()
             previous, self._packets = self._packets, (now, can["rx_packets"], can["tx_packets"])

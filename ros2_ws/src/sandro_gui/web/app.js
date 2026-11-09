@@ -146,7 +146,7 @@ function header(slow) {
   }));
   $("#host").textContent = slow.system?.host || "";
   const estop = $("#estop");
-  estop.disabled = !state.info?.ros;
+  estop.disabled = !state.info?.estop?.ros && !state.info?.estop?.can;
 }
 
 // Pages ------------------------------------------------------------------

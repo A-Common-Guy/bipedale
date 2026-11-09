@@ -201,10 +201,12 @@ def guide(teleop: dict) -> dict:
                  "every controller (all torques to zero) and sends the CAN E-stop to the drives. "
                  "It is not a substitute for the power cut-off."},
         {"group": "Safety", "keys": rearm, "hold": True,
-         "text": f"Re-arm after an E-stop, in two holds of {hold:g} s each. First hold: the "
-                 "drives are armed at zero torque with no controller. Hold the robot upright, "
-                 "then hold again: the selected policy (or "
-                 f"{e.get('rearm_controller', 'whole_body_controller')}) starts."},
+         "text": f"Re-arm after an E-stop, in two holds of {hold:g} s each; only once the "
+                 "drives have been armed in this launch (the first arming is the operator's, "
+                 "on the panel). First hold: the drives are armed at zero torque with no "
+                 "controller. Hold the robot upright, then hold again: the controller that ran "
+                 f"last starts again (or {e.get('rearm_controller', 'whole_body_controller')}). "
+                 "A fallen controller restarts with a single hold."},
     ]
     lightbar = [{"policy": name, "rgb": colors[3 * i:3 * i + 3]}
                 for i, name in enumerate(policies) if len(colors) >= 3 * i + 3]

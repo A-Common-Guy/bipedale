@@ -75,18 +75,17 @@ def main(argv: list[str] | None = None) -> None:
         simulation_args=list(launch.get("simulation_args", [])),
         overrides_path=paths["overrides"], stop_timeout_s=float(launch.get("stop_timeout_s", 20)),
         runs_dir=launch.get("runs_dir", "gui_runs"), keep_runs=int(launch.get("keep_runs", 30)),
+        keep_bytes=int(float(launch.get("keep_mb", 200)) * 1024 ** 2),
         controllers=list(cfg.get("robot", {}).get("controllers", [])),
         available_hardware=available)
-    teleop = yaml.safe_load(paths["teleop"].read_text())
-    policies = teleop["joy_teleop"]["ros__parameters"].get("policies", [])
     log = Logbook(ignore=cfg.get("log", {}).get("ignore", []))
 
     if args.demo:
         from . import demo
-        sources = demo.sources(log, settings, paths["controllers"], policies)
+        sources = demo.sources(log, settings, paths["controllers"])
     else:
         from .bluetooth import Bluetooth
-        from .can_monitor import CanMonitor, joint_mapping
+        from .can_monitor import CanMonitor, EstopBus, joint_mapping
         from .gamepad import JsReader
         from .launcher import Launcher
         from .system import SystemInfo
@@ -97,18 +96,20 @@ def main(argv: list[str] | None = None) -> None:
                     if a.startswith("imu_spi_device:=")), "/dev/spidev6.0")
         sources = {"log": log, "launcher": launcher, "pad": JsReader(), "bt": Bluetooth(),
                    "system": SystemInfo(interface, [spi, "/dev/gpiochip0"])}
-        if can_cfg.get("monitor", True) and hardware == "real":
+        if hardware == "real":
             try:
                 mapping = joint_mapping(paths["ros2_control"])
             except OSError as error:
                 mapping = {}
                 log.note(f"no joint mapping for the CAN monitor: {error}", WARN)
-            sources["can"] = CanMonitor(interface, mapping)
+            if can_cfg.get("monitor", True):
+                sources["can"] = CanMonitor(interface, mapping)
+            if can_cfg.get("estop", True):
+                sources["estop_bus"] = EstopBus(interface, sorted(mapping) or [1, 2, 3, 4, 5, 6])
         try:
             from .ros_bridge import RosBridge
             sources["ros"] = RosBridge(
-                cfg, log, use_rosout=lambda: launcher.status()["state"] == "external",
-                teleop_policies=policies)
+                cfg, log, use_rosout=lambda: launcher.status()["state"] == "external")
         except ImportError as error:
             log.note(f"ROS 2 is not available ({error}); launch and status only", ERROR)
 

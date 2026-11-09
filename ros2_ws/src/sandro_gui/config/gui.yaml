@@ -22,34 +22,47 @@ launch:
   # drives before it exits. SIGTERM after this long, SIGKILL 5 s later.
   stop_timeout_s: 20.0
   runs_dir: gui_runs   # launch output, relative to the working directory
+  # Oldest run logs are deleted beyond either limit (the running one never).
   keep_runs: 30
+  keep_mb: 200
 
 can:
   interface: can0
   # Passive listener (read only): per-drive frame rates, axis state, errors
   # and encoder angles, also before the drives are armed.
   monitor: true
+  # E-STOP also sends the GIM6010 E-stop frame from the panel's own socket,
+  # before any ROS call: it works with no launch and no DDS. Nothing else is sent.
+  estop: true
 
 robot:
   hardware_component: SandroSystem
   imu_component: SandroImu
   estop_service: /gim6010_estop/trigger
   clear_errors_service: /gim6010_estop/clear_errors
-  # Broadcasters restarted after the hardware component is armed again
-  # (its read error deactivates them, as joy_estop does).
-  broadcasters: [joint_state_broadcaster, imu_broadcaster]
+  # A starting stack is ready once these are active; they are restarted after
+  # the drives are armed again (their read error deactivates them).
+  broadcasters: [joint_state_broadcaster, imu_broadcaster, health_broadcaster]
   # Controllers the Run page offers, in this order.
   controllers: [whole_body_controller, rl_flat_level, rl_agile_terrain, rl_stand_up,
                 lqr_balancer, driving_balancer]
 
 # Topics watched for rate and freshness. expect_hz is what a healthy running
 # stack delivers (the 300 Hz control loop publishes the sensors every cycle).
+# sampled: high-rate topics the panel's ticker drains 20 times a second
+# instead of the executor waking for every message.
 topics:
-  - {name: /joint_states, type: sensor_msgs/msg/JointState, expect_hz: 300}
-  - {name: /imu_broadcaster/imu, type: sensor_msgs/msg/Imu, expect_hz: 300}
-  - {name: /dynamic_joint_states, type: control_msgs/msg/DynamicJointState, expect_hz: 300}
+  - {name: /joint_states, type: sensor_msgs/msg/JointState, expect_hz: 300, sampled: true}
+  - {name: /imu_broadcaster/imu, type: sensor_msgs/msg/Imu, expect_hz: 300, sampled: true}
+  # Drive health (feedback_age, online, errors, IMU age) at 10 Hz.
+  - {name: /health_broadcaster/dynamic_joint_states, type: control_msgs/msg/DynamicJointState,
+     expect_hz: 10}
   - {name: /joy, type: sensor_msgs/msg/Joy, expect_hz: 20}
   - {name: /cmd_vel, type: geometry_msgs/msg/TwistStamped, expect_hz: 50, while: deadman}
+# Also read, not listed in Streams: the 300 Hz health topic of stacks from
+# before health_broadcaster. The fresher of the two is used.
+legacy_topics:
+  - {name: /dynamic_joint_states, type: control_msgs/msg/DynamicJointState, sampled: true}
 # Oldest sample the drivers may hand the controllers (their imu/age and
 # feedback_age state interfaces): the BNO085 reports every 5 ms, the drives
 # broadcast their encoders every 5 ms.

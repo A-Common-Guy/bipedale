@@ -3,12 +3,16 @@
 A raw CAN socket with a kernel filter receives only the drives' heartbeats and
 encoder broadcasts, about 1.3k frames/s; the MIT traffic of an armed robot
 (another 4-5k frames/s) never reaches Python. The bus's total rate comes from
-the interface counters instead (system.can_link). Nothing is transmitted.
+the interface counters instead (system.can_link). The monitor transmits nothing.
 
 Frame ids are (node << 5) | command (sandro_hardware/protocol.hpp). The
 heartbeat carries axis error, axis state, fault flags and temperature, the
 encoder broadcast the rotor position (revolutions) and velocity, which the
 joint mapping of the ros2_control description turns into logical radians.
+
+The one exception to read-only is EstopBus: a separate socket that can only
+send the GIM6010 E-stop command, as sandro_hardware's gim6010_estop node does,
+so the panel's E-STOP reaches the drives with no launch and no DDS.
 """
 
 from __future__ import annotations
@@ -27,6 +31,67 @@ COMMANDS = {0x01: "heartbeat", 0x02: "estop", 0x04: "sdo_rx", 0x05: "sdo_tx", 0x
 AXIS_STATES = {0: "undefined", 1: "idle", 8: "closed loop"}
 ESTOP_REQUESTED, CAN_WATCHDOG = 0x4000, 0x100000
 _FRAME = struct.Struct("=IB3x8s")
+
+
+def operator_clearable(error: int, flags: int) -> bool:
+    """sandro_hardware protocol.hpp operator_clearable_error: only the E-stop and watchdog bits."""
+    return error != 0 and (error & ~(ESTOP_REQUESTED | CAN_WATCHDOG)) == 0 and flags == 0
+
+
+def estop_frame(node: int) -> bytes:
+    """The struct can_frame estop_node writes: id (node << 5) | 0x02, 8 zero bytes."""
+    if not 0 <= node <= 63:
+        raise ValueError("GIM6010 node_id must be in [0, 63]")
+    return _FRAME.pack(node << 5 | ESTOP, 8, bytes(8))
+
+
+class EstopBus:
+    """Sends the E-stop frame to every drive, and nothing else."""
+
+    def __init__(self, interface: str, nodes: list[int]) -> None:
+        self.interface = interface
+        self.frames = [estop_frame(n) for n in nodes]
+
+    def send(self) -> str:
+        try:
+            sock = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
+        except (OSError, AttributeError) as error:
+            return f"CAN E-stop from the panel failed: {error}"
+        try:
+            sock.setsockopt(socket.SOL_CAN_RAW, socket.CAN_RAW_FILTER, b"")
+            sock.settimeout(0.2)
+            sock.bind((self.interface,))
+            for frame in self.frames:
+                sock.send(frame)
+        except OSError as error:
+            return f"CAN E-stop from the panel failed: {error}"
+        finally:
+            sock.close()
+        return f"CAN E-stop sent by the panel to {len(self.frames)} drives on {self.interface}"
+
+
+def drive_faults(nodes: list[dict]) -> list[str]:
+    """One sentence per drive that keeps the hardware from arming, with what to do."""
+    out = []
+    for n in nodes:
+        if not n.get("joint"):
+            continue
+        name = f"{n['joint']} (node {n['node']})"
+        if n.get("heartbeat_age_s") is None or n["heartbeat_age_s"] > 1.0:
+            out.append(f"{name} is silent: check its CAN cable and power")
+            continue
+        error, flags = n.get("axis_error") or 0, n.get("fault_flags") or 0
+        if not error and not flags:
+            continue
+        text = axis_error_text(error, flags)
+        if operator_clearable(error, flags):
+            out.append(f"{name} {text}: clearable (E-stop or watchdog latch); arming clears it, "
+                       "or Clear drive errors and Arm again")
+        else:
+            out.append(f"{name} {text}: a drive fault that is not clearable from the panel; "
+                       "inspect the drive (Run log, temperature, encoder), power-cycle it once "
+                       "the cause is fixed")
+    return out
 
 
 def axis_error_text(error: int, flags: int) -> str:
@@ -166,6 +231,7 @@ class CanMonitor:
                     "encoder_age_s": now - state["encoder"] if "encoder" in state else None,
                     "axis_state": AXIS_STATES.get(state.get("axis_state"), state.get("axis_state")),
                     "axis_error": state.get("axis_error"),
+                    "fault_flags": state.get("fault_flags"),
                     "error_text": axis_error_text(state.get("axis_error", 0), state.get("fault_flags", 0)),
                     "temperature": state.get("temperature"),
                     "rates": rates, "host_rates": host,

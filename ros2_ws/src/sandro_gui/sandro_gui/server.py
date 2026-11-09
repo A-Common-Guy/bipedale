@@ -3,7 +3,9 @@
 The stream carries `fast` snapshots (joints, IMU, gamepad, rates) at
 fast_rate_hz, `slow` ones (launch, controllers, CAN, system, checks) at
 slow_rate_hz and new log lines. One ticker thread computes each snapshot
-once, however many browsers are connected.
+once, however many browsers are connected, and none while no browser is:
+then it only drains the sampled topics and keeps the panel's session state
+(panel.idle) current.
 """
 
 from __future__ import annotations
@@ -32,13 +34,52 @@ class Ticker:
         self.cond = threading.Condition()
         self.fast = self.slow = "{}"
         self.fast_seq = self.slow_seq = 0
+        self.clients = 0
+        self._demand = 0.0
+        self._reported: dict[str, float] = {}
         threading.Thread(target=self._run, name="ticker", daemon=True).start()
+
+    def attach(self) -> None:
+        with self.cond:
+            self.clients += 1
+
+    def detach(self) -> None:
+        with self.cond:
+            self.clients -= 1
+
+    def fresh(self, timeout: float = 1.0) -> tuple[str, str]:
+        """The snapshots for /api/state, built now if no stream keeps them current."""
+        with self.cond:
+            if self.clients == 0:
+                self._demand = time.monotonic() + 5.0
+                seq = self.slow_seq
+                self.cond.wait_for(lambda: self.slow_seq != seq, timeout=timeout)
+            return self.fast, self.slow
+
+    def _report(self, error: Exception) -> None:
+        key = f"{type(error).__name__}: {error}"
+        now = time.monotonic()
+        if now - self._reported.get(key, -1e9) < 60.0:
+            return
+        if len(self._reported) > 50:
+            self._reported.clear()
+        self._reported[key] = now
+        self.panel.log.note(f"snapshot failed: {error} (repeats are not logged for a minute)",
+                            ERROR)
+        traceback.print_exc()
 
     def _run(self) -> None:
         next_slow = 0.0
         while True:
             started = time.monotonic()
             try:
+                self.panel.sample()
+                if self.clients == 0 and started > self._demand:
+                    if started >= next_slow:
+                        next_slow = started + self.slow_period
+                        self.panel.idle()
+                    time.sleep(max(0.0, self.fast_period - (time.monotonic() - started)))
+                    continue
                 fast = self.panel.fast()
                 fast_json = json.dumps(_finite(fast), default=_jsonable, separators=(",", ":"))
                 slow_json = None
@@ -49,8 +90,7 @@ class Ticker:
                     slow_json = json.dumps(_finite(slow), default=_jsonable,
                                            separators=(",", ":"))
             except Exception as error:  # noqa: BLE001 - keep ticking
-                self.panel.log.note(f"snapshot failed: {error}", ERROR)
-                traceback.print_exc()
+                self._report(error)
                 time.sleep(1.0)
                 continue
             with self.cond:
@@ -111,7 +151,8 @@ class Handler(BaseHTTPRequestHandler):
     def _gzip_ok(self) -> bool:
         return "gzip" in self.headers.get("Accept-Encoding", "")
 
-    def _blob(self, key: str, data: bytes, kind: str, etag: str) -> None:
+    def _blob(self, key: str, data, kind: str, etag: str) -> None:
+        """`data` is the bytes, or a callable that reads them only when the ETag missed."""
         if self.headers.get("If-None-Match") == etag:
             self.send_response(HTTPStatus.NOT_MODIFIED)
             self.send_header("ETag", etag)
@@ -121,10 +162,12 @@ class Handler(BaseHTTPRequestHandler):
         if self._gzip_ok() and key.endswith(COMPRESSIBLE):
             cached = self._cache.get(key)
             if cached is None or cached[0] != etag:
-                cached = (etag, gzip.compress(data, 6))
+                cached = (etag, gzip.compress(data() if callable(data) else data, 6))
                 self._cache[key] = cached
             data = cached[1]
             headers["Content-Encoding"] = "gzip"
+        elif callable(data):
+            data = data()
         self._send(200, data, kind, headers)
 
     def _static(self, path: str) -> None:
@@ -139,8 +182,8 @@ class Handler(BaseHTTPRequestHandler):
         kind = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
         if file.suffix == ".js":
             kind = "text/javascript"
-        self._blob(str(file), file.read_bytes(), kind + ("; charset=utf-8" if kind.startswith("text")
-                                                         else ""),
+        self._blob(str(file), file.read_bytes, kind + ("; charset=utf-8" if kind.startswith("text")
+                                                       else ""),
                    f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"')
 
     def _body(self) -> dict:
@@ -164,8 +207,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/info":
                 return self._json(self.panel.info())
             if path == "/api/state":
-                return self._json({"fast": json.loads(self.ticker.fast),
-                                   "slow": json.loads(self.ticker.slow)})
+                fast, slow = self.ticker.fresh()
+                return self._json({"fast": json.loads(fast), "slow": json.loads(slow)})
             if path == "/api/logs":
                 return self._json(self.panel.log.since(int(query.get("after", 0)),
                                                         int(query.get("limit", 2000))))
@@ -221,17 +264,23 @@ class Handler(BaseHTTPRequestHandler):
             payload = {"error": str(error)}
             if hasattr(error, "running"):
                 payload["conflict"] = error.running
-                return self._json(payload, 409)
-            return self._json(payload, 500)
+            return self._json(payload, getattr(error, "http_status", 500))
 
     def _stream(self, after: int) -> None:
+        # One deflate stream per connection, flushed at every event: the
+        # snapshots repeat their keys, so later events cost a fraction.
+        packer = zlib.compressobj(5, zlib.DEFLATED, 31) if self._gzip_ok() else None
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Accel-Buffering", "no")
+        if packer is not None:
+            self.send_header("Content-Encoding", "gzip")
         self.end_headers()
         ticker, log = self.ticker, self.panel.log
-        fast_seq = slow_seq = -1
+        ticker.attach()
+        # The held snapshots may be from before an idle spell: start with the next ones.
+        fast_seq, slow_seq = ticker.fast_seq, ticker.slow_seq
         last_write = time.monotonic()
         try:
             while True:
@@ -253,11 +302,16 @@ class Handler(BaseHTTPRequestHandler):
                 if not chunks and time.monotonic() - last_write > 10:
                     chunks.append(": keepalive\n\n")
                 if chunks:
-                    self.wfile.write("".join(chunks).encode())
+                    data = "".join(chunks).encode()
+                    if packer is not None:
+                        data = packer.compress(data) + packer.flush(zlib.Z_SYNC_FLUSH)
+                    self.wfile.write(data)
                     self.wfile.flush()
                     last_write = time.monotonic()
         except (BrokenPipeError, ConnectionResetError, TimeoutError, OSError):
             return
+        finally:
+            ticker.detach()
 
 
 class Server(ThreadingHTTPServer):

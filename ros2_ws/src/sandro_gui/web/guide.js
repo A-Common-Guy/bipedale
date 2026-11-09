@@ -7,20 +7,22 @@ const STEPS = [
   ["Power and secure", "Robot lifted or on its stand, drives powered, the power cut-off in reach. The Pi starts the panel by itself: open http://<pi>:8080."],
   ["Bus and drives", "Overview: CAN bus error-active at 1 Mbit/s and Drives 6/6 heard, before anything is launched. A silent drive shows its node and how long it has been quiet. Error 0x104000 is the E-stop latch, which arming clears; any other code must be inspected."],
   ["Gamepad", "Press PS: the Gamepad check turns green with the battery level. A new pad is paired on the Gamepad page."],
-  ["IMU, drives off (optional)", "Run, IMU check, Start. The IMU page should read about 240 new samples per second, tilt near 0° on a level floor, and positive pitch when the robot tips forward. Stop it before the next step."],
-  ["Arm", "Run, Armed, controller none, gamepad teleop ticked, Start. The drives hold zero torque. Overview: joint states at 300 Hz, the IMU fresh, and the 3D legs following when you move a leg by hand."],
-  ["Start the controller", "Hold the robot upright, then Start the controller on the Run page or hold Create + Options for 2 s on the pad. It engages once the robot is upright and still."],
+  ["Start the stack", "Run: pick the controller to preload, gamepad teleop ticked, Start stack. One launch serves the session: the drives come up configured but not armed and the controller is loaded. The Stack check reads starting until everything is there, then drives not armed. Overview: joint states at 300 Hz, the IMU fresh, and the 3D legs following when you move a leg by hand."],
+  ["Arm and start", "Hold the robot upright (lay it down for rl_stand_up, which stands up by itself), then Run, Arm and start, and confirm. The first arm of a launch also asks you to tick that the robot is secured. Arm and Start can be separate steps: armed with no controller, the drives hold zero torque."],
   ["Drive", "Hold L1 and use the sticks (table below). Watch the Run page's diagnostics for saturation."],
   ["Stop", "E-STOP in the header or L2 + R2 for an immediate stop. Run, Stop for a normal shutdown: one SIGINT, the drives go idle and the deadman off before the launch exits."],
+  ["IMU alone (optional)", "Diagnostic: Run, Advanced, Launch IMU check, Start IMU check; no drive plugin is loaded. The IMU page should read about 240 new samples per second, tilt near 0° on a level floor, and positive pitch when the robot tips forward. Stop it before starting the stack."],
 ];
 
 const TROUBLE = [
   ["A drive is silent", "Its heartbeat age grows in the Drives table. Check that drive's CAN cable and power; the rest of the bus keeps working. Arming refuses while any drive is missing."],
   ["CAN bus-off or error-passive", "Bit rate or sample point mismatch, a missing terminator, or a drive powered down mid-run. can0.service configures 1 Mbit/s at boot; the bus error counters are in the CAN check."],
-  ["IMU stale or IMU FAULT in the log", "Run the IMU check with the drives off. Over SPI6: INT on GPIO25, RST on GPIO24, P0 and P1 tied high (deploy/pi/README.md)."],
-  ["Arm refused", "The Run log names the drive and its axis error. Only the E-stop and watchdog bits clear on arming; an encoder or temperature fault does not. A MIT frame bias above 0.2 rad means a drive zero is off."],
+  ["IMU stale or IMU FAULT in the log", "Run the IMU check (Run, Advanced) with the drives off. Over SPI6: INT on GPIO25, RST on GPIO24, P0 and P1 tied high (deploy/pi/README.md)."],
+  ["The stack stays starting", "The Run page lists what it still waits for. Controller manager died means ros2_control_node exited (the Run log says why, usually a drive that refused to configure): Stop, then Start again."],
+  ["Arm refused", "The message names each drive, its axis error and whether it is clearable. The E-stop and watchdog bits clear on arming, or with Clear drive errors; any other bit is a drive fault: inspect it, then power-cycle the drive. A MIT frame bias above 0.2 rad means a drive zero is off."],
+  ["A controller shows fallen", "It cut the drives after a fall or an oscillation and stays latched. Put the robot upright (lying for rl_stand_up) and Restart it on the Run page."],
   ["Gamepad does not connect", "Gamepad page: unblock the radio if rfkill blocks it, scan, and pair while the scan runs. Once paired, PS reconnects it."],
-  ["A policy oscillates", "The RL controllers cut the drives on a 5-15 Hz oscillation (RL_OSCILLATION in the log). Re-arm and try again from a calmer start; check the leg zeros if it repeats."],
+  ["A policy oscillates", "The RL controllers cut the drives on a 5-15 Hz oscillation (RL_OSCILLATION in the log) and show fallen. Restart the controller from a calmer pose; check the leg zeros if it repeats."],
 ];
 
 function keys(entry, labels) {
@@ -54,13 +56,15 @@ export function init(ctx) {
     h("h4", {}, "Rumble"),
     h("p", {}, "Pulses count the running policy: one for the first, two for the second. It plays whenever the running controller changes and on Circle. One long rumble: a switch was refused or aborted."),
     h("h4", {}, "When teleop runs"),
-    h("p", {}, "With Gamepad teleop ticked on the Run page, and on the real robot only once the drives are armed. Full stick deflection is the running controller's own limit, read from its parameters, so it means the same on every policy."));
+    h("p", {}, "With Gamepad teleop ticked on the Run page; it starts with the stack and drives only once a controller runs. Full stick deflection is the running controller's own limit, read from its parameters, so it means the same on every policy."));
   replace($("#guide-steps"), h("ol", { class: "steps long" }, STEPS.map(([title, text]) =>
-    h("li", {}, h("strong", {}, title), h("span", {}, text)))));
+    h("li", {}, h("strong", {}, title), h("span", {}, text)))),
+  h("p", { class: "hint" }, "Every action that moves the robot (start, restart, swap, arm and start) asks one confirmation; stopping a controller, disarming and stopping the stack ask none."));
   replace($("#guide-trouble"), h("table", { class: "combo-table" }, h("tbody", {}, TROUBLE.map(([symptom, fix]) =>
     h("tr", {}, h("td", { class: "combo-keys" }, symptom), h("td", {}, fix))))));
   replace($("#guide-estop"),
-    h("p", {}, "Both software E-stops (the header button, L2 + R2) deactivate every controller, so all torques go to zero, and send the CAN E-stop. The drives then latch ESTOP_REQUESTED."),
-    h("p", {}, "To continue: arm again (Run page, Hardware, Arm, or hold Create + Options for 2 s), then start the controller (Run page, or hold Create + Options again with the robot held upright)."),
+    h("p", {}, "The header E-STOP sends the CAN E-stop from the panel's own CAN socket first, so it reaches the drives even with no launch and no ROS; then, at the same time, through the E-stop node and by deactivating every controller. L2 + R2 deactivates every controller and sends the CAN E-stop through the E-stop node. The drives latch ESTOP_REQUESTED and the Stack check reads E-stopped."),
+    h("p", {}, "To continue: Run page, Re-arm and restart (one confirmation: it arms the drives and starts the controller that ran last), or Re-arm only, or hold Create + Options twice on the pad."),
+    h("p", {}, "A controller that fell or latched shows fallen in red: put the robot back and Restart it on the Run page (or one hold of Create + Options on the pad)."),
     h("p", { class: "warn-text" }, "Software stops ride on the same bus and computer that just misbehaved. The physical cut-off is the real E-stop."));
 }

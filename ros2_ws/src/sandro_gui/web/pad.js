@@ -165,10 +165,28 @@ function onSlow(slow) {
   $("#pad-device").textContent = slow.pad?.device ? `${slow.pad.name || "joystick"} on ${slow.pad.device}` : "no joystick device";
 }
 
+let watching = null;
+
+// bluetoothctl is polled only while this page is open somewhere.
+function watch() {
+  if (document.visibilityState === "visible") ctx.api("bt/watch", { seconds: 15 }).catch(() => {});
+}
+
 export function init(context) {
   ctx = context;
   live = padSvg();
   $("#pad-live").append(live.svg);
   ctx.on("fast", onFast);
   ctx.on("slow", onSlow);
+}
+
+export function show() {
+  watch();
+  clearInterval(watching);
+  watching = setInterval(watch, 10000);
+}
+
+export function hide() {
+  clearInterval(watching);
+  watching = null;
 }

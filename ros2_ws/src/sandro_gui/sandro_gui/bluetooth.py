@@ -65,10 +65,19 @@ class Bluetooth:
         self._busy: str | None = None
         self._output: list[str] = []
         self._wake = threading.Event()
+        self._watched_until = 0.0
         if self.available:
             threading.Thread(target=self._poll, name="bluetooth", daemon=True).start()
 
     # Status -------------------------------------------------------------
+
+    def watch(self, seconds: float = 15.0) -> dict:
+        """A browser shows the Gamepad page: poll for `seconds` more."""
+        idle = time.monotonic() >= self._watched_until
+        self._watched_until = time.monotonic() + min(max(seconds, 1.0), 60.0)
+        if idle:
+            self._wake.set()
+        return {"ok": True, "message": "watching"}
 
     def _poll(self) -> None:
         while True:
@@ -77,8 +86,14 @@ class Bluetooth:
             except Exception as error:  # noqa: BLE001 - keep polling
                 self._status = {"available": True, "error": str(error)}
             # Every poll is five bluetoothctl processes and as many D-Bus
-            # clients for bluetoothd: quick only while a scan or pairing runs.
-            self._wake.wait(1.5 if self.scanning or self._busy else 10.0)
+            # clients for bluetoothd: only while someone looks at the Gamepad
+            # page, quick only while a scan or pairing runs.
+            if self.scanning or self._busy:
+                self._wake.wait(1.5)
+            elif time.monotonic() < self._watched_until:
+                self._wake.wait(10.0)
+            else:
+                self._wake.wait()
             self._wake.clear()
 
     @property

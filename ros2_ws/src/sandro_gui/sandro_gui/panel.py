@@ -7,20 +7,27 @@ import json
 import shlex
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import yaml
 
 from . import gamepad
+from .can_monitor import ESTOP_REQUESTED, drive_faults
+from .control import ArmFailed, Control, condition, owning, short_type
+from .errors import Busy
 from .launcher import build_command
 from .logbook import ERROR, Logbook
 
 OK, WARN, ERR, OFF = "ok", "warn", "error", "off"
+MANAGER = "ros2_control_node"
+# A run still not ready after this long says so in the Stack check.
+SLOW_START_S = 45.0
 
 
-def _check(id_, label, level, value, detail="", short=None):
+def _check(id_, label, level, value, detail="", short=None, **extra):
     return {"id": id_, "label": label, "level": level, "value": value, "detail": detail,
-            "short": short or value}
+            "short": short or value, **extra}
 
 
 def _duration(seconds: float) -> str:
@@ -37,8 +44,96 @@ def launch_mode(request: dict | None) -> str:
         return "running"
     if request.get("hardware") == "mujoco":
         return "simulation"
-    return {"imu": "IMU check", "drives_off": "drives not armed",
-            "armed": "armed"}.get(request.get("mode"), "running")
+    return "IMU check" if request.get("mode") == "imu" else "stack"
+
+
+def readiness(request: dict, ros: dict | None, component: str = "SandroSystem",
+              imu_component: str = "SandroImu", broadcasters: list[str] | None = None) -> list[str]:
+    """What a starting launch still lacks; empty once it is ready.
+
+    Ready: the hardware components listed in their expected states (a real
+    stack: the IMU active, the drives configured, armed or not), the
+    broadcasters active and the requested controller loaded.
+    """
+    if not ros or not ros.get("manager"):
+        return ["the controller manager"]
+    hardware = {h["name"]: h["state"] for h in ros.get("hardware", [])}
+    controllers = {c["name"]: c["state"] for c in ros.get("controllers", [])}
+    waiting = []
+    imu_only = request.get("mode") == "imu" and request.get("hardware") != "mujoco"
+    if request.get("hardware") == "mujoco":
+        if not hardware or any(state != "active" for state in hardware.values()):
+            waiting.append("the simulated hardware active")
+    else:
+        if hardware.get(imu_component) != "active":
+            waiting.append(f"{imu_component} active")
+        if not imu_only and hardware.get(component) not in ("inactive", "active"):
+            waiting.append(f"{component} configured" + (f" (it is {hardware[component]})"
+                                                        if component in hardware else ""))
+    wanted = ["imu_broadcaster"] if imu_only else list(broadcasters or [])
+    waiting += [f"{b} active" for b in wanted if controllers.get(b) != "active"]
+    controller = request.get("controller") or "none"
+    if not imu_only and controller != "none" and controller not in controllers:
+        waiting.append(f"{controller} loaded")
+    return waiting
+
+
+def stack_state(launch: dict, ros: dict | None, session: dict | None, simulation: bool,
+                component: str = "SandroSystem", waiting: list[str] | None = None) -> dict:
+    """The Stack check, with `phase`: stopped, failed, starting, died, stopping, simulation,
+    imu, armed, not_armed, estopped, unconfigured or no_manager."""
+    session = session or {}
+    state = launch.get("state")
+    run = launch.get("run") or {}
+    if state == "stopping":
+        return _check("stack", "Robot stack", WARN, "stopping", "", phase="stopping")
+    if state not in ("starting", "running", "external"):
+        last = launch.get("last_exit") or {}
+        failed = last.get("code") not in (None, 0, -2)
+        return _check("stack", "Robot stack", ERR if failed else OFF, "stopped",
+                      f"last run exited with code {last['code']}" if failed else "start it from Run",
+                      phase="failed" if failed else "stopped")
+    external = state == "external"
+    mode = launch_mode(run.get("request")) if run else "running"
+    prefix = "external" if external else "running"
+    up = "" if external else f"up {_duration(run.get('uptime_s', 0))}"
+    died = sorted(set(run.get("died") or []))
+    if MANAGER in died:
+        return _check("stack", "Robot stack", ERR, f"{prefix} · controller manager died",
+                      "ros2_control_node exited inside the launch (the Run log says why, usually "
+                      "a drive that refused to configure): Stop, then Start again", "died",
+                      phase="died")
+    others = f"died: {', '.join(died)} (see the Run log)" if died else ""
+
+    def done(level, value, detail, short, phase):
+        if others and level == OK:
+            level = WARN
+        detail = " · ".join(filter(None, [detail, others, up]))
+        value = f"starting · {mode}" if phase == "starting" else f"{prefix} · {value}"
+        return _check("stack", "Robot stack", level, value, detail, short, phase=phase)
+
+    if state == "starting":
+        slow = run.get("uptime_s", 0) > SLOW_START_S
+        return done(WARN, "", ("still waiting for " if slow else "waiting for ")
+                    + ", ".join(waiting) if waiting else "", "starting", "starting")
+    if simulation or mode == "simulation":
+        return done(OK, "simulation", "", "sim", "simulation")
+    if mode == "IMU check":
+        return done(OK, "IMU check", "", "IMU check", "imu")
+    ros = ros or {}
+    if not ros.get("manager"):
+        return done(WARN, "no controller manager", "", "no manager", "no_manager")
+    system = {h["name"]: h["state"] for h in ros.get("hardware", [])}.get(component)
+    if system == "active":
+        return done(OK, "armed", "", "armed", "armed")
+    if session.get("estopped"):
+        return done(WARN, "E-stopped", f"drives {system or 'gone'}: Re-arm on the Run page, or hold "
+                    "Create + Options on the pad", "E-stopped", "estopped")
+    if system == "inactive":
+        return done(OK, "drives not armed", "", "not armed", "not_armed")
+    return done(WARN, f"drives {system or 'not listed'}",
+                "a drive did not configure: see the Drives table and the Run log", "drives off",
+                "unconfigured")
 
 
 def health(slow: dict, fast: dict, expect: dict, simulation: bool,
@@ -52,20 +147,8 @@ def health(slow: dict, fast: dict, expect: dict, simulation: bool,
     launch = slow.get("launch") or {}
     state = launch.get("state")
     run = launch.get("run") or {}
-    if state in ("running", "stopping", "starting"):
-        mode = launch_mode(run.get("request"))
-        checks.append(_check("stack", "Robot stack", WARN if state == "stopping" else OK,
-                             f"{state} · {mode}", f"up {_duration(run.get('uptime_s', 0))}",
-                             "stopping" if state == "stopping" else mode))
-    elif state == "external":
-        checks.append(_check("stack", "Robot stack", WARN, "running outside the panel",
-                             (launch.get("external") or [{}])[0].get("command", ""), "external"))
-    else:
-        last = launch.get("last_exit") or {}
-        failed = last.get("code") not in (None, 0, -2)
-        checks.append(_check("stack", "Robot stack", ERR if failed else OFF, "stopped",
-                             f"last run exited with code {last['code']}" if failed else
-                             "start it from Run"))
+    checks.append(stack_state(launch, slow.get("ros"), slow.get("session"), simulation, component,
+                              slow.get("waiting")))
 
     can = slow.get("can_link") or {}
     if simulation:
@@ -129,7 +212,7 @@ def health(slow: dict, fast: dict, expect: dict, simulation: bool,
         else:
             checks.append(_check("imu", "IMU", ERR if stack_up and
                                  (slow.get("ros") or {}).get("manager") else OFF, "no data",
-                                 "start the stack armed, or the IMU check"))
+                                 "published once the stack (or the IMU check) runs"))
     elif imu_age > 0.2:
         checks.append(_check("imu", "IMU", ERR, f"stale {imu_age:.1f} s", "no new BNO085 sample"))
     else:
@@ -158,24 +241,33 @@ def health(slow: dict, fast: dict, expect: dict, simulation: bool,
                              "no data", "published once the controller manager runs"))
 
     ros_slow = slow.get("ros") or {}
+    died = MANAGER in (run.get("died") or [])
     if ros_slow.get("manager"):
-        running = [c["name"] for c in ros_slow.get("controllers", []) if c.get("owns_commands")]
+        controllers = ros_slow.get("controllers", [])
+        running = [c for c in controllers if c.get("owns_commands")]
         hardware = {h["name"]: h["state"] for h in ros_slow.get("hardware", [])}
         system = hardware.get(component)
         armed = system == "active" or simulation
-        level = OK if running else (WARN if armed else OFF)
-        checks.append(_check("controller", "Controller", level,
-                             ", ".join(running) if running else "none running",
-                             f"drives {'armed' if system == 'active' else system or 'n/a'}",
-                             (running[0].replace("_controller", "") if running else "none")))
-    elif state == "running" and launch_mode(run.get("request")) in ("armed", "simulation") \
-            and run.get("uptime_s", 0) > 20:
+        fault = next((c for c in running if c.get("fault")), None)
+        if fault:
+            checks.append(_check("controller", "Controller", ERR,
+                                 f"{fault['name']} {fault['fault']['state']}",
+                                 f"{fault['fault']['text']}: Restart it on the Run page",
+                                 fault["fault"]["state"]))
+        else:
+            names = [c["name"] for c in running]
+            drives = "armed" if system == "active" else (
+                "E-stopped" if (slow.get("session") or {}).get("estopped") else system or "n/a")
+            checks.append(_check("controller", "Controller", OK if names else (WARN if armed else OFF),
+                                 ", ".join(names) if names else "none running", f"drives {drives}",
+                                 names[0].replace("_controller", "") if names else "none"))
+    elif died or (state in ("starting", "running") and run.get("uptime_s", 0) > 20):
         checks.append(_check("controller", "Controller", ERR, "controller manager down",
                              "it exited inside the running launch (see the Run log, usually a "
-                             "drive that refused to arm): Stop, then Start again", "down"))
+                             "drive that refused to configure): Stop, then Start again", "down"))
     else:
         checks.append(_check("controller", "Controller", OFF, "no controller manager",
-                             "starts with the armed or simulation launch"))
+                             "starts with the stack"))
 
     pad = slow.get("pad") or {}
     joy = (rates.get("/joy") or {})
@@ -214,6 +306,32 @@ def health(slow: dict, fast: dict, expect: dict, simulation: bool,
     return checks
 
 
+def controller_catalog(controllers_yaml: str | Path) -> dict[str, dict]:
+    """{name: {"type", "start_lying"}} from controllers.yaml and rl_policies.yaml beside it."""
+    path = Path(controllers_yaml)
+    sections: dict = {}
+    for file in (path, path.with_name("rl_policies.yaml")):
+        try:
+            data = yaml.safe_load(file.read_text()) or {}
+        except (OSError, yaml.YAMLError):
+            continue
+        manager = (data.pop("controller_manager", {}) or {}).get("ros__parameters", {})
+        for name, entry in manager.items():
+            if isinstance(entry, dict) and "type" in entry:
+                sections.setdefault(name, {})["type"] = short_type(entry["type"])
+        for name, section in data.items():
+            params = (section or {}).get("ros__parameters", {}) if isinstance(section, dict) else {}
+            lying = bool((params.get("safety") or {}).get("start_lying", False))
+            sections.setdefault(name, {})["start_lying"] = lying
+    return {name: {"type": s.get("type", ""), "start_lying": s.get("start_lying", False)}
+            for name, s in sections.items() if "type" in s}
+
+
+def _new_session(key) -> dict:
+    return {"key": key, "armed_once": False, "estopped": False, "last_controller": None,
+            "system": None, "disarming": False}
+
+
 class Panel:
     def __init__(self, cfg: dict, paths: dict, sources: dict, simulation: bool) -> None:
         self.cfg = cfg
@@ -223,19 +341,31 @@ class Panel:
         self.launcher = sources["launcher"]
         self.system = sources["system"]
         self.can = sources.get("can")
+        self.estop_bus = sources.get("estop_bus")
         self.pad = sources["pad"]
         self.bt = sources["bt"]
         self.ros = sources.get("ros")
         self.expect = cfg.get("expect", {})
+        robot = cfg.get("robot", {})
+        self.component = robot.get("hardware_component", "SandroSystem")
+        self.imu_component = robot.get("imu_component", "SandroImu")
+        self.broadcasters = list(robot.get("broadcasters", ["joint_state_broadcaster"]))
         self.topic_hz = {t["name"]: t.get("expect_hz", 0) for t in cfg.get("topics", [])}
         teleop = yaml.safe_load(Path(paths["teleop"]).read_text())
         self.guide = gamepad.guide(teleop)
         self.teleop = teleop["joy_teleop"]["ros__parameters"]
+        self.catalog = controller_catalog(paths["controllers"]) if paths.get("controllers") else {}
+        self.control = Control(self.ros, self.log, self.component, self.broadcasters,
+                               self.teleop.get("policies", [])) if self.ros is not None else None
+        self.session = _new_session(None)
+        self._waiting: list[str] = []
+        self._action_lock = threading.Lock()
+        self._busy: str | None = None
         self._model: tuple[dict, bytes] | None = None
         self._model_error: str | None = None
         threading.Thread(target=self._build_model, name="model", daemon=True).start()
         if self.ros is not None and hasattr(self.launcher, "on_start"):
-            self.launcher.on_start(self.ros.reset_baselines)
+            self.launcher.on_start(self.ros.new_run)
 
     # Model --------------------------------------------------------------
 
@@ -245,9 +375,15 @@ class Panel:
         settings = self.cfg.get("model", {})
         cell, minimum = settings.get("cell_mm", 1.0), settings.get("min_part_mm", 10.0)
         try:
-            stat = mjcf.stat()
-            key = hashlib.sha1(f"{mjcf.resolve()}|{stat.st_mtime_ns}|{stat.st_size}|{cell}|"
-                               f"{minimum}|2".encode()).hexdigest()[:12]
+            stamps = []
+            for path in model.sources(mjcf):
+                try:
+                    stat = path.stat()
+                    stamps.append(f"{path.name}:{stat.st_mtime_ns}:{stat.st_size}")
+                except OSError:
+                    stamps.append(f"{path.name}:missing")
+            key = hashlib.sha1(f"{mjcf.resolve()}|{'|'.join(stamps)}|{cell}|{minimum}|2".encode()
+                               ).hexdigest()[:12]
             cache = Path(self.paths["cache"])
             cache.mkdir(parents=True, exist_ok=True)
             meta, blob = cache / f"model-{key}.json", cache / f"model-{key}.bin"
@@ -279,6 +415,8 @@ class Panel:
             "hardware": launch.hardware,
             "available_hardware": list(launch.available_hardware),
             "controllers": launch.controllers,
+            "controller_info": {name: self.catalog.get(name, {}) for name in launch.controllers},
+            "component": self.component,
             "launch_args": launch.args,
             "overrides": launch.overrides_path,
             "teleop": {k: self.teleop.get(k) for k in ("policies", "policy_colors",
@@ -287,9 +425,14 @@ class Panel:
             "expect": self.expect,
             "topics": self.cfg.get("topics", []),
             "ros": self.ros is not None,
+            "estop": {"ros": self.ros is not None, "can": self.estop_bus is not None},
             "bluetooth": getattr(self.bt, "available", False),
             "can_monitor": self.can is not None,
         }
+
+    def sample(self) -> None:
+        if self.ros is not None and hasattr(self.ros, "sample"):
+            self.ros.sample()
 
     def fast(self) -> dict:
         pad = self.pad.snapshot()
@@ -311,14 +454,76 @@ class Panel:
                                                  "velocity": node["velocity"]}
         return {"t": time.time(), "ros": ros, "pad": pad_state, "can_joints": can_joints}
 
+    def _ros_slow(self) -> dict | None:
+        if self.ros is None:
+            return None
+        ros = self.ros.slow()
+        diagnostics = ros.get("diagnostics") or {}
+        ros["controllers"] = [dict(c, fault=condition(c.get("type"), diagnostics.get(c["name"])))
+                              if c.get("state") == "active" else c
+                              for c in ros.get("controllers", [])]
+        return ros
+
+    def _track(self, launch: dict, ros: dict | None, can: dict | None) -> None:
+        """Session bookkeeping and readiness, at the slow rate whether or not a browser looks."""
+        run = launch.get("run") or {}
+        if run:
+            key = f"run:{run['pid']}:{run['started']}"
+        elif launch.get("external"):
+            key = f"external:{launch['external'][0]['pid']}"
+        else:
+            key = None
+        if key != self.session["key"]:
+            self.session = _new_session(key)
+            if self.control is not None:
+                self.control.last_controller = None
+        s = self.session
+        manager = bool(ros and ros.get("manager"))
+        hardware = {h["name"]: h["state"] for h in ros.get("hardware", [])} if manager else {}
+        system = hardware.get(self.component)
+        if system == "active":
+            s["armed_once"], s["estopped"] = True, False
+        elif system is not None and s["system"] == "active" and not s["disarming"]:
+            # Active a moment ago and not disarmed here: the gamepad E-stop or a drive fault.
+            s["estopped"] = True
+        if system is not None and not s["disarming"]:
+            s["system"] = system
+        latched = [n for n in (can or {}).get("nodes", [])
+                   if n.get("joint") and (n.get("axis_error") or 0) & ESTOP_REQUESTED]
+        if key is not None and latched and system in ("inactive", "unconfigured"):
+            s["estopped"] = True
+        running = owning({c["name"]: c for c in (ros or {}).get("controllers", [])}) if manager \
+            else []
+        if running:
+            s["last_controller"] = running[0]
+        elif self.control is not None and self.control.last_controller:
+            s["last_controller"] = self.control.last_controller
+        if launch.get("state") == "starting":
+            self._waiting = readiness(run.get("request") or {}, ros, self.component,
+                                      self.imu_component, self.broadcasters)
+            if not self._waiting and hasattr(self.launcher, "mark_ready"):
+                self.launcher.mark_ready()
+        else:
+            self._waiting = []
+
+    def idle(self) -> None:
+        self._track(self.launcher.status(), self._ros_slow(),
+                    self.can.snapshot() if self.can else None)
+
     def slow(self) -> dict:
         pad = self.pad.snapshot()
         system = self.system.snapshot()
-        slow = {
+        launch = self.launcher.status()
+        ros = self._ros_slow()
+        can = self.can.snapshot() if self.can else None
+        self._track(launch, ros, can)
+        run = launch.get("run") or {}
+        last = self.session["last_controller"] or (run.get("request") or {}).get("controller")
+        return {
             "t": time.time(),
-            "launch": self.launcher.status(),
-            "ros": self.ros.slow() if self.ros else None,
-            "can": self.can.snapshot() if self.can else None,
+            "launch": launch,
+            "ros": ros,
+            "can": can,
             "can_link": system.pop("can", None),
             "system": system,
             "bt": self.bt.snapshot(),
@@ -326,12 +531,15 @@ class Panel:
                     "error": pad.get("error"), "battery": gamepad.battery()},
             "problems": self.log.problems(),
             "log_seq": self.log.seq,
+            "session": {"armed_once": self.session["armed_once"],
+                        "estopped": self.session["estopped"],
+                        "last_controller": None if last == "none" else last},
+            "waiting": list(self._waiting),
+            "busy": self._busy,
         }
-        return slow
 
     def checks(self, slow: dict, fast: dict) -> list[dict]:
-        component = self.cfg.get("robot", {}).get("hardware_component", "SandroSystem")
-        return health(slow, fast, self.expect, self.simulation, component, self.topic_hz)
+        return health(slow, fast, self.expect, self.simulation, self.component, self.topic_hz)
 
     # Actions ------------------------------------------------------------
 
@@ -340,30 +548,103 @@ class Panel:
             raise RuntimeError("ROS is not available in this process")
         return self.ros
 
+    def _control(self) -> Control:
+        if self.control is None:
+            raise RuntimeError("ROS is not available in this process")
+        return self.control
+
+    @contextmanager
+    def _exclusive(self, what: str):
+        """One controller-manager action at a time, from any tab: a second click is refused."""
+        if not self._action_lock.acquire(blocking=False):
+            raise Busy(f"{self._busy or 'another action'} is still in progress")
+        self._busy = what
+        try:
+            yield
+        finally:
+            self._busy = None
+            self._action_lock.release()
+
+    def emergency_stop(self) -> str:
+        """Never waits for another action: the CAN frame goes out first, then the rest."""
+        direct = self.estop_bus.send if self.estop_bus is not None else None
+        if self.control is not None:
+            message = self.control.emergency_stop(direct)
+        elif direct is not None:
+            message = direct() + "; ROS is not available in this process"
+        else:
+            raise RuntimeError("ROS is not available: use the power cut-off")
+        self.session["estopped"] = True
+        self.log.note("E-STOP from the panel: " + message, ERROR)
+        return message
+
+    def arm_failure(self, component: str, error: Exception) -> str:
+        """Why the drives did not arm, drive by drive, and what to do about it."""
+        faults = []
+        if self.can is not None:
+            snapshot = self.can.snapshot()
+            if snapshot.get("open"):
+                faults = drive_faults(snapshot.get("nodes", []))
+        if not faults and self.ros is not None:
+            dynamic = self.ros.slow().get("dynamic") or {}
+            faults = [f"{joint} reports error {int(values['error'])}: the Run log names it"
+                      for joint, values in dynamic.items() if values.get("error")]
+        if faults:
+            return f"{error}. " + "; ".join(faults) + "."
+        return (f"{error}. No drive reports an error on the bus: the Run log names the cause "
+                "(a MIT frame bias above 0.2 rad means a drive zero is off).")
+
+    def _arm(self, component: str, body: dict, controller: str | None = None) -> str:
+        if not self.session["armed_once"] and not body.get("secured"):
+            raise ValueError("confirm first that the robot is secured and the power cut-off is "
+                             "in reach")
+        control = self._control()
+        try:
+            message = control.arm_and_start(controller, component) if controller \
+                else control.arm(component)
+        except ArmFailed as error:
+            raise RuntimeError(self.arm_failure(component, error)) from error
+        self.session.update(armed_once=True, estopped=False, system="active")
+        return message
+
+    def _disarm(self, component: str) -> str:
+        self.session["disarming"] = True
+        try:
+            message = self._control().disarm(component)
+            self.session.update(estopped=False, system="inactive")
+        finally:
+            self.session["disarming"] = False
+        return message
+
     def act(self, action: str, body: dict) -> dict:
         name = body.get("name", "")
+        if action == "estop":
+            return {"message": self.emergency_stop()}
         if action == "launch/preview":
             return {"command": shlex.join(build_command(body, self.launcher.settings))}
         if action == "launch/start":
             return {"status": self.launcher.start(body)}
         if action == "launch/stop":
             return {"status": self.launcher.stop()}
-        if action == "controller/activate":
-            return {"message": self._ros().activate(name, bool(body.get("swap")))}
-        if action == "controller/deactivate":
-            return {"message": self._ros().deactivate(name)}
-        if action == "controller/configure":
-            return {"message": self._ros().configure(name)}
-        if action == "hardware/activate":
-            return {"message": self._ros().set_hardware(name, True)}
-        if action == "hardware/deactivate":
-            return {"message": self._ros().set_hardware(name, False)}
-        if action == "estop":
-            if self.ros is None:
-                raise RuntimeError("ROS is not available: use the power cut-off")
-            return {"message": self.ros.emergency_stop()}
-        if action == "clear_errors":
-            return {"message": self._ros().clear_errors()}
+        manager = {
+            "controller/activate": lambda c: c.activate(name, bool(body.get("swap"))),
+            "controller/deactivate": lambda c: c.deactivate(name),
+            "controller/restart": lambda c: c.restart(name),
+            "controller/configure": lambda c: c.configure(name),
+            "hardware/activate": lambda c: self._arm(name or self.component, body),
+            "hardware/deactivate": lambda c: self._disarm(name or self.component),
+            "arm_and_start": lambda c: self._arm(self.component, body, body.get("controller")),
+            "clear_errors": lambda c: c.clear_errors(),
+        }
+        if action in manager:
+            if action == "arm_and_start" and not body.get("controller"):
+                raise ValueError("arm_and_start needs a controller")
+            control = self._control()
+            label = {"clear_errors": "clearing drive errors",
+                     "arm_and_start": f"arming and starting {body.get('controller')}"}.get(
+                action, f"{action.replace('/', ' ')} {name}".strip())
+            with self._exclusive(label):
+                return {"message": manager[action](control)}
         if action == "params/set":
             ok, reason = self._ros().set_parameter(body["node"], body["name"], body.get("value"))
             if not ok:
@@ -374,6 +655,8 @@ class Panel:
             return {"message": "cleared"}
         if action.startswith("bt/"):
             verb = action[3:]
+            if verb == "watch":
+                return self.bt.watch(float(body.get("seconds", 15)))
             if verb == "scan":
                 return self.bt.scan(float(body.get("seconds", 60)))
             if verb == "stop_scan":

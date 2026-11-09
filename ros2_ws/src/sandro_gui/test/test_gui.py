@@ -3,14 +3,16 @@
 import math
 import re
 import struct
+import threading
 from pathlib import Path
 
 import pytest
 import yaml
 
-from sandro_gui import can_monitor, gamepad, logbook, model
-from sandro_gui.launcher import LaunchSettings, build_command, is_launch
-from sandro_gui.panel import health
+from sandro_gui import can_monitor, control, gamepad, logbook, model, system
+from sandro_gui.errors import Busy, Conflict
+from sandro_gui.launcher import LaunchSettings, build_command, died_process, is_launch, prune
+from sandro_gui.panel import controller_catalog, health, readiness, stack_state
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT.parent
@@ -93,31 +95,27 @@ def test_repeated_faults_fold_into_one_problem():
     assert book.problems() == []
 
 
-def test_armed_command_matches_the_pi_launch():
-    command = build_command({"mode": "armed", "controller": "whole_body_controller",
+def test_stack_command_preloads_the_controller_and_never_arms():
+    command = build_command({"mode": "stack", "controller": "whole_body_controller",
                              "teleop": True, "overrides": True}, settings())
     assert command[:5] == ["ros2", "launch", "sandro_bringup", "sandro.launch.py", "hardware:=real"]
-    assert "arm_hardware:=true" in command and "controller:=whole_body_controller" in command
+    assert "arm_hardware:=false" in command and "controller:=whole_body_controller" in command
     assert "teleop:=true" in command and "extra_params:=/cfg/overrides.yaml" in command
     assert "imu_spi_device:=/dev/spidev6.0" in command
-
-
-def test_unarmed_launch_never_starts_a_controller_or_teleop():
-    command = build_command({"mode": "drives_off", "controller": "rl_flat_level", "teleop": True},
-                            settings())
-    assert "arm_hardware:=false" in command
-    assert "controller:=none" in command and "teleop:=false" in command
+    assert build_command({}, settings()) == build_command({"mode": "stack"}, settings())
+    quiet = build_command({"controller": "rl_flat_level", "teleop": False}, settings())
+    assert "controller:=rl_flat_level" in quiet and "teleop:=false" in quiet
 
 
 def test_imu_check_simulation_and_validation():
     imu = build_command({"mode": "imu", "extra": "imu_mount_yaw_rad:=0"}, settings())
     assert imu == ["ros2", "launch", "sandro_bringup", "imu_check.launch.py",
                    "imu_transport:=spi", "imu_spi_device:=/dev/spidev6.0", "imu_mount_yaw_rad:=0"]
-    sim = build_command({"hardware": "mujoco", "mode": "drives_off", "controller": "lqr_balancer",
+    sim = build_command({"hardware": "mujoco", "controller": "lqr_balancer",
                          "overrides": False}, settings())
     assert "hardware:=mujoco" in sim and "controller:=lqr_balancer" in sim
     assert not any(a.startswith(("arm_hardware", "extra_params")) for a in sim)
-    for bad in ({"extra": "rm -rf"}, {"controller": "a;b"}, {"mode": "fly"},
+    for bad in ({"extra": "rm -rf"}, {"controller": "a;b"}, {"mode": "fly"}, {"mode": "armed"},
                 {"hardware": "mujoco"}):
         with pytest.raises(ValueError):
             build_command(bad, settings(available_hardware=("real",)) if bad.get("hardware")
@@ -242,17 +240,29 @@ def test_checks_flag_a_silent_drive_and_a_bus_off():
 
 def test_checks_flag_a_controller_manager_that_died_inside_the_launch():
     slow = _snapshot(launch={"state": "running",
-                             "run": {"uptime_s": 60, "request": {"mode": "armed"}}})
+                             "run": {"uptime_s": 60, "request": {"mode": "stack"}}})
     controller = {c["id"]: c for c in health(slow, {}, {}, False)}["controller"]
     assert controller["level"] == "error" and controller["value"] == "controller manager down"
-    early = _snapshot(launch={"state": "running", "run": {"uptime_s": 5, "request": {"mode": "armed"}}})
+    early = _snapshot(launch={"state": "running", "run": {"uptime_s": 5, "request": {"mode": "stack"}}})
     assert {c["id"]: c for c in health(early, {}, {}, False)}["controller"]["level"] == "off"
+    # A `process has died` line in the launch output says so at once, not after 20 s.
+    died = _snapshot(launch={"state": "starting", "run": {
+        "uptime_s": 3, "request": {"mode": "stack"}, "died": ["ros2_control_node"]}})
+    checks = {c["id"]: c for c in health(died, {}, {}, False)}
+    assert checks["controller"]["level"] == "error"
+    assert checks["stack"]["phase"] == "died" and checks["stack"]["level"] == "error"
+
+
+def test_died_lines_name_the_process():
+    assert died_process("[ERROR] [ros2_control_node-3]: process has died [pid 42, exit code -6, "
+                        "cmd '...']") == "ros2_control_node"
+    assert died_process("[INFO] [spawner-5]: process has finished cleanly [pid 50]") is None
 
 
 def test_checks_accept_a_healthy_running_stack():
     nodes = [{"node": n, "joint": f"j{n}", "heartbeat_age_s": 0.05, "error_text": "",
               "temperature": 35} for n in range(6)]
-    slow = _snapshot(launch={"state": "running", "run": {"uptime_s": 30, "request": {"mode": "armed"}}},
+    slow = _snapshot(launch={"state": "running", "run": {"uptime_s": 30, "request": {"mode": "stack"}}},
                      can={"frames_hz": 6000.0, "nodes": nodes},
                      ros={"manager": True, "hardware": [{"name": "SandroSystem", "state": "active"}],
                           "controllers": [{"name": "whole_body_controller", "owns_commands": True}]},
@@ -270,3 +280,296 @@ def test_checks_accept_a_healthy_running_stack():
     fast["ros"]["joints"]["a"]["sensor_age_s"] = 0.08
     checks = {c["id"]: c for c in health(slow, fast, expect, False, topic_hz=topic_hz)}
     assert checks["encoders"]["level"] == "warn" and "80 ms" in checks["encoders"]["detail"]
+
+
+# Launch readiness and the stack's state -----------------------------------
+
+BROADCASTERS = ["joint_state_broadcaster", "imu_broadcaster", "health_broadcaster"]
+
+
+def _ros(hardware: dict, controllers: dict, manager: bool = True) -> dict:
+    return {"manager": manager,
+            "hardware": [{"name": n, "state": s} for n, s in hardware.items()],
+            "controllers": [{"name": n, "state": s, "type": "", "claimed": ["x/effort"]
+                             if s == "active" and "broadcaster" not in n else [],
+                             "owns_commands": s == "active" and "broadcaster" not in n}
+                            for n, s in controllers.items()]}
+
+
+def test_a_stack_is_ready_with_drives_configured_broadcasters_up_and_the_controller_loaded():
+    request = {"mode": "stack", "controller": "rl_flat_level"}
+    up = {b: "active" for b in BROADCASTERS}
+    assert readiness(request, None, broadcasters=BROADCASTERS) == ["the controller manager"]
+    waiting = readiness(request, _ros({"SandroImu": "active", "SandroSystem": "unconfigured"},
+                                      {"imu_broadcaster": "active"}), broadcasters=BROADCASTERS)
+    assert waiting == ["SandroSystem configured (it is unconfigured)",
+                       "joint_state_broadcaster active", "health_broadcaster active",
+                       "rl_flat_level loaded"]
+    ready = _ros({"SandroImu": "active", "SandroSystem": "inactive"},
+                 dict(up, rl_flat_level="inactive"))
+    assert readiness(request, ready, broadcasters=BROADCASTERS) == []
+    # Armed at the start (arm_hardware:=true) is as ready.
+    armed = _ros({"SandroImu": "active", "SandroSystem": "active"}, dict(up, rl_flat_level="active"))
+    assert readiness(request, armed, broadcasters=BROADCASTERS) == []
+    imu = _ros({"SandroImu": "active"}, {"imu_broadcaster": "active"})
+    assert readiness({"mode": "imu"}, imu, broadcasters=BROADCASTERS) == []
+    sim = _ros({"SandroSystem": "active"}, dict(up, lqr_balancer="active"))
+    assert readiness({"hardware": "mujoco", "controller": "lqr_balancer"}, sim,
+                     broadcasters=BROADCASTERS) == []
+
+
+def test_stack_state_never_says_armed_after_an_estop():
+    launch = {"state": "running", "run": {"uptime_s": 30, "request": {"mode": "stack"}}}
+    down = _ros({"SandroImu": "active", "SandroSystem": "unconfigured"}, {})
+    state = stack_state(launch, down, {"estopped": True}, False)
+    assert state["phase"] == "estopped" and "armed" not in state["value"].replace("E-stopped", "")
+    assert state["short"] == "E-stopped"
+    idle = stack_state(launch, _ros({"SandroSystem": "inactive"}, {}), {}, False)
+    assert idle["phase"] == "not_armed" and idle["level"] == "ok"
+    assert stack_state(launch, _ros({"SandroSystem": "active"}, {}), {}, False)["phase"] == "armed"
+    broken = stack_state(launch, down, {}, False)
+    assert broken["phase"] == "unconfigured" and broken["level"] == "warn"
+    starting = stack_state({"state": "starting", "run": {"uptime_s": 2, "request": {}}}, None, {},
+                           False, waiting=["SandroImu active"])
+    assert starting["phase"] == "starting" and "SandroImu active" in starting["detail"]
+
+
+# Controllers ----------------------------------------------------------------
+
+def test_fallen_controllers_are_read_from_their_diagnostics():
+    rl = "sandro_controllers/RlPolicyController"
+    assert control.condition(rl, {"level": 1, "values": {"phase": 0}}) is None
+    assert control.condition(rl, {"level": 2, "values": {"phase": 2.0, "status_mask": 2.0}}
+                             )["state"] == "fallen"
+    oscillation = control.condition(rl, {"level": 2, "values": {"phase": 2, "status_mask": 66}})
+    assert oscillation["state"] == "fallen" and "RL_OSCILLATION" in oscillation["text"]
+    wbc = "sandro_controllers/WholeBodyController"
+    assert control.condition(wbc, {"level": 2, "values": {"status_mask": 4.0}})["state"] == "fallen"
+    stale = control.condition(wbc, {"level": 2, "message": "imu_stale",
+                                    "values": {"status_mask": 2.0}})
+    assert stale == {"state": "error", "text": "imu_stale"}
+    lqr = "sandro_controllers/LqrBalancerController"
+    assert control.condition(lqr, {"level": 2, "values": {"saturation_mask": 512}})["state"] == \
+        "fallen"
+    # And the Controller check turns red with it.
+    slow = _snapshot(launch={"state": "running", "run": {"uptime_s": 30, "request": {}}},
+                     ros=_ros({"SandroSystem": "active"}, {"rl_flat_level": "active"}))
+    slow["ros"]["controllers"][0]["fault"] = {"state": "fallen", "text": "fallen"}
+    check = {c["id"]: c for c in health(slow, {}, {}, False)}["controller"]
+    assert check["level"] == "error" and check["short"] == "fallen"
+
+
+class FakeManager:
+    """A controller manager that records the calls control.py makes."""
+
+    estop_service, clear_service = "/gim6010_estop/trigger", "/gim6010_estop/clear_errors"
+
+    def __init__(self, controllers: dict, hardware: str = "active") -> None:
+        self.states = dict(controllers)
+        self.types = {"whole_body_controller": "sandro_controllers/WholeBodyController",
+                      "rl_flat_level": "sandro_controllers/RlPolicyController",
+                      "rl_agile_terrain": "sandro_controllers/RlPolicyController",
+                      "timed_effort": "sandro_controllers/TimedEffortController"}
+        self.hardware = {"SandroSystem": hardware}
+        self.calls = []
+        self.handover_ok = True
+
+    def controllers(self, timeout=5.0):
+        self.calls.append(("controllers",))
+        return {n: {"name": n, "type": self.types.get(n, "broadcaster"), "state": s,
+                    "claimed": ["x/effort"] if s == "active" and n in self.types else []}
+                for n, s in self.states.items()}
+
+    def hardware_states(self, timeout=5.0):
+        return dict(self.hardware)
+
+    def load(self, name):
+        self.calls.append(("load", name))
+        self.states[name] = "unconfigured"
+
+    def configure(self, name):
+        self.calls.append(("configure", name))
+        self.states[name] = "inactive"
+
+    def switch(self, activate, deactivate, strict=True, timeout=5.0):
+        self.calls.append(("switch", list(activate), list(deactivate)))
+        for name in deactivate:
+            self.states[name] = "inactive"
+        for name in activate:
+            self.states[name] = "active"
+
+    def set_hardware(self, name, active):
+        self.calls.append(("set_hardware", name, active))
+        self.hardware[name] = "active" if active else "inactive"
+        return self.hardware[name]
+
+    def trigger(self, service, timeout=3.0, wait=1.0):
+        self.calls.append(("trigger", service))
+        return (self.handover_ok if service.endswith("arm_handover") else True), "ok"
+
+
+def test_swapping_a_balancer_for_a_policy_arms_its_handover_right_before_the_switch():
+    manager = FakeManager({"whole_body_controller": "active", "rl_flat_level": "inactive"})
+    ctl = control.Control(manager, logbook.Logbook())
+    with pytest.raises(Conflict):
+        ctl.activate("rl_flat_level")
+    ctl.activate("rl_flat_level", swap=True)
+    assert manager.calls[-2:] == [("trigger", "/rl_flat_level/arm_handover"),
+                                  ("switch", ["rl_flat_level"], ["whole_body_controller"])]
+    # Policy to balancer, or nothing running: no handover.
+    ctl.activate("whole_body_controller", swap=True)
+    assert ("trigger", "/whole_body_controller/arm_handover") not in manager.calls
+    fresh = FakeManager({"rl_agile_terrain": "inactive"})
+    control.Control(fresh, logbook.Logbook()).activate("rl_agile_terrain")
+    assert not any(c[0] == "trigger" for c in fresh.calls)
+    # A refused handover switches nothing: the running balancer keeps the robot.
+    refused = FakeManager({"whole_body_controller": "active"})
+    refused.handover_ok = False
+    with pytest.raises(RuntimeError, match="keeps the robot"):
+        control.Control(refused, logbook.Logbook()).activate("rl_flat_level", swap=True)
+    assert ("load", "rl_flat_level") in refused.calls
+    assert not any(c[0] == "switch" for c in refused.calls)
+
+
+def test_a_controller_never_starts_on_disarmed_drives():
+    manager = FakeManager({"whole_body_controller": "inactive"}, hardware="inactive")
+    ctl = control.Control(manager, logbook.Logbook())
+    with pytest.raises(RuntimeError, match="arm the drives first"):
+        ctl.activate("whole_body_controller")
+    assert not any(c[0] == "switch" for c in manager.calls)
+    ctl.arm_and_start("whole_body_controller")
+    assert [c for c in manager.calls if c[0] in ("set_hardware", "switch")] == [
+        ("set_hardware", "SandroSystem", True), ("switch", ["whole_body_controller"], [])]
+
+
+def test_estop_fires_the_can_frame_first_and_the_service_in_parallel_with_the_controllers():
+    order = []
+
+    class Slow(FakeManager):
+        fired = threading.Event()
+
+        def controllers(self, timeout=5.0):
+            # Deactivation must not hold the drives' E-stop back.
+            assert self.fired.wait(2.0), "the CAN E-stop waited for the controller listing"
+            order.append("controllers")
+            return super().controllers(timeout)
+
+        def trigger(self, service, timeout=3.0, wait=1.0):
+            order.append("service")
+            self.fired.set()
+            return super().trigger(service, timeout, wait)
+
+    manager = Slow({"whole_body_controller": "active", "imu_broadcaster": "active"})
+    ctl = control.Control(manager, logbook.Logbook())
+    message = ctl.emergency_stop(lambda: order.append("frame") or "frame sent")
+    assert order[0] == "frame" and order.index("service") < order.index("controllers")
+    assert manager.states["whole_body_controller"] == "inactive"
+    assert manager.states["imu_broadcaster"] == "active"
+    assert message.startswith("frame sent") and "deactivated whole_body_controller" in message
+    assert ctl.last_controller == "whole_body_controller"
+
+
+def test_an_estop_during_a_start_aborts_it():
+    manager = FakeManager({"rl_flat_level": "inactive"})
+    ctl = control.Control(manager, logbook.Logbook())
+    original = manager.configure
+
+    def configure_then_estop(name):
+        original(name)
+        ctl.emergency_stop()
+
+    manager.states.pop("rl_flat_level")
+    manager.configure = configure_then_estop
+    with pytest.raises(RuntimeError, match="E-STOP"):
+        ctl.activate("rl_flat_level")
+    assert ("switch", ["rl_flat_level"], []) not in manager.calls
+
+
+def test_arm_restarts_broadcasters_and_disarm_stops_controllers_first():
+    manager = FakeManager({"joint_state_broadcaster": "inactive", "imu_broadcaster": "active",
+                           "whole_body_controller": "inactive"}, hardware="unconfigured")
+    ctl = control.Control(manager, logbook.Logbook(),
+                          broadcasters=["joint_state_broadcaster", "imu_broadcaster"])
+    ctl.arm_and_start("whole_body_controller")
+    assert manager.calls.index(("set_hardware", "SandroSystem", True)) < \
+        manager.calls.index(("switch", ["joint_state_broadcaster"], [])) < \
+        manager.calls.index(("switch", ["whole_body_controller"], []))
+    ctl.disarm()
+    assert manager.calls[-2:] == [("switch", [], ["whole_body_controller"]),
+                                  ("set_hardware", "SandroSystem", False)]
+
+    class Refusing(FakeManager):
+        def set_hardware(self, name, active):
+            raise RuntimeError(f"{name} stays unconfigured")
+
+    with pytest.raises(control.ArmFailed, match="did not arm"):
+        control.Control(Refusing({}), logbook.Logbook()).arm()
+
+
+def test_conflicts_and_busy_actions_answer_409():
+    assert Busy("x").http_status == 409 and Conflict(["a"]).http_status == 409
+
+
+def test_controller_catalog_knows_which_policy_starts_lying():
+    catalog = controller_catalog(BRINGUP / "config" / "controllers.yaml")
+    assert catalog["rl_stand_up"] == {"type": "RlPolicyController", "start_lying": True}
+    assert catalog["rl_flat_level"]["start_lying"] is False
+    assert catalog["whole_body_controller"]["type"] == "WholeBodyController"
+
+
+# CAN E-stop and drive faults --------------------------------------------------
+
+def test_estop_frame_matches_the_estop_node():
+    can_id, length, data = struct.unpack("=IB3x8s", can_monitor.estop_frame(3))
+    assert (can_id, length, data) == ((3 << 5) | 0x02, 8, bytes(8))
+    with pytest.raises(ValueError):
+        can_monitor.estop_frame(64)
+    bus = can_monitor.EstopBus("can-that-does-not-exist", [1, 2])
+    assert "failed" in bus.send()
+
+
+def test_arm_failures_say_which_drive_and_whether_it_clears():
+    nodes = [{"node": 3, "joint": "right_wheel", "heartbeat_age_s": 0.05,
+              "axis_error": 0x104000, "fault_flags": 0},
+             {"node": 4, "joint": "left_motor_outer", "heartbeat_age_s": 0.05,
+              "axis_error": 0x800, "fault_flags": 0},
+             {"node": 6, "joint": "left_wheel", "heartbeat_age_s": None},
+             {"node": 1, "joint": "right_motor_inner", "heartbeat_age_s": 0.05, "axis_error": 0}]
+    faults = can_monitor.drive_faults(nodes)
+    assert len(faults) == 3
+    assert faults[0].startswith("right_wheel (node 3) 0x104000") and ": clearable" in faults[0]
+    assert "left_motor_outer (node 4) 0x800" in faults[1] and "not clearable" in faults[1]
+    assert "left_wheel (node 6) is silent" in faults[2]
+    assert can_monitor.operator_clearable(0x4000, 0) and not can_monitor.operator_clearable(0x4000, 1)
+
+
+# Housekeeping ---------------------------------------------------------------
+
+def test_run_logs_are_capped_by_count_and_size(tmp_path):
+    paths = []
+    for i in range(6):
+        path = tmp_path / f"run-20261109-10000{i}.log"
+        path.write_bytes(b"x" * 100)
+        paths.append(path)
+    assert prune(paths, keep=4, keep_bytes=10_000) == paths[:2]
+    assert prune(paths, keep=30, keep_bytes=250) == paths[:4]
+    # The running launch's log is never deleted, whatever its size.
+    assert paths[-1] not in prune(paths, keep=1, keep_bytes=0, current=paths[-1])
+
+
+def test_link_counters_come_from_sysfs(tmp_path):
+    base = tmp_path / "can0"
+    (base / "statistics").mkdir(parents=True)
+    (base / "operstate").write_text("up\n")
+    (base / "flags").write_text("0x40c1\n")
+    for name in system.COUNTERS:
+        (base / "statistics" / name).write_text("12\n")
+    counters = system.link_counters("can0", str(tmp_path))
+    assert counters["operstate"] == "UP" and counters["admin_up"] and counters["rx_packets"] == 12
+    assert system.link_counters("can1", str(tmp_path)) is None
+
+
+def test_model_cache_depends_on_the_meshes():
+    files = model.sources(DESCRIPTION / "mjcf" / "robot_full_floating.xml")
+    assert files[0].name == "robot_full_floating.xml"
+    assert any(f.suffix.lower() == ".stl" for f in files[1:])

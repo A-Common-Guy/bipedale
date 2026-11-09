@@ -6,6 +6,12 @@ start the panel re-attaches to the run recorded in current.json. A launch
 started elsewhere (deploy/pi/pi launch in another shell) is found in /proc
 and shown as external; it can be stopped but its output is not here.
 
+A real launch never arms the drives (arm_hardware:=false): the controller
+manager comes up with the IMU active, the drives configured but inactive and
+the chosen controller loaded inactive; arming and starting the controller are
+the panel's own steps. A run is `starting` until the panel finds that state
+(mark_ready), and a `process has died` line in its output is recorded at once.
+
 Stopping is one SIGINT to the launch's process group, exactly a Ctrl-C: the
 controller manager deactivates the drives (zero torque, idle, deadman off)
 before it exits. SIGTERM follows only after stop_timeout_s.
@@ -24,9 +30,11 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .logbook import ERROR, INFO, WARN, Logbook
+from .errors import Busy
+from .logbook import ERROR, INFO, WARN, Logbook, parse_line
 
-MODES = ("imu", "drives_off", "armed")
+# stack: the whole robot, drives not armed; imu: the BNO085 alone (diagnostic).
+MODES = ("stack", "imu")
 _ARGUMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*:=\S*$")
 _NAME = re.compile(r"^[A-Za-z0-9_]+$")
 _IMU_ARGS = ("imu_transport:=", "imu_spi_device:=", "imu_port:=")
@@ -42,13 +50,14 @@ class LaunchSettings:
     stop_timeout_s: float = 20.0
     runs_dir: str = "gui_runs"
     keep_runs: int = 30
+    keep_bytes: int = 200 * 1024 ** 2
     controllers: list[str] = field(default_factory=list)
     available_hardware: tuple[str, ...] = ("real",)
 
 
 def build_command(request: dict, settings: LaunchSettings) -> list[str]:
     """The `ros2 launch` command line for one Start request; ValueError when invalid."""
-    mode = request.get("mode", "drives_off")
+    mode = request.get("mode", "stack")
     hardware = request.get("hardware", settings.hardware)
     controller = request.get("controller", "none") or "none"
     if hardware not in ("real", "mujoco"):
@@ -70,9 +79,8 @@ def build_command(request: dict, settings: LaunchSettings) -> list[str]:
 
     command = ["ros2", "launch", "sandro_bringup", "sandro.launch.py", f"hardware:={hardware}"]
     if hardware == "real":
-        armed = mode == "armed"
         command += list(settings.args)
-        command.append(f"arm_hardware:={'true' if armed else 'false'}")
+        command.append("arm_hardware:=false")
         state_source = request.get("state_source", "encoder")
         if state_source not in ("encoder", "mit"):
             raise ValueError("state_source must be encoder or mit")
@@ -81,14 +89,40 @@ def build_command(request: dict, settings: LaunchSettings) -> list[str]:
             raise ValueError("encoder_period_ms must be within 1-100")
         command += [f"state_source:={state_source}", f"encoder_period_ms:={period}"]
     else:
-        armed = True
         command += list(settings.simulation_args)
-    teleop = bool(request.get("teleop", True)) and armed
-    command += [f"controller:={controller if armed else 'none'}",
-                f"teleop:={'true' if teleop else 'false'}"]
+    teleop = bool(request.get("teleop", True))
+    command += [f"controller:={controller}", f"teleop:={'true' if teleop else 'false'}"]
     if request.get("overrides", True) and settings.overrides_path:
         command.append(f"extra_params:={settings.overrides_path}")
     return command + extra
+
+
+def died_process(line: str) -> str | None:
+    """The process a `process has died` line of ros2 launch names, without its -N suffix."""
+    if "process has died" not in line:
+        return None
+    return re.sub(r"-\d+$", "", parse_line(line)[1])
+
+
+def prune(paths: list[Path], keep: int, keep_bytes: int, current: Path | None = None) -> list[Path]:
+    """The oldest of `paths` (sorted by name, so by time) beyond `keep` files or `keep_bytes`."""
+    old = [p for p in sorted(paths) if p != current]
+    sizes = {}
+    for path in old:
+        try:
+            sizes[path] = path.stat().st_size
+        except OSError:
+            sizes[path] = 0
+    total = sum(sizes.values()) + (current.stat().st_size if current and current.exists() else 0)
+    count = len(old) + (1 if current else 0)
+    doomed = []
+    for path in old:
+        if count <= max(1, keep) and total <= keep_bytes:
+            break
+        doomed.append(path)
+        count -= 1
+        total -= sizes[path]
+    return doomed
 
 
 def _cmdline(pid: int) -> list[str]:
@@ -161,11 +195,20 @@ class Launcher:
                 state = "external"
         if run:
             run["uptime_s"] = time.time() - run["started"]
+            run["died"] = list(run.get("died", []))
         return {"state": state, "run": run, "external": list(self._external),
                 "last_exit": self._last_exit}
 
     def running(self) -> bool:
         return self.status()["state"] in ("starting", "running", "stopping", "external")
+
+    def mark_ready(self) -> None:
+        with self._lock:
+            if self._state != "starting" or self._run is None:
+                return
+            self._state = "running"
+            took = time.time() - self._run["started"]
+        self.log.note(f"stack ready after {took:.0f} s")
 
     # Start / stop -------------------------------------------------------
 
@@ -173,7 +216,7 @@ class Launcher:
         command = build_command(request, self.settings)
         with self._lock:
             if self._run is not None or self._external:
-                raise RuntimeError("a launch is already running; stop it first")
+                raise Busy("a launch is already running; stop it first")
             stamp = time.strftime("%Y%m%d-%H%M%S")
             log_path = self.runs / f"run-{stamp}.log"
             env = dict(os.environ, PYTHONUNBUFFERED="1", RCUTILS_COLORIZED_OUTPUT="0",
@@ -188,8 +231,8 @@ class Launcher:
             self._proc = proc
             self._run = {"pid": proc.pid, "pgid": proc.pid, "ticks": _start_ticks(proc.pid),
                          "log": log_path.name, "started": time.time(), "request": request,
-                         "command": shlex.join(command)}
-            self._state = "running"
+                         "command": shlex.join(command), "died": []}
+            self._state = "starting"
             self._open_tail(log_path, from_start=True)
             self._save()
         self._prune()
@@ -260,7 +303,9 @@ class Launcher:
         return path if path.is_file() else None
 
     def _prune(self) -> None:
-        for path in sorted(self.runs.glob("run-*.log"))[:-max(1, self.settings.keep_runs)]:
+        current = self.runs / self._run["log"] if self._run else None
+        for path in prune(list(self.runs.glob("run-*.log")), self.settings.keep_runs,
+                          self.settings.keep_bytes, current):
             try:
                 path.unlink()
             except OSError:
@@ -281,7 +326,8 @@ class Launcher:
         except (OSError, ValueError):
             return
         if run.get("ticks") is not None and _start_ticks(run["pid"]) == run["ticks"]:
-            self._run, self._state = run, "running"
+            run.setdefault("died", [])
+            self._run, self._state = run, "starting"
             self._open_tail(self.runs / run["log"], from_start=True)
             self._read_tail(replay=True)
             self.log.note(f"re-attached to the running launch (pid {run['pid']})")
@@ -308,10 +354,14 @@ class Launcher:
         lines = (self._partial + chunk).split(b"\n")
         self._partial = lines.pop()
         for line in lines:
-            self.log.add_line(line.decode(errors="replace"), replay=replay)
+            text = line.decode(errors="replace")
+            self.log.add_line(text, replay=replay)
+            process = died_process(text)
+            if process and self._run is not None:
+                self._run["died"].append(process)
 
     def _watch(self) -> None:
-        next_scan = 0.0
+        next_scan = next_prune = 0.0
         while True:
             time.sleep(0.2)
             try:
@@ -333,6 +383,10 @@ class Launcher:
                     next_scan = now + 2.0
                     own = {self._run["pid"]} if self._run else set()
                     self._external = find_launches(own | {os.getpid()})
+                if now >= next_prune:
+                    next_prune = now + 60.0
+                    with self._lock:
+                        self._prune()
             except Exception as error:  # noqa: BLE001 - the watcher must survive
                 self.log.note(f"launch watcher: {error}", ERROR)
 

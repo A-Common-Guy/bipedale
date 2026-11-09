@@ -139,6 +139,15 @@ class _Tree:
             self._walk(child, child_pose, child_joint, child_chain)
 
 
+def sources(mjcf: Path) -> list[Path]:
+    """The MJCF and every mesh file it names: what the built model depends on."""
+    mjcf = Path(mjcf)
+    root = ET.parse(mjcf).getroot()
+    compiler = root.find("compiler")
+    mesh_dir = mjcf.parent / (compiler.get("meshdir", "") if compiler is not None else "")
+    return [mjcf] + sorted({mesh_dir / m.get("file") for m in root.iter("mesh") if m.get("file")})
+
+
 def build(mjcf: Path, cell_mm: float = 1.0, min_part_mm: float = 10.0) -> tuple[dict, bytes]:
     """(model description, packed mesh buffer) for the browser."""
     tree = _Tree(Path(mjcf))

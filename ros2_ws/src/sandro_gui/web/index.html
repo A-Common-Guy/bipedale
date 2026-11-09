@@ -20,7 +20,7 @@
       <button data-page="guide">Guide</button>
     </nav>
     <div id="chips" class="chips"></div>
-    <button id="estop" class="estop" title="Deactivate every controller and send the CAN E-stop">E-STOP</button>
+    <button id="estop" class="estop" title="Send the CAN E-stop to the drives (from the panel and through the E-stop node) and deactivate every controller">E-STOP</button>
   </header>
   <div class="offline-banner">Connection to the robot lost. Retrying…</div>
 
@@ -58,9 +58,10 @@
       <div class="grid run-top">
         <div class="panel">
           <div class="panel-head"><h2>Stack</h2>
-            <div class="tools"><button id="launch-start" class="primary">Start</button><button id="launch-stop" class="danger">Stop</button></div>
+            <div class="tools"><button id="launch-start" class="primary">Start stack</button><button id="launch-stop" class="danger" title="One SIGINT, as Ctrl-C: zero torque, drives idle, deadman off, then the launch exits. A balancing robot falls.">Stop</button></div>
           </div>
           <div id="launch-status" class="launch-status"></div>
+          <div id="flow" class="flow" hidden></div>
           <div id="start-form" class="start-form"></div>
         </div>
         <div class="stack">
