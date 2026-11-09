@@ -23,8 +23,9 @@ wheel-only balancers ignore it. Pressing L2 and R2 together is the gamepad
 E-stop: every command-owning controller is deactivated (all efforts zero, the
 robot drops) and on hardware the CAN E-stop fires too. Re-arm while holding the
 robot upright: in simulation `ros2 control switch_controllers --activate
-whole_body_controller`; on hardware relaunch with `arm_hardware:=true` (the
-drives latch `ESTOP_REQUESTED`, which arming clears; see
+whole_body_controller`; on hardware arm the drives again and then the
+controller, from the panel, the gamepad re-arm or `ros2 control` (the drives
+latch `ESTOP_REQUESTED`, which arming clears; see
 `HARDWARE_COMMISSIONING.md`). Only one balancer may be active.
 
 ## What the legs buy

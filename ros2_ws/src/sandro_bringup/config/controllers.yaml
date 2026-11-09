@@ -3,6 +3,8 @@ controller_manager:
     update_rate: 300
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
+    health_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
     imu_broadcaster:
       type: imu_sensor_broadcaster/IMUSensorBroadcaster
     driving_balancer:
@@ -27,6 +29,19 @@ controller_manager:
       type: sandro_controllers/TimedEffortController
     commission_left_leg:
       type: sandro_controllers/TimedEffortController
+
+# /joint_states at the control rate. use_local_topics is not an option here:
+# Jazzy moves both of its topics under ~/, /joint_states included.
+joint_state_broadcaster:
+  ros__parameters:
+    publish_dynamic_joint_states: false
+
+# Every state interface (feedback age, online, temperature, error, saturation,
+# IMU) for the control panel on /health_broadcaster/dynamic_joint_states.
+health_broadcaster:
+  ros__parameters:
+    update_rate: 10
+    use_local_topics: true
 
 imu_broadcaster:
   ros__parameters:
@@ -184,6 +199,8 @@ whole_body_controller:
              left_motor_inner, left_motor_outer, left_wheel]
     imu_name: imu
     command_topic: /cmd_vel
+    # compare_runs.py's leg_lag_ms and pitch_peak_hz need about 50 Hz; the
+    # message is filled without allocating, so the rate costs the loop little.
     diagnostics.publish_rate_hz: 50.0
     model:
       # Planar five-bar geometry (m) and the body-x direction of planar +x.

@@ -55,10 +55,10 @@ the numbers above were obtained with:
   now applied per physics step (1 ms by default, about one 3-frame CAN
   burst plus the gs_usb round trip).
 
-The IMU is 10 ms / 240 Hz: the SPI path on the Pi, the only one in use since 2026-10, gives
-241–243 Hz, 9 ms behind the encoders (`tools/imu_delay.py`, `recordings/imu_rock*_2026-10-21.csv`),
-i.e. `sim_imu_delay_s` 0.010 with the 1 ms joint delay. The UART path gave only 30 Hz
-(`sim_imu_rate_hz:=30` reproduces it, eighth comparison). Recheck the shipped gains against these settings before relying on
+The IMU is 10 ms / 200 Hz: the SPI path on the Pi, the only one in use since 2026-10, delivers each signal at
+200 Hz (`report_interval_us` 5000; the 241–243 Hz once quoted here counted orientation and gyro arrivals together),
+9 ms behind the encoders (`tools/imu_delay.py`, `recordings/imu_rock*_2026-10-21.csv`), i.e. `sim_imu_delay_s` 0.010 with
+the 1 ms joint delay. The UART path gave only 30 Hz (`sim_imu_rate_hz:=30` reproduces it, eighth comparison). Recheck the shipped gains against these settings before relying on
 the margins quoted above: the loop is less delayed than the one they were
 tuned for. `sim_joint_stagger:=false` puts all drives on one clock, as
 `state_source:=mit` does.
@@ -562,7 +562,7 @@ model and the comparison is repeated.
    maximum correlation is the IMU delay minus the encoder delay, as the
    controller receives them (synthetic recordings: within 0.1 ms).
    `sim_imu_delay_s` is that lag plus `sim_joint_delay_s`. Measure the
-   encoder age from the `feedback_age` interface on `/dynamic_joint_states`.
+   encoder age from the `feedback_age` interface on `/health_broadcaster/dynamic_joint_states`.
    The IMU delay is the one that matters (eighth comparison).
 3. **Tyre scrub.** Compare `yaw_rise_s` and `yaw_err_rms` in the turning
    phases. Raise `tyre.friction[1]` (torsional) until the simulated yaw

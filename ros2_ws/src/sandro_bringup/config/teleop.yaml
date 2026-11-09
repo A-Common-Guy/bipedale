@@ -36,7 +36,10 @@ joy_teleop:
     # incoming one engages at the height it would start from anyway.
     handover_height_m: 0.17
     handover_margin: 0.6       # fraction of the incoming engage joint velocity
-                               # the joints must stay below
+                               # the leg joints must stay below
+    # The wheels keep balancing while the robot stands, and the incoming
+    # policy starts from their measured speed; 1.5 rad/s is 0.1 m/s.
+    handover_wheel_velocity_rad_s: 1.5
     handover_hold_s: 0.3
     handover_timeout_s: 8.0
     # Stick ranges until the running controller's parameters are read:
@@ -53,8 +56,12 @@ joy_teleop:
 # service exists.
 # Re-arm: hold Create + Options (buttons 4 and 6) for rearm_hold_s. The first
 # hold arms the drives at zero torque with no controller, a second hold starts
-# rearm_controller, or the policy last selected with the gamepad switch; hold
-# the robot upright before the second.
+# the controller that ran last (rearm_controller until one has run) and loads
+# the other switch_policies inactive; hold the robot upright before the second.
+# The gamepad re-activates the drives only once they have been armed in this
+# launch (panel, `ros2 control` or arm_hardware:=true): the first arming of a
+# session is the operator's, after the pre-arm checks. A controller that runs
+# but reports ERROR (fallen, latched limp) restarts with a single hold.
 joy_estop:
   ros__parameters:
     axes: [4, 5]
@@ -62,8 +69,11 @@ joy_estop:
     rearm_buttons: [4, 6]
     rearm_hold_s: 2.0
     rearm_controller: whole_body_controller
+    switch_policies: [rl_flat_level, rl_agile_terrain]  # joy_teleop's policies
     hardware_component: SandroSystem
-    rearm_broadcasters: [joint_state_broadcaster]
+    # Broadcasters reading the drives, which a drive read error deactivates.
+    rearm_broadcasters: [joint_state_broadcaster, health_broadcaster]
+    rearm_timeout_s: 10.0      # a re-arm with no reply by then can start over
     joy_topic: /joy
     controller_manager: /controller_manager
     hardware_estop_service: /gim6010_estop/trigger

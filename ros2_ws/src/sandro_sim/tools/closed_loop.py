@@ -245,7 +245,7 @@ def command_sweep(args, binary: Path) -> int:
 # it goes on the robot; none may fall. They encode what is known about the
 # physical robot, not only the nominal simulation (SIM_TO_REAL.md,
 # "Closed-loop simulation without ROS").
-# The slow end of the BNO085 SPI link: 241-243 Hz, 9 ms on the robot
+# The slow end of the BNO085 SPI link: about 200 Hz per signal, 9 ms on the robot
 # (recordings/imu_rock*_2026-10-21.csv), with margin.
 SPI_IMU_SLOW = {"imu_rate": "180", "imu_delay": "0.015"}
 

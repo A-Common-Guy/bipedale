@@ -9,7 +9,7 @@ Drive (hold L1, the deadman):
 Policies:
     L1 + triangle  switch to the next policy in `policies`, softly: the robot
                    is brought to a standstill at the handover height with zero
-                   roll and still joints, the incoming controller is armed for
+                   roll and still legs and wheels, the incoming controller is armed for
                    a handover (~/arm_handover) and one controller switch swaps
                    the policies in a single control cycle; the incoming policy
                    engages at once from the measured pose. Release L1 or
@@ -25,8 +25,9 @@ way SDL opened it. The gamepad also rumbles once per position (one pulse for
 the first, two for the second, ...) whenever the running controller changes
 and on circle, where the pad offers rumble; one long rumble means a switch
 was aborted. The running
-controller is also published on /teleop/active_controller and the selected
-policy (which the E-stop re-arm restarts) on /teleop/selected_policy.
+controller is also published on /teleop/active_controller (which the E-stop
+re-arm restarts), the selected policy on /teleop/selected_policy and what a
+switch in progress waits for on /teleop/switch_status.
 
 Stick ranges follow the running controller's own command limits, read from
 its parameters, so full deflection means the same on every policy.
@@ -45,8 +46,6 @@ from controller_manager_msgs.srv import ListControllers, SwitchController
 from diagnostic_msgs.msg import DiagnosticArray
 from geometry_msgs.msg import TwistStamped
 from rcl_interfaces.srv import GetParameters
-from rclpy.callback_groups import ReentrantCallbackGroup
-from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState, Joy, JoyFeedback
@@ -100,9 +99,15 @@ def next_policy(policies: list[str], current: str | None) -> str | None:
     return policies[(policies.index(current) + 1) % len(policies)]
 
 
-def handover_ready(diag: dict, velocity, target: Limits, handover_height_m: float,
-                   margin: float) -> tuple[bool, str]:
-    """Whether the running policy holds the robot still enough to hand over, and why not."""
+def handover_ready(diag: dict, velocity: dict[str, float] | None, target: Limits,
+                   handover_height_m: float, margin: float,
+                   wheel_velocity_rad_s: float) -> tuple[bool, str]:
+    """Whether the running policy holds the robot still enough to hand over, and why not.
+
+    `velocity` maps the incoming policy's joints to their velocity; leg joints
+    must stay below `margin` times its engage joint velocity, wheels below
+    `wheel_velocity_rad_s`.
+    """
     if diag.get("message") != "policy":
         return False, f"running controller is '{diag.get('message', 'silent')}'"
     if abs(diag.get("velocity_reference_m_s", 1.0)) > 0.03:
@@ -117,8 +122,11 @@ def handover_ready(diag: dict, velocity, target: Limits, handover_height_m: floa
         return False, "body turning"
     if velocity is None:
         return False, "no joint state"
-    if any(abs(v) > margin * target.engage_joint_velocity_rad_s for v in velocity):
-        return False, "joints moving"
+    for name, v in velocity.items():
+        limit = (wheel_velocity_rad_s if "wheel" in name
+                 else margin * target.engage_joint_velocity_rad_s)
+        if abs(v) > limit:
+            return False, f"{name} moving"
     return True, ""
 
 
@@ -203,6 +211,7 @@ class JoyTeleop(Node):
         p("policies", ["rl_flat_level", "rl_agile_terrain"])
         p("handover_height_m", 0.17)
         p("handover_margin", 0.6)
+        p("handover_wheel_velocity_rad_s", 1.5)
         p("handover_hold_s", 0.3)
         p("handover_timeout_s", 8.0)
         p("height_gain_per_s", 3.0)
@@ -225,6 +234,7 @@ class JoyTeleop(Node):
         self.policies = list(g("policies"))
         self.handover_height = float(g("handover_height_m"))
         self.margin = float(g("handover_margin"))
+        self.wheel_velocity = float(g("handover_wheel_velocity_rad_s"))
         self.hold_s = float(g("handover_hold_s"))
         self.timeout_s = float(g("handover_timeout_s"))
         self.gain = float(g("height_gain_per_s"))
@@ -235,25 +245,24 @@ class JoyTeleop(Node):
         self.policy_colors = [int(v) for v in g("policy_colors")]
         self.leds = PadLeds(g("led_root"))
 
-        group = ReentrantCallbackGroup()
         manager = g("controller_manager")
-        self.list_client = self.create_client(
-            ListControllers, f"{manager}/list_controllers", callback_group=group)
-        self.switch_client = self.create_client(
-            SwitchController, f"{manager}/switch_controller", callback_group=group)
+        self.list_client = self.create_client(ListControllers, f"{manager}/list_controllers")
+        self.switch_client = self.create_client(SwitchController, f"{manager}/switch_controller")
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.command_pub = self.create_publisher(TwistStamped, g("command_topic"), 10)
         self.active_pub = self.create_publisher(String, "/teleop/active_controller", latched)
         self.selected_pub = self.create_publisher(String, "/teleop/selected_policy", latched)
+        self.status_pub = self.create_publisher(String, "/teleop/switch_status", latched)
         self.feedback_pub = self.create_publisher(JoyFeedback, "/joy/set_feedback", 10)
-        self.create_subscription(Joy, g("joy_topic"), self._on_joy, 10, callback_group=group)
-        self.create_subscription(JointState, "/joint_states", self._on_joints, 10,
-                                 callback_group=group)
+        self.create_subscription(Joy, g("joy_topic"), self._on_joy, 10)
+        # /joint_states runs at the control rate; it is decoded only while a
+        # switch waits for still joints.
+        self.joint_subscription = None
         self.diag: dict[str, dict] = {}
         for name in self.policies:
             self.create_subscription(
                 DiagnosticArray, f"/{name}/diagnostics",
-                lambda msg, name=name: self._on_diag(name, msg), 10, callback_group=group)
+                lambda msg, name=name: self._on_diag(name, msg), 10)
 
         self.joy: Joy | None = None
         self.joy_time = 0.0
@@ -266,6 +275,8 @@ class JoyTeleop(Node):
         self.selected: str | None = None
         self.loaded: dict[str, str] = {}
         self.parameter_clients: dict[str, object] = {}
+        self.fetching: set[str] = set()
+        self.unreachable: set[str] = set()
         self.handover_clients: dict[str, object] = {}
         self.listing = False
         self.publishing = False
@@ -273,8 +284,8 @@ class JoyTeleop(Node):
         self.switch: dict | None = None
         self.rumble: deque = deque()
 
-        self.create_timer(1.0 / float(g("rate_hz")), self._tick, callback_group=group)
-        self.create_timer(1.0, self._poll_controllers, callback_group=group)
+        self.create_timer(1.0 / float(g("rate_hz")), self._tick)
+        self.create_timer(1.0, self._poll_controllers)
         self.get_logger().info(
             f"gamepad teleop: hold button {self.deadman} to drive; switch policy with "
             f"{self.deadman}+{self.switch_button} among {self.policies}; "
@@ -315,7 +326,7 @@ class JoyTeleop(Node):
         names = self.controller_joints.get(controller)
         if not names or any(n not in table for n in names):
             return None
-        return [table[n] for n in names]
+        return {n: table[n] for n in names}
 
     # Controllers --------------------------------------------------------
 
@@ -336,6 +347,8 @@ class JoyTeleop(Node):
                    if c.state == "active" and len(c.claimed_interfaces) > 0]
         self.loaded = {c.name: c.state for c in controllers}
         self.set_active(running[0] if running else None)
+        if self.active is not None:
+            self.fetch_limits(self.active)
 
     def set_active(self, name: str | None) -> None:
         if name == self.active:
@@ -352,15 +365,19 @@ class JoyTeleop(Node):
         self.announce()
 
     def fetch_limits(self, name: str) -> None:
-        if name in self.limits:
+        """Requests the controller's limits; retried from the controller poll until read."""
+        if name in self.limits or name in self.fetching:
             return
         if name not in self.parameter_clients:
             self.parameter_clients[name] = self.create_client(
                 GetParameters, f"/{name}/get_parameters")
         client = self.parameter_clients[name]
-        if not client.wait_for_service(timeout_sec=0.5):
-            self.get_logger().warn(f"{name} parameters unreachable; default stick ranges")
+        if not client.service_is_ready():
+            if name not in self.unreachable:
+                self.unreachable.add(name)
+                self.get_logger().warn(f"{name} parameters unreachable; default stick ranges")
             return
+        self.fetching.add(name)
         rl = ["commands.forward_m_s", "commands.yaw_rad_s", "shaping.height_rate_m_s",
               "commands.roll_rad", "commands.initial_height_m", "safety.engage_tilt_rad",
               "safety.engage_joint_velocity_rad_s", "joints"]
@@ -374,9 +391,11 @@ class JoyTeleop(Node):
         try:
             values = future.result().values
         except Exception as error:  # noqa: BLE001
+            self.fetching.discard(name)
             self.get_logger().warn(f"{name} parameters: {error}")
             return
         if values and values[0].type != 0:
+            self.fetching.discard(name)
             v = values
             self.limits[name] = Limits(
                 v[0].double_value, v[1].double_value, v[2].double_value, v[3].double_value,
@@ -392,6 +411,7 @@ class JoyTeleop(Node):
             lambda f, name=name: self._on_wbc_parameters(name, f))
 
     def _on_wbc_parameters(self, name, future) -> None:
+        self.fetching.discard(name)
         try:
             v = future.result().values
         except Exception as error:  # noqa: BLE001
@@ -425,14 +445,32 @@ class JoyTeleop(Node):
         self.fetch_limits(target)
         self.switch = {"from": self.active, "to": target, "start": time.monotonic(),
                        "ready_since": None, "called": False, "why": ""}
+        self.joint_velocity.clear()
+        self.joint_subscription = self.create_subscription(
+            JointState, "/joint_states", self._on_joints, 10)
         self.get_logger().warn(
             f"policy switch {self.active} -> {target}: settling at "
             f"{self.handover_height:.3f} m, zero speed and roll")
 
+    def _end_switch(self, status: str = "") -> None:
+        self.switch = None
+        if self.joint_subscription is not None:
+            self.destroy_subscription(self.joint_subscription)
+            self.joint_subscription = None
+        self.status_pub.publish(String(data=status))
+
     def abort_switch(self, why: str) -> None:
         self.get_logger().error(f"policy switch aborted: {why}")
-        self.switch = None
+        self._end_switch(f"aborted: {why}")
         self.buzz()
+
+    def _set_why(self, s: dict, why: str) -> None:
+        if why != s["why"]:
+            s["why"] = why
+            if why:
+                self.get_logger().info(f"policy switch waits: {why}")
+            self.status_pub.publish(String(
+                data=f"{s['from']} -> {s['to']}: {why or 'ready, holding'}"))
 
     def _switch_step(self, now: float):
         s = self.switch
@@ -448,13 +486,14 @@ class JoyTeleop(Node):
             reference, self.handover_height, source.height_rate_m_s, self.gain), 0.0)
         target = self.limits.get(s["to"])
         if target is None:
-            s["why"] = "incoming policy limits unknown"
+            self._set_why(s, "incoming policy limits unknown")
             return command
         velocity = self._joints_of(s["to"], self.joint_velocity)
-        fresh = now - diag.get("time", 0.0) < 0.5
-        ready, s["why"] = handover_ready(diag, velocity, target, self.handover_height,
-                                         self.margin)
-        ready = ready and fresh
+        ready, why = handover_ready(diag, velocity, target, self.handover_height,
+                                    self.margin, self.wheel_velocity)
+        if ready and now - diag.get("time", 0.0) >= 0.5:
+            ready, why = False, f"no fresh {s['from']} diagnostics"
+        self._set_why(s, why)
         if not ready:
             s["ready_since"] = None
             return command
@@ -499,10 +538,10 @@ class JoyTeleop(Node):
         except Exception as error:  # noqa: BLE001
             ok = False
             self.get_logger().error(f"switch_controller failed: {error}")
-        self.switch = None
         if not ok:
             self.abort_switch(f"controller manager refused {s['from']} -> {s['to']}")
             return
+        self._end_switch(f"switched to {s['to']}")
         self.set_active(s["to"])
 
     # Output -------------------------------------------------------------
@@ -587,10 +626,8 @@ class JoyTeleop(Node):
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = JoyTeleop()
-    executor = MultiThreadedExecutor(num_threads=3)
-    executor.add_node(node)
     try:
-        executor.spin()
+        rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:

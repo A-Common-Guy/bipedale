@@ -181,6 +181,22 @@ def test_xacro_files_are_well_formed_and_document_tree_limit():
         assert joint.split("_", 1)[1] in description
 
 
+def test_xacro_defaults_for_bus_load_and_imu_rate():
+    """Without xacro: the defaults as written in the two xacro files."""
+    ros2_control = (PACKAGE / "urdf" / "sandro.ros2_control.xacro").read_text()
+    # Nothing reads iq at the control rate; 5 ms took a fifth of the bus.
+    assert '<param name="iq_period_ms">100</param>' in ros2_control
+    assert '<param name="encoder_period_ms">${encoder_period_ms}</param>' in ros2_control
+    # The BNO085 reports each signal every 5000 us.
+    assert "sim_imu_rate_hz:='200'" in ros2_control
+    assert '<param name="report_interval_us">5000</param>' in ros2_control
+    root = ET.parse(PACKAGE / "urdf" / "sandro.urdf.xacro").getroot()
+    args = {node.get("name"): node.get("default")
+            for node in root.iter("{http://www.ros.org/wiki/xacro}arg")}
+    assert args["sim_imu_rate_hz"] == "200"
+    assert args["encoder_period_ms"] == "5"
+
+
 def _expand(backend: str, *extra: str) -> ET.Element:
     result = subprocess.run(
         [

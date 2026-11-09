@@ -85,14 +85,8 @@ def _setup(context):
         ),
         Node(
             package="controller_manager", executable="spawner",
-            arguments=["joint_state_broadcaster", "-c", manager,
-                       "--controller-manager-timeout", "30"],
-            output="screen",
-        ),
-        Node(
-            package="controller_manager", executable="spawner",
-            arguments=["imu_broadcaster", "-c", manager,
-                       "--controller-manager-timeout", "30"],
+            arguments=["joint_state_broadcaster", "health_broadcaster", "imu_broadcaster",
+                       "-c", manager, "--controller-manager-timeout", "30"],
             output="screen",
         ),
         Node(

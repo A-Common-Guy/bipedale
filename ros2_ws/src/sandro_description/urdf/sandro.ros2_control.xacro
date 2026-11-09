@@ -55,7 +55,7 @@
               imu_mount_yaw_rad:='1.5707963267948966'
               state_source:='encoder' encoder_period_ms:='5'
               simulation_headless:='false' simulation_latency:='true'
-              sim_imu_delay_s:='0.010' sim_imu_rate_hz:='240'
+              sim_imu_delay_s:='0.010' sim_imu_rate_hz:='200'
               sim_joint_delay_s:='0.001' sim_joint_rate_hz:='200'
               sim_joint_stagger:='true' sim_command_delay_s:='0.001'">
     <ros2_control name="SandroSystem" type="system">
@@ -104,7 +104,9 @@
                and can run slower to free the bus. -->
           <param name="state_source">${state_source}</param>
           <param name="encoder_period_ms">${encoder_period_ms}</param>
-          <param name="iq_period_ms">5</param>
+          <!-- Only the iq state interface (/health_broadcaster) reads it; at
+               5 ms the six drives' iq frames took about 20 % of the bus. -->
+          <param name="iq_period_ms">100</param>
           <param name="heartbeat_period_ms">100</param>
           <param name="deadman_ms">300</param>
           <param name="stale_state_s">0.1</param>

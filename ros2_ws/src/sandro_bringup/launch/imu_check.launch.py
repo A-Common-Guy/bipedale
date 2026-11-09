@@ -50,13 +50,14 @@ def _setup(context):
              parameters=[{"robot_description": urdf},
                          os.path.join(bringup, "config", "controllers.yaml")],
              output="screen"),
-        # imu_broadcaster for the standard Imu message; joint_state_broadcaster for
-        # /dynamic_joint_states, which carries the driver's sample age and online flag.
-        *[Node(package="controller_manager", executable="spawner",
-               arguments=[name, "--controller-manager", "/controller_manager",
-                          "--controller-manager-timeout", "30"],
-               output="screen")
-          for name in ("imu_broadcaster", "joint_state_broadcaster")],
+        # imu_broadcaster for the standard Imu message; health_broadcaster for
+        # /health_broadcaster/dynamic_joint_states, which carries the driver's
+        # sample age and online flag.
+        Node(package="controller_manager", executable="spawner",
+             arguments=["joint_state_broadcaster", "health_broadcaster", "imu_broadcaster",
+                        "--controller-manager", "/controller_manager",
+                        "--controller-manager-timeout", "30"],
+             output="screen"),
     ]
 
 

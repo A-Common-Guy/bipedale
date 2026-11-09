@@ -138,16 +138,31 @@ class DriveTest(Node):
         self.message = ""
         self.level = 0
         self.samples = 0
+        self.first_sample = 0.0
+        self.rate_checked = False
         self.period = 1.0 / rate_hz
         self.recorder: Recorder | None = None
         self.record_path: str | None = None
         self.joint_subscription = None
         self.imu_subscription = None
 
+    def check_diagnostics_rate(self) -> None:
+        """Warns once when a recording's diagnostics are too slow for compare_runs.py."""
+        elapsed = time.monotonic() - self.first_sample
+        if self.rate_checked or self.samples < 5 or elapsed <= 0.0:
+            return
+        self.rate_checked = True
+        rate = (self.samples - 1) / elapsed
+        if rate < 40.0:
+            print(f"WARNING: diagnostics arrive at {rate:.0f} Hz; compare_runs.py's leg_lag_ms "
+                  "and pitch_peak_hz need about 50 Hz (diagnostics.publish_rate_hz: 50.0 in "
+                  "extra_params)", file=sys.stderr)
+
     def start_recording(self, path: str) -> None:
         # The header needs the diagnostic keys, so open the file at the first
         # diagnostics message (already received when this is called).
         self.recorder = Recorder(path, sorted(self.latest))
+        self.check_diagnostics_rate()
         self.joint_subscription = self.create_subscription(
             JointState, "/joint_states", self._on_joints, 50)
         self.imu_subscription = self.create_subscription(
@@ -161,6 +176,8 @@ class DriveTest(Node):
         self.message = status.message
         level = status.level
         self.level = int.from_bytes(level, "little") if isinstance(level, bytes) else int(level)
+        if self.samples == 0:
+            self.first_sample = time.monotonic()
         self.samples += 1
         if self.recorder:
             self.recorder.diagnostics(self.latest)
@@ -236,7 +253,7 @@ def main() -> int:
     rclpy.init()
     node = DriveTest(args.controller, args.topic, args.rate)
     # Subscriptions are serviced on their own thread so 300 Hz joint states
-    # and 50 Hz diagnostics are all recorded while the command loop paces
+    # and the diagnostics are all recorded while the command loop paces
     # itself with sleeps.
     executor = SingleThreadedExecutor()
     executor.add_node(node)
@@ -299,6 +316,7 @@ def main() -> int:
     print(f"finished: {node.samples} diagnostic samples, worst level {worst_level}, "
           f"fall latch {'YES' if fell else 'no'}")
     if node.recorder:
+        node.check_diagnostics_rate()
         node.recorder.close()
         print(f"recorded {node.recorder.rows} rows to {args.record}")
     node.destroy_node()

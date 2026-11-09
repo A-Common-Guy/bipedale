@@ -14,6 +14,14 @@ from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+DRIVES = "SandroSystem"
+# Spawned active in one spawner call, which stops at the first failure: the
+# IMU goes last so a missing IMU cannot keep the joint state off.
+BROADCASTERS = ("joint_state_broadcaster", "health_broadcaster", "imu_broadcaster")
+# ros2_control_node on the Raspberry Pi 4 (cores 0-3): SCHED_FIFO priority and
+# core of the control-loop thread, and mlockall of the whole process.
+REALTIME = {"thread_priority": 50, "cpu_affinity": 3, "lock_memory": True}
+
 
 def _truth(value):
     return value.lower() in ("1", "true", "yes", "on")
@@ -31,6 +39,18 @@ def _switchable(bringup, controller):
     with open(os.path.join(bringup, "config", "teleop.yaml"), encoding="utf-8") as stream:
         policies = yaml.safe_load(stream)["joy_teleop"]["ros__parameters"]["policies"]
     return [p for p in policies if p != controller] if controller in policies else []
+
+
+def _spawner(controllers, *flags):
+    return Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            *controllers, *flags, "--controller-manager", "/controller_manager",
+            "--controller-manager-timeout", "30",
+        ],
+        output="screen",
+    )
 
 
 def _setup(context):
@@ -110,11 +130,23 @@ def _setup(context):
                 }],
                 output="screen",
             ))
-        control_allowed = hardware == "mujoco" or arm_hardware
-        if hardware == "real" and not arm_hardware:
+        control_allowed = True
+        # One launch per session on the robot: the controller manager runs from
+        # the start with the IMU active and the drives configured but inactive
+        # (no torque, write() is never called), the broadcasters publish, and
+        # the requested controller waits inactive. Arming is
+        # set_hardware_component_state SandroSystem active, then activating the
+        # controller (control panel, joy_estop or ros2 control).
+        session = hardware == "real" and not arm_hardware
+        if session:
             actions.append(LogInfo(
-                msg="REAL SAFE STATE: controller manager not started and drives are not armed. "
-                    "Use arm_hardware:=true only after commissioning checks."
+                msg=f"REAL SAFE STATE: drives are not armed; {DRIVES} starts inactive (no "
+                    "torque)" + (f" and {controller} waits inactive" if controller != "none"
+                                 else "") +
+                    f". Arm from the control panel, or: ros2 control "
+                    f"set_hardware_component_state {DRIVES} active, then ros2 control "
+                    "switch_controllers --activate <controller>. arm_hardware:=true arms at "
+                    "launch; use it only after commissioning checks."
             ))
         elif hardware == "mujoco" and not _package("mujoco_ros2_control"):
             actions.append(LogInfo(
@@ -138,46 +170,35 @@ def _setup(context):
                     # The MuJoCo backend's plugins: the per-step MIT drive law.
                     *([os.path.join(sim_share, "config", "mujoco_plugins.yaml")]
                       if sim_share else []),
+                    *([REALTIME] if hardware == "real" else []),
                     # Optional overrides (tuning experiments, per-robot values)
                     # applied after the shipped configuration.
                     *([extra_params] if extra_params else []),
                     {"use_sim_time": hardware == "mujoco"},
+                    # After extra_params, so no override file can arm the drives.
+                    # A drive that fails to configure (CAN down) leaves the
+                    # IMU and the panel running instead of the whole manager.
+                    *([{
+                        "hardware_components_initial_state.inactive": [DRIVES],
+                        "hardware_components_initial_state.shutdown_on_initial_state_failure":
+                            False,
+                    }] if session else []),
                 ],
                 output="screen",
             ))
-            for broadcaster in ("joint_state_broadcaster", "imu_broadcaster"):
-                actions.append(Node(
-                    package="controller_manager",
-                    executable="spawner",
-                    arguments=[
-                        broadcaster, "--controller-manager", "/controller_manager",
-                        "--controller-manager-timeout", "30",
-                    ],
-                    output="screen",
-                ))
+            actions.append(_spawner(BROADCASTERS))
             if controller != "none":
-                controller_spawner = Node(
-                    package="controller_manager",
-                    executable="spawner",
-                    arguments=[
-                        controller, "--controller-manager", "/controller_manager",
-                        "--controller-manager-timeout", "30",
-                    ],
-                    output="screen",
-                )
-                actions.append(controller_spawner)
                 # The other policies of the gamepad switch, loaded and
                 # configured but inactive, so a switch is a single activation.
-                for policy in _switchable(bringup, controller):
-                    actions.append(Node(
-                        package="controller_manager",
-                        executable="spawner",
-                        arguments=[
-                            policy, "--inactive", "--controller-manager", "/controller_manager",
-                            "--controller-manager-timeout", "30",
-                        ],
-                        output="screen",
-                    ))
+                partners = _switchable(bringup, controller)
+                if session:
+                    actions.append(_spawner([controller, *partners], "--inactive"))
+                else:
+                    # Its own call: sim_reset waits for its exit, the activation.
+                    controller_spawner = _spawner([controller])
+                    actions.append(controller_spawner)
+                    if partners:
+                        actions.append(_spawner(partners, "--inactive"))
                 if hardware == "mujoco" and sim_reset:
                     # Physics runs from the moment the controller manager starts,
                     # about a second before the balancer is active, and unpowered
@@ -197,16 +218,15 @@ def _setup(context):
                         )],
                     )))
 
-    if teleop and hardware == "real" and not arm_hardware:
-        actions.append(LogInfo(
-            msg="REAL SAFE STATE: teleop publisher suppressed until arm_hardware:=true."
-        ))
-    elif teleop:
+    # Teleop runs in both real modes: nothing moves without an active
+    # controller on active drives, and joy_estop never arms the drives first.
+    if teleop:
         if _package("joy"):
             teleop_config = os.path.join(bringup, "config", "teleop.yaml")
             actions.extend([
                 Node(package="joy", executable="joy_node",
-                     parameters=[teleop_config], output="screen"),
+                     parameters=[teleop_config],
+                     arguments=["--ros-args", "--log-level", "warn"], output="screen"),
                 # Sticks to /cmd_vel scaled to the running controller, the
                 # soft policy switch and the rumble that tells the policy.
                 Node(package="sandro_bringup", executable="joy_teleop",
@@ -215,7 +235,8 @@ def _setup(context):
                 # Gamepad E-stop chord (L2 + R2): deactivates the balancer and,
                 # on hardware, fires the CAN E-stop. Software only; the
                 # physical cut-off stays mandatory.
-                # Its re-arm restarts the controller this launch spawned.
+                # Its re-arm restarts the controller that ran last, this
+                # launch's until another one has run.
                 Node(package="sandro_bringup", executable="joy_estop",
                      name="joy_estop",
                      parameters=[teleop_config,
@@ -270,7 +291,8 @@ def generate_launch_description():
         DeclareLaunchArgument("headless", default_value="false"),
         DeclareLaunchArgument(
             "arm_hardware", default_value="false",
-            description="Explicit real-hardware controller-manager opt-in; never defaults true",
+            description="real only: arm the drives and start the controller at launch; "
+                        "false starts them inactive for arming later; never defaults true",
         ),
         DeclareLaunchArgument(
             "sim_reset", default_value="true",
@@ -282,7 +304,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument("sim_imu_delay_s", default_value="0.010",
                               description="MuJoCo only: IMU latency from sample to host, seconds"),
-        DeclareLaunchArgument("sim_imu_rate_hz", default_value="240",
+        DeclareLaunchArgument("sim_imu_rate_hz", default_value="200",
                               description="MuJoCo only: IMU sample rate in Hz (0 = every cycle)"),
         DeclareLaunchArgument("sim_joint_delay_s", default_value="0.001",
                               description="MuJoCo only: encoder latency from sample to host "

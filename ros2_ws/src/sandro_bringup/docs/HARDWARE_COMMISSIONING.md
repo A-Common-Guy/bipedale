@@ -4,6 +4,23 @@ Physical bringup is intentionally non-arming. Python/ROS safety checks do not
 replace firmware limits, a physical E-stop, supports, or an independent power
 cut-off.
 
+One launch serves a whole session. `hardware:=real` (with the default
+`arm_hardware:=false`) starts the controller manager with the IMU active and
+`SandroSystem` configured but inactive: no torque, and ros2_control never calls
+its `write()`. The broadcasters run (joint state and IMU at the control rate,
+`/health_broadcaster/dynamic_joint_states` at 10 Hz) and the requested
+controller is loaded inactive. Arming is two steps, from the control panel or
+by hand:
+
+```bash
+ros2 control set_hardware_component_state SandroSystem active
+ros2 control switch_controllers --activate whole_body_controller
+```
+
+Arm the drives before activating the controller: ros2_control lets a
+controller activate on inactive drives, and it would then act the moment they
+arm. `arm_hardware:=true` keeps arming both at launch.
+
 The convenience CAN E-stop is:
 
 ```bash
@@ -16,8 +33,13 @@ the gamepad (`joy_estop`, configured in `config/teleop.yaml`) deactivates every
 command-owning controller and calls this same service; it is equally software
 only. Re-arming from the gamepad takes two deliberate holds of Create +
 Options (2 s each): the first arms the drives at zero torque with no
-controller, the second starts the whole-body controller (hold the robot
-upright first). Both run the same activation as below.
+controller, the second starts the controller that ran last (hold the robot
+upright first). Both run the same activation as below. The gamepad
+re-activates the drives only after they have been armed once in the running
+launch (panel, `ros2 control` or `arm_hardware:=true`): the first arming of a
+session is the operator's, after the pre-arm checks. A controller that still
+runs but reports ERROR on `~/diagnostics` (fallen, latched limp) restarts with
+one hold, without an E-stop.
 
 After either E-stop the drives latch `ESTOP_REQUESTED` (axis error `0x4000`,
 reported together with the CAN watchdog code as `0x104000` = 1064960).
@@ -57,7 +79,7 @@ ros2 control set_hardware_component_state SandroSystem inactive
      (`gim6010/zero_load_encoder.py`, manual 3.4.3). Set it in the
      upper-link-down pose per motor and leave `offset_rev: 0.0`.
    - **Host offset.** Leave the drive zero alone and put the rotor reading of
-     the upper-link-down pose (`raw_position_rev` on `/dynamic_joint_states`)
+     the upper-link-down pose (`raw_position_rev` on `/health_broadcaster/dynamic_joint_states`)
      into that joint's `offset_rev` in `sandro.ros2_control.xacro`.
 
    Verify either way: in the standing pose `/joint_states` must read about
@@ -119,8 +141,9 @@ ros2 control set_hardware_component_state SandroSystem inactive
    and leg position, from the reply to every MIT command instead, synchronous
    with the 300 Hz loop; the broadcast then only keeps the wheels' multi-turn
    position and `encoder_period_ms:=20` frees about 15 % of the bus.
-9. Inspect `/joint_states` and `/dynamic_joint_states`; the latter includes raw
-   requested/applied effort and saturation count. Verify disable, E-stop, stale
+9. Inspect `/joint_states` and `/health_broadcaster/dynamic_joint_states`
+   (10 Hz); the latter includes raw requested/applied effort, saturation count
+   and the drives' iq (broadcast every 100 ms, `iq_period_ms`). Verify disable, E-stop, stale
    feedback, CAN removal, IMU removal, process
    termination, overspeed, and command timeout before ground contact.
 10. Commission the IMU frame (x forward, y left, z up), then balance signs
