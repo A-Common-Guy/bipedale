@@ -84,6 +84,9 @@ if(BUILD_TESTING)
   target_link_libraries(test_sandro_rl_policy Eigen3::Eigen)
   target_compile_definitions(test_sandro_rl_policy PRIVATE
     SANDRO_CONTROLLERS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
+  ament_add_gtest(test_sandro_diagnostic_values test/test_diagnostic_values.cpp)
+  target_include_directories(test_sandro_diagnostic_values PRIVATE include)
 endif()
 
 ament_export_include_directories(include)

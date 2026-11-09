@@ -12,6 +12,7 @@
 #include "realtime_tools/realtime_buffer.hpp"
 #include "realtime_tools/realtime_publisher.hpp"
 
+#include "sandro_controllers/diagnostic_values.hpp"
 #include "sandro_controllers/rl_policy_core.hpp"
 
 namespace sandro_controllers {
@@ -58,7 +59,8 @@ private:
   void zero_commands();
 
   double diagnostics_rate_hz_{50.0};
-  double last_diagnostics_time_s_{};
+  RateGate diagnostics_gate_;
+  std::string diagnostics_name_;
   double inference_max_s_{};
   double inference_last_s_{};
   RlPhase last_phase_{RlPhase::kStand};

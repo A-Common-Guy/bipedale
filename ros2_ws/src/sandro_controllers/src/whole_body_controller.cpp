@@ -140,6 +140,11 @@ WholeBodyController::on_configure(const rclcpp_lifecycle::State &) {
     return controller_interface::CallbackReturn::ERROR;
   }
   std::copy(joints.begin(), joints.end(), joint_names_.begin());
+  for (std::size_t i = 0; i < joint_names_.size(); ++i) {
+    position_command_keys_[i] = "position_command_" + joint_names_[i] + "_rad";
+    effort_keys_[i] = "effort_" + joint_names_[i] + "_nm";
+  }
+  diagnostics_name_ = get_node()->get_name() + std::string("/whole_body");
   imu_name_ = get_node()->get_parameter("imu_name").as_string();
   command_topic_ = get_node()->get_parameter("command_topic").as_string();
   diagnostics_rate_hz_ =
@@ -277,7 +282,7 @@ WholeBodyController::on_activate(const rclcpp_lifecycle::State &) {
   }
   core_.reset(state, *settings_.readFromRT());
   command_.writeFromNonRT(StampedCommand{});
-  last_diagnostics_time_s_ = 0.0;
+  diagnostics_gate_.reset();
   last_reported_status_ = 0U;
   zero_commands();
   return controller_interface::CallbackReturn::SUCCESS;
@@ -354,31 +359,31 @@ void WholeBodyController::publish_diagnostics(const rclcpp::Time &time,
                                               const WholeBodyOutput &output,
                                               const double command_age_s,
                                               const double imu_age_s) {
-  if (time.seconds() - last_diagnostics_time_s_ < 1.0 / diagnostics_rate_hz_ ||
-      !diagnostics_publisher_ || !diagnostics_publisher_->trylock()) {
+  if (!diagnostics_gate_.due(time.seconds()) || !diagnostics_publisher_ ||
+      !diagnostics_publisher_->trylock()) {
     return;
   }
-  last_diagnostics_time_s_ = time.seconds();
+  diagnostics_gate_.commit(time.seconds(), diagnostics_rate_hz_);
   auto &message = diagnostics_publisher_->msg_;
   message.header.stamp = time;
   message.status.resize(1);
   auto &status = message.status.front();
-  status.name = get_node()->get_name() + std::string("/whole_body");
-  status.hardware_id = "sandro";
+  if (status.name != diagnostics_name_) {
+    status.name = diagnostics_name_;
+    status.hardware_id = "sandro";
+  }
   const bool error = output.fallen ||
                      (output.status & (WBC_IMU_STALE | WBC_INVALID_SETTINGS));
   status.level = error ? diagnostic_msgs::msg::DiagnosticStatus::ERROR
                        : (output.status == WBC_OK
                               ? diagnostic_msgs::msg::DiagnosticStatus::OK
                               : diagnostic_msgs::msg::DiagnosticStatus::WARN);
-  status.message = whole_body_status_text(output.status);
-  status.values.clear();
-  const auto add = [&status](const std::string &key, const auto value) {
-    diagnostic_msgs::msg::KeyValue item;
-    item.key = key;
-    item.value = std::to_string(value);
-    status.values.push_back(std::move(item));
-  };
+  if (output.status != diagnostics_status_ || status.message.empty()) {
+    status.message = whole_body_status_text(output.status);
+    diagnostics_status_ = output.status;
+  }
+  DiagnosticValues<diagnostic_msgs::msg::DiagnosticStatus> values(status);
+  const auto add = [&values](std::string_view key, const auto value) { values.add(key, value); };
   add("engaged", output.engaged ? 1 : 0);
   add("ramp", output.ramp);
   add("pitch_rad", output.pitch_rad);
@@ -402,7 +407,7 @@ void WholeBodyController::publish_diagnostics(const rclcpp::Time &time,
   add("leg_offset_model_m", output.leg_offset_model_m);
   add("leg_pd_in_drive", output.kp_nm_rad[0] > 0.0 || output.kp_nm_rad[3] > 0.0 ? 1 : 0);
   for (const std::size_t i : {0U, 1U, 3U, 4U}) {
-    add("position_command_" + joint_names_[i] + "_rad", output.position_command_rad[i]);
+    add(position_command_keys_[i], output.position_command_rad[i]);
   }
   add("leg_offset_state_m", output.leg_offset_state_m);
   add("leg_offset_rate_m_s", output.leg_offset_rate_m_s);
@@ -424,11 +429,12 @@ void WholeBodyController::publish_diagnostics(const rclcpp::Time &time,
   add("gain_leg_offset_command_per_s", output.gains[1][4]);
   add("gain_leg_offset_per_s", output.gains[1][5]);
   for (std::size_t i = 0; i < output.effort_nm.size(); ++i) {
-    add("effort_" + joint_names_[i] + "_nm", output.effort_nm[i]);
+    add(effort_keys_[i], output.effort_nm[i]);
   }
   add("command_age_s", command_age_s);
   add("imu_age_s", imu_age_s);
-  add("status_mask", output.status);
+  add("status_mask", static_cast<unsigned>(output.status));
+  values.finish();
   diagnostics_publisher_->unlockAndPublish();
 }
 

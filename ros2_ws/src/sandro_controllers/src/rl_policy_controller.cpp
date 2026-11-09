@@ -1,6 +1,7 @@
 #include "sandro_controllers/rl_policy_controller.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -264,6 +265,11 @@ RlPolicyController::on_configure(const rclcpp_lifecycle::State &) {
     return controller_interface::CallbackReturn::ERROR;
   }
   diagnostics_rate_hz_ = node->get_parameter("diagnostics.publish_rate_hz").as_double();
+  if (!std::isfinite(diagnostics_rate_hz_) || diagnostics_rate_hz_ <= 0.0) {
+    RCLCPP_ERROR(node->get_logger(), "diagnostics.publish_rate_hz must be positive");
+    return controller_interface::CallbackReturn::ERROR;
+  }
+  diagnostics_name_ = node->get_name() + std::string("/rl_policy");
   RlPolicySettings settings;
   std::string error;
   const int update_rate = get_update_rate() > 0 ? static_cast<int>(get_update_rate()) : 300;
@@ -344,7 +350,7 @@ RlPolicyController::on_activate(const rclcpp_lifecycle::State &) {
   const bool armed = steady_seconds() - handover_armed_s_.exchange(-1e9) <= kHandoverWindowS;
   const bool handed_over = armed && core_.hand_over(state);
   command_.writeFromNonRT(StampedCommand{});
-  last_diagnostics_time_s_ = 0.0;
+  diagnostics_gate_.reset();
   inference_max_s_ = 0.0;
   last_phase_ = core_.phase();
   last_reported_status_ = 0U;
@@ -476,30 +482,30 @@ void RlPolicyController::zero_commands() {
 void RlPolicyController::publish_diagnostics(const rclcpp::Time &time,
                                              const RlPolicyOutput &output,
                                              const double command_age_s) {
-  if (time.seconds() - last_diagnostics_time_s_ < 1.0 / diagnostics_rate_hz_ ||
-      !diagnostics_publisher_ || !diagnostics_publisher_->trylock()) {
+  if (!diagnostics_gate_.due(time.seconds()) || !diagnostics_publisher_ ||
+      !diagnostics_publisher_->trylock()) {
     return;
   }
-  last_diagnostics_time_s_ = time.seconds();
+  diagnostics_gate_.commit(time.seconds(), diagnostics_rate_hz_);
   auto &message = diagnostics_publisher_->msg_;
   message.header.stamp = time;
   message.status.resize(1);
   auto &status = message.status.front();
-  status.name = get_node()->get_name() + std::string("/rl_policy");
-  status.hardware_id = "sandro";
+  if (status.name != diagnostics_name_) {
+    status.name = diagnostics_name_;
+    status.hardware_id = "sandro";
+  }
   status.level = output.phase == RlPhase::kFallen ? diagnostic_msgs::msg::DiagnosticStatus::ERROR
                  : output.phase == RlPhase::kStand ? diagnostic_msgs::msg::DiagnosticStatus::WARN
                                                    : diagnostic_msgs::msg::DiagnosticStatus::OK;
-  status.message = phase_name(output.phase);
-  status.values.clear();
-  const auto add = [&status](const std::string &key, const auto value) {
-    diagnostic_msgs::msg::KeyValue item;
-    item.key = key;
-    item.value = std::to_string(value);
-    status.values.push_back(std::move(item));
-  };
+  const char *phase = phase_name(output.phase);
+  if (status.message != phase) {
+    status.message = phase;
+  }
+  DiagnosticValues<diagnostic_msgs::msg::DiagnosticStatus> values(status);
+  const auto add = [&values](std::string_view key, const auto value) { values.add(key, value); };
   add("phase", static_cast<int>(output.phase));
-  add("status_mask", output.status);
+  add("status_mask", static_cast<unsigned>(output.status));
   add("tilt_rad", output.tilt_rad);
   add("rate_rad_s", output.rate_rad_s);
   add("pitch_rad", output.pitch_rad);
@@ -510,14 +516,17 @@ void RlPolicyController::publish_diagnostics(const rclcpp::Time &time,
   add("roll_reference_rad", output.reference[3]);
   add("right_leg_height_m", output.leg_height_m[0]);
   add("left_leg_height_m", output.leg_height_m[1]);
+  constexpr std::array<std::string_view, 6> kActionKeys{"action_0", "action_1", "action_2",
+                                                        "action_3", "action_4", "action_5"};
   for (std::size_t i = 0; i < 6; ++i) {
-    add("action_" + std::to_string(i), output.action[i]);
+    add(kActionKeys[i], output.action[i]);
   }
   add("oscillation_leg_rad_s", output.oscillation_rad_s[0]);
   add("oscillation_wheel_rad_s", output.oscillation_rad_s[1]);
   add("inference_us", 1e6 * inference_last_s_);
   add("inference_max_us", 1e6 * inference_max_s_);
   add("command_age_s", command_age_s);
+  values.finish();
   diagnostics_publisher_->unlockAndPublish();
 }
 

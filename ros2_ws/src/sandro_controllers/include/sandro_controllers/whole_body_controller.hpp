@@ -13,6 +13,7 @@
 #include "realtime_tools/realtime_buffer.hpp"
 #include "realtime_tools/realtime_publisher.hpp"
 
+#include "sandro_controllers/diagnostic_values.hpp"
 #include "sandro_controllers/whole_body_core.hpp"
 
 namespace sandro_controllers {
@@ -61,7 +62,12 @@ private:
   std::string imu_name_;
   std::string command_topic_;
   double diagnostics_rate_hz_{10.0};
-  double last_diagnostics_time_s_{};
+  RateGate diagnostics_gate_;
+  // Built at configure time: the control loop only copies them.
+  std::string diagnostics_name_;
+  std::array<std::string, 6> position_command_keys_{};
+  std::array<std::string, 6> effort_keys_{};
+  std::uint32_t diagnostics_status_{};
   std::uint32_t last_reported_status_{};
   double control_period_s_{1.0 / 300.0};
   // Non-realtime copy of the accepted parameter set.
