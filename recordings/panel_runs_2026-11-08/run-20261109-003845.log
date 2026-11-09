@@ -1,0 +1,250 @@
+# 2026-11-09 00:38:45 ros2 launch sandro_bringup sandro.launch.py hardware:=real imu_transport:=spi imu_spi_device:=/dev/spidev6.0 rviz:=false arm_hardware:=true state_source:=encoder encoder_period_ms:=5 controller:=none teleop:=true extra_params:=/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml
+[INFO] [launch]: All log files can be found below /root/.ros/log/2026-11-09-00-38-46-889758-robot-16521
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [16535]
+[INFO] [gim6010_estop-2]: process started with pid [16536]
+[INFO] [ros2_control_node-3]: process started with pid [16537]
+[INFO] [spawner-4]: process started with pid [16538]
+[INFO] [spawner-5]: process started with pid [16539]
+[INFO] [joy_node-6]: process started with pid [16540]
+[INFO] [joy_teleop-7]: process started with pid [16541]
+[INFO] [joy_estop-8]: process started with pid [16542]
+[robot_state_publisher-1] [INFO] [1794184728.464093404] [robot_state_publisher]: Robot initialized
+[ros2_control_node-3] [INFO] [1794184728.517266723] [controller_manager]: Using Steady (Monotonic) clock for triggering controller manager cycles.
+[ros2_control_node-3] [INFO] [1794184728.560554820] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[ros2_control_node-3] [INFO] [1794184728.560994724] [controller_manager]: update rate is 300 Hz
+[ros2_control_node-3] [INFO] [1794184728.561429017] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-3] [INFO] [1794184728.562150864] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-3] [INFO] [1794184728.563718130] [controller_manager]: Received robot description from topic.
+[ros2_control_node-3] [INFO] [1794184728.564058108] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[ros2_control_node-3] [INFO] [1794184728.564460050] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 50.
+[ros2_control_node-3] [INFO] [1794184728.585891202] [controller_manager]: Loading hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794184728.590995941] [controller_manager]: Loaded hardware 'SandroSystem' from plugin 'sandro_hardware/GIM6010System'
+[ros2_control_node-3] [INFO] [1794184728.591570048] [controller_manager]: Initialize hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794184728.650286973] [controller_manager]: Successful initialization of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794184728.654855586] [controller_manager]: Loading hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794184728.655574766] [controller_manager]: Loaded hardware 'SandroImu' from plugin 'sandro_hardware/BNO085Sensor'
+[ros2_control_node-3] [INFO] [1794184728.655986929] [controller_manager]: Initialize hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794184728.702581427] [controller_manager]: Successful initialization of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794184728.703225608] [controller_manager]: Activating component 'SandroImu'.
+[ros2_control_node-3] [INFO] [1794184728.703494828] [resource_manager]: 'configure' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794184728.705690367] [resource_manager]: Successful 'configure' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794184728.705782181] [resource_manager]: 'activate' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794184729.038019344] [resource_manager]: Successful 'activate' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794184729.038518730] [controller_manager]: Activating component 'SandroSystem'.
+[ros2_control_node-3] [INFO] [1794184729.038839560] [resource_manager]: 'configure' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794184729.039521222] [resource_manager]: Successful 'configure' of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794184729.039667036] [resource_manager]: 'activate' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794184729.208255367] [GIM6010System]: right_motor_inner node 1 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184729.277544064] [GIM6010System]: right_motor_outer node 2 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184729.345633399] [GIM6010System]: right_wheel node 3 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184729.416501435] [GIM6010System]: left_motor_inner node 5 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184729.484480345] [GIM6010System]: left_motor_outer node 4 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184729.551364874] [GIM6010System]: left_wheel node 6 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184729.583449242] [GIM6010System]: right_motor_inner node 1: MIT position 1.2247 rad, encoder frame 1.2248 rad, bias -0.0001 rad
+[ros2_control_node-3] [INFO] [1794184729.585001082] [GIM6010System]: right_motor_outer node 2: MIT position -1.1591 rad, encoder frame -1.1589 rad, bias -0.0002 rad
+[ros2_control_node-3] [INFO] [1794184729.585024730] [GIM6010System]: right_wheel node 3: MIT position -1.5112 rad, encoder frame -1.5105 rad, bias -0.0007 rad
+[ros2_control_node-3] [INFO] [1794184729.585038119] [GIM6010System]: left_motor_inner node 5: MIT position 1.1606 rad, encoder frame 1.1605 rad, bias 0.0002 rad
+[ros2_control_node-3] [INFO] [1794184729.585200303] [GIM6010System]: left_motor_outer node 4: MIT position -1.1721 rad, encoder frame -1.1716 rad, bias -0.0005 rad
+[ros2_control_node-3] [INFO] [1794184729.585235006] [GIM6010System]: left_wheel node 6: MIT position 0.5507 rad, encoder frame 0.5508 rad, bias -0.0001 rad
+[ros2_control_node-3] [INFO] [1794184729.713509736] [resource_manager]: Successful 'activate' of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794184729.713957622] [controller_manager]: Registering statistics for : SandroImu
+[ros2_control_node-3] [INFO] [1794184729.714520932] [controller_manager]: Registering statistics for : SandroSystem
+[ros2_control_node-3] [INFO] [1794184729.717215245] [controller_manager]: Resource Manager has been successfully initialized. Starting Controller Manager services...
+[ros2_control_node-3] [INFO] [1794184730.042720775] [controller_manager]: Loading controller : 'imu_broadcaster' of type 'imu_sensor_broadcaster/IMUSensorBroadcaster'
+[ros2_control_node-3] [INFO] [1794184730.042960921] [controller_manager]: Loading controller 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794184730.052156037] [controller_manager]: Controller 'imu_broadcaster' node arguments: --ros-args --params-file /tmp/launch_params_ntkj3b9y --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_alznzinh 
+[spawner-5] [INFO] [1794184730.234485005] [spawner_imu_broadcaster]: Loaded imu_broadcaster
+[ros2_control_node-3] [INFO] [1794184730.244447244] [controller_manager]: Configuring controller: 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794184730.268043491] [controller_manager]: Activating controllers: [ imu_broadcaster ]
+[ros2_control_node-3] [INFO] [1794184730.272221885] [controller_manager]: Successfully switched controllers!
+[spawner-5] [INFO] [1794184730.283086969] [spawner_imu_broadcaster]: Configured and activated imu_broadcaster
+[joy_estop-8] [INFO] [1794184730.363346120] [joy_estop]: gamepad E-stop armed on axes [4, 5] (press together); re-arm by holding buttons [4, 6] for 2.0 s, twice
+[INFO] [spawner-5]: process has finished cleanly [pid 16539]
+[joy_teleop-7] [INFO] [1794184731.054758169] [joy_teleop]: gamepad teleop: hold button 9 to drive; switch policy with 9+3 among ['rl_flat_level', 'rl_agile_terrain']; button 1 tells the running one
+[ros2_control_node-3] [INFO] [1794184731.141327808] [controller_manager]: Loading controller : 'joint_state_broadcaster' of type 'joint_state_broadcaster/JointStateBroadcaster'
+[ros2_control_node-3] [INFO] [1794184731.141988377] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1794184731.154606596] [controller_manager]: Controller 'joint_state_broadcaster' node arguments: --ros-args --params-file /tmp/launch_params_ntkj3b9y --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_alznzinh 
+[spawner-4] [INFO] [1794184731.287442681] [spawner_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[ros2_control_node-3] [INFO] [1794184731.302953674] [controller_manager]: Configuring controller: 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1794184731.303355356] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[ros2_control_node-3] [INFO] [1794184731.337931483] [controller_manager]: Activating controllers: [ joint_state_broadcaster ]
+[ros2_control_node-3] [INFO] [1794184731.342419745] [controller_manager]: Successfully switched controllers!
+[spawner-4] [INFO] [1794184731.354117916] [spawner_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[INFO] [spawner-4]: process has finished cleanly [pid 16538]
+[ros2_control_node-3] [INFO] [1794184736.591821159] [controller_manager]: Loading controller : 'rl_stand_up' of type 'sandro_controllers/RlPolicyController'
+[ros2_control_node-3] [INFO] [1794184736.593263333] [controller_manager]: Loading controller 'rl_stand_up'
+[ros2_control_node-3] [INFO] [1794184736.619190210] [controller_manager]: Controller 'rl_stand_up' node arguments: --ros-args --params-file /tmp/launch_params_ntkj3b9y --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_alznzinh 
+[ros2_control_node-3] [INFO] [1794184736.767806916] [controller_manager]: Configuring controller: 'rl_stand_up'
+[ros2_control_node-3] [INFO] [1794184736.773218301] [rl_stand_up]: Policy /workspaces/sandro/install/sandro_controllers/share/sandro_controllers/policies/stand_up.bin: 4 x 25 observations, command limits 0.50 m/s, 1.50 rad/s, height 0.140-0.185 m, roll 0.00 rad; IMU offset 0.016 rad; trained on model 52ef810edae7
+[ros2_control_node-3] [INFO] [1794184738.093939950] [controller_manager]: Configuring controller: 'rl_stand_up'
+[ros2_control_node-3] [INFO] [1794184738.098851672] [rl_stand_up]: Policy /workspaces/sandro/install/sandro_controllers/share/sandro_controllers/policies/stand_up.bin: 4 x 25 observations, command limits 0.50 m/s, 1.50 rad/s, height 0.140-0.185 m, roll 0.00 rad; IMU offset 0.016 rad; trained on model 52ef810edae7
+[ros2_control_node-3] [INFO] [1794184742.314030280] [controller_manager]: Activating controllers: [ rl_stand_up ]
+[ros2_control_node-3] [INFO] [1794184742.317654382] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-3] [INFO] [1794184742.318310544] [rl_stand_up]: Activated: legs move to the stand pose, the policy engages once upright
+[ros2_control_node-3] [INFO] [1794184742.318620949] [controller_manager]: Successfully switched controllers!
+[ros2_control_node-3] [INFO] [1794184742.321935720] [rl_stand_up]: Limp; the stand-up policy engages once the robot rests (tilt 0.69 rad)
+[ros2_control_node-3] [INFO] [1794184742.522201590] [rl_stand_up]: Phase: policy (pitch -0.689 rad, gyro +0.00 +0.00 +0.00 rad/s, leg velocity -0.03 -0.01 +0.00 -0.00, wheel velocity +0.01 -0.01 rad/s, action +1.00 +0.63 -0.61 +0.56 +0.91 -0.63)
+[ros2_control_node-3] [INFO] [1794184742.525112698] [rl_stand_up]: Stand-up policy engaged lying down: no fall cut-off until upright
+[joy_teleop-7] [WARN] [1794184742.994355047] [joy_teleop]: running controller: rl_stand_up
+[joy_teleop-7] [WARN] [1794184743.011374474] [joy_teleop]: running: rl_stand_up (selected policy None)
+[joy_teleop-7] [INFO] [1794184743.016233048] [joy_teleop]: rl_stand_up: full stick 0.50 m/s, 1.50 rad/s, 0.05 m/s height, 0.00 rad roll
+[ros2_control_node-3] [INFO] [1794184745.735158416] [rl_stand_up]: Upright (tilt 0.04 rad): fall cut-off and oscillation watchdog armed (the watchdog after safety.oscillation_arm_delay_s)
+[ros2_control_node-3] [INFO] [1794184752.155634645] [controller_manager]: Loading controller : 'whole_body_controller' of type 'sandro_controllers/WholeBodyController'
+[ros2_control_node-3] [INFO] [1794184752.155850773] [controller_manager]: Loading controller 'whole_body_controller'
+[ros2_control_node-3] [INFO] [1794184752.156804636] [controller_manager]: Controller 'whole_body_controller' node arguments: --ros-args --params-file /tmp/launch_params_ntkj3b9y --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_alznzinh 
+[ros2_control_node-3] [INFO] [1794184752.325657467] [controller_manager]: Configuring controller: 'whole_body_controller'
+[ros2_control_node-3] [INFO] [1794184752.347316007] [whole_body_controller]: Whole-body LQR at 0.170 m leg height (leg lag 70 ms): wheel gains [x -1.43, v -1.21, pitch -14.47, rate -1.20, offset cmd -7.99, offset -18.48] Nm; leg gains [x 1.38, v 1.07, pitch 0.81, rate 0.20, offset cmd 11.39, offset 4.76] m/s; input-delay margin 20.0 ms over the gain table
+[ros2_control_node-3] [INFO] [1794184756.774102544] [controller_manager]: Activating controllers: [ whole_body_controller ]
+[ros2_control_node-3] [INFO] [1794184756.774352708] [controller_manager]: Deactivating controllers: [ rl_stand_up ]
+[ros2_control_node-3] [INFO] [1794184756.775333553] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-3] [INFO] [1794184756.775768735] [rl_stand_up]: Deactivated; longest inference 433 us
+[ros2_control_node-3] [INFO] [1794184756.776823375] [controller_manager]: Successfully switched controllers!
+[ros2_control_node-3] [WARN] [1794184756.991575822] [rclcpp]: Failed to get parameters: commands.forward_m_s
+[joy_teleop-7] [WARN] [1794184757.018865467] [joy_teleop]: running controller: whole_body_controller
+[joy_teleop-7] [WARN] [1794184757.038399467] [joy_teleop]: running: whole_body_controller (selected policy None)
+[ros2_control_node-3] [ERROR] [1794184821.031759588] [GIM6010System]: DRIVE FAULT: right_motor_outer (node 2): no encoder feedback  | right_wheel (node 3): no encoder feedback  | left_motor_inner (node 5): no encoder feedback  | left_wheel (node 6): no encoder feedback 
+[ros2_control_node-3] [WARN] [1794184821.952267125] [GIM6010System]: right_motor_inner node 1: deadman not disabled (node 1: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [WARN] [1794184822.872583017] [GIM6010System]: right_motor_outer node 2: deadman not disabled (node 2: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [WARN] [1794184823.792863409] [GIM6010System]: right_wheel node 3: deadman not disabled (node 3: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [WARN] [1794184824.713124728] [GIM6010System]: left_motor_inner node 5: deadman not disabled (node 5: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [WARN] [1794184825.633401195] [GIM6010System]: left_motor_outer node 4: deadman not disabled (node 4: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [WARN] [1794184826.553689347] [GIM6010System]: left_wheel node 6: deadman not disabled (node 6: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [ERROR] [1794184826.641417408] [controller_manager]: Deactivating following hardware components as their read cycle resulted in an error: [ SandroSystem ]
+[ros2_control_node-3] [ERROR] [1794184826.641774479] [controller_manager]: Deactivating following controllers as their hardware components read cycle resulted in an error: [ joint_state_broadcaster rl_stand_up whole_body_controller ]
+[ros2_control_node-3] [ERROR] [1794184826.642206717] [controller_manager]: Not acceptable command interfaces combination: 
+[ros2_control_node-3] Start interfaces: 
+[ros2_control_node-3] [
+[ros2_control_node-3] ]
+[ros2_control_node-3] Stop interfaces: 
+[ros2_control_node-3] [
+[ros2_control_node-3]   right_motor_inner/effort
+[ros2_control_node-3]   right_motor_outer/effort
+[ros2_control_node-3]   right_wheel/effort
+[ros2_control_node-3]   left_motor_inner/effort
+[ros2_control_node-3]   left_motor_outer/effort
+[ros2_control_node-3]   left_wheel/effort
+[ros2_control_node-3]   right_motor_inner/position
+[ros2_control_node-3]   right_motor_outer/position
+[ros2_control_node-3]   right_wheel/position
+[ros2_control_node-3]   left_motor_inner/position
+[ros2_control_node-3]   left_motor_outer/position
+[ros2_control_node-3]   left_wheel/position
+[ros2_control_node-3]   right_motor_inner/velocity
+[ros2_control_node-3]   right_motor_outer/velocity
+[ros2_control_node-3]   right_wheel/velocity
+[ros2_control_node-3]   left_motor_inner/velocity
+[ros2_control_node-3]   left_motor_outer/velocity
+[ros2_control_node-3]   left_wheel/velocity
+[ros2_control_node-3]   right_motor_inner/kp
+[ros2_control_node-3]   right_motor_outer/kp
+[ros2_control_node-3]   right_wheel/kp
+[ros2_control_node-3]   left_motor_inner/kp
+[ros2_control_node-3]   left_motor_outer/kp
+[ros2_control_node-3]   left_wheel/kp
+[ros2_control_node-3]   right_motor_inner/kd
+[ros2_control_node-3]   right_motor_outer/kd
+[ros2_control_node-3]   right_wheel/kd
+[ros2_control_node-3]   left_motor_inner/kd
+[ros2_control_node-3]   left_motor_outer/kd
+[ros2_control_node-3]   left_wheel/kd
+[ros2_control_node-3]   right_motor_inner/effort
+[ros2_control_node-3]   right_motor_outer/effort
+[ros2_control_node-3]   right_wheel/effort
+[ros2_control_node-3]   left_motor_inner/effort
+[ros2_control_node-3]   left_motor_outer/effort
+[ros2_control_node-3]   left_wheel/effort
+[ros2_control_node-3]   right_motor_inner/position
+[ros2_control_node-3]   right_motor_outer/position
+[ros2_control_node-3]   right_wheel/position
+[ros2_control_node-3]   left_motor_inner/position
+[ros2_control_node-3]   left_motor_outer/position
+[ros2_control_node-3]   left_wheel/position
+[ros2_control_node-3]   right_motor_inner/velocity
+[ros2_control_node-3]   right_motor_outer/velocity
+[ros2_control_node-3]   right_wheel/velocity
+[ros2_control_node-3]   left_motor_inner/velocity
+[ros2_control_node-3]   left_motor_outer/velocity
+[ros2_control_node-3]   left_wheel/velocity
+[ros2_control_node-3]   right_motor_inner/kp
+[ros2_control_node-3]   right_motor_outer/kp
+[ros2_control_node-3]   right_wheel/kp
+[ros2_control_node-3]   left_motor_inner/kp
+[ros2_control_node-3]   left_motor_outer/kp
+[ros2_control_node-3]   left_wheel/kp
+[ros2_control_node-3]   right_motor_inner/kd
+[ros2_control_node-3]   right_motor_outer/kd
+[ros2_control_node-3]   right_wheel/kd
+[ros2_control_node-3]   left_motor_inner/kd
+[ros2_control_node-3]   left_motor_outer/kd
+[ros2_control_node-3]   left_wheel/kd
+[ros2_control_node-3] ]
+[ros2_control_node-3] Not available: 
+[ros2_control_node-3] [
+[ros2_control_node-3]  right_motor_inner/effort
+[ros2_control_node-3]  right_motor_outer/effort
+[ros2_control_node-3]  right_wheel/effort
+[ros2_control_node-3]  left_motor_inner/effort
+[ros2_control_node-3]  left_motor_outer/effort
+[ros2_control_node-3]  left_wheel/effort
+[ros2_control_node-3]  right_motor_inner/position
+[ros2_control_node-3]  right_motor_outer/position
+[ros2_control_node-3]  right_wheel/position
+[ros2_control_node-3]  left_motor_inner/position
+[ros2_control_node-3]  left_motor_outer/position
+[ros2_control_node-3]  left_wheel/position
+[ros2_control_node-3]  right_motor_inner/velocity
+[ros2_control_node-3]  right_motor_outer/velocity
+[ros2_control_node-3]  right_wheel/velocity
+[ros2_control_node-3]  left_motor_inner/velocity
+[ros2_control_node-3]  left_motor_outer/velocity
+[ros2_control_node-3]  left_wheel/velocity
+[ros2_control_node-3]  right_motor_inner/kp
+[ros2_control_node-3]  right_motor_outer/kp
+[ros2_control_node-3]  right_wheel/kp
+[ros2_control_node-3]  left_motor_inner/kp
+[ros2_control_node-3]  left_motor_outer/kp
+[ros2_control_node-3]  left_wheel/kp
+[ros2_control_node-3]  right_motor_inner/kd
+[ros2_control_node-3]  right_motor_outer/kd
+[ros2_control_node-3]  right_wheel/kd
+[ros2_control_node-3]  left_motor_inner/kd
+[ros2_control_node-3]  left_motor_outer/kd
+[ros2_control_node-3]  left_wheel/kd
+[ros2_control_node-3]  right_motor_inner/effort
+[ros2_control_node-3]  right_motor_outer/effort
+[ros2_control_node-3]  right_wheel/effort
+[ros2_control_node-3]  left_motor_inner/effort
+[ros2_control_node-3]  left_motor_outer/effort
+[ros2_control_node-3]  left_wheel/effort
+[ros2_control_node-3]  right_motor_inner/position
+[ros2_control_node-3]  right_motor_outer/position
+[ros2_control_node-3]  right_wheel/position
+[ros2_control_node-3]  left_motor_inner/position
+[ros2_control_node-3]  left_motor_outer/position
+[ros2_control_node-3]  left_wheel/position
+[ros2_control_node-3]  right_motor_inner/velocity
+[ros2_control_node-3]  right_motor_outer/velocity
+[ros2_control_node-3]  right_wheel/velocity
+[ros2_control_node-3]  left_motor_inner/velocity
+[ros2_control_node-3]  left_motor_outer/velocity
+[ros2_control_node-3]  left_wheel/velocity
+[ros2_control_node-3]  right_motor_inner/kp
+[ros2_control_node-3]  right_motor_outer/kp
+[ros2_control_node-3]  right_wheel/kp
+[ros2_control_node-3]  left_motor_inner/kp
+[ros2_control_node-3]  left_motor_outer/kp
+[ros2_control_node-3]  left_wheel/kp
+[ros2_control_node-3]  right_motor_inner/kd
+[ros2_control_node-3]  right_motor_outer/kd
+[ros2_control_node-3]  right_wheel/kd
+[ros2_control_node-3]  left_motor_inner/kd
+[ros2_control_node-3]  left_motor_outer/kd
+[ros2_control_node-3]  left_wheel/kd
+[ros2_control_node-3] ]
+[ros2_control_node-3] 
+[ros2_control_node-3] [ERROR] [1794184826.642539973] [controller_manager]: Error while attempting mode switch when deactivating controllers in read cycle!
+[ros2_control_node-3] [WARN] [1794184826.643030062] [controller_manager]: Overrun might occur, Total time : 5611322.660 us (Expected < 3333.333 us) --> Read time : 5611230.883 us, Update time : 76.185 us, Write time : 15.592 us
+[ros2_control_node-3] [WARN] [1794184826.643269394] [controller_manager]: Overrun detected! The controller manager missed its desired rate of 300 Hz. The loop took 5611.614570 ms (missed cycles : 1684).
+[joy_teleop-7] [WARN] [1794184826.983250571] [joy_teleop]: running controller: none
+[joy_teleop-7] [WARN] [1794184826.985708145] [joy_teleop]: running: nothing (selected policy None)

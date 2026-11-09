@@ -1,0 +1,140 @@
+# 2026-11-08 23:01:16 ros2 launch sandro_bringup sandro.launch.py hardware:=real imu_transport:=spi imu_spi_device:=/dev/spidev6.0 rviz:=false arm_hardware:=true state_source:=encoder encoder_period_ms:=5 controller:=none teleop:=true extra_params:=/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml
+[INFO] [launch]: All log files can be found below /root/.ros/log/2026-11-08-23-01-17-705491-robot-7428
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [7435]
+[INFO] [gim6010_estop-2]: process started with pid [7436]
+[INFO] [ros2_control_node-3]: process started with pid [7437]
+[INFO] [spawner-4]: process started with pid [7438]
+[INFO] [spawner-5]: process started with pid [7439]
+[INFO] [joy_node-6]: process started with pid [7440]
+[INFO] [joy_teleop-7]: process started with pid [7441]
+[INFO] [joy_estop-8]: process started with pid [7442]
+[robot_state_publisher-1] [INFO] [1794178879.133958842] [robot_state_publisher]: Robot initialized
+[ros2_control_node-3] [INFO] [1794178879.353305944] [controller_manager]: Using Steady (Monotonic) clock for triggering controller manager cycles.
+[ros2_control_node-3] [INFO] [1794178879.400021241] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[ros2_control_node-3] [INFO] [1794178879.401799296] [controller_manager]: update rate is 300 Hz
+[ros2_control_node-3] [INFO] [1794178879.404383610] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-3] [INFO] [1794178879.404578776] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-3] [INFO] [1794178879.405927739] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 50.
+[ros2_control_node-3] [INFO] [1794178879.408497108] [controller_manager]: Received robot description from topic.
+[ros2_control_node-3] [INFO] [1794178879.408838793] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[ros2_control_node-3] [INFO] [1794178879.434021747] [controller_manager]: Loading hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794178879.441051411] [controller_manager]: Loaded hardware 'SandroSystem' from plugin 'sandro_hardware/GIM6010System'
+[ros2_control_node-3] [INFO] [1794178879.441985114] [controller_manager]: Initialize hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794178879.536940541] [controller_manager]: Successful initialization of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794178879.551168035] [controller_manager]: Loading hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794178879.554663553] [controller_manager]: Loaded hardware 'SandroImu' from plugin 'sandro_hardware/BNO085Sensor'
+[ros2_control_node-3] [INFO] [1794178879.558204922] [controller_manager]: Initialize hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794178879.671629156] [controller_manager]: Successful initialization of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794178879.672405082] [controller_manager]: Activating component 'SandroImu'.
+[ros2_control_node-3] [INFO] [1794178879.676053821] [resource_manager]: 'configure' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794178879.676869895] [resource_manager]: Successful 'configure' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794178879.676958580] [resource_manager]: 'activate' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794178880.025051003] [resource_manager]: Successful 'activate' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794178880.025325633] [controller_manager]: Activating component 'SandroSystem'.
+[ros2_control_node-3] [INFO] [1794178880.025584114] [resource_manager]: 'configure' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794178880.025990355] [resource_manager]: Successful 'configure' of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794178880.026092447] [resource_manager]: 'activate' hardware 'SandroSystem' 
+[joy_node-6] [INFO] [1794178880.467566983] [joy_node]: No haptic (rumble) available, skipping initialization
+[joy_node-6] [INFO] [1794178880.468930408] [joy_node]: Opened joystick: DualSense Wireless Controller.  deadzone: 0.080000
+[joy_node-6] [INFO] [1794178880.472925203] [joy_node]: Unknown event type 1543
+[spawner-5] [INFO] [1794178881.139424487] [spawner_imu_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[joy_teleop-7] [INFO] [1794178881.199386371] [joy_teleop]: gamepad teleop: hold button 9 to drive; switch policy with 9+3 among ['rl_flat_level', 'rl_agile_terrain']; button 1 tells the running one
+[joy_estop-8] [INFO] [1794178881.397476499] [joy_estop]: gamepad E-stop armed on axes [4, 5] (press together); re-arm by holding buttons [4, 6] for 2.0 s, twice
+[ros2_control_node-3] [ERROR] [1794178881.534169892] [GIM6010System]: activation failed: no CAN frame at all in 1.500000 s on 'can0': the bus is silent (drives unpowered, cut-off engaged, or the adapter-to-drive cable is off); silent: right_motor_inner (node 1: no heartbeat), right_motor_outer (node 2: no heartbeat), right_wheel (node 3: no heartbeat), left_motor_inner (node 5: no heartbeat), left_motor_outer (node 4: no heartbeat), left_wheel (node 6: no heartbeat)
+[ros2_control_node-3] [WARN] [1794178882.454896116] [GIM6010System]: right_motor_inner node 1: deadman not disabled (node 1: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [WARN] [1794178883.375344080] [GIM6010System]: right_motor_outer node 2: deadman not disabled (node 2: SDO verification timed out); it will trip by itself without frames
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[robot_state_publisher-1] [INFO] [1794178884.014569892] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[gim6010_estop-2] [INFO] [1794178884.014786318] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[INFO] [joy_estop-8]: sending signal 'SIGINT' to process[joy_estop-8]
+[INFO] [joy_teleop-7]: sending signal 'SIGINT' to process[joy_teleop-7]
+[INFO] [joy_node-6]: sending signal 'SIGINT' to process[joy_node-6]
+[INFO] [spawner-5]: sending signal 'SIGINT' to process[spawner-5]
+[INFO] [spawner-4]: sending signal 'SIGINT' to process[spawner-4]
+[INFO] [ros2_control_node-3]: sending signal 'SIGINT' to process[ros2_control_node-3]
+[INFO] [gim6010_estop-2]: sending signal 'SIGINT' to process[gim6010_estop-2]
+[INFO] [robot_state_publisher-1]: sending signal 'SIGINT' to process[robot_state_publisher-1]
+[ros2_control_node-3] [INFO] [1794178884.017222873] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1794178884.017426317] [controller_manager]: Shutdown request received....
+[ros2_control_node-3] [INFO] [1794178884.017710410] [controller_manager]: Shutting down all controllers in the controller manager.
+[joy_node-6] [INFO] [1794178884.017266132] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[spawner-5] [INFO] [1794178884.031347164] [spawner_imu_broadcaster]: KeyboardInterrupt received! Exiting....
+[joy_estop-8] Traceback (most recent call last):
+[joy_estop-8]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop", line 33, in <module>
+[joy_estop-8]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_estop')())
+[joy_estop-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_estop.py", line 382, in main
+[joy_estop-8]     node.destroy_node()
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1960, in destroy_node
+[joy_teleop-7] Traceback (most recent call last):
+[joy_teleop-7]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop", line 33, in <module>
+[joy_node-6] [INFO] [1794178884.095601028] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[joy_teleop-7]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_teleop')())
+[joy_teleop-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_teleop.py", line 597, in main
+[joy_estop-8]     self.destroy_client(self._clients[0])
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1870, in destroy_client
+[joy_estop-8]     client.destroy()
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/client.py", line 232, in destroy
+[joy_estop-8]     self.__client.destroy_when_not_in_use()
+[joy_estop-8] KeyboardInterrupt
+[joy_teleop-7]     node.destroy_node()
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1962, in destroy_node
+[joy_teleop-7]     self.destroy_service(self._services[0])
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1886, in destroy_service
+[gim6010_estop-2] [INFO] [1794178884.129505089] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[joy_teleop-7]     service.destroy()
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/service.py", line 123, in destroy
+[joy_teleop-7]     self.__service.destroy_when_not_in_use()
+[joy_teleop-7] KeyboardInterrupt
+[robot_state_publisher-1] [INFO] [1794178884.132642533] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[spawner-4] [INFO] [1794178884.285264363] [ros2_control_controller_spawner_joint_state_broadcaster]: KeyboardInterrupt received! Exiting....
+[ros2_control_node-3] [WARN] [1794178884.295916767] [GIM6010System]: right_wheel node 3: deadman not disabled (node 3: SDO verification timed out); it will trip by itself without frames
+[INFO] [joy_node-6]: process has finished cleanly [pid 7440]
+[INFO] [gim6010_estop-2]: process has finished cleanly [pid 7436]
+[INFO] [robot_state_publisher-1]: process has finished cleanly [pid 7435]
+[INFO] [spawner-5]: process has finished cleanly [pid 7439]
+[INFO] [spawner-4]: process has finished cleanly [pid 7438]
+[ERROR] [joy_estop-8]: process has died [pid 7442, exit code -2, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop --ros-args -r __node:=joy_estop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml'].
+[ERROR] [joy_teleop-7]: process has died [pid 7441, exit code -2, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop --ros-args -r __node:=joy_teleop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml'].
+[ros2_control_node-3] [WARN] [1794178885.217041490] [GIM6010System]: left_motor_inner node 5: deadman not disabled (node 5: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [WARN] [1794178886.137470566] [GIM6010System]: left_motor_outer node 4: deadman not disabled (node 4: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [WARN] [1794178887.057914642] [GIM6010System]: left_wheel node 6: deadman not disabled (node 6: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [ERROR] [1794178887.144076201] [resource_manager]: Failed to 'activate' hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794178887.144422312] [resource_manager]: 'deactivate' hardware 'SandroImu' 
+[ros2_control_node-3] terminate called after throwing an instance of 'std::runtime_error'
+[ros2_control_node-3]   what():  Failed to set the initial state of the component : SandroSystem to active
+[ros2_control_node-3] Stack trace (most recent call last):
+[ros2_control_node-3] [INFO] [1794178887.146038645] [resource_manager]: Successful 'deactivate' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794178887.146086941] [resource_manager]: 'shutdown' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794178887.146102441] [resource_manager]: Successful 'shutdown' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794178887.146294312] [resource_manager]: 'shutdown' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794178887.146322645] [resource_manager]: Successful 'shutdown' of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794178887.146432756] [controller_manager]: Shutting down the controller manager.
+[ros2_control_node-3] #19   Object "/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1", at 0xffffffffffffffff, in 
+[ros2_control_node-3] #18   Object "/opt/ros/jazzy/lib/controller_manager/ros2_control_node", at 0x5560f25eaf, in _start
+[ros2_control_node-3] #17   Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa45a8597, in __libc_start_main
+[ros2_control_node-3] #16   Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa45a84c3, in 
+[ros2_control_node-3] #15   Object "/opt/ros/jazzy/lib/controller_manager/ros2_control_node", at 0x5560f24fd3, in main
+[ros2_control_node-3] #14   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fa4b5c0a3, in rclcpp::executors::MultiThreadedExecutor::spin()
+[ros2_control_node-3] [INFO] [1794178887.152408013] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] #13   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fa4b5bc3b, in rclcpp::executors::MultiThreadedExecutor::run(unsigned long)
+[ros2_control_node-3] #12   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fa4b28c93, in rclcpp::Executor::execute_any_executable(rclcpp::AnyExecutable&)
+[ros2_control_node-3] #11   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fa4b27f17, in rclcpp::Executor::execute_subscription(std::shared_ptr<rclcpp::SubscriptionBase>)
+[ros2_control_node-3] #10   Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fa4e3155b, in 
+[ros2_control_node-3] #9    Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fa4da060f, in controller_manager::ControllerManager::robot_description_callback(std_msgs::msg::String_<std::allocator<void> > const&)
+[ros2_control_node-3] #8    Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fa4da98db, in controller_manager::ControllerManager::set_initial_hardware_components_state()
+[ros2_control_node-3] #7    Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fa4da03ef, in 
+[ros2_control_node-3] #6    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fa482a907, in __cxa_throw
+[ros2_control_node-3] #5    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fa4820e03, in std::terminate()
+[ros2_control_node-3] #4    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fa482a56f, in 
+[ros2_control_node-3] #3    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fa482d4d7, in __gnu_cxx::__verbose_terminate_handler()
+[ros2_control_node-3] #2    Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa45a7dff, in abort
+[ros2_control_node-3] #1    Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa45bcb3b, in raise
+[ros2_control_node-3] #0    Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa46074d8, in 
+[ros2_control_node-3] Aborted (Signal sent by tkill() 7437 0)
+[ERROR] [ros2_control_node-3]: process[ros2_control_node-3] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'
+[INFO] [ros2_control_node-3]: sending signal 'SIGTERM' to process[ros2_control_node-3]
+[ERROR] [ros2_control_node-3]: process[ros2_control_node-3] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'
+[INFO] [ros2_control_node-3]: sending signal 'SIGKILL' to process[ros2_control_node-3]

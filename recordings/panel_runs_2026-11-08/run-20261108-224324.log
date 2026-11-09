@@ -1,0 +1,243 @@
+# 2026-11-08 22:43:24 ros2 launch sandro_bringup sandro.launch.py hardware:=real imu_transport:=spi imu_spi_device:=/dev/spidev6.0 rviz:=false arm_hardware:=true state_source:=encoder encoder_period_ms:=5 controller:=none teleop:=true extra_params:=/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml
+[INFO] [launch]: All log files can be found below /root/.ros/log/2026-11-08-22-43-25-890254-robot-3516
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [3531]
+[INFO] [gim6010_estop-2]: process started with pid [3532]
+[INFO] [ros2_control_node-3]: process started with pid [3533]
+[INFO] [spawner-4]: process started with pid [3534]
+[INFO] [spawner-5]: process started with pid [3535]
+[INFO] [joy_node-6]: process started with pid [3536]
+[INFO] [joy_teleop-7]: process started with pid [3537]
+[INFO] [joy_estop-8]: process started with pid [3538]
+[ros2_control_node-3] [INFO] [1794177807.319990533] [controller_manager]: Using Steady (Monotonic) clock for triggering controller manager cycles.
+[ros2_control_node-3] [INFO] [1794177807.393644449] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[ros2_control_node-3] [INFO] [1794177807.396196504] [controller_manager]: update rate is 300 Hz
+[ros2_control_node-3] [INFO] [1794177807.396651948] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-3] [INFO] [1794177807.398657429] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-3] [INFO] [1794177807.399466003] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 50.
+[robot_state_publisher-1] [INFO] [1794177807.966740657] [robot_state_publisher]: Robot initialized
+[ros2_control_node-3] [INFO] [1794177807.969537082] [controller_manager]: Received robot description from topic.
+[ros2_control_node-3] [INFO] [1794177807.973575117] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[ros2_control_node-3] [INFO] [1794177808.066268489] [controller_manager]: Loading hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794177808.078698337] [controller_manager]: Loaded hardware 'SandroSystem' from plugin 'sandro_hardware/GIM6010System'
+[ros2_control_node-3] [INFO] [1794177808.083682261] [controller_manager]: Initialize hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794177808.190916331] [controller_manager]: Successful initialization of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794177808.198447958] [controller_manager]: Loading hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794177808.199497735] [controller_manager]: Loaded hardware 'SandroImu' from plugin 'sandro_hardware/BNO085Sensor'
+[ros2_control_node-3] [INFO] [1794177808.200200605] [controller_manager]: Initialize hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794177808.249243623] [controller_manager]: Successful initialization of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794177808.251753734] [controller_manager]: Activating component 'SandroImu'.
+[ros2_control_node-3] [INFO] [1794177808.253708492] [resource_manager]: 'configure' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794177808.254332140] [resource_manager]: Successful 'configure' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794177808.254398603] [resource_manager]: 'activate' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794177808.593668270] [resource_manager]: Successful 'activate' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794177808.593911011] [controller_manager]: Activating component 'SandroSystem'.
+[ros2_control_node-3] [INFO] [1794177808.594364862] [resource_manager]: 'configure' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794177808.594750436] [resource_manager]: Successful 'configure' of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794177808.594839936] [resource_manager]: 'activate' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794177808.765323538] [GIM6010System]: right_motor_inner node 1 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [ERROR] [1794177808.765793408] [GIM6010System]: activation failed: right_motor_outer node 2: axis_error=64 fault_flags=9 (not an operator-induced error; inspect before re-arming)
+[joy_node-6] [INFO] [1794177808.824736219] [joy_node]: No haptic (rumble) available, skipping initialization
+[joy_node-6] [INFO] [1794177808.826661867] [joy_node]: Opened joystick: DualSense Wireless Controller.  deadzone: 0.080000
+[joy_node-6] [INFO] [1794177808.828546477] [joy_node]: Unknown event type 1543
+[ros2_control_node-3] [ERROR] [1794177808.894388378] [resource_manager]: Failed to 'activate' hardware 'SandroSystem'
+[ros2_control_node-3] terminate called after throwing an instance of 'std::runtime_error'
+[ros2_control_node-3]   what():  Failed to set the initial state of the component : SandroSystem to active
+[ros2_control_node-3] Stack trace (most recent call last) in thread 3567:
+[ros2_control_node-3] #17   Object "/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1", at 0xffffffffffffffff, in 
+[ros2_control_node-3] #16   Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa0a7bb4b, in 
+[ros2_control_node-3] #15   Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa0a1582b, in 
+[ros2_control_node-3] #14   Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fa0c71adf, in 
+[ros2_control_node-3] #13   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fa0f6bc3b, in rclcpp::executors::MultiThreadedExecutor::run(unsigned long)
+[ros2_control_node-3] #12   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fa0f38c93, in rclcpp::Executor::execute_any_executable(rclcpp::AnyExecutable&)
+[ros2_control_node-3] #11   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fa0f37f17, in rclcpp::Executor::execute_subscription(std::shared_ptr<rclcpp::SubscriptionBase>)
+[ros2_control_node-3] #10   Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fa124155b, in 
+[ros2_control_node-3] #9    Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fa11b060f, in controller_manager::ControllerManager::robot_description_callback(std_msgs::msg::String_<std::allocator<void> > const&)
+[ros2_control_node-3] #8    Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fa11b98db, in controller_manager::ControllerManager::set_initial_hardware_components_state()
+[ros2_control_node-3] #7    Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fa11b03ef, in 
+[ros2_control_node-3] #6    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fa0c3a907, in __cxa_throw
+[ros2_control_node-3] #5    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fa0c30e03, in std::terminate()
+[ros2_control_node-3] #4    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fa0c3a56f, in 
+[ros2_control_node-3] #3    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fa0c3d4d7, in __gnu_cxx::__verbose_terminate_handler()
+[ros2_control_node-3] #2    Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa09b7dff, in abort
+[ros2_control_node-3] #1    Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa09ccb3b, in raise
+[ros2_control_node-3] #0    Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7fa0a174d8, in 
+[ros2_control_node-3] Aborted (Signal sent by tkill() 3533 0)
+[joy_estop-8] [INFO] [1794177809.837578389] [joy_estop]: gamepad E-stop armed on axes [4, 5] (press together); re-arm by holding buttons [4, 6] for 2.0 s, twice
+[spawner-4] [INFO] [1794177809.872697191] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[joy_teleop-7] [INFO] [1794177812.608350538] [joy_teleop]: gamepad teleop: hold button 9 to drive; switch policy with 9+3 among ['rl_flat_level', 'rl_agile_terrain']; button 1 tells the running one
+[gim6010_estop-2] [WARN] [1794177813.865755652] [gim6010_estop]: CAN Clear_Errors sent to configured GIM6010 nodes
+[gim6010_estop-2] [ERROR] [1794177825.905240457] [gim6010_estop]: CAN ESTOP sent to configured GIM6010 nodes
+[ERROR] [ros2_control_node-3]: process has died [pid 3533, exit code -6, cmd '/opt/ros/jazzy/lib/controller_manager/ros2_control_node --ros-args --params-file /tmp/launch_params_ghym5u4n --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_6rft1sg6'].
+[spawner-5] [WARN] [1794177829.763084878] [ros2_control_controller_spawner_imu_broadcaster]: Failed to acquire lock in 20 seconds. Attempt 1 of 5 failed. Retrying in 3 seconds...
+[spawner-4] [FATAL] [1794177839.926982379] [spawner_joint_state_broadcaster]: Could not contact service /controller_manager/list_controllers
+[ERROR] [spawner-4]: process has died [pid 3534, exit code 1, cmd '/opt/ros/jazzy/lib/controller_manager/spawner joint_state_broadcaster --controller-manager /controller_manager --controller-manager-timeout 30 --ros-args'].
+[spawner-5] [INFO] [1794177840.479653891] [spawner_imu_broadcaster]: Spawner lock acquired!
+[spawner-5] [INFO] [1794177840.503580326] [spawner_imu_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[spawner-5] [FATAL] [1794177870.549456389] [spawner_imu_broadcaster]: Could not contact service /controller_manager/list_controllers
+[ERROR] [spawner-5]: process has died [pid 3535, exit code 1, cmd '/opt/ros/jazzy/lib/controller_manager/spawner imu_broadcaster --controller-manager /controller_manager --controller-manager-timeout 30 --ros-args'].
+[joy_node-6] [INFO] [1794178012.515078821] [joy_node]: Unknown event type 1622
+[joy_node-6] [INFO] [1794178012.519802727] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.524468466] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.530286148] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.535253591] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.540098756] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.544840495] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.549666011] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.554479028] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.558167897] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.565159209] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.569130097] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.574167447] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.580110444] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.587756312] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178012.597769289] [joy_node]: Unknown event type 1624
+[joy_node-6] [INFO] [1794178013.263113573] [joy_node]: Unknown event type 1622
+[joy_node-6] [INFO] [1794178013.268209701] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.274685680] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.278831827] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.285420398] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.289686434] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.294188932] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.299179560] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.303897502] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.308979445] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.313909998] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.318774330] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.323638939] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.328471622] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.333219195] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.339037341] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.344669450] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.348633541] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.353464872] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.358509944] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.365328405] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.369411422] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.373541402] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.379215733] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.383958509] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.388896007] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.393283116] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.398996540] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.403640686] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.408999999] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.415010812] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.419199588] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.425589160] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.430175750] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.437613248] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.442252838] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.447358985] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.452762353] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.457840295] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.466811699] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.473100753] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.476858881] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.482743527] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.493167949] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.497394058] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.502504760] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.508060110] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.512863256] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.528872380] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.530953212] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.536207043] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.541282856] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.551738000] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.555752647] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.561475978] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.567965717] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.571597530] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.576455269] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.581661193] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.591191708] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.596078632] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.601681852] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.605711184] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.620333882] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.626208583] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.632224155] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.637115116] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.647153853] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.651393703] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.655780905] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.663124014] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.667203605] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.670348289] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.674934750] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.679737044] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.685174690] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.689541763] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.694816039] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.700153185] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.704731924] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.709416144] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.715336235] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.719109548] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.723185509] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.729038192] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.734149913] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.738962855] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.743671390] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.748384777] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.754093775] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.760989532] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.767693641] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.769001344] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.774192490] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.780425913] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.783985986] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.790488724] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.793704112] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.799725776] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.804497367] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.808232107] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.813185364] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.819136362] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.822738138] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.828532969] [joy_node]: Unknown event type 1623
+[joy_node-6] [INFO] [1794178013.842500260] [joy_node]: Unknown event type 1624
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[robot_state_publisher-1] [INFO] [1794178753.024951984] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[joy_node-6] [INFO] [1794178753.025003780] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[gim6010_estop-2] [INFO] [1794178753.025113280] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[INFO] [joy_estop-8]: sending signal 'SIGINT' to process[joy_estop-8]
+[INFO] [joy_teleop-7]: sending signal 'SIGINT' to process[joy_teleop-7]
+[INFO] [joy_node-6]: sending signal 'SIGINT' to process[joy_node-6]
+[INFO] [gim6010_estop-2]: sending signal 'SIGINT' to process[gim6010_estop-2]
+[INFO] [robot_state_publisher-1]: sending signal 'SIGINT' to process[robot_state_publisher-1]
+[joy_estop-8] Traceback (most recent call last):
+[joy_estop-8]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop", line 33, in <module>
+[joy_estop-8]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_estop')())
+[joy_estop-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_estop.py", line 382, in main
+[joy_estop-8]     node.destroy_node()
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1960, in destroy_node
+[joy_estop-8]     self.destroy_client(self._clients[0])
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1870, in destroy_client
+[joy_teleop-7] Traceback (most recent call last):
+[joy_teleop-7]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop", line 33, in <module>
+[joy_estop-8]     client.destroy()
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/client.py", line 232, in destroy
+[joy_node-6] [INFO] [1794178753.074502613] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[joy_teleop-7]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_teleop')())
+[joy_teleop-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_teleop.py", line 597, in main
+[joy_estop-8]     self.__client.destroy_when_not_in_use()
+[joy_estop-8] KeyboardInterrupt
+[gim6010_estop-2] [INFO] [1794178753.082381925] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[joy_teleop-7]     node.destroy_node()
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1962, in destroy_node
+[joy_teleop-7]     self.destroy_service(self._services[0])
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1886, in destroy_service
+[robot_state_publisher-1] [INFO] [1794178753.094315661] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[joy_teleop-7]     service.destroy()
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/service.py", line 123, in destroy
+[joy_teleop-7]     self.__service.destroy_when_not_in_use()
+[joy_teleop-7] KeyboardInterrupt
+[INFO] [joy_node-6]: process has finished cleanly [pid 3536]
+[INFO] [robot_state_publisher-1]: process has finished cleanly [pid 3531]
+[INFO] [gim6010_estop-2]: process has finished cleanly [pid 3532]
+[ERROR] [joy_estop-8]: process has died [pid 3538, exit code -2, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop --ros-args -r __node:=joy_estop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml'].
+[ERROR] [joy_teleop-7]: process has died [pid 3537, exit code -2, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop --ros-args -r __node:=joy_teleop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml'].

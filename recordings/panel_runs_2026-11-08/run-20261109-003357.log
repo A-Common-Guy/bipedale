@@ -1,0 +1,425 @@
+# 2026-11-09 00:33:57 ros2 launch sandro_bringup sandro.launch.py hardware:=real imu_transport:=spi imu_spi_device:=/dev/spidev6.0 rviz:=false arm_hardware:=true state_source:=encoder encoder_period_ms:=5 controller:=none teleop:=true extra_params:=/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml
+[INFO] [launch]: All log files can be found below /root/.ros/log/2026-11-09-00-33-58-512525-robot-15236
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [15245]
+[INFO] [gim6010_estop-2]: process started with pid [15246]
+[INFO] [ros2_control_node-3]: process started with pid [15247]
+[INFO] [spawner-4]: process started with pid [15248]
+[INFO] [spawner-5]: process started with pid [15249]
+[INFO] [joy_node-6]: process started with pid [15250]
+[INFO] [joy_teleop-7]: process started with pid [15251]
+[INFO] [joy_estop-8]: process started with pid [15252]
+[robot_state_publisher-1] [INFO] [1794184440.164635193] [robot_state_publisher]: Robot initialized
+[ros2_control_node-3] [INFO] [1794184440.249721436] [controller_manager]: Using Steady (Monotonic) clock for triggering controller manager cycles.
+[ros2_control_node-3] [INFO] [1794184440.281065451] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[ros2_control_node-3] [INFO] [1794184440.281823371] [controller_manager]: update rate is 300 Hz
+[ros2_control_node-3] [INFO] [1794184440.282105387] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-3] [INFO] [1794184440.282244349] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-3] [INFO] [1794184440.282771142] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 50.
+[ros2_control_node-3] [INFO] [1794184440.293283652] [controller_manager]: Received robot description from topic.
+[ros2_control_node-3] [INFO] [1794184440.293679649] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[ros2_control_node-3] [INFO] [1794184440.315362258] [controller_manager]: Loading hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794184440.321805448] [controller_manager]: Loaded hardware 'SandroSystem' from plugin 'sandro_hardware/GIM6010System'
+[ros2_control_node-3] [INFO] [1794184440.322345018] [controller_manager]: Initialize hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794184440.386441610] [controller_manager]: Successful initialization of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794184440.394713268] [controller_manager]: Loading hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794184440.395692038] [controller_manager]: Loaded hardware 'SandroImu' from plugin 'sandro_hardware/BNO085Sensor'
+[ros2_control_node-3] [INFO] [1794184440.400439575] [controller_manager]: Initialize hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794184440.446601400] [controller_manager]: Successful initialization of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794184440.447207340] [controller_manager]: Activating component 'SandroImu'.
+[ros2_control_node-3] [INFO] [1794184440.447500041] [resource_manager]: 'configure' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794184440.449356083] [resource_manager]: Successful 'configure' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794184440.449449137] [resource_manager]: 'activate' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794184440.791818262] [resource_manager]: Successful 'activate' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794184440.792174315] [controller_manager]: Activating component 'SandroSystem'.
+[ros2_control_node-3] [INFO] [1794184440.792526331] [resource_manager]: 'configure' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794184440.793154474] [resource_manager]: Successful 'configure' of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794184440.793282936] [resource_manager]: 'activate' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794184440.949251756] [GIM6010System]: right_motor_inner node 1 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184441.017871239] [GIM6010System]: right_motor_outer node 2 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184441.087475030] [GIM6010System]: right_wheel node 3 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184441.755164358] [GIM6010System]: left_motor_inner node 5 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[joy_teleop-7] [INFO] [1794184441.805231560] [joy_teleop]: gamepad teleop: hold button 9 to drive; switch policy with 9+3 among ['rl_flat_level', 'rl_agile_terrain']; button 1 tells the running one
+[ros2_control_node-3] [INFO] [1794184441.821822208] [GIM6010System]: left_motor_outer node 4 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184441.888931722] [GIM6010System]: left_wheel node 6 drive limits: position=12.500 rad velocity=65.000 rad/s torque=50.000 Nm kp=500.000 kd=5.000; hardware effort boundary=10.000 Nm
+[ros2_control_node-3] [INFO] [1794184441.930530731] [GIM6010System]: right_motor_inner node 1: MIT position 1.2247 rad, encoder frame 1.2248 rad, bias -0.0001 rad
+[ros2_control_node-3] [INFO] [1794184441.930644396] [GIM6010System]: right_motor_outer node 2: MIT position -1.1641 rad, encoder frame -1.1635 rad, bias -0.0005 rad
+[ros2_control_node-3] [INFO] [1794184441.931440279] [GIM6010System]: right_wheel node 3: MIT position -0.3500 rad, encoder frame -0.3499 rad, bias -0.0001 rad
+[ros2_control_node-3] [INFO] [1794184441.931484019] [GIM6010System]: left_motor_inner node 5: MIT position 1.1641 rad, encoder frame 1.1643 rad, bias -0.0002 rad
+[ros2_control_node-3] [INFO] [1794184441.932077163] [GIM6010System]: left_motor_outer node 4: MIT position -1.1717 rad, encoder frame -1.1716 rad, bias -0.0001 rad
+[ros2_control_node-3] [INFO] [1794184441.932329328] [GIM6010System]: left_wheel node 6: MIT position -0.4282 rad, encoder frame -0.4280 rad, bias -0.0002 rad
+[spawner-5] [INFO] [1794184441.972466329] [spawner_imu_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[ros2_control_node-3] [INFO] [1794184442.058985784] [resource_manager]: Successful 'activate' of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794184442.059248745] [controller_manager]: Registering statistics for : SandroImu
+[ros2_control_node-3] [INFO] [1794184442.059674427] [controller_manager]: Registering statistics for : SandroSystem
+[ros2_control_node-3] [INFO] [1794184442.060952898] [controller_manager]: Resource Manager has been successfully initialized. Starting Controller Manager services...
+[ros2_control_node-3] [INFO] [1794184442.243662677] [controller_manager]: Loading controller : 'imu_broadcaster' of type 'imu_sensor_broadcaster/IMUSensorBroadcaster'
+[ros2_control_node-3] [INFO] [1794184442.244120692] [controller_manager]: Loading controller 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794184442.251086804] [controller_manager]: Controller 'imu_broadcaster' node arguments: --ros-args --params-file /tmp/launch_params_4vyeicrd --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_q1tmfp38 
+[spawner-5] [INFO] [1794184442.316155519] [spawner_imu_broadcaster]: Loaded imu_broadcaster
+[ros2_control_node-3] [INFO] [1794184442.325138764] [controller_manager]: Configuring controller: 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794184442.352046998] [controller_manager]: Activating controllers: [ imu_broadcaster ]
+[ros2_control_node-3] [INFO] [1794184442.353603190] [controller_manager]: Successfully switched controllers!
+[joy_estop-8] [INFO] [1794184442.355004679] [joy_estop]: gamepad E-stop armed on axes [4, 5] (press together); re-arm by holding buttons [4, 6] for 2.0 s, twice
+[spawner-5] [INFO] [1794184442.364408365] [spawner_imu_broadcaster]: Configured and activated imu_broadcaster
+[INFO] [spawner-5]: process has finished cleanly [pid 15249]
+[ros2_control_node-3] [INFO] [1794184442.956747929] [controller_manager]: Loading controller : 'joint_state_broadcaster' of type 'joint_state_broadcaster/JointStateBroadcaster'
+[ros2_control_node-3] [INFO] [1794184442.959570444] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1794184442.972565936] [controller_manager]: Controller 'joint_state_broadcaster' node arguments: --ros-args --params-file /tmp/launch_params_4vyeicrd --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_q1tmfp38 
+[spawner-4] [INFO] [1794184443.115782652] [spawner_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[ros2_control_node-3] [INFO] [1794184443.121238332] [controller_manager]: Configuring controller: 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1794184443.122986503] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[ros2_control_node-3] [INFO] [1794184443.156110004] [controller_manager]: Activating controllers: [ joint_state_broadcaster ]
+[ros2_control_node-3] [INFO] [1794184443.160798931] [controller_manager]: Successfully switched controllers!
+[spawner-4] [INFO] [1794184443.175784351] [spawner_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[INFO] [spawner-4]: process has finished cleanly [pid 15248]
+[ros2_control_node-3] [INFO] [1794184447.735940145] [controller_manager]: Loading controller : 'rl_agile_terrain' of type 'sandro_controllers/RlPolicyController'
+[ros2_control_node-3] [INFO] [1794184447.736118940] [controller_manager]: Loading controller 'rl_agile_terrain'
+[ros2_control_node-3] [INFO] [1794184447.755699657] [controller_manager]: Controller 'rl_agile_terrain' node arguments: --ros-args --params-file /tmp/launch_params_4vyeicrd --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_q1tmfp38 
+[ros2_control_node-3] [INFO] [1794184447.851766964] [controller_manager]: Configuring controller: 'rl_agile_terrain'
+[ros2_control_node-3] [INFO] [1794184447.856533445] [rl_agile_terrain]: Policy /workspaces/sandro/install/sandro_controllers/share/sandro_controllers/policies/agile_terrain.bin: 4 x 26 observations, command limits 1.00 m/s, 3.00 rad/s, height 0.090-0.190 m, roll 0.30 rad; IMU offset 0.016 rad; trained on model 9fe892901e9d
+[ros2_control_node-3] [INFO] [1794184453.081486710] [controller_manager]: Loading controller : 'rl_flat_level' of type 'sandro_controllers/RlPolicyController'
+[ros2_control_node-3] [INFO] [1794184453.083152123] [controller_manager]: Loading controller 'rl_flat_level'
+[ros2_control_node-3] [INFO] [1794184453.084227281] [controller_manager]: Controller 'rl_flat_level' node arguments: --ros-args --params-file /tmp/launch_params_4vyeicrd --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_q1tmfp38 
+[ros2_control_node-3] [INFO] [1794184453.193443393] [controller_manager]: Configuring controller: 'rl_flat_level'
+[ros2_control_node-3] [INFO] [1794184453.196964607] [rl_flat_level]: Policy /workspaces/sandro/install/sandro_controllers/share/sandro_controllers/policies/flat_level_real.bin: 4 x 25 observations, command limits 0.50 m/s, 1.50 rad/s, height 0.140-0.185 m, roll 0.00 rad; IMU offset 0.016 rad; trained on model 9fe892901e9d
+[ros2_control_node-3] [INFO] [1794184453.225005203] [controller_manager]: Activating controllers: [ rl_agile_terrain ]
+[ros2_control_node-3] [INFO] [1794184453.228186938] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-3] [INFO] [1794184453.230508568] [rl_agile_terrain]: Activated: legs move to the stand pose, the policy engages once upright
+[ros2_control_node-3] [INFO] [1794184453.234693961] [controller_manager]: Successfully switched controllers!
+[joy_estop-8] [INFO] [1794184453.712874384] [joy_estop]: re-arm now starts rl_agile_terrain
+[joy_teleop-7] [WARN] [1794184453.762540071] [joy_teleop]: running controller: rl_agile_terrain
+[joy_teleop-7] [INFO] [1794184453.769264167] [joy_teleop]: rl_agile_terrain: full stick 1.00 m/s, 3.00 rad/s, 0.15 m/s height, 0.30 rad roll
+[joy_teleop-7] [WARN] [1794184453.799288970] [joy_teleop]: running policy 2: rl_agile_terrain
+[ros2_control_node-3] [INFO] [1794184454.713362443] [rl_agile_terrain]: Legs at the stand pose; waiting for the body to be upright (tilt 0.09 rad)
+[ros2_control_node-3] [INFO] [1794184455.217076483] [rl_agile_terrain]: Phase: policy (pitch +0.070 rad, gyro -0.01 +0.00 +0.00 rad/s, leg velocity +0.00 +0.02 +0.01 +0.00, wheel velocity +0.01 -0.01 rad/s, action +0.10 +0.23 +0.05 +0.21 +0.06 +0.18)
+[ros2_control_node-3] [INFO] [1794184472.437773093] [controller_manager]: Loading controller : 'rl_stand_up' of type 'sandro_controllers/RlPolicyController'
+[ros2_control_node-3] [INFO] [1794184472.438418255] [controller_manager]: Loading controller 'rl_stand_up'
+[ros2_control_node-3] [INFO] [1794184472.439751985] [controller_manager]: Controller 'rl_stand_up' node arguments: --ros-args --params-file /tmp/launch_params_4vyeicrd --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_q1tmfp38 
+[ros2_control_node-3] [INFO] [1794184472.575107303] [controller_manager]: Configuring controller: 'rl_stand_up'
+[ros2_control_node-3] [INFO] [1794184472.595203425] [rl_stand_up]: Policy /workspaces/sandro/install/sandro_controllers/share/sandro_controllers/policies/stand_up.bin: 4 x 25 observations, command limits 0.50 m/s, 1.50 rad/s, height 0.140-0.185 m, roll 0.00 rad; IMU offset 0.016 rad; trained on model 52ef810edae7
+[ros2_control_node-3] [INFO] [1794184474.372070949] [controller_manager]: Deactivating controllers: [ rl_agile_terrain ]
+[ros2_control_node-3] [INFO] [1794184474.373436235] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-3] [INFO] [1794184474.374728040] [rl_agile_terrain]: Deactivated; longest inference 501 us
+[ros2_control_node-3] [INFO] [1794184474.375450553] [controller_manager]: Successfully switched controllers!
+[joy_teleop-7] [WARN] [1794184474.722563541] [joy_teleop]: running controller: none
+[joy_teleop-7] [WARN] [1794184474.752018553] [joy_teleop]: running: nothing (selected policy rl_agile_terrain)
+[ros2_control_node-3] [INFO] [1794184479.991156892] [controller_manager]: Activating controllers: [ rl_stand_up ]
+[ros2_control_node-3] [INFO] [1794184479.993598077] [controller_manager]: Requested controller switch from non-realtime loop
+[ros2_control_node-3] [INFO] [1794184479.995427211] [rl_stand_up]: Activated: legs move to the stand pose, the policy engages once upright
+[ros2_control_node-3] [INFO] [1794184479.995713394] [controller_manager]: Successfully switched controllers!
+[ros2_control_node-3] [INFO] [1794184479.996708608] [rl_stand_up]: Limp; the stand-up policy engages once the robot rests (tilt 0.69 rad)
+[ros2_control_node-3] [INFO] [1794184480.193629209] [rl_stand_up]: Phase: policy (pitch -0.686 rad, gyro +0.00 +0.00 +0.00 rad/s, leg velocity +0.04 +0.02 -0.00 -0.00, wheel velocity -0.00 +0.00 rad/s, action +1.00 +0.63 -0.62 +0.56 +0.92 -0.63)
+[ros2_control_node-3] [INFO] [1794184480.196689055] [rl_stand_up]: Stand-up policy engaged lying down: no fall cut-off until upright
+[ros2_control_node-3] [ERROR] [1794184480.330006131] [GIM6010System]: DRIVE FAULT: right_motor_outer (node 2): no encoder feedback 
+[joy_teleop-7] [WARN] [1794184480.701744985] [joy_teleop]: running controller: rl_stand_up
+[joy_teleop-7] [INFO] [1794184480.705643029] [joy_teleop]: rl_stand_up: full stick 0.50 m/s, 1.50 rad/s, 0.05 m/s height, 0.00 rad roll
+[joy_teleop-7] [WARN] [1794184480.707468589] [joy_teleop]: running: rl_stand_up (selected policy rl_agile_terrain)
+[ros2_control_node-3] [WARN] [1794184481.271341451] [GIM6010System]: right_motor_outer node 2: deadman not disabled (node 2: SDO verification timed out); it will trip by itself without frames
+[ros2_control_node-3] [ERROR] [1794184481.353880570] [controller_manager]: Deactivating following hardware components as their read cycle resulted in an error: [ SandroSystem ]
+[ros2_control_node-3] [ERROR] [1794184481.354196216] [controller_manager]: Deactivating following controllers as their hardware components read cycle resulted in an error: [ joint_state_broadcaster rl_agile_terrain rl_stand_up ]
+[ros2_control_node-3] [ERROR] [1794184481.354611416] [controller_manager]: Not acceptable command interfaces combination: 
+[ros2_control_node-3] Start interfaces: 
+[ros2_control_node-3] [
+[ros2_control_node-3] ]
+[ros2_control_node-3] Stop interfaces: 
+[ros2_control_node-3] [
+[ros2_control_node-3]   right_motor_inner/effort
+[ros2_control_node-3]   right_motor_outer/effort
+[ros2_control_node-3]   right_wheel/effort
+[ros2_control_node-3]   left_motor_inner/effort
+[ros2_control_node-3]   left_motor_outer/effort
+[ros2_control_node-3]   left_wheel/effort
+[ros2_control_node-3]   right_motor_inner/position
+[ros2_control_node-3]   right_motor_outer/position
+[ros2_control_node-3]   right_wheel/position
+[ros2_control_node-3]   left_motor_inner/position
+[ros2_control_node-3]   left_motor_outer/position
+[ros2_control_node-3]   left_wheel/position
+[ros2_control_node-3]   right_motor_inner/velocity
+[ros2_control_node-3]   right_motor_outer/velocity
+[ros2_control_node-3]   right_wheel/velocity
+[ros2_control_node-3]   left_motor_inner/velocity
+[ros2_control_node-3]   left_motor_outer/velocity
+[ros2_control_node-3]   left_wheel/velocity
+[ros2_control_node-3]   right_motor_inner/kp
+[ros2_control_node-3]   right_motor_outer/kp
+[ros2_control_node-3]   right_wheel/kp
+[ros2_control_node-3]   left_motor_inner/kp
+[ros2_control_node-3]   left_motor_outer/kp
+[ros2_control_node-3]   left_wheel/kp
+[ros2_control_node-3]   right_motor_inner/kd
+[ros2_control_node-3]   right_motor_outer/kd
+[ros2_control_node-3]   right_wheel/kd
+[ros2_control_node-3]   left_motor_inner/kd
+[ros2_control_node-3]   left_motor_outer/kd
+[ros2_control_node-3]   left_wheel/kd
+[ros2_control_node-3]   right_motor_inner/effort
+[ros2_control_node-3]   right_motor_outer/effort
+[ros2_control_node-3]   right_wheel/effort
+[ros2_control_node-3]   left_motor_inner/effort
+[ros2_control_node-3]   left_motor_outer/effort
+[ros2_control_node-3]   left_wheel/effort
+[ros2_control_node-3]   right_motor_inner/position
+[ros2_control_node-3]   right_motor_outer/position
+[ros2_control_node-3]   right_wheel/position
+[ros2_control_node-3]   left_motor_inner/position
+[ros2_control_node-3]   left_motor_outer/position
+[ros2_control_node-3]   left_wheel/position
+[ros2_control_node-3]   right_motor_inner/velocity
+[ros2_control_node-3]   right_motor_outer/velocity
+[ros2_control_node-3]   right_wheel/velocity
+[ros2_control_node-3]   left_motor_inner/velocity
+[ros2_control_node-3]   left_motor_outer/velocity
+[ros2_control_node-3]   left_wheel/velocity
+[ros2_control_node-3]   right_motor_inner/kp
+[ros2_control_node-3]   right_motor_outer/kp
+[ros2_control_node-3]   right_wheel/kp
+[ros2_control_node-3]   left_motor_inner/kp
+[ros2_control_node-3]   left_motor_outer/kp
+[ros2_control_node-3]   left_wheel/kp
+[ros2_control_node-3]   right_motor_inner/kd
+[ros2_control_node-3]   right_motor_outer/kd
+[ros2_control_node-3]   right_wheel/kd
+[ros2_control_node-3]   left_motor_inner/kd
+[ros2_control_node-3]   left_motor_outer/kd
+[ros2_control_node-3]   left_wheel/kd
+[ros2_control_node-3] ]
+[ros2_control_node-3] Not available: 
+[ros2_control_node-3] [
+[ros2_control_node-3]  right_motor_inner/effort
+[ros2_control_node-3]  right_motor_outer/effort
+[ros2_control_node-3]  right_wheel/effort
+[ros2_control_node-3]  left_motor_inner/effort
+[ros2_control_node-3]  left_motor_outer/effort
+[ros2_control_node-3]  left_wheel/effort
+[ros2_control_node-3]  right_motor_inner/position
+[ros2_control_node-3]  right_motor_outer/position
+[ros2_control_node-3]  right_wheel/position
+[ros2_control_node-3]  left_motor_inner/position
+[ros2_control_node-3]  left_motor_outer/position
+[ros2_control_node-3]  left_wheel/position
+[ros2_control_node-3]  right_motor_inner/velocity
+[ros2_control_node-3]  right_motor_outer/velocity
+[ros2_control_node-3]  right_wheel/velocity
+[ros2_control_node-3]  left_motor_inner/velocity
+[ros2_control_node-3]  left_motor_outer/velocity
+[ros2_control_node-3]  left_wheel/velocity
+[ros2_control_node-3]  right_motor_inner/kp
+[ros2_control_node-3]  right_motor_outer/kp
+[ros2_control_node-3]  right_wheel/kp
+[ros2_control_node-3]  left_motor_inner/kp
+[ros2_control_node-3]  left_motor_outer/kp
+[ros2_control_node-3]  left_wheel/kp
+[ros2_control_node-3]  right_motor_inner/kd
+[ros2_control_node-3]  right_motor_outer/kd
+[ros2_control_node-3]  right_wheel/kd
+[ros2_control_node-3]  left_motor_inner/kd
+[ros2_control_node-3]  left_motor_outer/kd
+[ros2_control_node-3]  left_wheel/kd
+[ros2_control_node-3]  right_motor_inner/effort
+[ros2_control_node-3]  right_motor_outer/effort
+[ros2_control_node-3]  right_wheel/effort
+[ros2_control_node-3]  left_motor_inner/effort
+[ros2_control_node-3]  left_motor_outer/effort
+[ros2_control_node-3]  left_wheel/effort
+[ros2_control_node-3]  right_motor_inner/position
+[ros2_control_node-3]  right_motor_outer/position
+[ros2_control_node-3]  right_wheel/position
+[ros2_control_node-3]  left_motor_inner/position
+[ros2_control_node-3]  left_motor_outer/position
+[ros2_control_node-3]  left_wheel/position
+[ros2_control_node-3]  right_motor_inner/velocity
+[ros2_control_node-3]  right_motor_outer/velocity
+[ros2_control_node-3]  right_wheel/velocity
+[ros2_control_node-3]  left_motor_inner/velocity
+[ros2_control_node-3]  left_motor_outer/velocity
+[ros2_control_node-3]  left_wheel/velocity
+[ros2_control_node-3]  right_motor_inner/kp
+[ros2_control_node-3]  right_motor_outer/kp
+[ros2_control_node-3]  right_wheel/kp
+[ros2_control_node-3]  left_motor_inner/kp
+[ros2_control_node-3]  left_motor_outer/kp
+[ros2_control_node-3]  left_wheel/kp
+[ros2_control_node-3]  right_motor_inner/kd
+[ros2_control_node-3]  right_motor_outer/kd
+[ros2_control_node-3]  right_wheel/kd
+[ros2_control_node-3]  left_motor_inner/kd
+[ros2_control_node-3]  left_motor_outer/kd
+[ros2_control_node-3]  left_wheel/kd
+[ros2_control_node-3] ]
+[ros2_control_node-3] 
+[ros2_control_node-3] [ERROR] [1794184481.354958654] [controller_manager]: Error while attempting mode switch when deactivating controllers in read cycle!
+[ros2_control_node-3] [INFO] [1794184481.355294948] [rl_stand_up]: Deactivated; longest inference 280 us
+[ros2_control_node-3] [WARN] [1794184481.355712408] [controller_manager]: Overrun might occur, Total time : 1025748.628 us (Expected < 3333.333 us) --> Read time : 1025645.925 us, Update time : 86.240 us, Write time : 16.463 us
+[ros2_control_node-3] [WARN] [1794184481.355904350] [controller_manager]: Overrun detected! The controller manager missed its desired rate of 300 Hz. The loop took 1025.992176 ms (missed cycles : 308).
+[joy_teleop-7] [WARN] [1794184481.690220977] [joy_teleop]: running controller: none
+[joy_teleop-7] [WARN] [1794184481.692811901] [joy_teleop]: running: nothing (selected policy rl_agile_terrain)
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[ros2_control_node-3] [INFO] [1794184561.684664316] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1794184561.684822537] [controller_manager]: Shutdown request received....
+[ros2_control_node-3] [INFO] [1794184561.685156183] [controller_manager]: Shutting down all controllers in the controller manager.
+[ros2_control_node-3] [INFO] [1794184561.685350329] [controller_manager]: Shutting down controller 'rl_stand_up'
+[ros2_control_node-3] [INFO] [1794184561.686137545] [controller_manager]: Shutting down controller 'rl_flat_level'
+[ros2_control_node-3] [INFO] [1794184561.686813318] [controller_manager]: Shutting down controller 'rl_agile_terrain'
+[ros2_control_node-3] [INFO] [1794184561.687358129] [controller_manager]: Shutting down controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1794184561.687763681] [controller_manager]: Deactivating controller 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794184561.687987309] [controller_manager]: Shutting down controller 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794184561.688278899] [resource_manager]: 'deactivate' hardware 'SandroImu' 
+[joy_node-6] [INFO] [1794184561.684790130] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[robot_state_publisher-1] [INFO] [1794184561.685679530] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[gim6010_estop-2] [INFO] [1794184561.687743107] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[INFO] [joy_estop-8]: sending signal 'SIGINT' to process[joy_estop-8]
+[INFO] [joy_teleop-7]: sending signal 'SIGINT' to process[joy_teleop-7]
+[INFO] [joy_node-6]: sending signal 'SIGINT' to process[joy_node-6]
+[INFO] [ros2_control_node-3]: sending signal 'SIGINT' to process[ros2_control_node-3]
+[INFO] [gim6010_estop-2]: sending signal 'SIGINT' to process[gim6010_estop-2]
+[INFO] [robot_state_publisher-1]: sending signal 'SIGINT' to process[robot_state_publisher-1]
+[ros2_control_node-3] [INFO] [1794184561.702271366] [resource_manager]: Successful 'deactivate' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794184561.702337180] [resource_manager]: 'shutdown' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794184561.702355958] [resource_manager]: Successful 'shutdown' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794184561.702574178] [resource_manager]: 'shutdown' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794184561.702618974] [resource_manager]: Successful 'shutdown' of hardware 'SandroSystem'
+[ros2_control_node-3] [WARN] [1794184561.702631252] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/effort' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.702764047] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/position' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.702864213] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/velocity' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.702970323] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/kp' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.703089582] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/kd' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.703169655] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/effort' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.703234210] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/position' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.710308211] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/velocity' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.710616561] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/kp' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.710733671] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/kd' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.710789022] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/effort' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.710851929] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/position' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.710910244] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/velocity' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.710976391] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/kp' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711160242] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/kd' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711274815] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/effort' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711355851] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/position' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711416573] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/velocity' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711477424] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/kp' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711550683] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/kd' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711612868] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/effort' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711682386] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/position' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711743293] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/velocity' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711799478] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/kp' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711858014] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/kd' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711910532] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/effort' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.711967661] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/position' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.712017143] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/velocity' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.712070512] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/kp' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.712123994] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/kd' command interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.712174493] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/position' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.712229400] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/velocity' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.712318455] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.714132256] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/feedback_age' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.714306921] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/raw_position_rev' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.714520179] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/raw_velocity_rev_s' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.716869772] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/online' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.717004808] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/iq' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.717079326] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/temperature' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.717164733] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/error' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.717234880] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/requested_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.717298102] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/applied_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.717357898] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/saturation_count' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.717414675] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/position' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.717517341] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/velocity' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720137636] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720314801] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/feedback_age' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720446929] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/raw_position_rev' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720527299] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/raw_velocity_rev_s' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720585484] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/online' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720644224] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/iq' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720697113] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/temperature' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720754409] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/error' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720809649] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/requested_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.720907000] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/applied_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.721081406] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/saturation_count' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.721213757] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/position' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.721320015] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/velocity' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.721394293] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.721494681] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/feedback_age' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.721556680] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/raw_position_rev' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.725995998] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/raw_velocity_rev_s' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.726224866] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/online' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.726368236] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/iq' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.726451754] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/temperature' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.726514901] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/error' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.727773077] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/requested_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.727951816] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/applied_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728053723] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/saturation_count' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728139852] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/position' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728217666] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/velocity' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728273203] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728325424] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/feedback_age' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728461886] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/raw_position_rev' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728530478] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/raw_velocity_rev_s' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728705959] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/online' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728833272] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/iq' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728919049] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/temperature' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.728983882] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/error' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729056882] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/requested_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729157974] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/applied_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729229566] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/saturation_count' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729290417] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/position' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729346194] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/velocity' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729398898] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729463101] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/feedback_age' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729514619] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/raw_position_rev' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729569915] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/raw_velocity_rev_s' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729621303] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/online' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729672173] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/iq' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729757580] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/temperature' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729823505] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/error' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.729885857] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/requested_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.733479107] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/applied_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.734121028] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/saturation_count' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.734899429] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/position' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.738184534] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/velocity' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.742947997] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.746712394] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/feedback_age' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.747916366] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/raw_position_rev' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.748863563] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/raw_velocity_rev_s' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.749812296] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/online' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.753942135] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/iq' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.754451242] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/temperature' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.754579833] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/error' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.754653074] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/requested_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.754765906] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/applied_effort' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [WARN] [1794184561.754842461] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/saturation_count' state interface not in available list. This should not happen (hint: multiple cleanup calls).
+[ros2_control_node-3] [INFO] [1794184561.755094903] [controller_manager]: Shutting down the controller manager.
+[ros2_control_node-3] [ERROR] [1794184561.756580799] [controller_manager.pal_statistics]: Exception in publisher thread: context cannot be slept with because it's invalid!. Aborting!
+[ros2_control_node-3] [ERROR] [1794184561.756804483] [controller_manager.pal_statistics]: Exception in publisher thread: context cannot be slept with because it's invalid!. Aborting!
+[joy_node-6] [INFO] [1794184561.786270015] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[gim6010_estop-2] [INFO] [1794184561.796774712] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[robot_state_publisher-1] [INFO] [1794184561.800408703] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1794184561.894590848] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1794184561.897181902] [controller_manager.pal_statistics]: Async messages lost 0
+[ros2_control_node-3] [INFO] [1794184561.897243717] [controller_manager.pal_statistics]: publish_async_failures_ 0
+[ros2_control_node-3] [INFO] [1794184561.907033586] [controller_manager.pal_statistics]: Async messages lost 0
+[ros2_control_node-3] [INFO] [1794184561.907095752] [controller_manager.pal_statistics]: publish_async_failures_ 2
+[joy_teleop-7] Traceback (most recent call last):
+[joy_teleop-7]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop", line 33, in <module>
+[joy_teleop-7]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_teleop')())
+[joy_teleop-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_teleop.py", line 597, in main
+[joy_teleop-7]     node.destroy_node()
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1968, in destroy_node
+[joy_teleop-7]     self.__node.destroy_when_not_in_use()
+[joy_teleop-7] KeyboardInterrupt
+[joy_estop-8] Traceback (most recent call last):
+[joy_estop-8]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop", line 33, in <module>
+[joy_estop-8]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_estop')())
+[joy_estop-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_estop.py", line 382, in main
+[joy_estop-8]     node.destroy_node()
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1968, in destroy_node
+[joy_estop-8]     self.__node.destroy_when_not_in_use()
+[joy_estop-8] KeyboardInterrupt
+[INFO] [gim6010_estop-2]: process has finished cleanly [pid 15246]
+[INFO] [joy_node-6]: process has finished cleanly [pid 15250]
+[INFO] [robot_state_publisher-1]: process has finished cleanly [pid 15245]
+[ERROR] [joy_estop-8]: process has died [pid 15252, exit code -2, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop --ros-args -r __node:=joy_estop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml'].
+[ERROR] [joy_teleop-7]: process has died [pid 15251, exit code -2, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop --ros-args -r __node:=joy_teleop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml'].
+[INFO] [ros2_control_node-3]: process has finished cleanly [pid 15247]
