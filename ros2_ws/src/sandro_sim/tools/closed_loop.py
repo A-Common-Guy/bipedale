@@ -248,12 +248,17 @@ def command_sweep(args, binary: Path) -> int:
 # The slow end of the BNO085 SPI link: about 200 Hz per signal, 9 ms on the robot
 # (recordings/imu_rock*_2026-10-21.csv), with margin.
 SPI_IMU_SLOW = {"imu_rate": "180", "imu_delay": "0.015"}
+# Joint state from the drives' MIT replies (state_source:=mit): all drives
+# sampled together at 300 Hz, ~2.3 ms old (sandro.launch.py JOINT_TIMING).
+MIT_JOINTS = {"joint_rate": "300", "joint_stagger": "false", "joint_delay": "0.0023"}
 
 
 def gates():
     return [
         ("hardware sequence, nominal latency: stands within 0.035 rad RMS, tracks 0.2 m/s",
          "hardware", {}, lambda m: m[0]["pitch_rms"] < 0.035 and m[1]["vel_err_rms"] < 0.12),
+        ("hardware sequence, joint state from MIT replies: same bounds",
+         "hardware", MIT_JOINTS, lambda m: m[0]["pitch_rms"] < 0.035 and m[1]["vel_err_rms"] < 0.12),
         ("hardware sequence, IMU at 180 Hz / 15 ms (slow SPI)", "hardware", SPI_IMU_SLOW,
          lambda m: True),
         ("hardware sequence, drive law once per control cycle (no MitDrivePlugin)",

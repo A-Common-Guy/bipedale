@@ -65,11 +65,12 @@ IMU_COLUMNS = ["imu_qx", "imu_qy", "imu_qz", "imu_qw", "imu_gx", "imu_gy", "imu_
 # Latency profiles of the comparison. "spi_slow" is the gate closed_loop.py
 # uses for the slow end of the BNO085 SPI link; "worst" stacks it with the
 # far ends of the joint and command delays measured on the robot
-# (SIM_TO_REAL.md).
+# (SIM_TO_REAL.md); "mit" is the joint timing of state_source:=mit.
 PROFILES = {
     "nominal": {},
     "spi_slow": dict(closed_loop.SPI_IMU_SLOW),
     "worst": {**closed_loop.SPI_IMU_SLOW, "joint_delay": "0.005", "command_delay": "0.003"},
+    "mit": dict(closed_loop.MIT_JOINTS),
 }
 
 
@@ -310,7 +311,7 @@ class PolicyController:
                              0.0][: 4 if self.iface.has_roll else 3])
         self.height_command = height_target
         frame = self.iface.frame(quat, gyro, accel, q, v, self.last_action, self.ref)
-        self.history = np.tile(frame, (self.iface.history, 1))
+        self.history = np.tile(frame, (self.iface.history_frames, 1))
         self.cycle = 0
 
     def _heights(self, q):
@@ -349,7 +350,7 @@ class PolicyController:
                 jump = i.jump_observation(self.jump_timer, self.jump_height)
             frame = i.frame(quat, gyro, accel, q, v, self.last_action, self.ref, jump)
             self.history = np.concatenate([frame[None], self.history[:-1]], axis=0)
-            action = np.clip(self.policy(self.history.reshape(-1)), -i.clip, i.clip)
+            action = np.clip(self.policy(self.history[:: i.history_stride].reshape(-1)), -i.clip, i.clip)
             self.last_action = action
             self.frames = i.frames(action)
         self.cycle += 1

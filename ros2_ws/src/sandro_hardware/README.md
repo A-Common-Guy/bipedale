@@ -48,6 +48,8 @@ every joint is checked, not only those with `kp`) and inside 90 % of the MIT
 range; otherwise the broadcast keeps the position. While replies arrive the
 broadcast does not overwrite them; before the first reply (inactive) and
 `stale_state_s` after the last, the broadcast is the state again.
+`sandro.launch.py` passes `encoder_period_ms` 5 with `encoder` and 20 with
+`mit` unless set (`JOINT_TIMING`), and in MuJoCo the matching joint timing.
 
 Faults are reported in one throttled line per second, `DRIVE FAULT: <joint>
 (node N): no encoder feedback | no heartbeat | axis error 0xCODE ...`, with an

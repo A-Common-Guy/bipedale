@@ -139,7 +139,7 @@ const Eigen::VectorXf &MlpPolicy::run(const Eigen::VectorXf &observation) {
 bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_rate_hz,
                              std::string *error) {
   const auto &s = settings;
-  if (s.history < 1 || (s.command_size != 3 && s.command_size != 4) ||
+  if (s.history < 1 || s.history_stride < 1 || (s.command_size != 3 && s.command_size != 4) ||
       !(s.policy_rate_hz > 0.0) || update_rate_hz <= 0 || !(s.forward_m_s > 0.0) ||
       !(s.yaw_rad_s > 0.0) || !(s.height_max_m > s.height_min_m) ||
       (s.command_size == 4 && !(s.roll_rad > 0.0)) || !(s.leg_kp_nm_rad > 0.0) ||
@@ -173,9 +173,30 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
   const double c = std::cos(-s.imu_offset_rad);
   const double n = std::sin(-s.imu_offset_rad);
   body_from_imu_ << 1.0, 0.0, 0.0, 0.0, c, -n, 0.0, n, c;
+  frames_ = Eigen::VectorXf::Zero(frame_size_ * ((s.history - 1) * s.history_stride + 1));
   observation_ = Eigen::VectorXf::Zero(frame_size_ * s.history);
   frame_ = Eigen::VectorXf::Zero(frame_size_);
   return true;
+}
+
+void RlPolicyCore::fill_history() {
+  for (Eigen::Index k = 0; k < frames_.size() / frame_size_; ++k) {
+    frames_.segment(k * frame_size_, frame_size_) = frame_;
+  }
+  for (int k = 0; k < settings_.history; ++k) {
+    observation_.segment(k * frame_size_, frame_size_) = frame_;
+  }
+}
+
+void RlPolicyCore::push_frame() {
+  for (Eigen::Index k = frames_.size() - frame_size_ - 1; k >= 0; --k) {
+    frames_[k + frame_size_] = frames_[k];
+  }
+  frames_.head(frame_size_) = frame_;
+  const int stride = frame_size_ * settings_.history_stride;
+  for (int k = 0; k < settings_.history; ++k) {
+    observation_.segment(k * frame_size_, frame_size_) = frames_.segment(k * stride, frame_size_);
+  }
 }
 
 Eigen::Matrix3d RlPolicyCore::body_rotation(const RlPolicyState &state) const {
@@ -307,9 +328,7 @@ void RlPolicyCore::engage(const RlPolicyState &state) {
   last_action_.fill(0.0F);
   applied_action_.fill(0.0F);
   build_frame(state, frame_);
-  for (int k = 0; k < settings_.history; ++k) {
-    observation_.segment(k * frame_size_, frame_size_) = frame_;
-  }
+  fill_history();
   reset_oscillation(state);
   oscillation_tripped_ = false;
   armed_ = !settings_.start_lying;
@@ -375,9 +394,7 @@ bool RlPolicyCore::hand_over(const RlPolicyState &state) {
                           : 0.0F;
   }
   build_frame(state, frame_);
-  for (int k = 0; k < settings_.history; ++k) {
-    observation_.segment(k * frame_size_, frame_size_) = frame_;
-  }
+  fill_history();
   applied_action_ = last_action_;
   policy_frame_ = frames_from_action(applied_action_);
   return true;
@@ -504,11 +521,7 @@ RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCo
   if (phase_ == RlPhase::kPolicy && fresh && cycle_ % cycles_per_action_ == 0) {
     shape(command);
     build_frame(state, frame_);
-    const int tail = frame_size_ * (s.history - 1);
-    for (int k = tail - 1; k >= 0; --k) {
-      observation_[k + frame_size_] = observation_[k];
-    }
-    observation_.head(frame_size_) = frame_;
+    push_frame();
     const auto start = std::chrono::steady_clock::now();
     const Eigen::VectorXf &action = policy_.run(observation_);
     out.inference_s =

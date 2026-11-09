@@ -36,6 +36,7 @@ from .sources import JOINTS
 N_JOINTS = 6
 IMU_CHANNELS = 10           # quaternion wxyz, gyro, accelerometer
 N_CHANNELS = IMU_CHANNELS + 2 * N_JOINTS
+EVENT_TERMS = ("termination",)  # reward terms paid once per event, not per second
 HISTORY_LENGTH = 160        # physics steps (133 ms): longest delay plus the slowest sample period
 
 
@@ -111,6 +112,8 @@ class SandroEnv:
             raise ValueError(f"policy rate {cfg['policy_rate_hz']} Hz must divide the {control_rate:g} Hz control rate")
         self.decimation = int(round(cycles)) * control_steps
         self.dt = self.decimation * self.dt_physics
+        self.difference_scale = 0.01 / self.dt
+        self.event_scale = 0.01 if cfg["rewards"].get("scale_by_dt", True) else 1.0
         self.episode_steps = int(round(cfg["episode_s"] / self.dt))
 
         # Indices and constants.
@@ -181,6 +184,10 @@ class SandroEnv:
         self.actor_layout = self._actor_layout()
         self.critic_layout = self._critic_layout()
         self.history = int(cfg["observation"]["history"])
+        # Policy steps between stacked frames: a 300 Hz policy with stride 3
+        # sees the same 10 ms-spaced history as a 100 Hz one.
+        self.history_stride = int(cfg["observation"].get("history_stride", 1))
+        self.history_frames = (self.history - 1) * self.history_stride + 1
         self.actor_obs_size = self.actor_layout.size * self.history
         self.critic_obs_size = self.critic_layout.size
         self.action_perm = s.mirror_perm
@@ -263,6 +270,10 @@ class SandroEnv:
                  ("wheel_clearance", 2), ("push", self.push_dim), ("params", self.N_PARAMS)]
         return self._layout(comps)
 
+    def _actor_obs(self, obs_history):
+        """Every history_stride-th frame of the buffer, newest first, flattened."""
+        return obs_history[:: self.history_stride].reshape(-1)
+
     def mirror_actor_obs(self, obs):
         frame = self.actor_layout.size
         perm = np.concatenate([self.actor_layout.perm + k * frame for k in range(self.history)])
@@ -288,6 +299,13 @@ class SandroEnv:
             joint_delay = u(keys[4], L["joint_delay_s"])
             joint_rate = u(keys[5], L["joint_rate_hz"])
             sync = jax.random.uniform(keys[6]) < L["synchronous_joints_probability"]
+            # state_source:=mit: every drive replies to each command, so the
+            # joints are sampled together at the control rate.
+            mit = jax.random.uniform(jax.random.fold_in(keys[6], 1)) < L.get("mit_joints_probability", 0.0)
+            mit_delay = u(jax.random.fold_in(keys[4], 1), L.get("mit_joint_delay_s", [0.0023, 0.0023]))
+            joint_delay = jp.where(mit, mit_delay, joint_delay)
+            joint_rate = jp.where(mit, jp.float32(self.spec.limits.control_rate_hz), joint_rate)
+            sync = sync | mit
             joint_phase = jp.where(sync, jp.zeros(N_JOINTS), jax.random.uniform(keys[7], (N_JOINTS,)) / joint_rate)
             imu_phase = jax.random.uniform(keys[8]) / imu_rate
             command_delay = u(keys[9], L["command_delay_s"])
@@ -562,17 +580,17 @@ class SandroEnv:
             "push_force_sample": push_force, "push_force": jp.zeros(self.push_dim),
             "last_action": jp.zeros(N_JOINTS), "last_action2": jp.zeros(N_JOINTS),
             "frame": zero_frame, "drive_tau": jp.zeros(N_JOINTS), "axle_prev": self._axle_mid(data),
-            "obs_history": jp.zeros((self.history, self.actor_layout.size)),
+            "obs_history": jp.zeros((self.history_frames, self.actor_layout.size)),
         }
         if self.has_jump:
             jump_wait, jump_height = self._sample_jump(jax.random.fold_in(k[9], 1))
             info.update({"jump_wait": jump_wait, "jump_timer": jp.float32(-10.0), "jump_height": jump_height})
         sensed = self._read_sensors(info)
         frame, parts = self._actor_frame(sensed, info)
-        obs_history = jp.tile(frame[None], (self.history, 1))
+        obs_history = jp.tile(frame[None], (self.history_frames, 1))
         info["obs_history"] = obs_history
         truth = self._truth(data, info)
-        obs = {"actor": obs_history.reshape(-1),
+        obs = {"actor": self._actor_obs(obs_history),
                "critic": self._critic_obs(parts, truth, info, model_params)}
         metrics = {name: jp.float32(0.0) for name in self.metric_names()}
         zero = jp.float32(0.0)
@@ -724,10 +742,10 @@ class SandroEnv:
         reward, terms = self._reward(truth, info, action, prev_action, info["last_action2"], taus, terminated)
         timeout = info["step"] >= self.episode_steps
         done = jp.maximum(terminated, timeout.astype(jp.float32))
-        obs = {"actor": obs_history.reshape(-1),
+        obs = {"actor": self._actor_obs(obs_history),
                "critic": self._critic_obs(parts, truth, info, model_params)}
         obs = jax.tree.map(lambda x: jp.where(diverged, 0.0, x), obs)
-        termination_penalty = self.cfg["rewards"]["weights"].get("termination", 0.0) * self.dt
+        termination_penalty = self.cfg["rewards"]["weights"].get("termination", 0.0) * self.event_scale
         reward = jp.where(diverged | ~jp.isfinite(reward), termination_penalty, reward)
         terms = {k: jp.where(diverged, 0.0, v) for k, v in terms.items()}
         cat_delta = jp.where(diverged, 0.0, cat_delta)
@@ -796,7 +814,8 @@ class SandroEnv:
             lift = jp.max(truth["clearance"] - c["wheel_lift"]["limit_m"]) / c["wheel_lift"]["slack"]
             violations.append(lift * (1.0 - self._jumping(info)))
         v = jp.clip(jp.stack(violations), 0.0, 1.0)
-        return c["p_max"] * jp.max(v)
+        # p_max is per 10 ms; a faster policy terminates as often per second.
+        return 1.0 - (1.0 - c["p_max"] * jp.max(v)) ** (self.dt / 0.01)
 
     def _reward(self, truth, info, action, prev_action, prev_action2, taus, terminated):
         r = self.cfg["rewards"]
@@ -819,8 +838,11 @@ class SandroEnv:
             "pitch_rate": truth["pitch_rate"] ** 2,
             "vertical_velocity": truth["vertical_speed"] ** 2,
             "leg_symmetry": (truth["offsets"][0] - truth["offsets"][1]) ** 2,
-            "action_rate": jp.sum((action - prev_action) ** 2),
-            "action_accel": jp.sum((action - 2 * prev_action + prev_action2) ** 2),
+            # Differences per 10 ms, so a faster policy is held to the same
+            # smoothness (unchanged at 100 Hz).
+            "action_rate": jp.sum(((action - prev_action) * self.difference_scale) ** 2),
+            "action_accel": jp.sum(((action - 2 * prev_action + prev_action2)
+                                    * self.difference_scale ** 2) ** 2),
             "leg_torque": jp.mean(jp.sum(taus[:, legs] ** 2, axis=1)),
             "wheel_torque": jp.mean(jp.sum(taus[:, wheels] ** 2, axis=1)),
             "leg_velocity": jp.sum(truth["qd"][legs] ** 2),
@@ -847,7 +869,9 @@ class SandroEnv:
                 terms[name] = terms[name] * (1.0 - jumping)
         terms = {k: v for k, v in terms.items() if k in w}
         scale = self.dt if r.get("scale_by_dt", True) else 1.0
-        weighted = {k: w[k] * v * scale for k, v in terms.items()}
+        # Events happen once, whatever the policy rate: their weight is per
+        # 10 ms step.
+        weighted = {k: w[k] * v * (self.event_scale if k in EVENT_TERMS else scale) for k, v in terms.items()}
         reward = sum(weighted.values())
         return reward, weighted
 

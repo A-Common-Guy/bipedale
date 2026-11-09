@@ -43,6 +43,7 @@ struct RlPolicySettings {
   std::string policy_file;
   double policy_rate_hz{100.0};
   int history{4};
+  int history_stride{1};  // policy steps between the stacked frames
   int command_size{3};
   double gyro_scale{0.25};
   double leg_velocity_scale{0.1};
@@ -208,9 +209,15 @@ public:
   RlPolicyFrame frames_from_action(const std::array<float, 6> &action) const;
   void shape(const RlPolicyCommand &command);
   const std::array<double, 4> &reference() const { return reference_; }
+  // The policy input of the last inference (history frames, newest first).
+  const Eigen::VectorXf &observation() const { return observation_; }
   std::array<double, 2> leg_heights(const RlPolicyState &state) const;
 
 private:
+  // Fills the whole history with frame_.
+  void fill_history();
+  // Pushes frame_ as the newest frame and gathers the strided observation.
+  void push_frame();
   Eigen::Matrix3d body_rotation(const RlPolicyState &state) const;
   void engage(const RlPolicyState &state);
   double feasible_roll(double roll, double height) const;
@@ -241,6 +248,7 @@ private:
   bool oscillation_tripped_{false};
   bool armed_{true};  // fall cut-off active
   double armed_s_{};  // time since the fall cut-off armed
+  Eigen::VectorXf frames_;  // the last (history - 1) * history_stride + 1 frames, newest first
   Eigen::VectorXf observation_;
   Eigen::VectorXf frame_;
   RlPolicyFrame policy_frame_{};

@@ -113,6 +113,11 @@ env:
       joint_delay_s: [0.0005, 0.006]
       joint_rate_hz: [150.0, 300.0]
       synchronous_joints_probability: 0.2
+      # Episodes with the joint state of state_source:=mit: all joints sampled
+      # together at the control rate, mit_joint_delay_s old (2.3 ms nominal,
+      # sandro.launch.py JOINT_TIMING).
+      mit_joints_probability: 0.0
+      mit_joint_delay_s: [0.0015, 0.0035]
       command_delay_s: [0.0005, 0.003]
     sensors:
       imu_noise_scale: [0.5, 2.0]

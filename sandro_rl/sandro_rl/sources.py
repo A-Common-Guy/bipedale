@@ -80,11 +80,17 @@ def simulated_imu_roll_offset() -> float:
     return float((identified().get("imu_mount") or {}).get("roll_offset_rad", 0.0))
 
 
-def launch_defaults(path: Path = LAUNCH) -> dict[str, str]:
-    """DeclareLaunchArgument(name, default_value=...) pairs of the launch file."""
+def launch_defaults(path: Path = LAUNCH, state_source: str | None = None) -> dict[str, str]:
+    """DeclareLaunchArgument(name, default_value=...) pairs of the launch file,
+    'auto' joint timing resolved from its JOINT_TIMING table for state_source
+    (default: the launch file's own default)."""
     tree = ast.parse(path.read_text())
     defaults: dict[str, str] = {}
+    timing: dict[str, dict[str, str]] = {}
     for node in ast.walk(tree):
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and getattr(node.targets[0], "id", None) == "JOINT_TIMING"):
+            timing = ast.literal_eval(node.value)
         if not (isinstance(node, ast.Call) and getattr(node.func, "id", None) == "DeclareLaunchArgument"):
             continue
         if not node.args or not isinstance(node.args[0], ast.Constant):
@@ -92,6 +98,10 @@ def launch_defaults(path: Path = LAUNCH) -> dict[str, str]:
         for keyword in node.keywords:
             if keyword.arg == "default_value" and isinstance(keyword.value, ast.Constant):
                 defaults[str(node.args[0].value)] = str(keyword.value.value)
+    source = state_source or defaults.get("state_source", "encoder")
+    for name, value in timing.get(source, {}).items():
+        if defaults.get(name) == "auto":
+            defaults[name] = value
     return defaults
 
 
@@ -107,8 +117,8 @@ class Latency:
     command_delay_s: float
 
     @classmethod
-    def from_launch(cls) -> "Latency":
-        d = launch_defaults()
+    def from_launch(cls, state_source: str | None = None) -> "Latency":
+        d = launch_defaults(state_source=state_source)
         return cls(
             imu_delay_s=float(d["sim_imu_delay_s"]),
             imu_rate_hz=float(d["sim_imu_rate_hz"]),

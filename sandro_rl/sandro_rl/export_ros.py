@@ -173,6 +173,7 @@ def parameter_block(name: str, policy: str, contract: dict, actor: dict, safety:
     policy_rate_hz: {_f(float(contract["policy_rate_hz"]))}
     observation:
       history: {obs["history"]}
+      history_stride: {obs.get("history_stride", 1)}
       command_size: {frame["command"]}
       gyro_scale: {_f(obs["scales"]["gyro"])}
       leg_velocity_scale: {_f(obs["scales"]["leg_vel"])}

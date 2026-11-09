@@ -110,7 +110,8 @@ def export(policy_dir: Path) -> Path:
     (policy_dir / "policy.json").write_text(json.dumps({
         "onnx": out.name, "onnx_max_abs_error_vs_reference": err,
         "policy_rate_hz": cfg["env"]["policy_rate_hz"], "control_rate_hz": i.control_rate_hz,
-        "observation": {"history": i.history, "order": "newest frame first", "frame": frame,
+        "observation": {"history": i.history, "history_stride": i.history_stride,
+                        "order": "newest frame first", "frame": frame,
                         "legs": list(sources.LEG_JOINTS), "wheels": list(sources.WHEEL_JOINTS),
                         "scales": i.scales, "imu_offset_correction_rad": i.imu_offset_correction,
                         "command_normalisation": {"forward_m_s": i.v_max, "yaw_rad_s": i.yaw_max,

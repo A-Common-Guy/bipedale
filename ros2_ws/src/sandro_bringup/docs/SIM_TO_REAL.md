@@ -145,10 +145,15 @@ The hardware plugin gained `state_source:=mit` (with `encoder_period_ms:=20`):
 joint velocity and leg position from the MIT reply each drive sends to every
 command, one cycle old at most and synchronous with the loop, instead of the
 5 ms encoder broadcast that the loop beats against. It is untested on the
-robot as of this writing; try it once the baseline above is repeatable, and
-if it helps set `sim_joint_delay_s:=0.0023 sim_joint_rate_hz:=300
-sim_joint_stagger:=false` for the simulation to match (the reply is sampled
-when the previous cycle's command arrives and read one cycle later).
+robot as of this writing; try it once the baseline above is repeatable. The
+simulation matches it with `sim_joint_delay_s:=0.0023 sim_joint_rate_hz:=300
+sim_joint_stagger:=false` (the reply is sampled when the previous cycle's
+command arrives and read one cycle later). Since 2026-11 `state_source:=mit`
+alone selects both, on either backend: `encoder_period_ms` and the
+`sim_joint_*` arguments default to `auto`, resolved from `JOINT_TIMING` in
+`sandro.launch.py`. The WBC passes the closed-loop gates with it
+(`closed_loop.py check`, "joint state from MIT replies"), and
+`rl_flat_level_fast` trained on it in half its episodes.
 
 ### Third comparison (2026-09-20, identified simulation with the override)
 

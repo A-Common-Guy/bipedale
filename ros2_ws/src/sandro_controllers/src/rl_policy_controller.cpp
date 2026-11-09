@@ -168,6 +168,8 @@ void RlPolicyController::declare_parameters() {
   node->declare_parameter("policy_fingerprint", "",
                           read_only("Model fingerprint the policy was trained on."));
   node->declare_parameter("observation.history", 4, read_only("Frames stacked, newest first."));
+  node->declare_parameter("observation.history_stride", 1,
+                          read_only("Policy steps between stacked frames."));
   node->declare_parameter("observation.command_size", 3,
                           read_only("Command terms: 3, or 4 with a roll command."));
   node->declare_parameter("action.wheel_mode", "velocity", read_only("velocity or torque."));
@@ -192,6 +194,8 @@ bool RlPolicyController::read_settings(RlPolicySettings &s, std::string *error) 
     s.*entry.field = node->get_parameter(entry.name).as_double();
   }
   s.history = static_cast<int>(node->get_parameter("observation.history").as_int());
+  s.history_stride =
+      static_cast<int>(node->get_parameter("observation.history_stride").as_int());
   s.command_size = static_cast<int>(node->get_parameter("observation.command_size").as_int());
   const auto mode = node->get_parameter("action.wheel_mode").as_string();
   if (mode != "velocity" && mode != "torque") {
@@ -278,9 +282,11 @@ RlPolicyController::on_configure(const rclcpp_lifecycle::State &) {
     return controller_interface::CallbackReturn::ERROR;
   }
   RCLCPP_INFO(node->get_logger(),
-              "Policy %s: %d x %d observations, command limits %.2f m/s, %.2f rad/s, "
-              "height %.3f-%.3f m, roll %.2f rad; IMU offset %.3f rad; trained on model %.12s",
-              settings.policy_file.c_str(), settings.history, core_.frame_size(),
+              "Policy %s at %.0f Hz: %d x %d observations (stride %d), command limits %.2f m/s, "
+              "%.2f rad/s, height %.3f-%.3f m, roll %.2f rad; IMU offset %.3f rad; trained on "
+              "model %.12s",
+              settings.policy_file.c_str(), settings.policy_rate_hz, settings.history,
+              core_.frame_size(), settings.history_stride,
               settings.forward_m_s, settings.yaw_rad_s, settings.height_min_m,
               settings.height_max_m, settings.roll_rad, settings.imu_offset_rad,
               node->get_parameter("policy_fingerprint").as_string().c_str());

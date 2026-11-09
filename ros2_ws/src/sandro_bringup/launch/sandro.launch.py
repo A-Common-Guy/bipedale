@@ -21,10 +21,32 @@ BROADCASTERS = ("joint_state_broadcaster", "health_broadcaster", "imu_broadcaste
 # ros2_control_node on the Raspberry Pi 4 (cores 0-3): SCHED_FIFO priority and
 # core of the control-loop thread, and mlockall of the whole process.
 REALTIME = {"thread_priority": 50, "cpu_affinity": 3, "lock_memory": True}
+# What the "auto" launch arguments resolve to for each state_source: the
+# encoder broadcast period on the robot, and the joint sampling MuJoCo
+# emulates. 'encoder': free-running 200 Hz broadcasts at spread phases; 'mit':
+# every drive replies to each 300 Hz command, ~2.3 ms after it is sent
+# (docs/SIM_TO_REAL.md). sandro_rl/sources.py reads this table.
+JOINT_TIMING = {
+    "encoder": {"encoder_period_ms": "5", "sim_joint_delay_s": "0.001",
+                "sim_joint_rate_hz": "200", "sim_joint_stagger": "true"},
+    "mit": {"encoder_period_ms": "20", "sim_joint_delay_s": "0.0023",
+            "sim_joint_rate_hz": "300", "sim_joint_stagger": "false"},
+}
 
 
 def _truth(value):
     return value.lower() in ("1", "true", "yes", "on")
+
+
+def _joint_timing(context, name):
+    """A JOINT_TIMING launch argument, 'auto' resolved from state_source."""
+    value = LaunchConfiguration(name).perform(context)
+    if value != "auto":
+        return value
+    source = LaunchConfiguration("state_source").perform(context)
+    if source not in JOINT_TIMING:
+        raise ValueError(f"state_source must be one of {sorted(JOINT_TIMING)}, not {source!r}")
+    return JOINT_TIMING[source][name]
 
 
 def _package(name):
@@ -91,15 +113,13 @@ def _setup(context):
                             for name in ("imu_transport", "imu_spi_device", "imu_port")
                         ],
                         f"state_source:={LaunchConfiguration('state_source').perform(context)}",
-                        f"encoder_period_ms:={LaunchConfiguration('encoder_period_ms').perform(context)}",
                         f"simulation_headless:={'true' if headless else 'false'}",
                         f"simulation_latency:={'true' if sim_latency else 'false'}",
                         *[
                             f"{name}:={LaunchConfiguration(name).perform(context)}"
-                            for name in ("sim_imu_delay_s", "sim_imu_rate_hz", "sim_joint_delay_s",
-                                         "sim_joint_rate_hz", "sim_joint_stagger",
-                                         "sim_command_delay_s")
+                            for name in ("sim_imu_delay_s", "sim_imu_rate_hz", "sim_command_delay_s")
                         ],
+                        *[f"{name}:={_joint_timing(context, name)}" for name in JOINT_TIMING["encoder"]],
                     ],
                     text=True,
                 )
@@ -268,7 +288,7 @@ def generate_launch_description():
             description=(
                 "Controller to spawn, or none: whole_body_controller, "
                 "driving_balancer (cascade), lqr_balancer (full state feedback), "
-                "rl_flat_level or rl_agile_terrain (sandro_rl policies), "
+                "rl_flat_level, rl_flat_level_fast (300 Hz) or rl_agile_terrain (sandro_rl policies), "
                 "rl_stand_up (engages lying down, gets up, then balances)"
             ),
         ),
@@ -280,11 +300,13 @@ def generate_launch_description():
                               description="UART device, used with imu_transport:=uart"),
         DeclareLaunchArgument(
             "state_source", default_value="encoder",
-            description="real only: joint state from the 0x09 'encoder' broadcast or the synchronous 'mit' reply",
+            description="joint state from the 0x09 'encoder' broadcast or the synchronous 'mit' reply; "
+                        "in MuJoCo it selects the matching emulated joint timing",
         ),
         DeclareLaunchArgument(
-            "encoder_period_ms", default_value="5",
-            description="real only: period of the drives' encoder broadcast; 20 is enough with state_source:=mit",
+            "encoder_period_ms", default_value="auto",
+            description="real only: period of the drives' encoder broadcast; auto is 5, or 20 with "
+                        "state_source:=mit",
         ),
         DeclareLaunchArgument("teleop", default_value="true"),
         DeclareLaunchArgument("rviz", default_value="true"),
@@ -306,14 +328,15 @@ def generate_launch_description():
                               description="MuJoCo only: IMU latency from sample to host, seconds"),
         DeclareLaunchArgument("sim_imu_rate_hz", default_value="200",
                               description="MuJoCo only: IMU sample rate in Hz (0 = every cycle)"),
-        DeclareLaunchArgument("sim_joint_delay_s", default_value="0.001",
-                              description="MuJoCo only: encoder latency from sample to host "
-                                          "(CAN frame plus USB adapter), seconds"),
-        DeclareLaunchArgument("sim_joint_rate_hz", default_value="200",
-                              description="MuJoCo only: encoder sample rate in Hz (0 = every cycle)"),
-        DeclareLaunchArgument("sim_joint_stagger", default_value="true",
-                              description="MuJoCo only: drives sample at spread phases (broadcast); "
-                                          "false for state_source:=mit replies"),
+        DeclareLaunchArgument("sim_joint_delay_s", default_value="auto",
+                              description="MuJoCo only: joint state latency from sample to host "
+                                          "(CAN frame plus USB adapter), seconds; auto from state_source"),
+        DeclareLaunchArgument("sim_joint_rate_hz", default_value="auto",
+                              description="MuJoCo only: joint sample rate in Hz (0 = every cycle); "
+                                          "auto from state_source"),
+        DeclareLaunchArgument("sim_joint_stagger", default_value="auto",
+                              description="MuJoCo only: drives sample at spread phases (broadcast) "
+                                          "or together (MIT replies); auto from state_source"),
         DeclareLaunchArgument("sim_command_delay_s", default_value="0.001",
                               description="MuJoCo only: latency from write() to the drive "
                                           "(USB adapter plus CAN frames), seconds"),

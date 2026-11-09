@@ -272,6 +272,32 @@ TEST(RlPolicy, HandOverEngagesAtOnceFromTheMeasuredPoseOnlyWhenUpright) {
   EXPECT_TRUE(out.inferred);
 }
 
+// A 300 Hz policy with stride 3 infers every cycle on frames 10 ms apart.
+TEST(RlPolicy, StridedHistoryStacksEveryStrideThFrame) {
+  sc::RlPolicyCore core;
+  std::string error;
+  auto s = flat_settings();
+  s.policy_rate_hz = 300.0;
+  s.history_stride = 3;
+  ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+  auto state = standing(s);
+  core.reset(state);
+  ASSERT_TRUE(core.hand_over(state));
+  constexpr int kCycles = 20;
+  for (int n = 1; n <= kCycles; ++n) {
+    state.angular_velocity = {0.01 * n, 0.0, 0.0};
+    const auto out = core.update(state, sc::RlPolicyCommand{}, 1.0 / 300.0);
+    ASSERT_TRUE(out.inferred) << n;
+  }
+  const auto &obs = core.observation();
+  ASSERT_EQ(obs.size(), 4 * core.frame_size());
+  for (int k = 0; k < 4; ++k) {
+    EXPECT_NEAR(obs[k * core.frame_size() + 3], 0.25 * 0.01 * (kCycles - 3 * k), 1e-6) << k;
+  }
+  s.history_stride = 0;
+  EXPECT_FALSE(core.configure(s, 300, &error));
+}
+
 TEST(RlPolicy, WheelFilterSmoothsOnlyTheWheelCommands) {
   std::string error;
   const auto s = flat_settings();

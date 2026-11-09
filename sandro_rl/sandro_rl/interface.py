@@ -57,6 +57,8 @@ class PolicyInterface:
         self.body_from_imu_correction = rotation_x(-self.imu_offset_correction)
         self.scales = cfg["observation"]["scales"]
         self.history = int(cfg["observation"]["history"])
+        self.history_stride = int(cfg["observation"].get("history_stride", 1))
+        self.history_frames = (self.history - 1) * self.history_stride + 1
         self.accelerometer = bool(cfg["observation"].get("accelerometer", False))
         c = cfg["commands"]
         self.v_max = float(_ros(c["forward_m_s"], lim.max_forward_m_s))

@@ -104,6 +104,47 @@ def test_interface_matches_environment(env, cfg, spec):
                     float(env.feasible_roll(jp.float32(roll), jp.float32(h))), abs=1e-6)
 
 
+def test_strided_history_feeds_frames_ten_ms_apart(spec):
+    """flat_level_fast acts every cycle on frames 3 cycles apart, in the
+    evaluator as in the environment (env._actor_obs)."""
+    from types import SimpleNamespace
+
+    from sandro_rl.env import SandroEnv
+    from sandro_rl.evaluate import PolicyController
+
+    cfg = config_mod.load("flat_level_fast.yaml")
+    iface = PolicyInterface(cfg, spec)
+    assert (iface.cycles_per_action, iface.history, iface.history_stride) == (1, 4, 3)
+    seen = []
+    controller = PolicyController(iface, lambda obs: seen.append(obs.copy()) or np.zeros(6), fall_angle_rad=1.0)
+    quat = np.array([0.0, 0.0, 0.0, 1.0])
+    controller.reset(quat, np.zeros(3), np.zeros(3), spec.stand_q, np.zeros(6), 0.17)
+    for n in range(1, 21):
+        controller.update(quat, np.array([0.01 * n, 0.0, 0.0]), np.zeros(3), spec.stand_q, np.zeros(6),
+                          np.zeros(3), 1 / 300)
+    assert len(seen) == 20
+    frames = seen[-1].reshape(iface.history, -1)
+    gyro_x = frames[:, 3] / iface.scales["gyro"]
+    np.testing.assert_allclose(gyro_x, [0.20, 0.17, 0.14, 0.11], atol=1e-6)
+
+    buffer = np.arange(10)[:, None] * np.ones((1, 2))
+    stacked = SandroEnv._actor_obs(SimpleNamespace(history_stride=3), buffer)
+    np.testing.assert_array_equal(stacked, [0, 0, 3, 3, 6, 6, 9, 9])
+
+
+@pytest.mark.gpu
+def test_per_second_terms_do_not_depend_on_the_policy_rate():
+    from sandro_rl.env import SandroEnv
+
+    slow = SandroEnv(config_mod.load("flat_level_real.yaml"))
+    fast = SandroEnv(config_mod.load("flat_level_fast.yaml"))
+    assert slow.difference_scale == pytest.approx(1.0) and fast.difference_scale == pytest.approx(3.0)
+    assert slow.event_scale == fast.event_scale == pytest.approx(0.01)
+    # A ramp at 1/s: the same action_rate per second at both rates.
+    for env in (slow, fast):
+        assert ((env.dt * env.difference_scale) ** 2) == pytest.approx(1e-4)
+
+
 def test_actor_sees_no_privileged_state(cfg, spec):
     """The actor frame is built from IMU, encoders, previous action and command only."""
     i = PolicyInterface(cfg, spec)
