@@ -94,7 +94,8 @@ cmd_gui() {
       fi
       if remote "docker exec $CONTAINER pgrep -f $PANEL_PATTERN >/dev/null"; then
         echo "panel running: http://$host:8080"
-      elif ! remote "[ -f ~/$DIR/install/sandro_gui/share/sandro_gui/package.xml ]"; then
+      # Inside the container: the install's symlinks point to /workspaces/sandro.
+      elif ! remote "docker exec $CONTAINER test -f /workspaces/sandro/install/sandro_gui/share/sandro_gui/package.xml"; then
         echo "panel not built yet: deploy/pi/pi build"
       else
         echo "panel not running; it restarts within seconds (deploy/pi/pi gui log)"

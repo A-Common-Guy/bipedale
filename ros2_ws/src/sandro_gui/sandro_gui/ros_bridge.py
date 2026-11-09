@@ -168,11 +168,11 @@ class RosBridge:
         }
         self.estop_service = robot.get("estop_service", "/gim6010_estop/trigger")
         self.clear_service = robot.get("clear_errors_service", "/gim6010_estop/clear_errors")
+        self._clients_lock = threading.Lock()
         self._triggers: dict[str, object] = {}
         self._trigger(self.estop_service)
         self._trigger(self.clear_service)
         self._param_clients: dict[tuple[str, str], object] = {}
-        self._clients_lock = threading.Lock()
         self.baseline: dict[str, dict] = {}
         self.param_types: dict[str, dict] = {}
 
