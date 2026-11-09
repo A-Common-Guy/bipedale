@@ -1243,6 +1243,49 @@ checkpoint):
 | `flat_level_real` | Pitch RMS 0.015–0.019 against 0.026–0.032 and no fall in the worst-case shoves, but with the IMU at 180 Hz / 15 ms (`spi_slow`) the wheels chatter at 4–9 Nm RMS in the driving and turning phases. A second run with the IMU delay randomised to 20 ms was worse (a fall). The "worst" profile, the same IMU with 5 ms joint delay, is clean, so it is the IMU lagging fresh joint data by 14 ms. Not understood | no, the previous checkpoint stays |
 | `agile_terrain` | Mixed: standing pitch RMS 0.014 against 0.004 rad on the course, 23 Hz content on planks at nominal latency, calmer than before at the worst latency; action noise still rising (0.06 to 0.10) at the end, i.e. not converged in 600 iterations at 6144 envs (8192 run out of GPU memory beside the desktop) | no, the previous checkpoint stays |
 
+### The 8–10 Hz yaw mode on the robot (2026-11-09)
+
+Balancing on the 2026-11 body, every policy makes a fast, loud oscillation
+that does not upset the balance; the WBC does at times. Recordings and
+scripts: `recordings/buzz_2026-11-09/` (`buzz_spectrum.py` in
+`recordings/`).
+
+- **The mode:** 8–10 Hz, in yaw. The wheels move against each other (5–15 Hz
+  right/left wheel velocity correlation −0.6 to −0.83, against +1.00 in the
+  0.5–3 Hz forward rocking), the yaw rate is 2–4× the pitch rate, the legs
+  move in height (inner against outer, −0.76 to −0.93) and the IMU sees it
+  sideways. The noise is the wheel torque reversing through the gear
+  backlash about ten times a second.
+- **The policy drives it:** in `rl_flat_level` the wheel actions carry it
+  (5–15 Hz RMS 0.05–0.06, as much as everything below 5 Hz).
+- **Not the joint feedback:** with `state_source:=encoder` at a 20 ms
+  broadcast (50 Hz, 3–19 ms old) it is at 11–13 Hz; with `state_source:=mit`
+  (about 260 Hz, 1.4–2.3 ms old) at 9–10 Hz and as strong.
+- **Not the drives' own damping loop:** a model of the MIT kd acting on a
+  rotor that floats in the gear backlash rings at 100–180 Hz, but the
+  60+ Hz band is 3–4× weaker than 5–15 Hz in every recording. Lowering the
+  WBC's leg drive damping from 0.5 to 0.2 made it quieter by ear, not quiet.
+
+| Policy (one MIT-mode run) | 5–15 Hz yaw rate | Wheels opposed / together | |
+| --- | --- | --- | --- |
+| `rl_flat_level_fast` | 0.88 rad/s | 1.48 / 0.74 rad/s | oscillation watchdog after 1.7 s (legs 1.00, wheels 1.21 rad/s) |
+| `rl_flat_level` | 0.37 rad/s | 0.74 / 0.31 rad/s | |
+| `rl_agile_terrain` | 0.10 rad/s | 0.20 / 0.12 rad/s | |
+
+`agile_terrain` is the one trained with lateral pushes (up to 12 N), roll
+and yaw torque disturbances (1 Nm) and a looser yaw sigma (0.5 against
+0.35); its runtime gains are those of the flat policies. The likely plant is
+a yaw resonance near 9 Hz that the simulation lacks: the body's yaw inertia
+(0.093 kg m²) on about 370 Nm/rad of tyre side or leg compliance. Not
+identified.
+
+Next, not done: the flat policies with `agile_terrain`'s lateral and
+roll/yaw disturbances and yaw sigma; a yaw (and roll) compliance between
+body and ground in the MJCF, randomised so that its mode spans about
+6–14 Hz; a penalty on the rate of the differential wheel action. Untried on
+the robot: wheel kd 0.2 (`buzz_wheel_kd02.yaml`) and a low-pass on the
+differential wheel command alone.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that
