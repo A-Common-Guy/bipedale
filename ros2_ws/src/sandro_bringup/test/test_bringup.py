@@ -221,3 +221,16 @@ def test_real_hardware_never_defaults_to_arm():
     commissioning = (ROOT / "launch" / "commissioning.launch.py").read_text()
     assert '"arm_hardware", default_value="false"' in main_launch
     assert '"activate", default_value="false"' in commissioning
+
+
+def test_imu_check_keeps_only_the_imu_component():
+    path = ROOT / "launch" / "imu_check.launch.py"
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    urdf = ('<robot><link name="base_link"/>'
+            '<ros2_control name="SandroSystem" type="system"><hardware/></ros2_control>'
+            '<ros2_control name="SandroImu" type="sensor">\n<hardware/>\n</ros2_control></robot>')
+    stripped = module.imu_only(urdf)
+    assert "SandroSystem" not in stripped and 'name="SandroImu"' in stripped
+    assert '<link name="base_link"/>' in stripped
