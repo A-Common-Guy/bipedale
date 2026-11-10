@@ -1,0 +1,919 @@
+{
+ "config": {
+  "seed": 0,
+  "env": {
+   "impl": "warp",
+   "graph_mode": "warp_staged",
+   "policy_rate_hz": 100,
+   "episode_s": 20.0,
+   "naconmax_per_env": 12,
+   "njmax_per_env": 96,
+   "terrain": {
+    "type": "flat",
+    "obstacles": {}
+   },
+   "action": {
+    "legs": {
+     "mode": "position",
+     "scale_rad": 0.5,
+     "kp": "ros",
+     "kd": "ros"
+    },
+    "wheels": {
+     "mode": "velocity",
+     "scale_rad_s": 20.0,
+     "kd_nm_s_rad": 0.4,
+     "scale_nm": 3.0
+    },
+    "clip": 1.0
+   },
+   "observation": {
+    "history": 4,
+    "accelerometer": false,
+    "imu_offset_correction": "ros",
+    "scales": {
+     "gyro": 0.25,
+     "leg_vel": 0.1,
+     "wheel_vel": 0.05
+    }
+   },
+   "commands": {
+    "resample_s": [
+     2.0,
+     5.0
+    ],
+    "zero_probability": 0.2,
+    "component_zero_probability": 0.25,
+    "forward_m_s": "ros",
+    "yaw_rad_s": "ros",
+    "height_m": "ros",
+    "height_change_probability": 0.5,
+    "forward_accel_m_s2": "ros",
+    "yaw_time_constant_s": "ros",
+    "height_rate_m_s": "ros"
+   },
+   "rewards": {
+    "scale_by_dt": true,
+    "sigma": {
+     "forward": 0.15,
+     "yaw": 0.35,
+     "height": 0.012
+    },
+    "weights": {
+     "alive": 1.0,
+     "track_forward": 2.0,
+     "track_yaw": 1.0,
+     "track_height": 1.0,
+     "roll": -20.0,
+     "pitch": -25.0,
+     "pitch_rate": -0.3,
+     "vertical_velocity": -2.0,
+     "leg_symmetry": -200.0,
+     "action_rate": -0.08,
+     "action_accel": -0.04,
+     "leg_torque": -0.002,
+     "wheel_torque": -0.02,
+     "leg_velocity": -0.0005,
+     "termination": -200.0,
+     "wheel_differential_rate": -0.1
+    }
+   },
+   "termination": {
+    "tilt_rad": 0.8,
+    "imu_height_m": 0.17,
+    "max_qvel": 200.0
+   },
+   "constraints": {
+    "enabled": true,
+    "p_max": 0.25,
+    "leg_torque": {
+     "limit": "ros",
+     "slack": 0.5
+    },
+    "thermal": {
+     "enabled": true
+    },
+    "stretch": {
+     "limit": 0.97,
+     "slack": 0.02
+    },
+    "joint_range": {
+     "margin_rad": 0.1,
+     "slack": 0.1
+    },
+    "height": {
+     "margin_m": 0.008,
+     "slack": 0.01
+    },
+    "tilt": {
+     "limit_rad": 0.45,
+     "slack": 0.3
+    },
+    "wheel_lift": {
+     "limit_m": 0.01,
+     "slack": 0.02
+    }
+   },
+   "init": {
+    "joint_noise_rad": 0.03,
+    "tilt_rad": 0.05,
+    "velocity_noise": 0.05
+   },
+   "pushes": {
+    "enabled": true,
+    "interval_s": [
+     3.0,
+     8.0
+    ],
+    "duration_s": [
+     0.05,
+     0.2
+    ],
+    "force_n": 12.0,
+    "lateral_force_n": 12.0
+   },
+   "randomization": {
+    "enabled": true,
+    "latency": {
+     "imu_delay_s": [
+      0.005,
+      0.015
+     ],
+     "imu_rate_hz": [
+      150.0,
+      300.0
+     ],
+     "joint_delay_s": [
+      0.0005,
+      0.006
+     ],
+     "joint_rate_hz": [
+      150.0,
+      300.0
+     ],
+     "synchronous_joints_probability": 0.2,
+     "mit_joints_probability": 0.0,
+     "mit_joint_delay_s": [
+      0.0015,
+      0.0035
+     ],
+     "command_delay_s": [
+      0.0005,
+      0.003
+     ]
+    },
+    "sensors": {
+     "imu_noise_scale": [
+      0.5,
+      2.0
+     ],
+     "encoder_noise_rad": 0.0005,
+     "joint_velocity_noise": 0.05,
+     "joint_velocity_gain": [
+      0.75,
+      1.05
+     ],
+     "imu_mount_bias_rad": 0.02,
+     "gyro_bias_rad_s": 0.01
+    },
+    "drives": {
+     "torque_scale": [
+      0.85,
+      1.15
+     ],
+     "leg_gain_scale": [
+      0.9,
+      1.1
+     ],
+     "wheel_lag_s": [
+      0.01,
+      0.08
+     ],
+     "nominal_wheel_lag_s": 0.04,
+     "gear": {
+      "probability": 0.8,
+      "stiffness_nm_rad": [
+       25.0,
+       400.0
+      ],
+      "play_rad": [
+       0.0,
+       0.025
+      ],
+      "damping_nm_s_rad": [
+       0.005,
+       0.05
+      ],
+      "rotor_inertia_scale": [
+       1.0,
+       4.0
+      ],
+      "substeps": 8
+     }
+    },
+    "model": {
+     "body_mass_scale": [
+      0.9,
+      1.1
+     ],
+     "payload_mass_add_kg": [
+      -0.4,
+      0.4
+     ],
+     "payload_offset_m": [
+      0.04,
+      0.02,
+      0.03
+     ],
+     "tyre_sliding_friction": [
+      0.5,
+      1.2
+     ],
+     "tyre_torsional_scale": [
+      0.5,
+      2.0
+     ],
+     "leg_frictionloss_scale": [
+      0.5,
+      3.0
+     ],
+     "wheel_frictionloss_scale": [
+      0.5,
+      2.0
+     ],
+     "damping_scale": [
+      0.5,
+      2.0
+     ],
+     "armature_scale": [
+      0.5,
+      8.0
+     ]
+    }
+   }
+  },
+  "train": {
+   "num_envs": 8192,
+   "steps_per_env": 24,
+   "iterations": 1000,
+   "learning_rate": 0.0001,
+   "desired_kl": 0.01,
+   "gamma": 0.99,
+   "lam": 0.95,
+   "clip": 0.2,
+   "value_coef": 1.0,
+   "entropy_coef": 0.005,
+   "epochs": 5,
+   "minibatches": 4,
+   "max_grad_norm": 1.0,
+   "init_log_std": -0.7,
+   "actor_hidden": [
+    256,
+    256,
+    128
+   ],
+   "critic_hidden": [
+    512,
+    256,
+    128
+   ],
+   "activation": "elu",
+   "symmetry_coef": 0.5,
+   "checkpoint_every": 100,
+   "eval_every": 50,
+   "resume_log_std": -3.0,
+   "curriculum_offset": 300
+  },
+  "curriculum": {
+   "stages": [
+    {
+     "iteration": 0,
+     "set": {
+      "env.randomization.drives.wheel_lag_s": [
+       0.0,
+       0.03
+      ]
+     }
+    },
+    {
+     "iteration": 300,
+     "set": {
+      "env.randomization.drives.wheel_lag_s": [
+       0.01,
+       0.08
+      ]
+     }
+    }
+   ]
+  },
+  "name": "flat_level_drivetrain"
+ },
+ "fingerprint": {
+  "sha256": "929ab315b470cdb60855da5df8435a4dedf597caffd7d76df4de688b4e74af0f",
+  "files": {
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1.stl": "dc31d825807ed8c6731135aae6093f10ea96855d574d54af002f33c4cbf0d5ef",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10.stl": "25c6e315616bae15415a7c1deecca4e9a67d375d6e9c9c4f11828fef5de07be2",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11.stl": "5948e4a2b1fe48ef905e163bf21b0efaeb3d8479cdf26b1f4120db3c62bb6714",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12.stl": "df439b4c0a73691fc07d5eb1f31b7707c53eb31f5ae5c511375339b7f036569c",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13.stl": "9c15f64c4f5c40720c2147f495b2dfe21fb7f7e5c78ae7de8c00a3876b5cd818",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14.stl": "c7620d080ac7f7ff0879123e66ae10cf13287b0c846035d602c8eab8438bb3af",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15.stl": "93d22ef4f015d2a541ef555e57da85ab2ffd9e0a85f174e07810738e76979cc7",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16.stl": "d661eaaecdaa3c287f0a294211c65a72e1320cbdc126ce3a1e6d48bd04dfeaef",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17.stl": "44d7c97556ed1bf513311055ca558486d282db311e4ebc639aa040de7125b0d5",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported18.stl": "a1669a36dba0073aa4e6c6a805e84ed69a576dacdf8a2ddb1c22cfd54b1f4078",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19.stl": "1f9ea82e357d7f9805b8852adab5e340cbfc78ea837ff8bf6bbf6de26bc06e00",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2.stl": "b2b5a42adb3cde83a9094b6d99c33a9665dfd7f76822aa904081fb64a2f1620f",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20.stl": "a5ef5e57c4c4944475127bfc4ef55b54ea835c8153100323bfe3405de4b68218",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21.stl": "72d14ae270a998dd3a4c6c409d590d12ec3c0a0da97d27e4ca71ad4f1e1434d0",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22.stl": "00126ba8760376196e86b53e764683767e8d446d3425de1775d57b0621869629",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23.stl": "6247b15da5683cd532c8c1fe33b85f50eaa02b87d3e62c58a53c9f07f2389605",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24.stl": "f2fe505f8c1ff0da771213fbb2a2be1bd9c65069317c2439da59eaf0e0fd5aa0",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25.stl": "abfbb08964b44639bece084c24d82a8b9b7e6c653a00d8b698fbfc9bfb9e3dcf",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26.stl": "524df67754d5cddb29f93238758c424c1bd0edfc0f7bfcb3051ee80c03e7e08a",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27.stl": "81e905b51ec6dfaddefa4b9c566d778e884fae6b8f99356d2347f027437770e6",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28.stl": "6f8afb599f81d5e142e34f135888dbe725053edf9401aeea496fc16e65d110c3",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29.stl": "b8bf53f04c32078ef03909c3a5e1e4a99adacbfa93b547401b9666cf3c74f3f7",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3.stl": "bfa2348e8028dc7af0d6a770f1fcef79e8b554601f6baece26f83d16b2a4e78c",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30.stl": "a4e52bd9e577308f7cb6e5e329580ecd4dc2b2e7ff6a4e2d000d164fe4b6ae2f",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31.stl": "4d12f5479c25fcc2d402ba8615c69f6259b7d7c2227d497fa9ca104eb2fd12db",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32.stl": "1f431244f3358db31e568991903f2f292bac98de3ea079d5c880b859e0c134fa",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33.stl": "9564c822d0c59ce25ba58e6e694cf2e647efc94a60cdbc99ddcbe8147cd4df9f",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34.stl": "9d1d095480e47b045eb93c3805b6ce56084befc8768c08efec9b51080f966c31",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35.stl": "5a0f376d683b56ec0801a1dc28542d58d7f5719c464457b62d14194fb707663a",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36.stl": "0a1d7608fa1d028f9bb36e4b9356a1cf5bd43f2a4855b1a3f7c5b165d9d49d92",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37.stl": "24e84691a1807688191f6b9f6b299f234444c80bdcf9edb11bac92a299311a63",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38.stl": "696eba12091ef023f9a200443f95f968ba82bc5c9fd77bb67bbf07c3f6fcc3b1",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39.stl": "26393cc56f85e5ddee9f2a27ce76f89941bc044da964dc501474ab7159740617",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4.stl": "2b55a5039083ecc4144fb50f08a92fcf88a84be2e5e3974b26043c264a59eb6e",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40.stl": "3aeb70862c066860167790aa2d5203c013444b7add037fb5f5f4421ae77c8bc9",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41.stl": "f3b36ad3cbeb713a1616fbf02d21bff9682bcf54a5b627e0cd94d2aecb6c80ec",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5.stl": "8aca4ff81c0f1571fae136474219778121e4017f7a7e088c657b8ba0299a2cdd",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6.stl": "8dd5d14cc7e2765734062bfde1b6ebd0f2e82d25c214e6dc5e5014a1ab97b084",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7.stl": "3b0d8787af959183f760f4d922c5f4da414d68940294823cb695e93596e5e05f",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8.stl": "bd75bbd62799647c1eca19328dabc0a0c2e34e5d0fcbf93c574183f7c7583a8c",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9.stl": "d0a2d8eada6dc859f53444794634356b64c4b6d5e180290bd826272226879e65",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1.stl": "f056930758975ffee8adacf0e009a079839d4f0fa188766b6d236383c672c249",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2.stl": "1af162efd6f0ff9b96ed79ce420556b66f5d56b770712f314b711137d0e890c7",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3.stl": "3487c14ee81155ada005c6c5eb976563323c71c3fdd345dc912d6f140e8f30ee",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4.stl": "3f68036e93163e68817e0b6ccd61bc55897ba390abe330c492467f7771807c30",
+   "ros2_ws/src/sandro_description/mjcf/assets/2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5.stl": "f68721d970dd0d4a8d11c077a616240bc60b47e841928af2738abc858be60418",
+   "ros2_ws/src/sandro_description/mjcf/assets/2x_usb2_0_ports__rpi4modelb__imported1.stl": "1e860d924fd5fa03adf9fd47a296dc2a55b0992a2167fa196fddb561cca4437a",
+   "ros2_ws/src/sandro_description/mjcf/assets/2x_usb3_0_ports__rpi4modelb__imported1.stl": "c431408f1aae727f2bcd277be1b2c32eeb8183470897124d88ddebefed7741f2",
+   "ros2_ws/src/sandro_description/mjcf/assets/91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional.stl": "f3b760411b41aa742dc8d8b1af49bc71a3de89cbd206321d0c8b0eb94b283b34",
+   "ros2_ws/src/sandro_description/mjcf/assets/bearing_5_2_4_0_7.stl": "b0717e598787d35cf1b9984ad25794d148cfcc0eae191810b3b972f8485727a1",
+   "ros2_ws/src/sandro_description/mjcf/assets/biella.stl": "f8daa6d301b9f7f4da7dd8f87b0f070127227097e20b366a25ed91885a087031",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body1.stl": "3645fa15222ef9adc13858cf341041b06d8607a7ebb48cf591c76cc97eca121e",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body10.stl": "c4e58d082aaa8296b19bb47118cb75dc94d277ad7a72c94e97aa96f59b6d61bb",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body11.stl": "12675788870370ef1e8fe6b348150ebd20c2acbe56a8e5e1198a30a73232401a",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body12.stl": "838c69dc41297d9d92e2fe84df848983d9ebfb1376f5a38b04438b5acd5dd1ce",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body13.stl": "8c5e24920a11ecf3fa1b1b92a91d93b8f851dc9aacdd8bd76a59e81531fa3f84",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body14.stl": "3d3bdb5716558697d9729e3b985415aae3c51b70f1d06a90cb3e682ede386b1d",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body15.stl": "fd8eb69702a86487f4d43182d94986a24d6cd2a4aa4d61640a9e9693270322bd",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body16.stl": "8560fc8cae3505a7a4b08e878af65e471539ccca64a86ea0f8dd021dd0d933e4",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body17.stl": "36b33fcf4338b88112958c6cea390e1f29f132174ff4585116ccf3958231adb9",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body18.stl": "d296cd0d8990a96e3e62b6ae149e58d23bcb2641104063d6eeb436e2ab8f8fa4",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body19.stl": "5eeb47a254d39b3309279e257d645749ee3025777fe34db184c1e48f656347b3",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body2.stl": "03c73b288ea9ac9a67e14a6c408b71941c70c67852ca156f3fb002c86c803812",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body20.stl": "fe8c0b2915012a99c5fe639c02f13546ef5570e53a4cc3fff2f97618208d7660",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body21.stl": "6c1bd7959cd0feacf27b0b22edd8f536afbb39af7bc1f3fa74d37c51ece7d10d",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body22.stl": "bb619ff837042ea54c4ec459639eb9a1f8a80bf76f17770cb73c25b61457f3f6",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body23.stl": "cb3101645c35b36dd6e2f73cd1f89577c6efb738bb6d5d2eb672d625e29940bf",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body24.stl": "01c9a0449c4de053df76eb97c3299adf1ac5ef8f7e480c3b2f6bb73b47ae22bb",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body25.stl": "b761128afde4317cf5968b92a1c30bd50a0bcdbe3a6999bf9e51a4f9b5d6ccb2",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body26.stl": "7762ff64c1a3c8273d2bffd8b74d149084dc1a8e1db0e2fc351be21d36aaa773",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body27.stl": "105da2889a782503acde05ed8f8157ec6161c3d3cfaa4c8b67c28bf949f92807",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body28.stl": "37185d24d24eef1757205a417c5fe4b88ac076d384c0ecc8e7347eb92550071f",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body29.stl": "246ff2e039210d9f9a59a61fe03eec411fb72c8d9a7d524417cbb00c94bdb0df",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body3.stl": "46dccc78c5eca9849d78286f23a5089ff4e51a36410592b8fe62774a438f834b",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body30.stl": "9b3dd37ff37498755c13084889f7700f5bc6e912fa90d8337f453df630e6dcb3",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body31.stl": "a7c4b0224a43e84aeb4a787aab11904bef9bddc63fa9c946279ef2d44e98d0f4",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body4.stl": "06f722d59f5fa7cd8f63b639bf634b059f1efe559dee1fd4367e3064ad30eaf7",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body5.stl": "2dd316d0512f63df62d67fd1ee8aad633487fca80bfccfccecb96091b8a92f7a",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body6.stl": "f220670a6d124d2b35dbb2b591ce570ada6cb330cb2fdc5ca00ac92fb1d33303",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body7.stl": "d913d05e7f2238eecec58fcc0c90cef10cf449a9521baa65470ffc73221b3a19",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body8.stl": "80e0a79e47ff5bc860f4ae21463ab993fa3bf1de64fd005dd7c8d0f909768e04",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno055_9axis_imu_v2_1__body9.stl": "a8f42f6ff05c7399f8f5bafbcd8e1059477a4e43d9e031829898fd50f7d44d88",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body1.stl": "3645fa15222ef9adc13858cf341041b06d8607a7ebb48cf591c76cc97eca121e",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body10.stl": "c4e58d082aaa8296b19bb47118cb75dc94d277ad7a72c94e97aa96f59b6d61bb",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body11.stl": "12675788870370ef1e8fe6b348150ebd20c2acbe56a8e5e1198a30a73232401a",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body12.stl": "838c69dc41297d9d92e2fe84df848983d9ebfb1376f5a38b04438b5acd5dd1ce",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body13.stl": "8c5e24920a11ecf3fa1b1b92a91d93b8f851dc9aacdd8bd76a59e81531fa3f84",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body14.stl": "3d3bdb5716558697d9729e3b985415aae3c51b70f1d06a90cb3e682ede386b1d",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body15.stl": "fd8eb69702a86487f4d43182d94986a24d6cd2a4aa4d61640a9e9693270322bd",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body16.stl": "8560fc8cae3505a7a4b08e878af65e471539ccca64a86ea0f8dd021dd0d933e4",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body17.stl": "36b33fcf4338b88112958c6cea390e1f29f132174ff4585116ccf3958231adb9",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body18.stl": "d296cd0d8990a96e3e62b6ae149e58d23bcb2641104063d6eeb436e2ab8f8fa4",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body19.stl": "5eeb47a254d39b3309279e257d645749ee3025777fe34db184c1e48f656347b3",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body2.stl": "03c73b288ea9ac9a67e14a6c408b71941c70c67852ca156f3fb002c86c803812",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body20.stl": "fe8c0b2915012a99c5fe639c02f13546ef5570e53a4cc3fff2f97618208d7660",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body21.stl": "6c1bd7959cd0feacf27b0b22edd8f536afbb39af7bc1f3fa74d37c51ece7d10d",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body22.stl": "bb619ff837042ea54c4ec459639eb9a1f8a80bf76f17770cb73c25b61457f3f6",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body23.stl": "cb3101645c35b36dd6e2f73cd1f89577c6efb738bb6d5d2eb672d625e29940bf",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body24.stl": "01c9a0449c4de053df76eb97c3299adf1ac5ef8f7e480c3b2f6bb73b47ae22bb",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body25.stl": "b761128afde4317cf5968b92a1c30bd50a0bcdbe3a6999bf9e51a4f9b5d6ccb2",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body26.stl": "7762ff64c1a3c8273d2bffd8b74d149084dc1a8e1db0e2fc351be21d36aaa773",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body27.stl": "105da2889a782503acde05ed8f8157ec6161c3d3cfaa4c8b67c28bf949f92807",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body28.stl": "37185d24d24eef1757205a417c5fe4b88ac076d384c0ecc8e7347eb92550071f",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body29.stl": "246ff2e039210d9f9a59a61fe03eec411fb72c8d9a7d524417cbb00c94bdb0df",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body3.stl": "46dccc78c5eca9849d78286f23a5089ff4e51a36410592b8fe62774a438f834b",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body30.stl": "9b3dd37ff37498755c13084889f7700f5bc6e912fa90d8337f453df630e6dcb3",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body31.stl": "a7c4b0224a43e84aeb4a787aab11904bef9bddc63fa9c946279ef2d44e98d0f4",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body4.stl": "06f722d59f5fa7cd8f63b639bf634b059f1efe559dee1fd4367e3064ad30eaf7",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body5.stl": "2dd316d0512f63df62d67fd1ee8aad633487fca80bfccfccecb96091b8a92f7a",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body6.stl": "f220670a6d124d2b35dbb2b591ce570ada6cb330cb2fdc5ca00ac92fb1d33303",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body7.stl": "d913d05e7f2238eecec58fcc0c90cef10cf449a9521baa65470ffc73221b3a19",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body8.stl": "80e0a79e47ff5bc860f4ae21463ab993fa3bf1de64fd005dd7c8d0f909768e04",
+   "ros2_ws/src/sandro_description/mjcf/assets/bno085_9axis_imu_v1_1__body9.stl": "a8f42f6ff05c7399f8f5bafbcd8e1059477a4e43d9e031829898fd50f7d44d88",
+   "ros2_ws/src/sandro_description/mjcf/assets/body_lower.stl": "8d4a5b81cc9a469a7640b3d301cbc5ee7f1dd8d96d4da9b42c579b6c0945a0e2",
+   "ros2_ws/src/sandro_description/mjcf/assets/body_tssop_1__body1.stl": "6199b1d604b46d3ad18ec6fda33129207726d39bb45b46ce7b21213a466b62d6",
+   "ros2_ws/src/sandro_description/mjcf/assets/bodymotorholder.stl": "6f6ae7b4827351fa6cdd1edca7ffc3d22fcd724160e8503c785b6b5388f18257",
+   "ros2_ws/src/sandro_description/mjcf/assets/broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow.stl": "5f57f9fddb13938e9cc002154a3b656f67f5fd5d86f03f626fde30849dce90d6",
+   "ros2_ws/src/sandro_description/mjcf/assets/broadcom_bcm2711b0_cpu__rpi4modelb__top.stl": "1d8af56870feb605a13d0327d57654558c458e9079160633ab24cfde19bc2b28",
+   "ros2_ws/src/sandro_description/mjcf/assets/broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3.stl": "006ffed63520351e9bb0bee7b080f6c97a4395bfb82a20539ffb42c54cbef034",
+   "ros2_ws/src/sandro_description/mjcf/assets/bss138ps_v2_1__body1.stl": "97d2eb573d3838a205af88146421833c7ecbb4be4d9a37a4dc86920a19829ac6",
+   "ros2_ws/src/sandro_description/mjcf/assets/bss138ps_v2_1__body2.stl": "87b5f09ff3662de3e600db70d142d95f2fa01f03b5e4047c2bd8a6ed103e8187",
+   "ros2_ws/src/sandro_description/mjcf/assets/bss138ps_v2_1__body3.stl": "73d9fec0cbad389448639066e9659a0f10f572d7e3bb151000b3e28c29241286",
+   "ros2_ws/src/sandro_description/mjcf/assets/bss138ps_v2_1__body4.stl": "692c9bccf7bf3784b8d66df502f2b585714802e3f5887c46af9af5d7f30b1a76",
+   "ros2_ws/src/sandro_description/mjcf/assets/bss138ps_v2_1__body5.stl": "23ee35c97318a174f973d4a15098aeea1fcb1981a0ad1437ae01128a808df3d6",
+   "ros2_ws/src/sandro_description/mjcf/assets/bss138ps_v2_1__body6.stl": "caa8861a464d76afa0557615cae8844c2a360f9e1fe5b71d4850ec4848704084",
+   "ros2_ws/src/sandro_description/mjcf/assets/bss138ps_v2_1__body7.stl": "b6b03c42b85c17ebc48867cbcc606511b0500d521bed69134329f797acbe96a0",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported1.stl": "9ab882a2435ca8b46c526aafa5d45008d5f420eb60d6b1de76e5b088177e38dc",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported10.stl": "f02763c689d3b0d73bed27553d56595e22b886d4d06e6eba28fcb6bef79c03d6",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported11.stl": "92cc89fc93d3596158fbfe4f13e0dbdb3782fdf1bc76f100b3c85e8120de3578",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported12.stl": "0370abf8908a648624bbb8b9744daf8227cb39a672ac68bc2c063fca68892c73",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported13.stl": "ae627b37f6ef4c43f780cb584f2fde1e477c2b529234644e610cdea00dbe428a",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported14.stl": "710728dfcbe92ff11d2a226e1aedfc854033aee8b73a360e0a004f862e5201dc",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported15.stl": "e0ad5f7611c131e8d71e4e391f62cdd624ce5b7783a000ca5c3f8a881c58e684",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported16.stl": "6d862338a064f5806da2fb943a6e0e17dc86123188b45ef6d246450a4e9c384e",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported17.stl": "4589c8c276ca131bd3ced34b2cc4a29af0d5487f6fb90fbe06b243036c364c6d",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported2.stl": "5e5713ab05a7c8a8ea8a213406b4ede7b96e29f8d05ac7ba73ef82715f7aeec6",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported3.stl": "8a11b4e81cfe8cff4ac5399d72a0a44f23e21c3689759b26e895441e657cfc51",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported4.stl": "07d38cb7b19212ad56de44831a0db54642879891d75e1a66c457ca3a173a0c49",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported5.stl": "c78ef385b61471ffc81df146485b995e6bce53726902af6202bf97b2fc56628b",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported6.stl": "f8a5d8b8daa5951852c9a243fe274683a3982c104df1d1284cdfc3898190b631",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported7.stl": "0f58f0a7b7189ae47e33078427bf762ef70a32976f3806d1b7ca342e41935fed",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported8.stl": "0490988d6409baa0c9b7c9fd2d34b290a69c4a78e11cb5375c2fb3416f2e20f9",
+   "ros2_ws/src/sandro_description/mjcf/assets/camera_connector__rpi4modelb__imported9.stl": "9452bfdb14e7eb47c3b47ba2778deb7cd54f854e2d299e51aec70168a4e4037d",
+   "ros2_ws/src/sandro_description/mjcf/assets/capc_0603_t0_9_bn_v1_1__body1.stl": "86dde8f2723554959556e794cddcb057b3e6d077d3960eb6db4a15d75d74b1da",
+   "ros2_ws/src/sandro_description/mjcf/assets/capc_0805_t0_95_bn_v1_1__body1.stl": "9b6d26a4b4f7e34bd3a41d537b4ca284b885b1de3081418f27f78821438f7413",
+   "ros2_ws/src/sandro_description/mjcf/assets/crystal_xtal3215_32_768khz_v2_1__body1.stl": "209bb11a970a12b2d754be7f5d990e64cadcf69f48d26144045f776e9707d8f1",
+   "ros2_ws/src/sandro_description/mjcf/assets/crystal_xtal3215_32_768khz_v2_1__body2.stl": "d466f147ed99b8491ccc2183d4d82c3ecbf037c42d74aaa660c354d126976301",
+   "ros2_ws/src/sandro_description/mjcf/assets/crystal_xtal3215_32_768khz_v2_1__body3.stl": "b41e9f74307a2eb421861887f2c72ab1dc93048275e8745ea82206a36338a97d",
+   "ros2_ws/src/sandro_description/mjcf/assets/crystal_xtal3215_32_768khz_v2_1__body4.stl": "90ea0214064503a72f75574a0444075a8d269928c07ac8568be8efbdcd90e035",
+   "ros2_ws/src/sandro_description/mjcf/assets/cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp.stl": "3e7f16b2ee9ca97e6a229f82b3c57a9b6e32988d325cc929a3326f8cb2a2b2dd",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported1.stl": "9ab882a2435ca8b46c526aafa5d45008d5f420eb60d6b1de76e5b088177e38dc",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported10.stl": "f02763c689d3b0d73bed27553d56595e22b886d4d06e6eba28fcb6bef79c03d6",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported11.stl": "92cc89fc93d3596158fbfe4f13e0dbdb3782fdf1bc76f100b3c85e8120de3578",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported12.stl": "0370abf8908a648624bbb8b9744daf8227cb39a672ac68bc2c063fca68892c73",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported13.stl": "ae627b37f6ef4c43f780cb584f2fde1e477c2b529234644e610cdea00dbe428a",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported14.stl": "710728dfcbe92ff11d2a226e1aedfc854033aee8b73a360e0a004f862e5201dc",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported15.stl": "e0ad5f7611c131e8d71e4e391f62cdd624ce5b7783a000ca5c3f8a881c58e684",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported16.stl": "6d862338a064f5806da2fb943a6e0e17dc86123188b45ef6d246450a4e9c384e",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported17.stl": "4589c8c276ca131bd3ced34b2cc4a29af0d5487f6fb90fbe06b243036c364c6d",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported2.stl": "5e5713ab05a7c8a8ea8a213406b4ede7b96e29f8d05ac7ba73ef82715f7aeec6",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported3.stl": "8a11b4e81cfe8cff4ac5399d72a0a44f23e21c3689759b26e895441e657cfc51",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported4.stl": "07d38cb7b19212ad56de44831a0db54642879891d75e1a66c457ca3a173a0c49",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported5.stl": "c78ef385b61471ffc81df146485b995e6bce53726902af6202bf97b2fc56628b",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported6.stl": "f8a5d8b8daa5951852c9a243fe274683a3982c104df1d1284cdfc3898190b631",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported7.stl": "0f58f0a7b7189ae47e33078427bf762ef70a32976f3806d1b7ca342e41935fed",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported8.stl": "0490988d6409baa0c9b7c9fd2d34b290a69c4a78e11cb5375c2fb3416f2e20f9",
+   "ros2_ws/src/sandro_description/mjcf/assets/display_connector__rpi4modelb__imported9.stl": "9452bfdb14e7eb47c3b47ba2778deb7cd54f854e2d299e51aec70168a4e4037d",
+   "ros2_ws/src/sandro_description/mjcf/assets/female_micro_hdmi_connector__rpi4modelb__imported1.stl": "f5de57b726f537436cebcff2e375fe3ad07a7c31add9c155ded7127cc03715a6",
+   "ros2_ws/src/sandro_description/mjcf/assets/female_usb_type_c_connector__rpi4modelb__imported1.stl": "73615392f3fed4a7c58d5f41682d2acbb14c3f44ea1a8f227bb366f470918f91",
+   "ros2_ws/src/sandro_description/mjcf/assets/gigabit_ethernet_port__rpi4modelb__imported1.stl": "988c212346fce8bddc65ee9fdcda84e0794fb0826b277b9e13cd17baa2526aa6",
+   "ros2_ws/src/sandro_description/mjcf/assets/handle.stl": "46ff01d08966e4991ea74997c026bee1408f8fab6cd4dc81e47f22f983c18957",
+   "ros2_ws/src/sandro_description/mjcf/assets/handle_holder_1.stl": "32b1ed9484ca3487c47f0f7507a7cc8446fce73f229eb87f0e44f63b185185e9",
+   "ros2_ws/src/sandro_description/mjcf/assets/handle_holder_2.stl": "71b3cc493976d3b713b0b7ccfe5ea988138b4a242fb82a245942b57f25a4fcbd",
+   "ros2_ws/src/sandro_description/mjcf/assets/imu_holder.stl": "b340ea2117a916af6f4749f1c5eb73eb9d5cdcc661fd80fae790bc8f18edc6fa",
+   "ros2_ws/src/sandro_description/mjcf/assets/lead_tssop_1__body1.stl": "c856c34a7423e22c4527abd435867536fd653b895e71b2ee12ae33021083dd7c",
+   "ros2_ws/src/sandro_description/mjcf/assets/led_0603_single_color_v1_1__body1.stl": "388669f17a12a016217f741475fe86351735869d0588c650a5f82915aaddd79e",
+   "ros2_ws/src/sandro_description/mjcf/assets/led_0603_single_color_v1_1__body2.stl": "d2c864bde66e525077e3a002b27d371b35c0835eca553f21d1908ef94b83a362",
+   "ros2_ws/src/sandro_description/mjcf/assets/led_0603_single_color_v1_1__body3.stl": "820c2d1b6a25182667e9404b77929f951a15b9d035b03faaedfe070acd199dff",
+   "ros2_ws/src/sandro_description/mjcf/assets/led_0603_single_color_v1_1__body4.stl": "e8da61c24a7922634a3c561d800d668d71cff00bdfc5162c461a0003a36eddbd",
+   "ros2_ws/src/sandro_description/mjcf/assets/led_0603_single_color_v1_1__body5.stl": "f015b8049f4e1bb1b07c2b722d89a5c8e29367015668c98f2ba9ea38708eb967",
+   "ros2_ws/src/sandro_description/mjcf/assets/manovella1.stl": "72dbf6e0f99024b096ff9458292ce38f82ef18c290b01cca992de40244daa253",
+   "ros2_ws/src/sandro_description/mjcf/assets/manovella2.stl": "2379c7ef64947653885766fb391e9409b676b576c273c2100955521bccf737ea",
+   "ros2_ws/src/sandro_description/mjcf/assets/microphone_plug__rpi4modelb__imported1.stl": "4cac4585cf49cf31c7c5e27ea291f027eb0c2e50be2b5e14f487215963bd59cb",
+   "ros2_ws/src/sandro_description/mjcf/assets/microphone_plug__rpi4modelb__imported2.stl": "291f76671eb83fbfc4c0e68ab493d5cdd9dfbf1b76eef44d0be3406a70194802",
+   "ros2_ws/src/sandro_description/mjcf/assets/microphone_plug__rpi4modelb__imported3.stl": "b4b58ceb6fb25f9e7735f210a64cc70444021d8b823a49e881417cbd37d834f2",
+   "ros2_ws/src/sandro_description/mjcf/assets/microphone_plug__rpi4modelb__imported4.stl": "c1f42a0a3e769023735aa095e3ca2546ddadece413ac3df08045f6b3041191ac",
+   "ros2_ws/src/sandro_description/mjcf/assets/microphone_plug__rpi4modelb__imported5.stl": "ff408ad01ed60f13b037f30ade40da0c4d51225c94584b99a2280f3f56a11664",
+   "ros2_ws/src/sandro_description/mjcf/assets/motor_2.stl": "ae429390cfb5d239ba012f8cf8ceb1b982917109e578eee757d790fafe0d40c7",
+   "ros2_ws/src/sandro_description/mjcf/assets/motor_shaft_2.stl": "2155007276bdc7f89c9bf169da8707140a0155dd7b70b48f0560386ae97f5959",
+   "ros2_ws/src/sandro_description/mjcf/assets/mxl7704_universal_pmic__rpi4modelb__partnoextended.stl": "fcb94749e6fdae8de767d9590516fbb58d17a07ec3dbb79c39974c8191668917",
+   "ros2_ws/src/sandro_description/mjcf/assets/pcb__rpi4modelb__cornerradius.stl": "514f68727eb6471130f9574e7c7ae7afe34ab7db4c90bb2cd13850699e67b7d0",
+   "ros2_ws/src/sandro_description/mjcf/assets/pernobiella.stl": "4546dc226daab562e72fae6a00394abcd6a069b79c5497c9cb8100af9b6aac54",
+   "ros2_ws/src/sandro_description/mjcf/assets/power_box_lid.stl": "71b072c84920afb21cb0d677db2e585eca2d53fea1c04cef6b87f5fdebcbfa4a",
+   "ros2_ws/src/sandro_description/mjcf/assets/power_dist_box.stl": "3de111a079885344b5e5e8343751dcf22f3cf041941ebac79ae7547c2d24569a",
+   "ros2_ws/src/sandro_description/mjcf/assets/printed_circuit_board_1__body1.stl": "986f82cc1e5b7886d9f56014821bc21002c2a0ae9c4ad4824a8a772415dd209f",
+   "ros2_ws/src/sandro_description/mjcf/assets/qwicc_v1_1__body1.stl": "027e88457adb0325948e44765a8336123631cd0ec990e8985627bcd75ca2e341",
+   "ros2_ws/src/sandro_description/mjcf/assets/qwicc_v1_1__body2.stl": "81a0e8df5ee197b9758d7bc313da6a5cebfa11f822d94bb605aca50b26c7af97",
+   "ros2_ws/src/sandro_description/mjcf/assets/qwicc_v1_1__body3.stl": "e6cf6438999ee6231e68dead87ed258baad4e007b36f01001b545573161341ee",
+   "ros2_ws/src/sandro_description/mjcf/assets/qwicc_v1_1__body4.stl": "0984fb307e1577623ff61d69d591d4fda3f2e44ba8f1b224dc361ec4d5205947",
+   "ros2_ws/src/sandro_description/mjcf/assets/qwicc_v1_1__body5.stl": "92f8b5d2fb4cc07ddd3995906e91875a92f0dd9c08a7fa804118838aa2c026e6",
+   "ros2_ws/src/sandro_description/mjcf/assets/qwicc_v1_1__body6.stl": "71a49ba3bb62367944f7ed40ded328c6f67bfe6d10dab34799c269011014eb33",
+   "ros2_ws/src/sandro_description/mjcf/assets/qwicc_v1_1__body7.stl": "28a01a1e90827f0fde1313af74b80fce78bd6f8d141d7ebed5ac7a7741780f9c",
+   "ros2_ws/src/sandro_description/mjcf/assets/robot_roof.stl": "ecf16f0c5eb46b7ffb757665b63ebfc407f15cbe732df72e128aabd430819e16",
+   "ros2_ws/src/sandro_description/mjcf/assets/rpi_holder.stl": "b307d2f51b443d4e63ebf440fde58a207f13be9c2dd6125835b570f717881569",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported1.stl": "3679d3370e3a3c13b5ab84ba3e94b75da2d159504457320b2cdd3a01b3705f7c",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported10.stl": "fbdab61d5e6c60590abd9c7e91622ee0a40367caca05bd470206abcf5b323a45",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported2.stl": "75f256457cddedc95c2446a4439e4dcb7cc89264470326f2bb477cf219bba14d",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported3.stl": "505f648e30dda65e7a74056e1dbf8519a652abe7925f493d48ec40009932974a",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported4.stl": "dff7f7473a818ceaefd0516cbd7359fd4b410a675d0a2374778c5496beaad4e5",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported5.stl": "5cc78932fe23a6b34c6eb8eb92fc3d8df63091c21be03d81f19013fc5325d8c9",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported6.stl": "084b172646a77b7513c314ce61b8fed2e0ee28af42cc225c7333c3fbf71369ed",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported7.stl": "e8a3d6d11300e56ae953a3ac4ba24e25b01339845f989fae499ae82cb8d0a854",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported8.stl": "6369483799b0c1955928bb5b44b7eadd62a9af04c234b2436792ec8ed67bbc05",
+   "ros2_ws/src/sandro_description/mjcf/assets/sd_card_slot__rpi4modelb__imported9.stl": "5621cdf228104a91253eda7d4315d933d8a5aa0505047df023532f8ce505115b",
+   "ros2_ws/src/sandro_description/mjcf/assets/smallplate_manovella2.stl": "8454af468ae183c3a8ea1f78dded8edabb972ec6a4f6dfb7be8aedcd35bbc49e",
+   "ros2_ws/src/sandro_description/mjcf/assets/sot23_5_v1_1__body1.stl": "fd7a0d47d50d757e93ec42521ae7ec51fde9261c73c12ba1f4003c823f57031c",
+   "ros2_ws/src/sandro_description/mjcf/assets/sot23_5_v1_1__body2.stl": "ef56e85e752c7bc84bc3d01c8081808e97cd3afa5ec83e6b1c73c0c3506b6b0f",
+   "ros2_ws/src/sandro_description/mjcf/assets/sot23_5_v1_1__body3.stl": "0e7e8afee2af84e80a5886633f7d1cdc71baa78ba4b7e002ca1ba57774f19ee7",
+   "ros2_ws/src/sandro_description/mjcf/assets/sot23_5_v1_1__body4.stl": "432350b4f0be347e73174ad5ba87f1c57ca002bbb94177f387a3660c597167e7",
+   "ros2_ws/src/sandro_description/mjcf/assets/sot23_5_v1_1__body5.stl": "46a34296424a4e52d876970a4ae69def96d51463af1fa48267fa9baaaabfc9f0",
+   "ros2_ws/src/sandro_description/mjcf/assets/sot23_5_v1_1__body6.stl": "500574378bcea245bd211292f919ac422bf9f991486eda59c3ab10a1502e9bfd",
+   "ros2_ws/src/sandro_description/mjcf/assets/tire.stl": "279fa0309c282b9d343c1a52beb8236466016dd0050cf2dc5e5cf335e0bf5b38",
+   "ros2_ws/src/sandro_description/mjcf/assets/via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp.stl": "8caf16147e6950e80fbc95144823ec09dae013bfb56befcf151efcc8e39dc331",
+   "ros2_ws/src/sandro_description/mjcf/assets/wheel_tire_holder.stl": "715de6ae159e32f0e2bbfc947ac1972df9e86c5dc1e8810996239f932173539d",
+   "ros2_ws/src/sandro_description/mjcf/assets/wheelmotorhub.stl": "5eaa8c31617e8ab4189743e298878b36c0004abd36c685ccdd994f3d8123636a",
+   "ros2_ws/src/sandro_description/mjcf/assets/wheelstickcover.stl": "4d010da4317e65b31cfda0506fa4b418c4ec6a037f4f05ccc5ec01617c93a360",
+   "ros2_ws/src/sandro_description/mjcf/assets/yc164_respack_v1_1__body1.stl": "6f65b4ef96ba4165cc9325f1b21f83fda0174efc76731e4f07f6748594ae91b3",
+   "ros2_ws/src/sandro_description/mjcf/robot_ros2.xml": "0677f7ace56a142b040c1f6894ea2a5c27e7a4bfb7d5c170da1342b4e518aa09",
+   "ros2_ws/src/sandro_description/mjcf/scene_ros2.xml": "aec6f8d0f526e4a62374753c4f9dbbf2493eeee961bc7077043737c0378952c8",
+   "ros2_ws/src/sandro_description/config/sim_identified.yaml": "5b1e9e35ef19311ba4c6ddda50cd9b7a5852fcc1a1c5dd836cd5cc204b43b6db",
+   "ros2_ws/src/sandro_bringup/config/controllers.yaml": "2b508225377e2424b8dd5d1045a767e72deca4c96ce535042033eac7a3cf4479",
+   "ros2_ws/src/sandro_bringup/config/sandro_real_overrides.yaml": "bfbcd1ebb3ce5cbc9a4ed5efa07359f55b96ed481b1659fc2a59b6373b2af4ef",
+   "ros2_ws/src/sandro_bringup/launch/sandro.launch.py": "dafbefe4c90018247a5f42d33b3e1dffa7851ed2a8f7c3d4271c4b31558b019d",
+   "ros2_ws/src/sandro_description/urdf/sandro.ros2_control.xacro": "207caea12829553a5e167249e87a9943dcbf7dfd2547413d391e9d511f4cb90d"
+  }
+ },
+ "contract": {
+  "joints": [
+   "right_motor_inner",
+   "right_motor_outer",
+   "right_wheel",
+   "left_motor_inner",
+   "left_motor_outer",
+   "left_wheel"
+  ],
+  "actuator_gear": [
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "tyre_condim": [
+   4,
+   4
+  ],
+  "tyre_friction": [
+   [
+    0.8,
+    0.07,
+    0.0001
+   ],
+   [
+    0.8,
+    0.07,
+    0.0001
+   ]
+  ],
+  "physics_dt": 0.000833333333333,
+  "steps_per_control": 4,
+  "total_mass_kg": 4.825,
+  "stand_q": [
+   0.41133484,
+   0.21714621,
+   -1.48937,
+   0.21522591,
+   0.41287811,
+   2.14299
+  ],
+  "imu_roll_bias_rad": -0.049,
+  "control_rate_hz": 300.0
+ },
+ "versions": {
+  "mujoco": "3.16.0",
+  "mujoco-mjx": "3.16.0",
+  "mujoco-warp": "3.16.0",
+  "jax": "0.11.2",
+  "flax": "0.12.10"
+ },
+ "python": "3.12.15",
+ "iteration": 1000,
+ "env_steps": 196608000,
+ "wall_s": 1625.3006496429443,
+ "compile_s": 21.01729702949524,
+ "curriculum_stage": 1,
+ "base_config": {
+  "seed": 0,
+  "env": {
+   "impl": "warp",
+   "graph_mode": "warp_staged",
+   "policy_rate_hz": 100,
+   "episode_s": 20.0,
+   "naconmax_per_env": 12,
+   "njmax_per_env": 96,
+   "terrain": {
+    "type": "flat",
+    "obstacles": {}
+   },
+   "action": {
+    "legs": {
+     "mode": "position",
+     "scale_rad": 0.5,
+     "kp": "ros",
+     "kd": "ros"
+    },
+    "wheels": {
+     "mode": "velocity",
+     "scale_rad_s": 20.0,
+     "kd_nm_s_rad": 0.4,
+     "scale_nm": 3.0
+    },
+    "clip": 1.0
+   },
+   "observation": {
+    "history": 4,
+    "accelerometer": false,
+    "imu_offset_correction": "ros",
+    "scales": {
+     "gyro": 0.25,
+     "leg_vel": 0.1,
+     "wheel_vel": 0.05
+    }
+   },
+   "commands": {
+    "resample_s": [
+     2.0,
+     5.0
+    ],
+    "zero_probability": 0.2,
+    "component_zero_probability": 0.25,
+    "forward_m_s": "ros",
+    "yaw_rad_s": "ros",
+    "height_m": "ros",
+    "height_change_probability": 0.5,
+    "forward_accel_m_s2": "ros",
+    "yaw_time_constant_s": "ros",
+    "height_rate_m_s": "ros"
+   },
+   "rewards": {
+    "scale_by_dt": true,
+    "sigma": {
+     "forward": 0.15,
+     "yaw": 0.35,
+     "height": 0.012
+    },
+    "weights": {
+     "alive": 1.0,
+     "track_forward": 2.0,
+     "track_yaw": 1.0,
+     "track_height": 1.0,
+     "roll": -20.0,
+     "pitch": -25.0,
+     "pitch_rate": -0.3,
+     "vertical_velocity": -2.0,
+     "leg_symmetry": -200.0,
+     "action_rate": -0.08,
+     "action_accel": -0.04,
+     "leg_torque": -0.002,
+     "wheel_torque": -0.02,
+     "leg_velocity": -0.0005,
+     "termination": -200.0,
+     "wheel_differential_rate": -0.1
+    }
+   },
+   "termination": {
+    "tilt_rad": 0.8,
+    "imu_height_m": 0.17,
+    "max_qvel": 200.0
+   },
+   "constraints": {
+    "enabled": true,
+    "p_max": 0.25,
+    "leg_torque": {
+     "limit": "ros",
+     "slack": 0.5
+    },
+    "thermal": {
+     "enabled": true
+    },
+    "stretch": {
+     "limit": 0.97,
+     "slack": 0.02
+    },
+    "joint_range": {
+     "margin_rad": 0.1,
+     "slack": 0.1
+    },
+    "height": {
+     "margin_m": 0.008,
+     "slack": 0.01
+    },
+    "tilt": {
+     "limit_rad": 0.45,
+     "slack": 0.3
+    },
+    "wheel_lift": {
+     "limit_m": 0.01,
+     "slack": 0.02
+    }
+   },
+   "init": {
+    "joint_noise_rad": 0.03,
+    "tilt_rad": 0.05,
+    "velocity_noise": 0.05
+   },
+   "pushes": {
+    "enabled": true,
+    "interval_s": [
+     3.0,
+     8.0
+    ],
+    "duration_s": [
+     0.05,
+     0.2
+    ],
+    "force_n": 12.0,
+    "lateral_force_n": 12.0
+   },
+   "randomization": {
+    "enabled": true,
+    "latency": {
+     "imu_delay_s": [
+      0.005,
+      0.015
+     ],
+     "imu_rate_hz": [
+      150.0,
+      300.0
+     ],
+     "joint_delay_s": [
+      0.0005,
+      0.006
+     ],
+     "joint_rate_hz": [
+      150.0,
+      300.0
+     ],
+     "synchronous_joints_probability": 0.2,
+     "mit_joints_probability": 0.0,
+     "mit_joint_delay_s": [
+      0.0015,
+      0.0035
+     ],
+     "command_delay_s": [
+      0.0005,
+      0.003
+     ]
+    },
+    "sensors": {
+     "imu_noise_scale": [
+      0.5,
+      2.0
+     ],
+     "encoder_noise_rad": 0.0005,
+     "joint_velocity_noise": 0.05,
+     "joint_velocity_gain": [
+      0.75,
+      1.05
+     ],
+     "imu_mount_bias_rad": 0.02,
+     "gyro_bias_rad_s": 0.01
+    },
+    "drives": {
+     "torque_scale": [
+      0.85,
+      1.15
+     ],
+     "leg_gain_scale": [
+      0.9,
+      1.1
+     ],
+     "wheel_lag_s": [
+      0.01,
+      0.08
+     ],
+     "nominal_wheel_lag_s": 0.04,
+     "gear": {
+      "probability": 0.8,
+      "stiffness_nm_rad": [
+       25.0,
+       400.0
+      ],
+      "play_rad": [
+       0.0,
+       0.025
+      ],
+      "damping_nm_s_rad": [
+       0.005,
+       0.05
+      ],
+      "rotor_inertia_scale": [
+       1.0,
+       4.0
+      ],
+      "substeps": 8
+     }
+    },
+    "model": {
+     "body_mass_scale": [
+      0.9,
+      1.1
+     ],
+     "payload_mass_add_kg": [
+      -0.4,
+      0.4
+     ],
+     "payload_offset_m": [
+      0.04,
+      0.02,
+      0.03
+     ],
+     "tyre_sliding_friction": [
+      0.5,
+      1.2
+     ],
+     "tyre_torsional_scale": [
+      0.5,
+      2.0
+     ],
+     "leg_frictionloss_scale": [
+      0.5,
+      3.0
+     ],
+     "wheel_frictionloss_scale": [
+      0.5,
+      2.0
+     ],
+     "damping_scale": [
+      0.5,
+      2.0
+     ],
+     "armature_scale": [
+      0.5,
+      8.0
+     ]
+    }
+   }
+  },
+  "train": {
+   "num_envs": 8192,
+   "steps_per_env": 24,
+   "iterations": 1000,
+   "learning_rate": 0.0001,
+   "desired_kl": 0.01,
+   "gamma": 0.99,
+   "lam": 0.95,
+   "clip": 0.2,
+   "value_coef": 1.0,
+   "entropy_coef": 0.005,
+   "epochs": 5,
+   "minibatches": 4,
+   "max_grad_norm": 1.0,
+   "init_log_std": -0.7,
+   "actor_hidden": [
+    256,
+    256,
+    128
+   ],
+   "critic_hidden": [
+    512,
+    256,
+    128
+   ],
+   "activation": "elu",
+   "symmetry_coef": 0.5,
+   "checkpoint_every": 100,
+   "eval_every": 50,
+   "resume_log_std": -3.0,
+   "curriculum_offset": 300
+  },
+  "curriculum": {
+   "stages": [
+    {
+     "iteration": 0,
+     "set": {
+      "env.randomization.drives.wheel_lag_s": [
+       0.0,
+       0.03
+      ]
+     }
+    },
+    {
+     "iteration": 300,
+     "set": {
+      "env.randomization.drives.wheel_lag_s": [
+       0.01,
+       0.08
+      ]
+     }
+    }
+   ]
+  },
+  "name": "flat_level_drivetrain"
+ }
+}

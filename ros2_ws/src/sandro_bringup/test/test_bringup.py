@@ -242,7 +242,8 @@ def test_real_robot_overrides_only_touch_known_parameters():
     shipped.update(yaml.safe_load((ROOT / "config" / "rl_policies.yaml").read_text()))
     overrides = yaml.safe_load((ROOT / "config" / "sandro_real_overrides.yaml").read_text())
     assert set(overrides) == {"whole_body_controller", "rl_flat_level", "rl_agile_terrain",
-                              "rl_stand_up", "rl_flat_level_fast"}
+                              "rl_stand_up", "rl_flat_level_fast", "rl_flat_level_drivetrain",
+                              "rl_flat_level_fast_drivetrain"}
     base = shipped["whole_body_controller"]["ros__parameters"]
 
     def check(subset, reference, path=""):
@@ -258,7 +259,8 @@ def test_real_robot_overrides_only_touch_known_parameters():
     # A rearward neutral shift eats the front pivot's stretch margin at height.
     assert tasks["fore_aft"]["neutral_offset_m"] < 0.0
     assert tasks["height"]["max_m"] <= 0.19
-    for name in ("rl_flat_level", "rl_agile_terrain", "rl_stand_up", "rl_flat_level_fast"):
+    for name in ("rl_flat_level", "rl_agile_terrain", "rl_stand_up", "rl_flat_level_fast",
+                 "rl_flat_level_drivetrain", "rl_flat_level_fast_drivetrain"):
         check(overrides[name]["ros__parameters"], shipped[name]["ros__parameters"], f"{name}.")
         # One physical IMU mounting for every controller.
         assert (overrides[name]["ros__parameters"]["observation"]["imu_offset_rad"]
@@ -269,7 +271,8 @@ def test_rl_policies_are_complete():
     config = yaml.safe_load((ROOT / "config" / "rl_policies.yaml").read_text())
     manager = config["controller_manager"]["ros__parameters"]
     controllers = ROOT.parent / "sandro_controllers"
-    assert set(manager) == {"rl_flat_level", "rl_agile_terrain", "rl_stand_up", "rl_flat_level_fast"}
+    assert set(manager) == {"rl_flat_level", "rl_agile_terrain", "rl_stand_up", "rl_flat_level_fast",
+                            "rl_flat_level_drivetrain", "rl_flat_level_fast_drivetrain"}
     # Only the stand-up policy engages lying down.
     assert {name for name in manager
             if (config[name]["ros__parameters"].get("safety") or {}).get("start_lying")} == {"rl_stand_up"}
@@ -388,7 +391,8 @@ def test_real_launch_starts_one_session_with_the_drives_inactive(monkeypatch, ro
     # first failure); one loads the controller and its switch partner inactive.
     assert [(names, inactive) for names, inactive, _ in spawners] == [
         (list(module.BROADCASTERS), False),
-        (["rl_flat_level", "rl_agile_terrain", "rl_flat_level_fast"], True)]
+        (["rl_flat_level", "rl_agile_terrain", "rl_flat_level_fast", "rl_flat_level_drivetrain",
+          "rl_flat_level_fast_drivetrain"], True)]
     assert module.BROADCASTERS[-1] == "imu_broadcaster"
     assert "REAL SAFE STATE" in logs and "not armed" in logs
     # Teleop starts too: nothing moves before the operator arms.
@@ -416,7 +420,7 @@ def test_armed_real_launch_keeps_everything_active(monkeypatch, ros_stubs):
     assert module.REALTIME in manager.kwargs["parameters"]
     assert [(names, inactive) for names, inactive, _ in spawners] == [
         (list(module.BROADCASTERS), False), (["rl_agile_terrain"], False),
-        (["rl_flat_level", "rl_flat_level_fast"], True)]
+        (["rl_flat_level", "rl_flat_level_fast", "rl_flat_level_drivetrain", "rl_flat_level_fast_drivetrain"], True)]
     assert "REAL SAFE STATE" not in logs
 
 

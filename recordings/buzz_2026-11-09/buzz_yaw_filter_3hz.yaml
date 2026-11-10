@@ -30,6 +30,18 @@ rl_flat_level_fast:
       imu_offset_rad: 0.016
     action:
       wheel_differential_filter_hz: 3.0
+rl_flat_level_drivetrain:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
+    action:
+      wheel_differential_filter_hz: 3.0
+rl_flat_level_fast_drivetrain:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
+    action:
+      wheel_differential_filter_hz: 3.0
 rl_agile_terrain:
   ros__parameters:
     observation:

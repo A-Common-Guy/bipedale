@@ -1,0 +1,36 @@
+# flat_level_real on a compliant, backlashed wheel drive train. On the robot
+# (2026-11-09, recordings/buzz_2026-11-09) every policy pumps an 8-10 Hz yaw
+# mode: the body yaws on the drive trains' compliance (the gyro lags the
+# encoders' rolling yaw by 121-146 deg), the gear's play shows as odd
+# harmonics on the motor side, and the policy's opposed wheel action, timed
+# on the gyro, reaches the wheels early enough to feed it. The first-order
+# wheel lag the policies trained with has no resonance. Here, in 80 % of the
+# episodes, each wheel's rotor sits behind play and a spring (env._gear;
+# about 32 Nm/rad per wheel puts the body's yaw at 9.4 Hz), and the encoders
+# and the drive law see the rotor. Not identified yet:
+# ros2_ws/src/sandro_bringup/tools/drive_train_test.py measures it.
+#
+#     uv run python -m sandro_rl.train configs/flat_level_drivetrain.yaml --resume policies/flat_level_real
+inherit: flat_level_real.yaml
+
+env:
+  randomization:
+    drives:
+      gear:
+        probability: 0.8
+        stiffness_nm_rad: [25.0, 400.0]     # log-uniform, per wheel
+        play_rad: [0.0, 0.025]              # total play at the wheel
+        damping_nm_s_rad: [0.005, 0.05]
+        rotor_inertia_scale: [1.0, 4.0]     # x the MJCF wheel armature
+        substeps: 8
+  pushes:
+    lateral_force_n: 12.0
+  rewards:
+    weights:
+      wheel_differential_rate: -0.1
+
+train:
+  iterations: 1000
+  learning_rate: 1.0e-4
+  curriculum_offset: 300
+  resume_log_std: -3.0

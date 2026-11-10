@@ -11,6 +11,10 @@ controller_manager:
       type: sandro_controllers/RlPolicyController
     rl_flat_level_fast:
       type: sandro_controllers/RlPolicyController
+    rl_flat_level_drivetrain:
+      type: sandro_controllers/RlPolicyController
+    rl_flat_level_fast_drivetrain:
+      type: sandro_controllers/RlPolicyController
 
 rl_flat_level:
   ros__parameters:
@@ -165,6 +169,100 @@ rl_flat_level_fast:
     command_topic: /cmd_vel
     policy_file: package://sandro_controllers/policies/flat_level_fast.bin
     policy_fingerprint: 2d775171eefb5f79d5617b35e0b0528a4ea6f971c1501fc1c56a1a52f32c8a4f
+    policy_rate_hz: 300.0
+    observation:
+      history: 4
+      history_stride: 3
+      command_size: 3
+      gyro_scale: 0.25
+      leg_velocity_scale: 0.1
+      wheel_velocity_scale: 0.05
+      # The simulated IMU's mounting (sim_identified.yaml imu_mount); the
+      # robot overrides set the physical one.
+      imu_offset_rad: -0.049
+    commands:
+      forward_m_s: 0.5
+      yaw_rad_s: 1.5
+      height_min_m: 0.14
+      height_max_m: 0.185
+      roll_rad: 0.0
+      # Height command on engaging (the WBC's tasks.height.target_m); the
+      # reference starts at the measured height and moves there.
+      initial_height_m: 0.17
+    shaping:
+      forward_accel_m_s2: 1.0
+      yaw_time_constant_s: 0.15
+      height_rate_m_s: 0.05
+      roll_rate_rad_s: 0.5
+      leg_height_min_m: 0.14
+      leg_height_max_m: 0.185
+      track_width_m: 0.304
+    action:
+      leg_scale_rad: 0.5
+      leg_kp_nm_rad: 12.0
+      leg_kd_nm_s_rad: 0.5
+      joint_min_rad: -2.0943951
+      joint_max_rad: 2.0943951
+      wheel_mode: velocity
+      wheel_scale_rad_s: 20.0
+      wheel_kd_nm_s_rad: 0.4
+      wheel_scale_nm: 3.0
+      stand_q: [0.41133484, 0.21714621, -1.48937, 0.21522591, 0.41287811, 2.14299]
+
+rl_flat_level_drivetrain:
+  ros__parameters:
+    joints: [right_motor_inner, right_motor_outer, right_wheel, left_motor_inner, left_motor_outer, left_wheel]
+    imu_name: imu
+    command_topic: /cmd_vel
+    policy_file: package://sandro_controllers/policies/flat_level_drivetrain.bin
+    policy_fingerprint: 929ab315b470cdb60855da5df8435a4dedf597caffd7d76df4de688b4e74af0f
+    policy_rate_hz: 100.0
+    observation:
+      history: 4
+      history_stride: 1
+      command_size: 3
+      gyro_scale: 0.25
+      leg_velocity_scale: 0.1
+      wheel_velocity_scale: 0.05
+      # The simulated IMU's mounting (sim_identified.yaml imu_mount); the
+      # robot overrides set the physical one.
+      imu_offset_rad: -0.049
+    commands:
+      forward_m_s: 0.5
+      yaw_rad_s: 1.5
+      height_min_m: 0.14
+      height_max_m: 0.185
+      roll_rad: 0.0
+      # Height command on engaging (the WBC's tasks.height.target_m); the
+      # reference starts at the measured height and moves there.
+      initial_height_m: 0.17
+    shaping:
+      forward_accel_m_s2: 1.0
+      yaw_time_constant_s: 0.15
+      height_rate_m_s: 0.05
+      roll_rate_rad_s: 0.5
+      leg_height_min_m: 0.14
+      leg_height_max_m: 0.185
+      track_width_m: 0.304
+    action:
+      leg_scale_rad: 0.5
+      leg_kp_nm_rad: 12.0
+      leg_kd_nm_s_rad: 0.5
+      joint_min_rad: -2.0943951
+      joint_max_rad: 2.0943951
+      wheel_mode: velocity
+      wheel_scale_rad_s: 20.0
+      wheel_kd_nm_s_rad: 0.4
+      wheel_scale_nm: 3.0
+      stand_q: [0.41133484, 0.21714621, -1.48937, 0.21522591, 0.41287811, 2.14299]
+
+rl_flat_level_fast_drivetrain:
+  ros__parameters:
+    joints: [right_motor_inner, right_motor_outer, right_wheel, left_motor_inner, left_motor_outer, left_wheel]
+    imu_name: imu
+    command_topic: /cmd_vel
+    policy_file: package://sandro_controllers/policies/flat_level_fast_drivetrain.bin
+    policy_fingerprint: 581c0685d0ed81ce7e40c7f9be8175daff496e078bcf4e05ecf9877985f3eba2
     policy_rate_hz: 300.0
     observation:
       history: 4

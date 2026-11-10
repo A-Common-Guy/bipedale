@@ -1286,6 +1286,50 @@ body and ground in the MJCF, randomised so that its mode spans about
 the robot: wheel kd 0.2 (`buzz_wheel_kd02.yaml`) and a low-pass on the
 differential wheel command alone.
 
+**What the mode is made of (2026-11-10).** Transfer functions at the peak
+on the same bags, with the encoders' rolling yaw `r (w_R - w_L) / track`
+against the gyro (coherence 0.97–0.99):
+
+- The gyro's yaw lags the rolling yaw by 121–146° with a gain of about 1.
+  The IMU's measured 8–9 ms explains about 30°. The BNO085 report used
+  (calibrated gyroscope, 0x02) is lightly filtered, so 40 ms at 9 Hz is
+  unlikely. With the IMU delay removed the phase runs −92° at 6.3 Hz, −113°
+  at 9.4 Hz and −127° at 15 Hz: a fairly well damped compliance between the
+  encoders and the body resonating near 6–8 Hz. About 32 Nm/rad per wheel
+  drive train puts the body's yaw (0.093 kg m²) at 9.4 Hz.
+- The legs swing fore-aft against each other by about 0.9 mm at 9 Hz,
+  roughly half of the body's yaw at the wheel track: part of the compliance.
+- The motor-side opposed wheel velocity and torque carry 13–23 % odd
+  harmonics, the gyro 5–7 %: gear play inside the loop.
+- The policy's opposed wheel action opposes the gyro's yaw rate (−161 to
+  −178°). Through the lag it reaches the wheels about 40° early and feeds the
+  mode. The wheel torque in phase with the encoders' velocity is what any
+  sustained oscillation with friction needs and does not identify the plant.
+
+In the CPU evaluator (`evaluate.Gear`: a rotor behind play and a spring,
+the encoder and the drive law on the rotor) a 60–100 Nm/rad spring makes
+`flat_level_real` and `agile_terrain` oscillate at robot-like amplitude
+(0.15–0.19 rad/s), while `flat_level_fast` stays clean in every variant,
+also with rubber-like damping. On the robot it is the worst, so no model
+here reproduces the robot's ranking, and a policy clean in simulation may
+still buzz. `ros2_ws/src/sandro_bringup/tools/drive_train_test.py`
+measures the play and stiffness with the wheel blocked.
+
+`flat_level_drivetrain` and `flat_level_fast_drivetrain` (deployed as
+`rl_flat_level_drivetrain`, `rl_flat_level_fast_drivetrain`) train on that
+drive train: in 80 % of the episodes each wheel's rotor sits behind
+0–25 mrad of play and a 25–400 Nm/rad spring (log-uniform, damping
+0.005–0.05 Nm s/rad, rotor 1–4 × the MJCF armature; `env._gear`, the drive
+law every substep), with no first-order wheel lag in those episodes,
+12 N lateral pushes and a penalty on the rate of the opposed wheel action.
+On the drive-train grid (30–300 Nm/rad, play 0–20 mrad, rotor 1 and 4×)
+the 5–15 Hz yaw is 0.004–0.008 rad/s against up to 0.16 for
+`flat_level_real`. On the standard scenarios `flat_level_drivetrain` beats
+`flat_level_real` in pitch everywhere (0.018–0.023 against 0.026–0.031),
+has no slow-IMU chatter and no fall in the worst-case shoves, and its yaw
+error rises from 0.011 to 0.013 rad/s; `flat_level_fast_drivetrain` is on
+par with `flat_level_fast`.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that

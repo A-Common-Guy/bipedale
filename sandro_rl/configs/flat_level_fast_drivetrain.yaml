@@ -1,0 +1,25 @@
+# flat_level_fast on the compliant, backlashed wheel drive train of
+# flat_level_drivetrain.yaml (see there). On the robot the fast policy pumps
+# the 8-10 Hz yaw mode hardest, into the oscillation watchdog after 1.7 s.
+#
+#     uv run python -m sandro_rl.train configs/flat_level_fast_drivetrain.yaml --resume policies/flat_level_fast
+inherit: flat_level_fast.yaml
+
+env:
+  randomization:
+    drives:
+      gear:
+        probability: 0.8
+        stiffness_nm_rad: [25.0, 400.0]
+        play_rad: [0.0, 0.025]
+        damping_nm_s_rad: [0.005, 0.05]
+        rotor_inertia_scale: [1.0, 4.0]
+        substeps: 8
+  pushes:
+    lateral_force_n: 12.0
+  rewards:
+    weights:
+      wheel_differential_rate: -0.1
+
+train:
+  iterations: 800

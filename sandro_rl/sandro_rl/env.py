@@ -113,6 +113,7 @@ class SandroEnv:
         self.decimation = int(round(cycles)) * control_steps
         self.dt = self.decimation * self.dt_physics
         self.difference_scale = 0.01 / self.dt
+        self.gear_substeps = int(((cfg["randomization"].get("drives") or {}).get("gear") or {}).get("substeps", 8))
         self.event_scale = 0.01 if cfg["rewards"].get("scale_by_dt", True) else 1.0
         self.episode_steps = int(round(cfg["episode_s"] / self.dt))
 
@@ -122,6 +123,7 @@ class SandroEnv:
         self.act_ids = jp.array(s.joint_actuator)
         self.leg_idx = s.leg_index
         self.wheel_idx = s.wheel_index
+        self.wheel_armature = np.asarray(s.model.dof_armature[np.asarray(s.joint_dof)[s.wheel_index]], np.float32)
         self.stand_q = jp.array(s.stand_q, dtype=jp.float32)
         self.stand_qpos = jp.array(s.stand_qpos, dtype=jp.float32)
         self.geometry = lim.leg_geometry
@@ -323,6 +325,7 @@ class SandroEnv:
             torque_scale = u(keys[13], D["torque_scale"], (N_JOINTS,))
             gain_scale = u(keys[14], D["leg_gain_scale"])
             wheel_lag = u(keys[15], D.get("wheel_lag_s", [0.0, 0.0]))
+            gear = self._sample_gear(jax.random.fold_in(keys[15], 1), D.get("gear") or {})
             enc_noise, vel_noise = S["encoder_noise_rad"], S["joint_velocity_noise"]
         else:
             imu_delay = jp.float32(lat.imu_delay_s)
@@ -341,6 +344,7 @@ class SandroEnv:
             torque_scale = jp.ones(N_JOINTS)
             gain_scale = jp.float32(1.0)
             wheel_lag = jp.float32(r["drives"].get("nominal_wheel_lag_s", 0.0))
+            gear = self._sample_gear(None, {})
             enc_noise, vel_noise = 0.0, 0.0
         imu_period = jp.where(imu_rate > 0, 1.0 / jp.maximum(imu_rate, 1e-6), 0.0)
         joint_period = jp.where(joint_rate > 0, 1.0 / jp.maximum(joint_rate, 1e-6), 0.0)
@@ -358,8 +362,30 @@ class SandroEnv:
             "gyro_bias": gyro_bias.astype(jp.float32),
             "torque_scale": torque_scale.astype(jp.float32),
             "gain_scale": jp.float32(gain_scale),
-            "wheel_lag": jp.float32(wheel_lag),
+            # The gear's spring is the drive train's lag where it is modelled.
+            "wheel_lag": jp.where(gear["gear_on"] > 0, 0.0, wheel_lag).astype(jp.float32),
             "imu_rate": jp.float32(imu_rate), "imu_delay": jp.float32(imu_delay),
+            **gear,
+        }
+
+    def _sample_gear(self, rng, g):
+        """The wheel drive trains' gear (Gear in evaluate.py): rigid, or per wheel a
+        rotor behind play and a spring, in g["probability"] of the episodes.
+        Stiffness log-uniform; rotor inertia a multiple of the MJCF armature."""
+        if rng is None or not g.get("probability", 0.0):
+            return {"gear_on": jp.float32(0.0), "gear_k": jp.full(2, 1000.0, jp.float32),
+                    "gear_half_play": jp.zeros(2, jp.float32), "gear_c": jp.full(2, 0.02, jp.float32),
+                    "rotor_j": jp.asarray(self.wheel_armature, jp.float32)}
+        k = jax.random.split(rng, 5)
+        u = lambda key, lo_hi: jax.random.uniform(key, (2,), minval=lo_hi[0], maxval=lo_hi[1])
+        lo, hi = g["stiffness_nm_rad"]
+        return {
+            "gear_on": (jax.random.uniform(k[0]) < g["probability"]).astype(jp.float32),
+            "gear_k": jp.exp(u(k[1], [math.log(lo), math.log(hi)])).astype(jp.float32),
+            "gear_half_play": (0.5 * u(k[2], g.get("play_rad", [0.0, 0.0]))).astype(jp.float32),
+            "gear_c": u(k[3], g.get("damping_nm_s_rad", [0.02, 0.02])).astype(jp.float32),
+            "rotor_j": (jp.asarray(self.wheel_armature) * u(k[4], g.get("rotor_inertia_scale", [1.0, 1.0])))
+                       .astype(jp.float32),
         }
 
     def _sample_command(self, rng, previous_height):
@@ -415,9 +441,41 @@ class SandroEnv:
         return wait, duration, force * enabled
 
     # ------------------------------------------------------------ physics helpers
-    def _record(self, data, params, rng):
-        raw = jp.concatenate([data.sensordata[self.sensor_index], data.qpos[self.qadr], data.qvel[self.dadr]])
+    def _record(self, data, params, rng, rotor):
+        q, v = self._encoder_state(data, params, rotor)
+        raw = jp.concatenate([data.sensordata[self.sensor_index], q, v])
         return raw + params["noise"] * jax.random.normal(rng, (N_CHANNELS,))
+
+    def _encoder_state(self, data, params, rotor):
+        """Joint positions and velocities as the drives' motor-side encoders see them."""
+        w, on = self.wheel_idx, params["gear_on"] > 0
+        q = data.qpos[self.qadr]
+        v = data.qvel[self.dadr]
+        return (q.at[w].set(jp.where(on, rotor[0], q[w])), v.at[w].set(jp.where(on, rotor[1], v[w])))
+
+    def _gear(self, frame, data, params, limit, rotor):
+        """The wheel drives through their gears over one physics step: the MIT law
+        on the rotor every substep (the drive's own loop runs far above the
+        physics rate), the rotor against the spring beyond the play. The mean
+        motor torque and the mean torque the gears pass to the wheels."""
+        w = self.wheel_idx
+        wq, wv = data.qpos[self.qadr[w]], data.qvel[self.dadr[w]]
+        q_ref, v_ref, kp, kd, ff = (frame[i][w] for i in range(5))
+        lim, scale = limit[w], params["torque_scale"][w]
+        k, half, c, j = params["gear_k"], params["gear_half_play"], params["gear_c"], params["rotor_j"]
+        h = self.dt_physics / self.gear_substeps
+        rq, rv = rotor[0], rotor[1]
+        motor = passed = jp.zeros(2)
+        for _ in range(self.gear_substeps):
+            tm = jp.clip(kp * (jp.where(kp > 0, q_ref, rq) - rq) + kd * (v_ref - rv) + ff, -lim, lim) * scale
+            delta = rq - wq
+            over = jp.sign(delta) * jp.maximum(jp.abs(delta) - half, 0.0)
+            ts = k * over + jp.where(over != 0, c * (rv - wv), 0.0)
+            rv = rv + (tm - ts) / j * h
+            rq = rq + rv * h
+            wq = wq + wv * h
+            motor, passed = motor + tm, passed + ts
+        return motor / self.gear_substeps, passed / self.gear_substeps, jp.stack([rq, rv])
 
     def _frames(self, action, params):
         """MIT frame per joint (q_ref, v_ref, kp, kd, tau_ff) from the policy action."""
@@ -579,8 +637,10 @@ class SandroEnv:
         command, duration = self._sample_command(k[6], h0)
         ref0 = jp.array([0.0, 0.0, h0, 0.0][: self.n_command])
         wait, push_duration, push_force = self._sample_push(k[7])
+        # The rotors start where the wheels are, at rest against the play.
+        rotor = jp.stack([data.qpos[self.qadr[self.wheel_idx]], data.qvel[self.dadr[self.wheel_idx]]])
         history = jp.zeros((HISTORY_LENGTH, N_CHANNELS))
-        history = latency.write(history, jp.int32(0), self._record(data, params, k[8]))
+        history = latency.write(history, jp.int32(0), self._record(data, params, k[8], rotor))
         zero_frame = jp.zeros((5, N_JOINTS))
         info = {
             "rng": k[9], "step": jp.int32(0), "physics_step": jp.int32(0), "params": params,
@@ -589,6 +649,7 @@ class SandroEnv:
             "push_force_sample": push_force, "push_force": jp.zeros(self.push_dim),
             "last_action": jp.zeros(N_JOINTS), "last_action2": jp.zeros(N_JOINTS),
             "frame": zero_frame, "drive_tau": jp.zeros(N_JOINTS), "axle_prev": self._axle_mid(data),
+            "rotor": rotor,
             # As if the robot had been working: up to half the heat budget.
             "heat": jax.random.uniform(jax.random.fold_in(k[9], 3), (N_JOINTS,), maxval=0.5)
                     * self.envelope.rated_nm ** 2,
@@ -685,24 +746,33 @@ class SandroEnv:
         blend = jp.ones(N_JOINTS).at[self.wheel_idx].set(blend)
         limit = self._torque_limit(info["heat"])
 
+        gear_on = params["gear_on"] > 0
+        w = self.wheel_idx
+
         def substep(carry, inputs):
-            data, history, pstep, drive_tau = carry
+            data, history, pstep, drive_tau, rotor = carry
             j, key = inputs
             due = j.astype(jp.float32) * self.dt_physics >= delay - 1e-9
             frame = jp.where(due, new_frame, old_frame)
             tau = self._mit_torque(frame, data, params, limit) * params["torque_scale"]
-            drive_tau = drive_tau + blend * (tau - drive_tau)
+            motor, passed, geared = self._gear(frame, data, params, limit, rotor)
+            rigid = jp.stack([data.qpos[self.qadr[w]], data.qvel[self.dadr[w]]])
+            rotor = jp.where(gear_on, geared, rigid)
+            out = tau.at[w].set(jp.where(gear_on, passed, tau[w]))
+            tau = tau.at[w].set(jp.where(gear_on, motor, tau[w]))
+            drive_tau = drive_tau + blend * (out - drive_tau)
             ctrl = jp.zeros(self.mj_model.nu).at[self.act_ids].set(drive_tau)
             data = data.replace(ctrl=ctrl, xfrc_applied=xfrc)
             data = mjx.step(model, data)
             pstep = pstep + 1
-            history = latency.write(history, pstep, self._record(data, params, key))
-            return (data, history, pstep, drive_tau), tau
+            history = latency.write(history, pstep, self._record(data, params, key, rotor))
+            return (data, history, pstep, drive_tau, rotor), tau
 
-        (data, history, pstep, drive_tau), taus = jax.lax.scan(
-            substep, (state.data, info["history"], info["physics_step"], info["drive_tau"]),
+        (data, history, pstep, drive_tau, rotor), taus = jax.lax.scan(
+            substep, (state.data, info["history"], info["physics_step"], info["drive_tau"], info["rotor"]),
             (jp.arange(self.decimation), noise_keys))
         info["drive_tau"] = drive_tau
+        info["rotor"] = rotor
         # The heat of the torque each drive was asked for (the spread in
         # torque_scale is the torque constant's, not the current's).
         info["heat"] = torque_envelope.account(
@@ -768,6 +838,7 @@ class SandroEnv:
         cat_delta = jp.where(diverged, 0.0, cat_delta)
         info["obs_history"] = jp.where(diverged, 0.0, info["obs_history"])
         info["heat"] = jp.where(diverged | ~jp.isfinite(info["heat"]), 0.0, info["heat"])
+        info["rotor"] = jp.where(diverged | ~jp.all(jp.isfinite(info["rotor"])), 0.0, info["rotor"])
         metrics = dict(terms)
         if self.has_jump:
             metrics["jump_active"] = (info["jump_timer"] > 0.0).astype(jp.float32)
@@ -864,6 +935,10 @@ class SandroEnv:
             "action_rate": jp.sum(((action - prev_action) * self.difference_scale) ** 2),
             "action_accel": jp.sum(((action - 2 * prev_action + prev_action2)
                                     * self.difference_scale ** 2) ** 2),
+            # The opposed half of the wheel actions drives the body's yaw.
+            "wheel_differential_rate": (((action[wheels[0]] - action[wheels[1]])
+                                         - (prev_action[wheels[0]] - prev_action[wheels[1]]))
+                                        * self.difference_scale) ** 2,
             "leg_torque": jp.mean(jp.sum(taus[:, legs] ** 2, axis=1)),
             "wheel_torque": jp.mean(jp.sum(taus[:, wheels] ** 2, axis=1)),
             "leg_velocity": jp.sum(truth["qd"][legs] ** 2),
