@@ -43,12 +43,17 @@ def read_actor(onnx_path: Path) -> dict:
     init = {i.name: numpy_helper.to_array(i) for i in model.graph.initializer}
     ops = [n.op_type for n in model.graph.node]
     hidden_ops = {op for op in ops if op in ACTIVATIONS}
-    if ops[:3] != ["Sub", "Div", "Clip"] or ops[-1] != "Clip" or len(hidden_ops) != 1:
+    # Only the MLP's operators: a flow policy's graph (fpo.build_onnx) also
+    # starts with the normaliser and ends with the clip.
+    if (ops[:3] != ["Sub", "Div", "Clip"] or ops[-1] != "Clip" or len(hidden_ops) != 1
+            or not set(ops) <= {"Sub", "Div", "Clip", "Gemm"} | hidden_ops):
         raise ValueError(f"{onnx_path}: not an export.build_onnx graph: {ops}")
     layers = []
     while f"W{len(layers)}" in init:
         i = len(layers)
         layers.append((init[f"W{i}"].astype(np.float32), init[f"b{i}"].astype(np.float32)))
+    if not layers:
+        raise ValueError(f"{onnx_path}: no dense layers")
     return {"mean": init["obs_mean"].astype(np.float32), "std": init["obs_std"].astype(np.float32),
             "obs_clip": float(init["obs_hi"]), "act_clip": float(init["act_hi"]),
             "activation": ACTIVATIONS[hidden_ops.pop()], "layers": layers}

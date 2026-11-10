@@ -16,6 +16,7 @@ batch and over the per-environment randomised model.
 
 from __future__ import annotations
 
+import copy
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,6 +31,7 @@ from flax import struct
 from mujoco import mjx
 
 from . import kinematics, latency, terrain, torque_envelope
+from .interface import goal_observation, ray_angles, ray_observation
 from .robot import RobotSpec, rotation_x
 from .sources import JOINTS
 
@@ -103,7 +105,19 @@ class SandroEnv:
         if self.impl == "warp" and cfg.get("graph_mode"):
             import warp as wp
             graph_mode = getattr(wp.JaxCallableGraphMode, cfg["graph_mode"].upper())
-        self.mjx_model = mjx.put_model(s.model, impl=self.impl, graph_mode=graph_mode)
+        physics = s.model
+        if self.impl == "jax":
+            # MJX's JAX backend cannot collide the tyre cylinders with meshes
+            # or boxes (put_model raises). For debugging runs on it (the CPU),
+            # only the tyres and the floor collide, as in bench.py; obstacles
+            # still reach the rays, clearances and ground heights (analytic).
+            physics = copy.deepcopy(s.model)
+            keep = {*s.tyre_geoms.tolist(), s.floor_geom}
+            off = [g for g in range(physics.ngeom) if g not in keep]
+            physics.geom_contype[off] = 0
+            physics.geom_conaffinity[off] = 0
+            self.mj_model = physics       # make_data sizes the contacts from it
+        self.mjx_model = mjx.put_model(physics, impl=self.impl, graph_mode=graph_mode)
         self.dt_physics = s.physics_dt
         control_steps = s.steps_per_control
         control_rate = lim.control_rate_hz
@@ -178,6 +192,23 @@ class SandroEnv:
         self.jump = c.get("jump") or {}
         self.has_jump = bool(self.jump.get("enabled", bool(self.jump)))
         self.jump_h_max = float(self.jump.get("height_m", [0.0, 0.1])[1])
+        # Optional goal commands (avoid task): reach a point at a commanded
+        # cruise speed, instead of tracking a forward speed and a yaw rate.
+        self.goals = c.get("goals") or {}
+        self.has_goal = bool(self.goals.get("enabled", bool(self.goals)))
+        # Optional range scanner: rays in the body's horizontal plane from a
+        # point on the torso, against the obstacles and the floor.
+        self.rays = cfg["observation"].get("rays") or {}
+        self.n_rays = int(self.rays.get("count", 0))
+        if self.n_rays:
+            self.ray_angles = jp.asarray(ray_angles(self.n_rays, float(self.rays.get("fov_deg", 360.0))),
+                                         dtype=jp.float32)
+            self.ray_range = float(self.rays["max_range_m"])
+            self.ray_offset = jp.asarray(self.rays.get("offset_m", [0.0, 0.0, 0.0]), dtype=jp.float32)
+        # The robot's footprint for pillar clearances, a box around the axle midpoint.
+        self.hull_half = jp.asarray((cfg.get("avoidance") or {}).get("hull_half_m", [0.125, 0.17]),
+                                    dtype=jp.float32)
+        self.has_pillars = any(b["kind"] == "pillar" for b in terrain.boxes(cfg.get("terrain", {})))
         p = cfg["pushes"]
         self.push_dim = 5 if ("vertical_force_n" in p or "torque_nm" in p) else 2
 
@@ -241,6 +272,13 @@ class SandroEnv:
             "push": (np.arange(size), np.array([1, -1, 1, -1, -1])[:size]),
             "jump": (np.arange(size), np.ones(size)),
             "params": (np.arange(size), np.ones(size)),
+            # (distance, cos, sin of the bearing); the rays are symmetric
+            # about the forward axis (interface.ray_angles), so they reverse.
+            "goal": (np.arange(3), np.array([1, 1, -1])),
+            "true_goal": (np.arange(3), np.array([1, 1, -1])),
+            "rays": (np.arange(size)[::-1], np.ones(size)),
+            "true_rays": (np.arange(size)[::-1], np.ones(size)),
+            "clearance": (np.arange(1), np.ones(1)),
         }
         return table[name]
 
@@ -262,7 +300,11 @@ class SandroEnv:
         comps += [("leg_pos", 4), ("leg_vel", 4), ("wheel_vel", 2), ("last_action", 6), ("command", self.n_command)]
         if self.has_jump:
             comps.append(("jump", 2))
+        comps += self._exteroceptive_components()
         return self._layout(comps)
+
+    def _exteroceptive_components(self):
+        return ([("goal", 3)] if self.has_goal else []) + ([("rays", self.n_rays)] if self.n_rays else [])
 
     N_PARAMS = 8 + 8   # episode parameters + randomize.MODEL_PARAMS
 
@@ -271,9 +313,16 @@ class SandroEnv:
                  ("last_action", 6), ("command", self.n_command)]
         if self.has_jump:
             comps.append(("jump", 2))
+        comps += self._exteroceptive_components()
         comps += [("true_gravity", 3), ("true_gyro", 3), ("base_velocity", 3), ("true_leg_pos", 4),
                  ("true_leg_vel", 4), ("true_wheel_vel", 2), ("leg_height", 2), ("leg_offset", 2),
                  ("wheel_clearance", 2), ("push", self.push_dim), ("params", self.N_PARAMS)]
+        if self.has_goal:
+            comps.append(("true_goal", 3))
+        if self.n_rays:
+            comps.append(("true_rays", self.n_rays))
+        if self.has_pillars:
+            comps.append(("clearance", 1))
         return self._layout(comps)
 
     def _actor_obs(self, obs_history):
@@ -394,12 +443,17 @@ class SandroEnv:
         # Curriculum stages narrow the sampled range; the observation keeps
         # normalising by the full range, so the policy's inputs keep their meaning.
         fraction = float(c.get("sample_fraction", 1.0))
-        v = jax.random.uniform(k[0], minval=-self.v_max, maxval=self.v_max) * fraction
-        w = jax.random.uniform(k[1], minval=-self.yaw_max, maxval=self.yaw_max) * fraction
-        v = jp.where(jax.random.uniform(k[2]) < c["component_zero_probability"], 0.0, v)
-        w = jp.where(jax.random.uniform(k[3]) < c["component_zero_probability"], 0.0, w)
-        zero = jax.random.uniform(k[4]) < c["zero_probability"]
-        v, w = jp.where(zero, 0.0, v), jp.where(zero, 0.0, w)
+        if self.has_goal:
+            # The operator sets a cruise speed; the goal gives the direction.
+            lo, hi = self.goals["speed_m_s"]
+            v, w = jax.random.uniform(k[0], minval=lo, maxval=hi), jp.float32(0.0)
+        else:
+            v = jax.random.uniform(k[0], minval=-self.v_max, maxval=self.v_max) * fraction
+            w = jax.random.uniform(k[1], minval=-self.yaw_max, maxval=self.yaw_max) * fraction
+            v = jp.where(jax.random.uniform(k[2]) < c["component_zero_probability"], 0.0, v)
+            w = jp.where(jax.random.uniform(k[3]) < c["component_zero_probability"], 0.0, w)
+            zero = jax.random.uniform(k[4]) < c["zero_probability"]
+            v, w = jp.where(zero, 0.0, v), jp.where(zero, 0.0, w)
         h = jax.random.uniform(k[5], minval=self.h_min, maxval=self.h_max)
         h = jp.where(jax.random.uniform(k[6]) < c["height_change_probability"], h, previous_height)
         duration = jax.random.uniform(k[7], minval=c["resample_s"][0], maxval=c["resample_s"][1])
@@ -427,6 +481,82 @@ class SandroEnv:
         """(target clearance / max, remaining fraction of the window), zero outside a jump."""
         active = timer > 0.0
         return jp.where(active, jp.array([height / self.jump_h_max, timer / self.jump["window_s"]]), 0.0)
+
+    def _goal_free(self, point, data):
+        """Clearance of a robot footprint (any heading) centred on a point."""
+        half = jp.full(2, jp.max(self.hull_half))
+        return self.terrain.clearance(point, jp.array([1.0, 0.0]), half, data)
+
+    def _sample_goal(self, rng, origin, data):
+        """A goal distance_m from origin in any direction, the first of four
+        candidates that is clear of the pillars (else the first)."""
+        g = self.goals
+        k = jax.random.split(rng, 2)
+        dist = jax.random.uniform(k[0], (4,), minval=g["distance_m"][0], maxval=g["distance_m"][1])
+        angle = jax.random.uniform(k[1], (4,), minval=-math.pi, maxval=math.pi)
+        candidates = origin[None] + dist[:, None] * jp.stack([jp.cos(angle), jp.sin(angle)], -1)
+        if not self.has_pillars:
+            return candidates[0]
+        free = jax.vmap(lambda p: self._goal_free(p, data))(candidates) > g.get("free_m", 0.15)
+        return candidates[jp.argmax(free)]
+
+    def _goal_time(self, start, goal, cruise):
+        """Time allowed for a goal: twice the straight-line time plus a margin."""
+        g = self.goals
+        return (g.get("time_factor", 2.0) * jp.linalg.norm(goal - start) / jp.maximum(cruise, 0.1)
+                + g.get("time_margin_s", 3.0))
+
+    def _goal_course(self, rng, data, pos, quat, yaw):
+        """The episode's first goal, with `blockers` pillars put on the way to
+        it, and every pillar on the start pose or the goal parked."""
+        g = self.goals
+        k = jax.random.split(rng, 3)
+        start = jp.asarray(self.stand_axle[:2], dtype=jp.float32)
+        goal = self._sample_goal(k[0], start, self.terrain.apply(data, pos, quat))
+        idx = jp.asarray(self.terrain.pillar_items)
+        blockers = min(int(g.get("blockers", 0)), len(self.terrain.pillar_items))
+        if blockers:
+            dist = jp.maximum(jp.linalg.norm(goal - start), 1e-6)
+            along = (goal - start) / dist
+            lo = jp.clip(g.get("blocker_start_m", 0.8) / dist, 0.3, 0.65)
+            u = jax.random.uniform(k[1], (blockers,), minval=lo, maxval=0.7)
+            side = jax.random.uniform(k[2], (blockers,), minval=-1, maxval=1) * g.get("blocker_offset_m", 0.2)
+            xy = start[None] + (u * dist)[:, None] * along[None] + side[:, None] * jp.array([-along[1], along[0]])[None]
+            pos = pos.at[idx[:blockers], 0:2].set(xy)
+        placed = self.terrain.apply(data, pos, quat)
+        heading = jp.array([jp.cos(yaw), jp.sin(yaw)])
+        on_start = self.terrain.pillar_gaps(start, heading, self.hull_half, placed) < g.get("start_clearance_m", 0.2)
+        on_goal = self.terrain.pillar_gaps(goal, jp.array([1.0, 0.0]), jp.full(2, jp.max(self.hull_half)),
+                                           placed) < g.get("free_m", 0.15)
+        pos = pos.at[idx, 2].set(jp.where(on_start | on_goal, terrain.PARK_Z, pos[idx, 2]))
+        return pos, goal
+
+    def _scan(self, data, r_body):
+        """True range of every scanner ray, m."""
+        origin = data.site_xpos[self.spec.imu_site] + r_body @ self.ray_offset
+        local = jp.stack([jp.cos(self.ray_angles), jp.sin(self.ray_angles), jp.zeros_like(self.ray_angles)], -1)
+        return self.terrain.ray_distance(origin, local @ r_body.T, data, self.ray_range)
+
+    def _measure_rays(self, true, rng):
+        """One scan as the robot reads it: range noise and dropouts (no return)."""
+        r = self.rays
+        k = jax.random.split(rng, 2)
+        sigma = r.get("noise_m", 0.0) + r.get("noise_fraction", 0.0) * true
+        measured = true + sigma * jax.random.normal(k[0], true.shape)
+        measured = jp.where(jax.random.uniform(k[1], true.shape) < r.get("dropout", 0.0), self.ray_range, measured)
+        return ray_observation(measured, self.ray_range, jp)
+
+    def _goal_vector(self, goal, axle, heading):
+        """(forward, left) of a goal from the axle midpoint, heading frame."""
+        rel = goal - axle[:2]
+        return rel @ heading, rel[1] * heading[0] - rel[0] * heading[1]
+
+    def _goal_obs(self, data, info):
+        """The goal as the robot's odometry places it (truth plus drift)."""
+        _, r_body = self._body_frame(data)
+        heading = r_body[:2, 0] / jp.maximum(jp.linalg.norm(r_body[:2, 0]), 1e-6)
+        forward, left = self._goal_vector(info["goal"] + info["odo_error"], self._axle_mid(data), heading)
+        return goal_observation(forward, left, self.goals["range_m"], jp)
 
     def _sample_push(self, rng):
         """Fore-aft, lateral (and vertical force, roll and yaw torque) in the heading frame."""
@@ -552,6 +682,10 @@ class SandroEnv:
                  "last_action": info["last_action"], "command": command}
         if self.has_jump:
             parts["jump"] = self.jump_observation(info["jump_timer"], info["jump_height"])
+        if self.has_goal:
+            parts["goal"] = info["goal_obs"]
+        if self.n_rays:
+            parts["rays"] = info["ray_obs"]
         return jp.concatenate([parts[n] for n in self.actor_layout.names]), parts
 
     def _truth(self, data, info):
@@ -572,7 +706,16 @@ class SandroEnv:
         anchors = data.xanchor[self.spec.wheel_joint_ids]
         ground = self.terrain.ground_height(jp.concatenate([anchors, mid[None]]), data)
         clearance = anchors[:, 2] - self.wheel_radius - ground[:2]
-        return {
+        extra = {}
+        if self.has_goal:
+            forward, left = self._goal_vector(info["goal"], mid, heading[:2])
+            extra["goal_vec"] = jp.array([forward, left])
+            extra["goal_dist"] = jp.sqrt(forward ** 2 + left ** 2)
+        if self.n_rays:
+            extra["rays"] = self._scan(data, r_body)
+        if self.has_pillars:
+            extra["obstacle_clearance"] = self.terrain.clearance(mid[:2], heading[:2], self.hull_half, data)
+        return extra | {
             "r_body": r_body, "gravity": r_body.T @ jp.array([0.0, 0.0, -1.0]),
             "gyro": self.body_from_imu.T @ gyro_true,
             "forward_speed": vel @ heading, "lateral_speed": vel @ lateral, "vertical_speed": vel[2],
@@ -604,6 +747,13 @@ class SandroEnv:
             "wheel_clearance": jp.clip(truth["clearance"], -0.05, 0.1) * 20.0,
             "push": info["push_force"] / 10.0, "params": params,
         })
+        if self.has_goal:
+            parts["true_goal"] = goal_observation(truth["goal_vec"][0], truth["goal_vec"][1],
+                                                  self.goals["range_m"], jp)
+        if self.n_rays:
+            parts["true_rays"] = ray_observation(truth["rays"], self.ray_range, jp)
+        if self.has_pillars:
+            parts["clearance"] = jp.clip(truth["obstacle_clearance"], -0.1, 1.0)[None]
         return jp.concatenate([parts[n] for n in self.critic_layout.names])
 
     # ------------------------------------------------------------ API
@@ -629,7 +779,10 @@ class SandroEnv:
             qpos = jp.where(off, self._rotate_base(self.fallen_states[pick], jp.zeros(2), yaw), qpos)
             qvel = jp.where(off, 0.0, qvel)
         data = data.replace(qpos=qpos, qvel=qvel, ctrl=jp.zeros(self.mj_model.nu))
-        data = self.terrain.apply(data, *self.terrain.layout(k[3]))
+        pos, quat = self.terrain.layout(k[3])
+        if self.has_goal:
+            pos, goal = self._goal_course(jax.random.fold_in(k[3], 1), data, pos, quat, yaw)
+        data = self.terrain.apply(data, pos, quat)
         data = mjx.forward(model, data)
         params = self._sample_episode_params(k[5], randomize)
         h0 = jp.clip(jp.mean(kinematics.leg_state(qpos[self.qadr][self.leg_idx], self.geometry,
@@ -658,6 +811,16 @@ class SandroEnv:
         if self.has_jump:
             jump_wait, jump_height = self._sample_jump(jax.random.fold_in(k[9], 1))
             info.update({"jump_wait": jump_wait, "jump_timer": jp.float32(-10.0), "jump_height": jump_height})
+        if self.has_goal:
+            start = jp.asarray(self.stand_axle[:2], dtype=jp.float32)
+            info.update({"goal": goal, "goal_timer": self._goal_time(start, goal, command[0]),
+                         "goal_hold": jp.float32(0.0), "odo_error": jp.zeros(2)})
+            info["goal_obs"] = self._goal_obs(data, info)
+        if self.n_rays:
+            kr = jax.random.split(jax.random.fold_in(k[9], 2), 3)
+            period = 1.0 / jax.random.uniform(kr[0], minval=self.rays["rate_hz"][0], maxval=self.rays["rate_hz"][1])
+            info.update({"ray_period": period, "ray_timer": jax.random.uniform(kr[1]) * period,
+                         "ray_obs": self._measure_rays(self._scan(data, self._body_frame(data)[1]), kr[2])})
         sensed = self._read_sensors(info)
         frame, parts = self._actor_frame(sensed, info)
         obs_history = jp.tile(frame[None], (self.history_frames, 1))
@@ -809,6 +972,35 @@ class SandroEnv:
 
         truth = self._truth(data, info)
         info["axle_prev"] = truth["axle"]
+        if self.has_goal:
+            # Held within reach_m for hold_s, or out of time: the next goal is
+            # sampled from where the robot stands. The rewards of this step
+            # are still for the goal it drove to (truth).
+            g = self.goals
+            k_goal = jax.random.split(jax.random.fold_in(k_cmd, 21), 2)
+            near = truth["goal_dist"] < g["reach_m"]
+            info["goal_hold"] = jp.where(near, info["goal_hold"] + self.dt, 0.0)
+            info["goal_timer"] = info["goal_timer"] - self.dt
+            reached = info["goal_hold"] >= g.get("hold_s", 1.0)
+            renew = reached | (info["goal_timer"] <= 0.0)
+            here = truth["axle"][:2]
+            new_goal = self._sample_goal(k_goal[0], here, data)
+            info["goal"] = jp.where(renew, new_goal, info["goal"])
+            info["goal_timer"] = jp.where(renew, self._goal_time(here, new_goal, info["command"][0]),
+                                          info["goal_timer"])
+            info["goal_hold"] = jp.where(renew, 0.0, info["goal_hold"])
+            # Odometry drift: a random walk that grows with the distance driven.
+            driven = jp.hypot(truth["forward_speed"], truth["lateral_speed"]) * self.dt
+            drift = g.get("odometry_drift", 0.0) * driven * jax.random.normal(k_goal[1], (2,))
+            info["odo_error"] = jp.where(renew, 0.0, info["odo_error"] + drift)
+            info["goal_obs"] = self._goal_obs(data, info)
+        if self.n_rays:
+            # The scanner's sample and hold at its own rate.
+            info["ray_timer"] = info["ray_timer"] - self.dt
+            due = info["ray_timer"] <= 0.0
+            fresh = self._measure_rays(truth["rays"], jax.random.fold_in(k_noise, 23))
+            info["ray_obs"] = jp.where(due, fresh, info["ray_obs"])
+            info["ray_timer"] = jp.where(due, info["ray_timer"] + info["ray_period"], info["ray_timer"])
         sensed = self._read_sensors(info)
         info["last_action2"] = info["last_action"]
         prev_action = info["last_action"]
@@ -850,6 +1042,11 @@ class SandroEnv:
             "cat_delta": cat_delta, "tilt": truth["tilt"],
             "err_roll": jp.abs(truth["roll"] - info["command_ref"][3]) if self.has_roll else jp.float32(0.0),
         })
+        if self.has_goal:
+            metrics["goal_distance"] = truth["goal_dist"]
+            metrics["goal_reached"] = reached.astype(jp.float32)
+        if self.has_pillars:
+            metrics["clearance"] = jp.minimum(truth["obstacle_clearance"], 2.0)
         metrics = {k: jp.where(diverged, 0.0, v) for k, v in metrics.items()}
         return State(data=data, obs=obs, reward=reward, done=done, terminated=terminated,
                      cat_delta=cat_delta, info=info, metrics=metrics)
@@ -857,13 +1054,18 @@ class SandroEnv:
     def metric_names(self):
         names = list(self.cfg["rewards"]["weights"]) + ["err_forward", "err_yaw", "err_height", "cat_delta", "tilt",
                                                         "err_roll"]
-        return names + (["jump_active", "clearance_min"] if self.has_jump else [])
+        return (names + (["jump_active", "clearance_min"] if self.has_jump else [])
+                + (["goal_distance", "goal_reached"] if self.has_goal else [])
+                + (["clearance"] if self.has_pillars else []))
 
     # ------------------------------------------------------------ task terms
     def _terminated(self, truth):
         t = self.cfg["termination"]
         bad = (truth["tilt"] > t["tilt_rad"]) | (truth["imu_height"] < t["imu_height_m"])
         bad = bad | ~jp.all(jp.isfinite(truth["q"]))
+        if self.has_pillars:
+            # Driving into a pillar is a failure, like a fall.
+            bad = bad | (truth["obstacle_clearance"] < t.get("obstacle_m", 0.0))
         return bad.astype(jp.float32)
 
     def _jumping(self, info):
@@ -899,6 +1101,8 @@ class SandroEnv:
                 # Only the stance counts: getting up may brace on one leg.
                 split = split * (truth["tilt"] < c["leg_split"]["upright_rad"])
             violations.append(split)
+        if self.has_pillars and c.get("obstacle"):
+            violations.append((c["obstacle"]["margin_m"] - truth["obstacle_clearance"]) / c["obstacle"]["slack"])
         if "wheel_lift" in c and c["wheel_lift"]:
             lift = jp.max(truth["clearance"] - c["wheel_lift"]["limit_m"]) / c["wheel_lift"]["slack"]
             violations.append(lift * (1.0 - self._jumping(info)))
@@ -914,7 +1118,9 @@ class SandroEnv:
         w, sig = r["weights"], r["sigma"]
         ref = info["command_ref"]
         g = 9.81
-        lean = jp.arctan(ref[0] * ref[1] / g)
+        # Goal commands carry no yaw rate: the lean follows the turn driven.
+        lean = (jp.arctan(truth["forward_speed"] * truth["yaw_rate"] / g) if self.has_goal
+                else jp.arctan(ref[0] * ref[1] / g))
         # Commanded roll plus the coordinated-turn lean (roll is positive with
         # the left side up, so a left turn leans to -lean).
         roll_target = (ref[3] if self.has_roll else 0.0) - lean
@@ -963,6 +1169,20 @@ class SandroEnv:
             terms["jump_overshoot"] = in_window * jp.maximum(jp.min(truth["clearance"]) - info["jump_height"], 0.0) ** 2
             for name in ("track_height", "vertical_velocity"):
                 terms[name] = terms[name] * (1.0 - jumping)
+        if self.has_goal:
+            # Agile But Safe (He et al. 2024) style: speed towards the goal up to
+            # the cruise speed, then stand still on it.
+            dist = truth["goal_dist"]
+            at_goal = (dist < self.goals["reach_m"]).astype(jp.float32)
+            toward = truth["goal_vec"] / jp.maximum(dist, 1e-6)
+            velocity = jp.array([truth["forward_speed"], truth["lateral_speed"]])
+            cruise = jp.maximum(ref[0], 0.1)
+            terms["goal_progress"] = (1.0 - at_goal) * jp.clip(velocity @ toward, -cruise, cruise) / cruise
+            terms["goal_facing"] = (1.0 - at_goal) * toward[0]
+            terms["goal_reach"] = at_goal * jp.exp(-(jp.linalg.norm(velocity) / 0.15) ** 2)
+        if self.has_pillars:
+            margin = r.get("obstacle_margin_m", 0.3)
+            terms["obstacle"] = jp.clip(1.0 - truth["obstacle_clearance"] / margin, 0.0, 1.0) ** 2
         terms = {k: v for k, v in terms.items() if k in w}
         scale = self.dt if r.get("scale_by_dt", True) else 1.0
         # Events happen once, whatever the policy rate: their weight is per

@@ -31,6 +31,17 @@ from .env import SandroEnv
 from .ppo import PPO
 
 
+def make_agent(env, config: dict):
+    """train.algorithm: ppo (Gaussian policy, the default) or fpo (flow policy, fpo.py)."""
+    algorithm = config["train"].get("algorithm", "ppo")
+    if algorithm == "fpo":
+        from .fpo import FlowPPO
+        return FlowPPO(env, config)
+    if algorithm != "ppo":
+        raise ValueError(f"unknown train.algorithm {algorithm}")
+    return PPO(env, config)
+
+
 def build(config: dict, num_envs: int | None = None, seed: int | None = None):
     env = SandroEnv(config)
     n = num_envs or config["train"]["num_envs"]
@@ -39,7 +50,7 @@ def build(config: dict, num_envs: int | None = None, seed: int | None = None):
     key = jax.random.key(seed)
     k_model, k_init, k_runner = jax.random.split(key, 3)
     model, in_axes, model_params = randomize.randomize(env, env.mjx_model, k_model, n)
-    agent = PPO(env, config)
+    agent = make_agent(env, config)
     reset, autoreset_step = agent.make_env_fns(model, in_axes, model_params)
     return env, agent, reset, autoreset_step, k_init, k_runner
 
@@ -126,7 +137,7 @@ def main() -> int:
         ts = ts.replace(params=jax.tree.map(jp.asarray, payload["params"]),
                         actor_norm=Normalizer(**{k: jp.asarray(v) for k, v in payload["actor_norm"].items()}),
                         critic_norm=Normalizer(**{k: jp.asarray(v) for k, v in payload["critic_norm"].items()}))
-        if "resume_log_std" in t:
+        if "resume_log_std" in t and "log_std" in ts.params:
             # A converged policy's action noise is too small to explore a new task.
             params = dict(ts.params)
             params["log_std"] = jp.full_like(params["log_std"], float(t["resume_log_std"]))

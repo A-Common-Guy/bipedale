@@ -1,0 +1,22 @@
+# avoid with a flow policy (FPO++, fpo.py): passing a pillar on the left or
+# on the right is two equally good actions, the case where a flow policy can
+# represent both and a Gaussian has to average or commit. The settings are
+# flat_tracking_fpo's.
+inherit: avoid.yaml
+
+train:
+  algorithm: fpo
+  epochs: 16
+  fpo:
+    flow_steps: 16
+    deploy_steps: 8
+    mc_samples: 8
+    action_scale: 0.5
+    time_features: 4
+    clip: 0.05
+    learning_rate: 1.0e-4
+    weight_decay: 1.0e-4
+    loss_clamp: 20.0
+    log_ratio_clamp: 2.0
+    value_clip: 0.2
+    aspo: true

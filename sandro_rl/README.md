@@ -67,6 +67,17 @@ uv run python -m sandro_rl.evaluate policies/step_climb --scenario steps --cours
 uv run python -m sandro_rl.evaluate runs/terrain --scenario expressive --video expressive.mp4  # roll and height
 uv run python -m sandro_rl.evaluate policies/stand_up --scenario stand_up --fallen 1.4 --video up.mp4  # limp fall, then stand up
 
+# obstacle avoidance: goals among posts and walls, seen by a simulated planar range scanner
+uv run python -m sandro_rl.train configs/avoid.yaml --out runs/avoid
+uv run python -m sandro_rl.evaluate runs/avoid --scenario avoid --course slalom --video slalom.mp4   # or --course wall
+# flow policies (FPO++) instead of the Gaussian: the same tasks, train.algorithm: fpo
+uv run python -m sandro_rl.train configs/flat_tracking_fpo.yaml --out runs/flat_fpo
+uv run python -m sandro_rl.train configs/avoid_fpo.yaml --out runs/avoid_fpo
+
+# debugging without a GPU: MJX's JAX backend on the CPU (tyre-floor contacts only, DESIGN.md 12)
+uv run python -m sandro_rl.train configs/avoid.yaml --out /tmp/avoid --set env.impl=jax --set env.graph_mode=null \
+    --set train.num_envs=8 --set train.iterations=3
+
 # traces of recordings (truth pitch, speed, yaw rate, leg height, wheel torque)
 uv run python -m sandro_rl.plots out.png runs/flat/eval/policy_hardware_nominal.csv runs/flat/eval/wbc_hardware_nominal.csv
 
@@ -122,6 +133,13 @@ Each folder under `policies/` contains:
 | [`step_climb`](policies/step_climb) | `jump` on planks up to 6.5 cm and steeper ramps, on the weighed robot. Crossing planks is not commanded; commanded jumps are kept | `steps.mp4` | Crosses the 3 cm plank on 5 of 5 seeds and the 4 cm one on 2; never 5 or 6 cm, never the 6 cm curb. Stands with its legs 60 mm apart fore and aft (an exploit, docs/DESIGN.md 8), and its heading drifts after crossings, so in `steps.mp4` it passes the later planks beside them. Not exportable to ROS yet (jump inputs) |
 | [`stand_up`](policies/stand_up) | Gets up from switched off: limp falls onto the folded legs, front or back, leaning or lying flat, then balances and drives as `flat_level`. Collides the leg links (boxes fitted to the CAD). The drives' 9 Nm envelope (10 Nm before 2026-11) | `stand_up_front.mp4`, `stand_up_back.mp4` | Up and staying up in 18 of 18 falls (pitches ±0.3 to ±1.4 rad) and 36 of 36 on held-out falls across the three latency profiles. Up in 0.1–1.6 s. Legs within 3 mm fore and aft once up. Completes all 9 standard runs. Refit on the 2026-11 body: up from 120 of 120 falls (pitches ±0.3 to ±1.4 rad, three latency profiles, 40 and 80 ms of wheel lag) in 0.1–1.8 s. Deployed as `rl_stand_up` (`safety.start_lying`: engages limp where the robot lies, fall cut-off once upright) |
 
+Two task configs have no trained policy yet (DESIGN.md sections 12 and 13):
+
+| Config | What it is | Status |
+| --- | --- | --- |
+| `avoid` | Drive to goals 1.5–4 m away among posts and short walls taller than the robot, at a commanded cruise speed up to 1.2 m/s, through a simulated 16-beam planar range scanner. Touching a pillar is a failure (after Agile But Safe, He et al. 2024) | Code and CPU tests only. Sandro has no range sensor; not exportable to ROS |
+| `flat_tracking_fpo`, `avoid_fpo` | The same tasks with a flow-matching policy trained by FPO++ (Yi et al. 2026) instead of the Gaussian | Code and CPU tests only. On a toy problem it keeps both of two equally good actions, where the Gaussian leans to one; with one right answer it learns slower. Not exportable to ROS |
+
 `flat_tracking`, `agile_terrain`, `jump`, `step_climb` and `stand_up` were then fine-tuned on 10–80 ms of wheel drive-train lag, which made `flat_level` ring at 7.5 Hz on the robot. The rows above are from before that refit; its results, at 40 ms of lag, are in [docs/DESIGN.md](docs/DESIGN.md) section 8 (wheel drive-train lag) and each policy's `eval/lag_sweep.md`. The videos predate it.
 
 `flat_tracking`, `flat_level`, `agile_terrain` and `jump` were fine-tuned on the weighed robot (4.825 kg, loaded tyre radius
@@ -137,11 +155,12 @@ subsection of section 8.
 | `configs/` | task configs; each inherits `base.yaml` and states only what differs. `ros` marks values read from the ROS stack |
 | `sandro_rl/sources.py` | reads the MJCF, controllers.yaml, the robot overrides and the launch latency defaults; fingerprint |
 | `sandro_rl/robot.py` | model loading and contract check |
-| `sandro_rl/env.py` | batched environment: MIT drives at physics rate, latency emulation, commands, rewards, CaT constraints |
-| `sandro_rl/randomize.py`, `terrain.py`, `latency.py` | domain randomisation, obstacles, sensor timing |
+| `sandro_rl/env.py` | batched environment: MIT drives at physics rate, latency emulation, commands (speeds or goals), range scanner, rewards, CaT constraints |
+| `sandro_rl/randomize.py`, `terrain.py`, `latency.py` | domain randomisation, obstacles (planks, hills, pillars) with analytic ray casts and clearances, sensor timing |
 | `sandro_rl/ppo.py`, `networks.py`, `train.py` | PPO with symmetry loss, asymmetric critic, curriculum |
-| `sandro_rl/interface.py` | numpy observation and action contract shared by evaluation and deployment |
+| `sandro_rl/fpo.py` | flow-matching policies trained with FPO++, and their ONNX export |
+| `sandro_rl/interface.py` | numpy observation and action contract shared by evaluation and deployment, goal odometry |
 | `sandro_rl/export.py`, `evaluate.py`, `plots.py` | ONNX export, CPU evaluation and comparison against the WBC, plots |
 | `sandro_rl/consistency.py`, `bench.py` | CPU vs GPU check, backend benchmark |
 | `sandro_rl/refit.py`, `scripts/refit_lag.sh`, `scripts/package_refit.sh` | fine-tune policies onto the wheel drive-train lag, then package and re-evaluate them |
-| `tests/` | model consistency, observation contract, determinism |
+| `tests/` | model consistency, observation contract, determinism, rays against `mj_ray`, the avoid task, FPO++ |

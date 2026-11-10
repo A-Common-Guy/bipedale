@@ -1,7 +1,8 @@
 """Terrain added around the generated robot model, never inside it.
 
 `flat` uses scene_ros2.xml as generated. `obstacles` adds planks and hills
-(an up ramp, a plateau and a down ramp) as mocap bodies through MjSpec at
+(an up ramp, a plateau and a down ramp), and pillars taller than the robot
+(posts and short walls, to drive around), as mocap bodies through MjSpec at
 load time; the robot, its contacts and the floor are untouched, so the
 consistency check of the robot still applies.
 
@@ -26,6 +27,8 @@ import numpy as np
 OBSTACLE_PREFIX = "obstacle_"
 PARK_Z = -5.0          # where unused obstacles wait, below the floor
 SHAPE_SEED = 12345
+KIND_CONFIG = {"plank": "planks", "hill": "hills", "pillar": "pillars"}
+FAR = 10.0             # clearance reported when there is no pillar, m
 
 
 def _spread(rng, lo_hi, n):
@@ -75,6 +78,17 @@ def boxes(cfg: dict) -> list[dict]:
                               "size": [half_len, 0.5 * width, thickness]})
             out.append({"name": f"{OBSTACLE_PREFIX}hill{i}", "kind": "hill", "top": top,
                         "footprint": 0.5 * plateau + run, "geoms": geoms})
+    # Drawn after the planks and hills, so their shapes stay those of the
+    # configs trained before pillars existed.
+    pillars = cfg.get("pillars") or {}
+    n = int(pillars.get("count", 0))
+    if n:
+        top = float(pillars["height_m"][1])
+        for i, (depth, width) in enumerate(zip(_spread(rng, pillars["depth_m"], n),
+                                               _spread(rng, pillars["width_m"], n))):
+            out.append({"name": f"{OBSTACLE_PREFIX}pillar{i}", "kind": "pillar", "top": top,
+                        "geoms": [{"pos": [0.0, 0.0, -0.5 * top], "euler_y": 0.0,
+                                   "size": [0.5 * depth, 0.5 * width, 0.5 * top]}]})
     return out
 
 
@@ -155,6 +169,9 @@ class Terrain:
         self.geom_size = jp.asarray(np.array(sizes, dtype=np.float32).reshape(-1, 3))
         self.tops = np.array([it["top"] for it in self.items], dtype=np.float32)
         self.kinds = [it["kind"] for it in self.items]
+        # A pillar is one geom, so pillar geoms and pillar items share an order.
+        self.pillar_items = np.array([k for k, kind in enumerate(self.kinds) if kind == "pillar"], dtype=int)
+        self.pillar_geoms = np.array([g for g, k in enumerate(owner) if self.kinds[k] == "pillar"], dtype=int)
 
     @property
     def active(self) -> bool:
@@ -171,7 +188,7 @@ class Terrain:
         r_lo = np.zeros(n, np.float32)
         r_hi = np.zeros(n, np.float32)
         for k, item in enumerate(self.items):
-            c = self.cfg["planks" if item["kind"] == "plank" else "hills"]
+            c = self.cfg[KIND_CONFIG[item["kind"]]]
             lo[k], hi[k] = c["height_m"]
             r_lo[k], r_hi[k] = c["radius_m"]
             r_lo[k] += item.get("footprint", 0.0)
@@ -189,15 +206,19 @@ class Terrain:
         idx = jp.asarray(self.mocap_ids)
         return data.replace(mocap_pos=data.mocap_pos.at[idx].set(pos), mocap_quat=data.mocap_quat.at[idx].set(quat))
 
+    def _world_geoms(self, data):
+        """Centre [g, 3] and rotation [g, 3, 3] of every obstacle geom in the world."""
+        idx = jp.asarray(self.mocap_ids)
+        body_pos = data.mocap_pos[idx][self.geom_owner]
+        body_rot = jax.vmap(_quat_to_mat)(data.mocap_quat[idx])[self.geom_owner]
+        centre = body_pos + jp.einsum("gij,gj->gi", body_rot, self.geom_centre)
+        return centre, body_rot @ self.geom_rot
+
     def ground_height(self, points, data):
         """Terrain height under each point (x, y): the highest box top face covering it, or the floor."""
         if not self.active:
             return jp.zeros(points.shape[0])
-        idx = jp.asarray(self.mocap_ids)
-        body_pos = data.mocap_pos[idx][self.geom_owner]
-        body_rot = jax.vmap(_quat_to_mat)(data.mocap_quat[idx])[self.geom_owner]
-        rot = body_rot @ self.geom_rot                                   # [g, 3, 3]
-        centre = body_pos + jp.einsum("gij,gj->gi", body_rot, self.geom_centre)
+        centre, rot = self._world_geoms(data)
         normal = rot[:, :, 2]
 
         def one(p):
@@ -209,3 +230,68 @@ class Terrain:
             return jp.maximum(jp.max(jp.where(inside, z, 0.0)), 0.0)
 
         return jax.vmap(one)(points)
+
+    def ray_distance(self, origin, directions, data, max_range):
+        """Distance from origin along each unit direction [n, 3] to the first
+        obstacle face or the floor (z = 0), capped at max_range: mj_ray on the
+        world geoms, as a slab test against the boxes."""
+        down = -directions[:, 2]
+        dist = jp.where(down > 1e-6, origin[2] / jp.maximum(down, 1e-6), max_range)
+        dist = jp.clip(dist, 0.0, max_range)
+        if not self.active:
+            return dist
+        centre, rot = self._world_geoms(data)
+        o = jp.einsum("gji,gj->gi", rot, origin[None] - centre)          # [g, 3] origin in each box frame
+        d = jp.einsum("gji,nj->ngi", rot, directions)                    # [n, g, 3]
+        d = jp.where(jp.abs(d) < 1e-9, 1e-9, d)
+        t1 = (-self.geom_size - o) / d
+        t2 = (self.geom_size - o) / d
+        near = jp.max(jp.minimum(t1, t2), -1)
+        far = jp.min(jp.maximum(t1, t2), -1)
+        t = jp.where(far >= jp.maximum(near, 0.0), jp.maximum(near, 0.0), max_range)
+        return jp.minimum(dist, jp.min(t, -1))
+
+    def pillar_gaps(self, centre, heading, half, data):
+        """Gap (m) in the ground plane between a box footprint (centre xy,
+        unit heading xy, half extents) and each pillar's footprint, item
+        order [pillars]; negative when they overlap (by the overlap depth)."""
+        if len(self.pillar_items) == 0:
+            return jp.zeros(0)
+        g_centre, rot = self._world_geoms(data)
+        g = jp.asarray(self.pillar_geoms)
+        c2 = g_centre[g, :2]
+        # Pillars turn about z only, so their local x and y axes stay horizontal.
+        a2, b2 = rot[g, :2, 0], rot[g, :2, 1]
+        h2 = self.geom_size[g, :2]
+        a1 = heading / jp.maximum(jp.linalg.norm(heading), 1e-9)
+        b1 = jp.array([-a1[1], a1[0]])
+        h1 = jp.asarray(half)
+
+        def one(c, a, b, h):
+            rel = c - centre
+            axes = jp.stack([a1, b1, a, b])
+            r1 = h1[0] * jp.abs(axes @ a1) + h1[1] * jp.abs(axes @ b1)
+            r2 = h[0] * jp.abs(axes @ a) + h[1] * jp.abs(axes @ b)
+            separation = jp.abs(axes @ rel) - r1 - r2
+            corners = jp.array([[1, 1], [1, -1], [-1, 1], [-1, -1]], dtype=jp.float32)
+
+            def point_box(p, cb, ab, bb, hb):
+                local = jp.array([(p - cb) @ ab, (p - cb) @ bb])
+                return jp.linalg.norm(jp.maximum(jp.abs(local) - hb, 0.0))
+
+            own = centre + corners[:, :1] * h1[0] * a1 + corners[:, 1:] * h1[1] * b1
+            theirs = c + corners[:, :1] * h[0] * a + corners[:, 1:] * h[1] * b
+            # Two disjoint convex polygons are closest at a corner of one of them.
+            gap = jp.minimum(jp.min(jax.vmap(lambda p: point_box(p, c, a, b, h))(own)),
+                             jp.min(jax.vmap(lambda p: point_box(p, centre, a1, b1, h1))(theirs)))
+            return jp.where(jp.max(separation) > 0.0, gap, jp.max(separation))
+
+        gaps = jax.vmap(one)(c2, a2, b2, h2)
+        # A pillar parked below the floor is out of the way.
+        tops = data.mocap_pos[jp.asarray(self.mocap_ids[self.pillar_items]), 2]
+        return jp.where(tops > 0.0, gaps, FAR)
+
+    def clearance(self, centre, heading, half, data):
+        """Smallest pillar_gaps (FAR without pillars)."""
+        gaps = self.pillar_gaps(centre, heading, half, data)
+        return jp.min(gaps) if gaps.shape[0] else jp.float32(FAR)

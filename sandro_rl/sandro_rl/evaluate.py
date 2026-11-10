@@ -39,7 +39,7 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-from . import checkpoint, kinematics, sources, torque_envelope
+from . import checkpoint, interface, kinematics, sources, torque_envelope
 from .interface import PolicyInterface, quat_to_mat
 from .robot import RobotSpec, rotation_x
 from .sources import JOINTS
@@ -254,6 +254,10 @@ EXTRA_SCENARIOS = {
              "2,0.5,0", "1,0.5,0,0,0,0.05", "2,0.5,0", "1,0.5,0,0,0,0.08", "2,0.5,0", "2,0,0"],
     # With --fallen: engaged lying down, 8 s to get up, then drive and turn.
     "stand_up": ["8,0,0", "3,0.4,0", "3,0,1.0", "2,0,0"],
+    # Goal policies (avoid task) on an AVOID_COURSES layout: the forward field
+    # is the cruise speed, the yaw rate is unused; the goals are the course's.
+    "avoid": ["45,0.6,0"],
+    "avoid_fast": ["45,1.0,0"],
 }
 SCENARIOS = {**closed_loop.SCENARIOS, **EXTRA_SCENARIOS}
 
@@ -270,6 +274,18 @@ COURSES = {
               {"distance_m": 5.4, "height_m": 0.06, "slope_deg": 45.0, "plateau_m": 0.8, "width_m": 1.6}),
     # The same curb alone, close enough that heading drift does not miss it.
     "curb": ([], {"distance_m": 1.5, "height_m": 0.06, "slope_deg": 45.0, "plateau_m": 0.8, "width_m": 1.6}),
+}
+
+
+# Courses of the goal policies, along the start heading (x ahead, y left, m):
+# pillars as (x, y, depth, width, height, yaw deg) and the goals in order.
+AVOID_COURSES = {
+    # Three posts off the line, a wall across it, then back through them.
+    "slalom": {"pillars": [(1.2, 0.0, 0.12, 0.12, 0.6, 0.0), (2.4, 0.35, 0.12, 0.12, 0.6, 0.0),
+                           (3.6, -0.35, 0.12, 0.12, 0.6, 0.0), (5.0, 0.0, 0.1, 1.0, 0.6, 0.0)],
+               "goals": [(6.2, 0.0), (0.0, 0.0)]},
+    # A wide wall straight ahead: left or right is the policy's choice.
+    "wall": {"pillars": [(1.5, 0.0, 0.1, 1.6, 0.6, 0.0)], "goals": [(3.0, 0.0)]},
 }
 
 
@@ -327,6 +343,33 @@ def course_model(spec: RobotSpec, layout: str = "planks", leg_boxes: bool = Fals
     return terrain.static_course(spec, items, poses, leg_boxes=leg_boxes)
 
 
+def avoid_course_model(spec: RobotSpec, layout: str, leg_boxes: bool = False):
+    """An AVOID_COURSES layout compiled in place: (model, goals [n, 2] in the
+    world, pillar geom ids)."""
+    from . import terrain
+
+    course = AVOID_COURSES[layout]
+    d = mujoco.MjData(spec.model)
+    mujoco.mj_resetDataKeyframe(spec.model, d, mujoco.mj_name2id(spec.model, mujoco.mjtObj.mjOBJ_KEY, "stand"))
+    mujoco.mj_forward(spec.model, d)
+    r = d.site_xmat[spec.imu_site].reshape(3, 3)
+    yaw = math.atan2(r[1, 0], r[0, 0])
+    start = d.xanchor[spec.wheel_joint_ids].mean(axis=0)[:2]
+    c, s = math.cos(yaw), math.sin(yaw)
+    place = lambda x, y: start + np.array([c * x - s * y, s * x + c * y])
+    items, poses = [], []
+    for i, (x, y, depth, width, height, turn) in enumerate(course["pillars"]):
+        items.append({"name": f"{terrain.OBSTACLE_PREFIX}course_pillar{i}", "kind": "pillar", "top": height,
+                      "geoms": [{"pos": [0.0, 0.0, -0.5 * height], "euler_y": 0.0,
+                                 "size": [0.5 * depth, 0.5 * width, 0.5 * height]}]})
+        a = yaw + math.radians(turn)
+        poses.append(([*place(x, y), height], [math.cos(0.5 * a), 0.0, 0.0, math.sin(0.5 * a)]))
+    m = terrain.static_course(spec, items, poses, leg_boxes=leg_boxes)
+    pillars = [g for g in range(m.ngeom)
+               if (mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_GEOM, g) or "").startswith(f"{terrain.OBSTACLE_PREFIX}course_pillar")]
+    return m, np.array([place(x, y) for x, y in course["goals"]]), pillars
+
+
 class OnnxPolicy:
     def __init__(self, path: Path):
         import onnxruntime as ort
@@ -353,13 +396,17 @@ class PolicyController:
         self.fallen = False
         self.jump_timer, self.jump_height, self.jump_request = -10.0, 0.0, 0.0
         self.differential_filter_hz, self.differential = 0.0, 0.0
+        # Goal policies: set by the caller before each update (interface.goal_observation, ray_observation).
+        self.goal_obs = interface.goal_observation(0.0, 0.0, iface.goal_range)
+        self.ray_obs = np.ones(iface.n_rays)
 
     def reset(self, quat, gyro, accel, q, v, height_target):
         heights = self._heights(q)
         self.ref = np.array([0.0, 0.0, float(np.clip(np.mean(heights), self.iface.h_min, self.iface.h_max)),
                              0.0][: 4 if self.iface.has_roll else 3])
         self.height_command = height_target
-        frame = self.iface.frame(quat, gyro, accel, q, v, self.last_action, self.ref)
+        frame = self.iface.frame(quat, gyro, accel, q, v, self.last_action, self.ref,
+                                 goal=self.goal_obs, rays=self.ray_obs)
         self.history = np.tile(frame, (self.iface.history_frames, 1))
         self.cycle = 0
 
@@ -385,7 +432,8 @@ class PolicyController:
             i = self.iface
             self.height_command = float(np.clip(self.height_command + np.clip(command[2], -i.h_rate, i.h_rate)
                                                 * i.dt, i.h_min, i.h_max))
-            target = np.array([np.clip(command[0], -i.v_max, i.v_max), np.clip(command[1], -i.yaw_max, i.yaw_max),
+            yaw_rate = 0.0 if i.has_goal else np.clip(command[1], -i.yaw_max, i.yaw_max)
+            target = np.array([np.clip(command[0], -i.v_max, i.v_max), yaw_rate,
                                self.height_command, command[3] if len(command) > 3 else 0.0])
             self.ref = i.shape(self.ref, target)
             jump = 0.0
@@ -397,7 +445,8 @@ class PolicyController:
                     self.jump_timer, self.jump_height = i.jump_window, request
                 self.jump_request = request
                 jump = i.jump_observation(self.jump_timer, self.jump_height)
-            frame = i.frame(quat, gyro, accel, q, v, self.last_action, self.ref, jump)
+            frame = i.frame(quat, gyro, accel, q, v, self.last_action, self.ref, jump,
+                            goal=self.goal_obs, rays=self.ray_obs)
             self.history = np.concatenate([frame[None], self.history[:-1]], axis=0)
             action = np.clip(self.policy(self.history[:: i.history_stride].reshape(-1)), -i.clip, i.clip)
             self.last_action = action
@@ -431,6 +480,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     config = meta["config"]
     spec = RobotSpec.load()
     iface = PolicyInterface(config, spec)
+    output.with_suffix(".avoid.json").unlink(missing_ok=True)
     lim = spec.limits
     options = SimOptions.from_closed_loop({"seed": str(seed), **sim}, spec.latency)
     rng = np.random.default_rng(options.seed)
@@ -441,9 +491,14 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
 
     from . import terrain
     leg_boxes = bool((config["env"].get("collision") or {}).get("leg_boxes", False))
-    m = (course_model(spec, "planks" if course is True else course, leg_boxes) if course
-         else terrain.build(spec, {}, leg_boxes=True) if leg_boxes
-         else mujoco.MjModel.from_xml_path(str(spec.scene)))
+    goals_world, pillar_geoms = None, []
+    if iface.has_goal:
+        m, goals_world, pillar_geoms = avoid_course_model(spec, course if course in AVOID_COURSES else "slalom",
+                                                          leg_boxes)
+    else:
+        m = (course_model(spec, "planks" if course is True else course, leg_boxes) if course
+             else terrain.build(spec, {}, leg_boxes=True) if leg_boxes
+             else mujoco.MjModel.from_xml_path(str(spec.scene)))
     d = mujoco.MjData(m)
     mujoco.mj_resetDataKeyframe(m, d, mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, "stand"))
     if fallen_pitch is not None:
@@ -503,6 +558,71 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     wheel_blend = 1.0 - math.exp(-m.opt.timestep / options.wheel_lag_s) if options.wheel_lag_s > 0 else 1.0
     wheel_act = [act[i] for i, name in enumerate(JOINTS) if "wheel" in name]
     wheel_tau = {a: 0.0 for a in wheel_act}
+
+    if iface.has_goal:
+        # Goal policies: goals kept by wheel odometry (interface.GoalOdometry),
+        # each placed relative to the robot when it is given, as an operator
+        # would; the scanner through mj_ray at its mean rate; the clearance
+        # from mj_geomDistance between the robot's collision geoms and the pillars.
+        goal_cfg = config["env"]["commands"]["goals"]
+        rays_cfg = iface.rays
+        odometry = interface.GoalOdometry(lim.wheel_radius_m)
+        robot_geoms = [g for g in range(m.ngeom) if m.geom_bodyid[g] != 0 and g not in pillar_geoms
+                       and (m.geom_contype[g] or m.geom_conaffinity[g])]
+        avoid = {"goal": -1, "hold": 0.0, "reached": [], "min_gap_m": math.inf, "next_scan": 0.0, "done_at": -1.0}
+        angles = interface.ray_angles(iface.n_rays, float(rays_cfg.get("fov_deg", 360.0))) if iface.n_rays else []
+        scan_period = 1.0 / float(np.mean(rays_cfg["rate_hz"])) if iface.n_rays else 0.0
+        hit_geom = np.zeros(1, dtype=np.int32)
+        fromto = np.zeros(6)
+
+    def exteroception(now, quat, gyro, vel, period):
+        """The goal and scan observations of one control cycle."""
+        r_meas = iface.body_rotation(quat)
+        yaw_meas = math.atan2(r_meas[1, 0], r_meas[0, 0])
+        pitch_rate = float((iface.body_from_imu_correction.T @ gyro)[1])
+        rt = d.site_xmat[imu_site].reshape(3, 3) @ body_from_imu
+        yaw_true = math.atan2(rt[1, 0], rt[0, 0])
+        axle = d.xanchor[wheel_joints].mean(axis=0)[:2]
+
+        def give(world):
+            rel = world - axle
+            c, s = math.cos(yaw_true), math.sin(yaw_true)
+            odometry.set_goal(c * rel[0] + s * rel[1], -s * rel[0] + c * rel[1], yaw_meas)
+
+        if odometry.goal is None:
+            give(axle)                     # stand still until the phases start
+        if phase_start >= 0 and avoid["goal"] < 0:
+            avoid["goal"] = 0
+            give(goals_world[0])
+        odometry.update(vel[iface.wheel_idx], pitch_rate, yaw_meas, period)
+        forward, left = odometry.relative()
+        if 0 <= avoid["goal"] < len(goals_world):
+            # Arrival as the robot judges it, from its odometry.
+            near = math.hypot(forward, left) < goal_cfg["reach_m"]
+            avoid["hold"] = avoid["hold"] + period if near else 0.0
+            if avoid["hold"] >= goal_cfg.get("hold_s", 1.0):
+                avoid["reached"].append({"goal": avoid["goal"], "t_s": round(now - phase_start, 3),
+                                         "truth_error_m": round(float(np.linalg.norm(goals_world[avoid["goal"]] - axle)), 4)})
+                avoid["goal"] += 1
+                avoid["hold"] = 0.0
+                if avoid["goal"] < len(goals_world):
+                    give(goals_world[avoid["goal"]])
+                else:
+                    avoid["done_at"] = now
+        controller.goal_obs = interface.goal_observation(forward, left, iface.goal_range)
+        if iface.n_rays and now >= avoid["next_scan"]:
+            avoid["next_scan"] = now + scan_period
+            r_max = float(rays_cfg["max_range_m"])
+            origin = d.site_xpos[imu_site] + rt @ np.asarray(rays_cfg.get("offset_m", [0.0, 0.0, 0.0]), float)
+            dist = np.empty(iface.n_rays)
+            for k, a in enumerate(angles):
+                hit = mujoco.mj_ray(m, d, origin, rt @ np.array([math.cos(a), math.sin(a), 0.0]), GROUND_GROUPS,
+                                    1, -1, hit_geom)
+                dist[k] = r_max if hit < 0 else min(hit, r_max)
+            dist = dist + (rays_cfg.get("noise_m", 0.0) + rays_cfg.get("noise_fraction", 0.0) * dist) \
+                * rng.normal(size=iface.n_rays)
+            dist = np.where(rng.uniform(size=iface.n_rays) < rays_cfg.get("dropout", 0.0), r_max, dist)
+            controller.ray_obs = interface.ray_observation(dist, r_max)
 
     def step(push_force):
         nonlocal last_frame_t
@@ -590,6 +710,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         gyro, accel = imu[4:7], imu[7:10]
 
         if not activated:
+            if iface.has_goal:
+                exteroception(now, quat, gyro, vel, period)    # the first frame fills the history
             controller.reset(quat, gyro, accel, pos, vel, lim.height_target_m)
             activated = True
             continue
@@ -622,6 +744,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                     last_hop = now
             if engaged_at >= 0:
                 received = published[1:6]
+        if iface.has_goal:
+            exteroception(now, quat, gyro, vel, period)
         frames = controller.update(quat, gyro, accel, pos, vel, received, period)
 
         # write()
@@ -640,6 +764,12 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
             finished = True
         if fall_time >= 0 and now - fall_time > 0.5:
             finished = True
+        if iface.has_goal and avoid["done_at"] >= 0 and now - avoid["done_at"] > 1.0:
+            finished = True
+        if pillar_geoms and (last_diag < 0 or now - last_diag >= 1.0 / options.diagnostics_rate_hz - 1e-9):
+            for pillar in pillar_geoms:
+                for g in robot_geoms:
+                    avoid["min_gap_m"] = min(avoid["min_gap_m"], mujoco.mj_geomDistance(m, d, g, pillar, 1.0, fromto))
 
         phase = -1 if phase_start < 0 else phase_index
         base = {"t_s": f"{now - recording_start:.6g}", "phase": phase, "cmd_forward": published[1],
@@ -715,6 +845,12 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     if renderer is not None and frames_out:
         import imageio.v2 as imageio
         imageio.mimsave(video, frames_out, fps=video_fps, codec="libx264", quality=7)
+    if iface.has_goal:
+        summary = {"course": course if course in AVOID_COURSES else "slalom", "scenario": scenario,
+                   "goals": len(goals_world), "reached": avoid["reached"],
+                   "min_clearance_m": round(float(avoid["min_gap_m"]), 4),
+                   "collided": bool(avoid["min_gap_m"] <= 0.0), "fell": fall_time >= 0}
+        output.with_suffix(".avoid.json").write_text(json.dumps(summary, indent=1))
     return (3 if fall_time >= 0 else 0), output
 
 
@@ -844,9 +980,10 @@ def main() -> int:
     parser.add_argument("--sim", action="append", default=[], metavar="KEY=VALUE")
     parser.add_argument("--output")
     parser.add_argument("--video")
-    parser.add_argument("--course", nargs="?", const="planks", choices=sorted(COURSES),
+    parser.add_argument("--course", nargs="?", const="planks", choices=sorted(COURSES) + sorted(AVOID_COURSES),
                         help="an obstacle course along the start heading (default planks: "
-                             f"{COURSE} and a hill {COURSE_HILL}); see COURSES")
+                             f"{COURSE} and a hill {COURSE_HILL}); see COURSES. Goal policies take an "
+                             "AVOID_COURSES layout (default slalom)")
     parser.add_argument("--heading-hold", type=float, default=0.0, metavar="GAIN",
                         help="steer back to the scenario's heading, GAIN rad/s per rad (an operator)")
     parser.add_argument("--fallen", type=float, metavar="PITCH",
@@ -881,6 +1018,8 @@ def main() -> int:
     code, _ = run(policy_dir, args.scenario, sim, output, Path(args.video) if args.video else None,
                   course=args.course, heading_hold=args.heading_hold, fallen_pitch=args.fallen, hop=args.hop)
     print(f"{'FELL' if code == 3 else 'completed all phases'}; recording: {output}")
+    if output.with_suffix(".avoid.json").exists():
+        print(output.with_suffix(".avoid.json").read_text())
     per_phase = all_metrics(output, args.scenario)
     keys = COMPARE_KEYS
     print(f"{'phase':>5s} " + " ".join(f"{k[:15]:>15s}" for k in keys))

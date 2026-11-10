@@ -18,7 +18,7 @@ import onnx
 from onnx import TensorProto, helper, numpy_helper
 
 from . import checkpoint, sources
-from .interface import PolicyInterface
+from .interface import PolicyInterface, ray_angles
 from .robot import RobotSpec
 from .sources import JOINTS
 
@@ -88,14 +88,20 @@ def export(policy_dir: Path) -> Path:
     cfg = meta["config"]
     activation = cfg["train"]["activation"]
     clip_action = float(cfg["env"]["action"]["clip"])
-    model = build_onnx(payload, activation, 10.0, clip_action)
+    flow = cfg["train"].get("algorithm", "ppo") == "fpo"
+    if flow:
+        from . import fpo
+        model = fpo.build_onnx(payload, cfg["train"], 10.0, clip_action)
+    else:
+        model = build_onnx(payload, activation, 10.0, clip_action)
     out = policy_dir / "policy.onnx"
     onnx.save(model, out)
     session = ort.InferenceSession(str(out), providers=["CPUExecutionProvider"])
     obs = np.random.default_rng(0).normal(size=(256, payload["actor_norm"]["mean"].size)).astype(np.float32)
     obs = obs * np.sqrt(payload["actor_norm"]["var"]) + payload["actor_norm"]["mean"]
     got = session.run(None, {"obs": obs.astype(np.float32)})[0]
-    want = reference_forward(payload, activation, obs.astype(np.float64))
+    want = (fpo.reference_action(payload, cfg["train"], obs.astype(np.float64), clip_action=clip_action) if flow
+            else reference_forward(payload, activation, obs.astype(np.float64)))
     err = float(np.max(np.abs(got - want)))
     if err > 1e-4:
         raise RuntimeError(f"ONNX output differs from the reference network by {err}")
@@ -104,6 +110,7 @@ def export(policy_dir: Path) -> Path:
     i = PolicyInterface(cfg, spec)
     frame = [("gravity", 3), ("gyro", 3)] + ([("accel", 3)] if i.accelerometer else []) + [
         ("leg_pos", 4), ("leg_vel", 4), ("wheel_vel", 2), ("last_action", 6), ("command", 4 if i.has_roll else 3)] + ([("jump", 2)] if i.has_jump else [])
+    frame += ([("goal", 3)] if i.has_goal else []) + ([("rays", i.n_rays)] if i.n_rays else [])
     if sum(n for _, n in frame) * i.history != payload["actor_norm"]["mean"].size:
         raise RuntimeError("interface.PolicyInterface no longer matches the trained observation size")
     a = cfg["env"]["action"]
@@ -120,7 +127,20 @@ def export(policy_dir: Path) -> Path:
                                                   **({"jump": {"height_max_m": i.jump_h_max, "window_s": i.jump_window,
                                                                "observation": "[target / height_max_m, remaining / window_s], "
                                                                               "zero outside a jump"}}
-                                                     if i.has_jump else {})}},
+                                                     if i.has_jump else {})},
+                        **({"goal": {"range_m": i.goal_range,
+                                     "observation": "interface.goal_observation of the goal (forward, left) m from "
+                                                    "the axle midpoint in the heading frame, kept by "
+                                                    "interface.GoalOdometry; the command's yaw rate is 0 and its "
+                                                    "forward speed the cruise speed"}}
+                           if i.has_goal else {}),
+                        **({"rays": {**i.rays, "angles_rad": [float(a) for a in ray_angles(i.n_rays, float(
+                            i.rays.get("fov_deg", 360.0)))],
+                                     "observation": "interface.ray_observation: range / max_range_m, 1 for no return; "
+                                                    "rays in the body's x-y plane from the IMU site + offset_m"}}
+                           if i.n_rays else {})},
+        "policy": ({"type": "flow", "integration": "Euler from x = 0 (zero-sampling), unrolled in the ONNX graph",
+                    "deploy_steps": int(fpo.settings(cfg["train"])["deploy_steps"])} if flow else {"type": "mlp"}),
         "action": {"joints": list(JOINTS),
                    "legs": {"q_ref": "stand_q + scale_rad * a", "scale_rad": i.leg_scale,
                             "kp": i.leg_kp, "kd": i.leg_kd, "range_rad": [i.q_lo, i.q_hi]},

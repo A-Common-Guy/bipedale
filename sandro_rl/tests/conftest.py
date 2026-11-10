@@ -7,6 +7,12 @@ import pytest
 # Tests run next to a training job: take GPU memory on demand only.
 os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
+import jax  # noqa: E402
+
+# Tests compare against float64 references (mj_ray, numpy); on GPUs with
+# TF32 the default float32 matmul keeps about three digits.
+jax.config.update("jax_default_matmul_precision", "highest")
+
 from sandro_rl import sources  # noqa: E402
 
 

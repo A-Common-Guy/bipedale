@@ -29,6 +29,65 @@ def quat_to_mat(w, x, y, z) -> np.ndarray:
     ])
 
 
+# The goal and range observations of the avoid task, for numpy (deployment)
+# and jax.numpy (training) alike, so both sides compute them with one code.
+def ray_angles(count: int, fov_deg: float) -> np.ndarray:
+    """Scanner ray directions in the body frame, rad (0 ahead, + to the left),
+    symmetric about the forward axis so the left-right mirror reverses them."""
+    if fov_deg >= 360.0:
+        return -math.pi + (np.arange(count) + 0.5) * 2.0 * math.pi / count
+    half = math.radians(fov_deg) / 2.0
+    return np.linspace(-half, half, count) if count > 1 else np.zeros(1)
+
+
+def ray_observation(distances, max_range_m, xp=np):
+    """Ranges as fractions of the maximum range, 1 for no return."""
+    return xp.clip(distances / max_range_m, 0.0, 1.0)
+
+
+def goal_observation(forward, left, range_m, xp=np):
+    """(distance capped at range_m / range_m, cos, sin of the bearing) of a
+    goal at (forward, left) m from the axle midpoint in the heading frame."""
+    dist = xp.sqrt(forward * forward + left * left)
+    safe = xp.maximum(dist, 1e-6)
+    near = dist < 1e-6
+    return xp.stack([xp.minimum(dist, range_m) / range_m, xp.where(near, 1.0, forward / safe),
+                     xp.where(near, 0.0, left / safe)])
+
+
+class GoalOdometry:
+    """Keeps a goal in the robot's heading frame from wheel odometry and the
+    IMU yaw, as the deployment controller must (training adds the drift of
+    this estimate, commands.goals.odometry_drift)."""
+
+    def __init__(self, wheel_radius_m: float):
+        self.radius = wheel_radius_m
+        self.goal = None              # in the odometry frame
+        self.position = np.zeros(2)
+        self.yaw = 0.0
+
+    def set_goal(self, forward, left, yaw):
+        """A new goal, given relative to the robot now."""
+        self.position, self.yaw = np.zeros(2), yaw
+        c, s = math.cos(yaw), math.sin(yaw)
+        self.goal = np.array([c * forward - s * left, s * forward + c * left])
+
+    def update(self, wheel_velocity, pitch_rate, yaw, dt):
+        """wheel_velocity: (right, left) rad/s; yaw from the IMU, rad."""
+        # The wheels turn relative to the body: add the pitch rate back (the
+        # WBC's forward_velocity_m_s does the same).
+        speed = self.radius * (float(np.mean(wheel_velocity)) + pitch_rate)
+        mid = self.yaw + 0.5 * math.remainder(yaw - self.yaw, 2.0 * math.pi)
+        self.position = self.position + speed * dt * np.array([math.cos(mid), math.sin(mid)])
+        self.yaw = yaw
+
+    def relative(self):
+        """(forward, left) of the goal from the robot now."""
+        rel = self.goal - self.position
+        c, s = math.cos(self.yaw), math.sin(self.yaw)
+        return float(c * rel[0] + s * rel[1]), float(-s * rel[0] + c * rel[1])
+
+
 class PolicyInterface:
     def __init__(self, config: dict, spec: RobotSpec):
         cfg = config["env"]
@@ -82,6 +141,12 @@ class PolicyInterface:
         self.has_jump = bool(jump.get("enabled", bool(jump)))
         self.jump_h_max = float(jump.get("height_m", [0.0, 0.1])[1])
         self.jump_window = float(jump.get("window_s", 0.8))
+        goals = c.get("goals") or {}
+        self.has_goal = bool(goals.get("enabled", bool(goals)))
+        self.goal_range = float(goals.get("range_m", 4.0))
+        rays = cfg["observation"].get("rays") or {}
+        self.n_rays = int(rays.get("count", 0))
+        self.rays = rays
 
     # ------------------------------------------------------------ observation
     def body_rotation(self, quat_wxyz) -> np.ndarray:
@@ -95,10 +160,13 @@ class PolicyInterface:
             return np.zeros(2)
         return np.array([height / self.jump_h_max, timer / self.jump_window])
 
-    def frame(self, quat_wxyz, gyro, accel, q, v, last_action, command_ref, jump=(0.0, 0.0)) -> np.ndarray:
+    def frame(self, quat_wxyz, gyro, accel, q, v, last_action, command_ref, jump=(0.0, 0.0),
+              goal=None, rays=None) -> np.ndarray:
         """One observation frame from the measured signals (JOINTS order).
 
-        jump: jump_observation(...) for policies trained with jump events."""
+        jump: jump_observation(...) for policies trained with jump events;
+        goal: goal_observation(...) and rays: ray_observation(...) for the
+        avoid task."""
         r_body = self.body_rotation(quat_wxyz)
         gravity = r_body.T @ np.array([0.0, 0.0, -1.0])
         q, v = np.asarray(q, float), np.asarray(v, float)
@@ -113,6 +181,10 @@ class PolicyInterface:
                   v[self.wheel_idx] * self.scales["wheel_vel"], np.asarray(last_action, float), command]
         if self.has_jump:
             parts.append(np.asarray(jump, float))
+        if self.has_goal:
+            parts.append(np.asarray(goal, float))
+        if self.n_rays:
+            parts.append(np.asarray(rays, float))
         return np.concatenate(parts)
 
     # ------------------------------------------------------------ action

@@ -26,7 +26,7 @@ ros2_ws/src/...                 (read, never written)
 sandro_rl/sources.py   reads all of the above, hashes them (fingerprint)
 sandro_rl/robot.py     loads the MJCF, checks the model contract
 sandro_rl/env.py       batched GPU environment (MJX, impl=warp)
-sandro_rl/train.py     PPO + curriculum; checkpoints carry config and fingerprint
+sandro_rl/train.py     PPO (or FPO++, fpo.py) + curriculum; checkpoints carry config and fingerprint
 sandro_rl/export.py    ONNX + policy.json (the deployment contract)
 sandro_rl/evaluate.py  CPU MuJoCo, full latency emulation, side by side with the WBC
 sandro_rl/consistency.py   CPU MuJoCo vs GPU backend check
@@ -1477,3 +1477,226 @@ interfaces on the wheel drives. The plugin exports them for all six joints
    (section 8, stand_up deployment). The folded legs sit at up to 2.2 rad,
    outside the ±2.09 rad target range; the targets are clamped to it in
    training as on the robot.
+   Pushing up takes the 10 Nm drive limits, against 3 Nm today.
+10. **Goal and range inputs** (`avoid`, section 12): `RlPolicyController`
+    would need a range-sensor driver and two more frame terms. The goal term
+    is `interface.goal_observation` of a goal kept by wheel odometry, as
+    `interface.GoalOdometry` does. The ray term is `interface.ray_observation`
+    of the latest scan, held between scans, with the rays in the order of
+    `interface.ray_angles`. A goal could arrive as a `geometry_msgs/PoseStamped`
+    relative to the robot. The cruise speed would stay `/cmd_vel` `linear.x`.
+11. **Flow inference** (`train.algorithm: fpo`, section 13): `MlpPolicy` runs
+    one MLP. A flow policy runs the same MLP `deploy_steps` times (8) on
+    (observation, x, time), adding v / steps to x from x = 0.
+    `fpo.build_onnx` shows the cheap form: the observation part of the first
+    layer is computed once, and the time part is a constant bias per step.
+    `export_ros.read_actor` refuses these graphs until the controller can
+    run them.
+
+## 12. Obstacle avoidance: `configs/avoid.yaml` (not trained yet)
+
+Every policy above is blind. Planks and hills can be crossed without seeing
+them, because the wheels feel them. A post or a wall has to be seen before
+the robot reaches it. This task adds the three things avoidance needs:
+
+- an exteroceptive input;
+- a command that leaves the policy free to choose its path;
+- obstacles that must not be touched.
+
+It follows Agile But Safe (ABS, He et al. 2024, [RESEARCH.md](RESEARCH.md)
+section 7): goal commands, ray distances as the exteroceptive input, and a
+collision counted as a failure. It does not have ABS's second half, the
+reach-avoid value network and recovery policy (see the open points below).
+
+**The sensor is an assumption.** Sandro has no range sensor. The simulated
+one is a planar 360° lidar:
+
+- 16 beams (`interface.ray_angles`, symmetric about the forward axis);
+- 2.5 m range;
+- 8–15 Hz, sample and hold;
+- noise of 1 cm + 1 % of the range;
+- 2 % dropouts, read as no return;
+- mounted 3 cm below the IMU, tilting with the body, so it sees the floor
+  when the body pitches.
+
+A narrower sensor, such as a multi-zone time-of-flight array, is
+`rays.fov_deg` and `rays.count`. Its mass falls inside the ±0.4 kg payload
+randomisation.
+
+**Obstacles.** `pillars` are a new terrain kind: boxes 0.45–0.8 m tall,
+from 8 cm posts to 1.2 m walls, as mocap bodies like the planks. They are
+drawn after the planks and hills, so the shapes of the existing configs
+are unchanged. Each episode places 14 of them in a 0.7–4.5 m ring. It then
+puts `blockers` of them across the line to the first goal, and parks below
+the floor any that would stand on the start pose or on the goal.
+
+**Commands.** `commands.goals` replaces the forward speed and yaw rate:
+
+- The goal is 1.5–4 m from the robot. The policy sees the actor term `goal`:
+  (distance / 4 m capped at 1, cos and sin of the bearing), in the heading
+  frame.
+- The cruise speed is 0.3–1.2 m/s, in `command[0]`. `command[1]` (yaw rate)
+  is always 0.
+- The next goal comes after 1 s within 0.25 m of the current one, or when
+  the time runs out (2× the straight-line time plus 3 s).
+- The observed goal drifts by a random walk of 3 cm per metre driven: on
+  the robot it comes from wheel odometry (`interface.GoalOdometry`).
+
+**Rewards and failures** (weights × dt, as in section 4):
+
+| Term | Weight | Definition |
+| --- | --- | --- |
+| `goal_progress` | 3 | velocity towards the goal, clipped to ± the cruise speed, / cruise speed; 0 on the goal |
+| `goal_reach` | 3 | on the goal (within 0.25 m) × exp(−(speed / 0.15)²) |
+| `goal_facing` | 0.3 | cos of the bearing, off the goal |
+| `obstacle` | −3 | (1 − clearance / 0.3 m)² below 0.3 m |
+| `track_forward`, `track_yaw` | 0 | replaced by the goal terms |
+
+Everything else is `base.yaml`. Touching a pillar ends the episode as a
+fall does (`termination.obstacle_m`: 0). A clearance under 5 cm is a CaT
+constraint with a 5 cm slack. The clearance is the gap in the ground plane
+between a 0.25 × 0.34 m box around the axle midpoint (the robot's 0.23 ×
+0.32 m outline, inflated) and each pillar. The critic also gets the true
+goal, the true ranges and the clearance.
+
+**What was checked** (CPU, `tests/test_rays.py`, `tests/test_avoid.py`):
+
+- the analytic ray cast (a slab test against the boxes and the floor)
+  against MuJoCo's own `mj_ray`, to 2e-4 m on random rays;
+- the env's scanner pose against `mj_ray` from the IMU site, to 1e-3 m;
+- the footprint gap (separating axes plus corner distances) against brute
+  force, to 1 cm;
+- reset over 32 worlds: no start within 0.1 m of a pillar, every goal clear;
+- a pillar under the robot ends the episode;
+- the observation frame of `interface.py` against the env's, value by value;
+- the odometry on a drive-and-turn.
+
+Three PPO iterations of `avoid` and `avoid_fpo` ran on the CPU, through
+`train.py` and `export.py`. Neither policy is trained.
+
+**The JAX backend on the CPU.** `env.impl: jax` used to fail on this model:
+MJX's JAX backend cannot collide the tyre cylinders with the body meshes.
+For that backend only, the environment now keeps only the tyre and floor
+contacts, as `bench.py` does. The rays, clearances and ground heights are
+analytic, so the avoid task's logic can be debugged without a GPU.
+Contacts other than the tyres' are missing there, so its physics is not
+for training. The MuJoCo Warp path does not reach this code. For the
+existing tasks, the changes of sections 12 and 13 leave the results
+unchanged: two PPO iterations of `flat_tracking` and `agile_terrain`, run
+with the original and the changed `env.py`, `ppo.py`, `terrain.py` and
+`interface.py`, gave bit-identical parameters, states, observations and
+rewards. The check ran on the JAX backend on the CPU, the only one
+available to it.
+
+**Evaluation** (`evaluate.py`, CPU MuJoCo with the full latency emulation):
+
+```bash
+uv run python -m sandro_rl.evaluate runs/avoid --scenario avoid --course slalom --video slalom.mp4
+uv run python -m sandro_rl.evaluate runs/avoid --scenario avoid_fast --course wall
+```
+
+The courses are in `AVOID_COURSES`:
+
+- `slalom`: three posts off the line and a wall, to 6.2 m and back;
+- `wall`: a 1.6 m wall 1.5 m ahead, where going left or right is the
+  policy's choice.
+
+The evaluation runs the deployment side as the robot would:
+
+- Each goal is placed relative to the robot when it is given, as an
+  operator would place it, and then kept by `GoalOdometry` from the
+  measured wheel speeds and IMU yaw.
+- Arrival is judged from the odometry.
+- The scanner is `mj_ray` at its mean rate, with the training's noise.
+
+The clearance is `mj_geomDistance` between the robot's collision geoms and
+the pillars, the truth rather than the box footprint. Each run writes
+`<recording>.avoid.json` with:
+
+- the goals reached, their times and their true position errors;
+- the minimum clearance;
+- whether the robot collided or fell.
+
+**Open points.**
+
+- **No safety shield.** ABS pairs the agile policy with a learned
+  reach-avoid value and a recovery policy that takes over when that value
+  says a collision is coming. Training that value on this environment's
+  rollouts is the next step towards running at speed on the hardware.
+- **Static, box-shaped obstacles only.** No moving obstacles, no people.
+- **The legs are not in the footprint.** Only the torso and tyres collide
+  in the description (section 11, item 8).
+- **A planar scanner misses planks and steps.** Combining this task with
+  `step_climb` needs a height scan, or a tilted second scanner.
+- **Not exportable to ROS** (section 11, item 10).
+
+## 13. Flow policies: FPO++ (`train.algorithm: fpo`, not trained on Sandro yet)
+
+`fpo.py` trains a flow-matching policy with FPO++ (Yi et al. 2026, arXiv
+2602.02481; [RESEARCH.md](RESEARCH.md) section 7) in place of the Gaussian.
+FPO++ is the first flow policy taken to humanoid hardware without expert
+distillation. Everything else of `ppo.py` is shared: rollout, GAE, the
+asymmetric critic, CaT, the normalisers, the curriculum. `ppo.py` was
+refactored so that sampling and the update are methods. The Gaussian path
+computes exactly what it did before (the bit-identity check of section 12).
+
+**The method.**
+
+- **The flow.** The actor is a velocity field v(x_τ, τ, obs) over the
+  scaled action x = a / 0.5. Training rollouts integrate it from
+  x_0 ~ N(0, I) in 16 Euler steps. The 0.5 makes the initial spread equal
+  to the Gaussian's `init_log_std` of −0.7 (measured: 0.491 against 0.497).
+- **The exported policy is deterministic.** It integrates from x_0 = 0
+  ("zero-sampling") in 8 steps, unrolled into the ONNX graph. The exported
+  graph matches the numpy reference to 7e-9.
+- **The ratio.** A flow has no likelihood. The update uses the flow-matching
+  loss l of 8 (τ, ε) pairs per action as a stand-in, with one ratio per
+  pair, ρ_i = exp(l_old − l_new), each clipped on its own.
+- **The surrogate (ASPO).** Positive advantages use PPO's clip (0.05).
+  Negative ones use SPO: ρA − |A|(ρ − 1)² / (2 · 0.05).
+- **Optimiser.** AdamW at a fixed 1e-4, betas (0.9, 0.95), weight decay
+  1e-4, 16 epochs, no entropy bonus.
+- **Symmetry.** The mirror loss becomes equivariance of the field:
+  v(Mx, τ, M obs) = M v(x, τ, obs).
+
+**Departures from the paper's locomotion settings** (`configs/flat_tracking_fpo.yaml`):
+
+- 16 flow steps instead of 64, and 8 Monte-Carlo samples instead of 16,
+  for compute and GPU memory;
+- the loss clamp (20) and the log-ratio clamp (±2) are mine; the paper
+  does not give its values;
+- the critic keeps PPO's value clip of 0.2.
+
+**What it buys, measured on a toy** (`tests/test_fpo.py`, 256 one-step
+bandits, the same networks and budget for both):
+
+| Problem | Gaussian PPO | FPO++ |
+| --- | --- | --- |
+| One best action per context: error of the deterministic action after 150 iterations (0.32 at the start) | 0.0007 | 0.037 |
+| Two equally good actions (+M and −M): share of sampled actions on the + side, two seeds | 16 %, 20 % | 53 %, 48 % |
+| Two equally good actions: mean reward | −0.23, −0.21 | −0.03, −0.02 |
+
+With one right answer, the Gaussian learns faster; the paper also reports
+that FPO++ does not fully close the gap to tuned Gaussian PPO. With two
+right answers, the Gaussian leans to one side and pays for its spread over
+both. The flow keeps both, and its deterministic action still lands on one
+of them. Balancing and speed tracking have one right answer. Passing a wall
+on the left or on the right has two. That is why `avoid_fpo.yaml` exists.
+
+**Cost on the robot.** Each action takes 8 forward passes of the 125k-parameter
+actor instead of 1. The observation half of the first layer is shared across
+the passes. The time on the Raspberry Pi is not measured.
+
+**To run on the GPU:**
+
+```bash
+uv run python -m sandro_rl.train configs/flat_tracking.yaml --out runs/flat_ppo
+uv run python -m sandro_rl.train configs/flat_tracking_fpo.yaml --out runs/flat_fpo
+uv run python -m sandro_rl.evaluate runs/flat_fpo --compare      # same table as flat_tracking's
+uv run python -m sandro_rl.train configs/avoid.yaml --out runs/avoid
+uv run python -m sandro_rl.train configs/avoid_fpo.yaml --out runs/avoid_fpo
+```
+
+The training throughput of FPO++ at 8192 worlds and its GPU memory use
+(the update evaluates the field at 8 pairs per action) are not measured. If
+memory runs out, lower `train.fpo.mc_samples` or raise `train.minibatches`.

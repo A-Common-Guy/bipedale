@@ -1,0 +1,22 @@
+# flat_tracking with a flow policy trained by FPO++ (fpo.py) instead of the
+# Gaussian PPO, everything else equal: the controlled comparison of the two
+# policy classes. Hyperparameters are the paper's locomotion ones (Yi et al.
+# 2026, table A.1) except where noted; the sweep ranges are theirs.
+inherit: flat_tracking.yaml
+
+train:
+  algorithm: fpo
+  epochs: 16                    # paper: 16 on Go2, 32 elsewhere; PPO here uses 5
+  fpo:
+    flow_steps: 16              # rollout integration; paper 64 (swept 8-64)
+    deploy_steps: 8             # zero-sampling in the exported graph; the G1 used 5
+    mc_samples: 8               # (tau, eps) pairs per action; paper 16 (swept 8-32), 8 for GPU memory
+    action_scale: 0.5           # x = a / 0.5, so x_0 ~ N(0, I) starts at the Gaussian's init_log_std -0.7
+    time_features: 4
+    clip: 0.05                  # paper 0.05 (swept 0.03-0.06)
+    learning_rate: 1.0e-4       # AdamW, betas (0.9, 0.95), fixed
+    weight_decay: 1.0e-4
+    loss_clamp: 20.0            # not given in the paper
+    log_ratio_clamp: 2.0        # not given in the paper
+    value_clip: 0.2             # the critic keeps PPO's clip
+    aspo: true

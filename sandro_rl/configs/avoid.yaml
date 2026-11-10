@@ -1,0 +1,84 @@
+# Obstacle avoidance: drive to goals among posts and short walls taller than
+# the robot, seen through a planar range scanner on the torso, at a commanded
+# cruise speed of up to 1.2 m/s. The recipe of Agile But Safe (He et al.
+# 2024) on a wheeled biped: goal commands, ray distances as the exteroceptive
+# input, collisions as failures. Sandro has no range sensor yet; the scanner
+# here is the assumption docs/DESIGN.md 12 states, and the policy is not
+# exportable to ROS (export_ros.py refuses the goal and ray inputs).
+inherit: base.yaml
+
+env:
+  naconmax_per_env: 24
+  njmax_per_env: 192
+
+  terrain:
+    type: obstacles
+    friction: 0.8
+    # Posts (8 cm square) to short walls (1.2 m); the robot is 0.34 m tall.
+    pillars: {count: 14, height_m: [0.45, 0.8], depth_m: [0.08, 0.4], width_m: [0.08, 1.2], radius_m: [0.7, 4.5]}
+
+  avoidance:
+    hull_half_m: [0.125, 0.17]          # footprint around the axle midpoint (robot AABB 0.23 x 0.32 m, inflated)
+
+  observation:
+    # A 360 degree planar lidar 3 cm below the IMU, tilting with the body.
+    rays: {count: 16, fov_deg: 360, max_range_m: 2.5, offset_m: [0.0, 0.0, -0.03], rate_hz: [8.0, 15.0],
+           noise_m: 0.01, noise_fraction: 0.01, dropout: 0.02}
+
+  action:
+    wheels: {scale_rad_s: 25.0}         # 1.68 m/s at the loaded tyre radius
+
+  commands:
+    forward_m_s: 1.2                    # normalises the cruise speed
+    forward_accel_m_s2: 2.0
+    goals:
+      distance_m: [1.5, 4.0]            # from the robot when sampled
+      range_m: 4.0                      # observation saturates beyond
+      reach_m: 0.25
+      hold_s: 1.0                       # stand within reach_m this long, then the next goal
+      speed_m_s: [0.3, 1.2]             # cruise speed command
+      time_factor: 2.0                  # time allowed: 2x the straight-line time + margin
+      time_margin_s: 3.0
+      blockers: 2                       # pillars put across the way to the first goal
+      blocker_offset_m: 0.2
+      blocker_start_m: 0.8
+      free_m: 0.15                      # goals this far from every pillar
+      start_clearance_m: 0.2
+      odometry_drift: 0.03              # goal error per metre driven (wheel odometry)
+
+  rewards:
+    obstacle_margin_m: 0.3
+    weights:
+      track_forward: 0.0                # goals replace the speed and yaw-rate tracking
+      track_yaw: 0.0
+      goal_progress: 3.0
+      goal_facing: 0.3
+      goal_reach: 3.0
+      obstacle: -3.0
+
+  termination:
+    obstacle_m: 0.0                     # footprint touching a pillar
+
+  constraints:
+    obstacle: {margin_m: 0.05, slack: 0.05}
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.commands.goals.speed_m_s: [0.3, 0.6]
+        env.commands.goals.blockers: 0
+        env.pushes.force_n: 6.0
+    - iteration: 400
+      set:
+        env.commands.goals.speed_m_s: [0.3, 0.9]
+        env.commands.goals.blockers: 1
+        env.pushes.force_n: 9.0
+    - iteration: 900                    # stages accumulate: restate the full values
+      set:
+        env.commands.goals.speed_m_s: [0.3, 1.2]
+        env.commands.goals.blockers: 2
+        env.pushes.force_n: 12.0
+
+train:
+  iterations: 2000

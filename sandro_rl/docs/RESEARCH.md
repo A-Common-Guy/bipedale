@@ -195,3 +195,56 @@ Everything was checked against arXiv IDs or DOIs (titles and authors through the
 - **No wheeled-biped RL jumping with hardware results was found.** The CAC 2025 "stage-wise reward shaping" jumping paper ([DOI](https://doi.org/10.1109/cac67268.2025.11486681)) exists, but I couldn't confirm whether it reached hardware. RL jumping on hardware exists for Cassie, a non-wheeled biped ([Li 2023](https://arxiv.org/abs/2302.09450)).
 - **No peer-reviewed RL papers for DIABLO, Unitree B2-W or LimX W1.** The CCC 2023 wheeled-biped balance RL paper is cited but I didn't check it.
 - **Venues not confirmed** (arXiv IDs only): Mittal 2024, CaT, Chen 2022, CAPS and LCP.
+
+## 7. Added 2026-10-28: flow policies and learned obstacle avoidance
+
+Compiled for `configs/avoid.yaml` and `fpo.py` (DESIGN.md sections 12 and
+13). Titles, authors and dates were checked on the arXiv pages.
+
+- **Agile But Safe (ABS).** [He 2024, RSS](https://arxiv.org/abs/2401.17583),
+  [proceedings](https://roboticsproceedings.org/rss20/p059.html). *Hardware: yes, Unitree Go1,
+  onboard sensing and compute.*
+  - Collision-free agile locomotion from two policies: an agile policy that
+    reaches goals among obstacles, and a recovery policy.
+  - A learned reach-avoid value network decides when the recovery policy
+    takes over, and is also the recovery policy's objective.
+  - Exteroception enters as ray distances, predicted from depth images by
+    a separate network.
+  - Secondary summaries report up to 3.1 m/s in clutter (not checked
+    against the paper).
+  - Adopted here: goal commands, ray distances as the input, collision as a
+    failure. Not adopted yet: the reach-avoid value and the recovery policy.
+- **REASAN.** [arXiv 2512.09537](https://arxiv.org/abs/2512.09537). Reactive safe navigation for
+  legged robots. It describes ABS as handling mainly obstacles that block
+  straight-line motion, and its RGB-D input as limiting omnidirectional
+  perception. Seen through a summary only.
+- **FPO: Flow Matching Policy Gradients.** [McAllister 2025, arXiv 2507.21053](https://arxiv.org/abs/2507.21053).
+  *Simulation only.*
+  - Policy gradients for flow and diffusion policies, without likelihoods:
+    the ratio is formed from conditional flow matching losses.
+  - "FPO can train diffusion-style policies from scratch in a variety of
+    continuous control tasks."
+- **FPO++: Flow Policy Gradients for Robot Control.** [Yi 2026, arXiv 2602.02481](https://arxiv.org/abs/2602.02481)
+  (v1 of 2 Feb 2026; a v2 is dated 13 Oct 2026, and the details below are
+  from v1). *Hardware: yes, "robust sim-to-real transfer on two humanoid
+  robots" (the Booster T1 and Unitree G1 in the text), without expert
+  distillation.*
+  - Changes over FPO:
+    - a ratio per Monte-Carlo sample instead of per action;
+    - ASPO, which is the PPO clip for positive advantages and the SPO
+      penalty for negative ones;
+    - CFM losses clamped before the difference, and the difference before
+      the exponential.
+  - Deployment by zero-sampling: integrating from zero noise was better
+    than sampling. The G1 ran 5 integration steps.
+  - Locomotion settings (Isaac Lab):
+    - 64 flow steps and 16 samples per action;
+    - learning rate 1e-4 and clip 0.05;
+    - AdamW with betas (0.9, 0.95);
+    - 16–32 epochs and 4096 environments.
+  - Not stated: the τ distribution, the clamp values, the handling of
+    action bounds, and whether the loss is normalised by the sample count.
+  - Limitation it reports: on motion tracking it did not fully close the
+    gap to tuned Gaussian PPO.
+- **AWARE** (wheel-legged evasion of fast obstacles, M20 platform), arXiv
+  2604.23761. Found through a summary page only, not checked.

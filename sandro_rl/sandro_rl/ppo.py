@@ -10,7 +10,9 @@ Gaussian. Additions:
     discounted by gamma * (1 - delta);
   - a mirror loss on the actor mean (Mittal et al. 2024) using the robot's
     left-right symmetry.
-One iteration (rollout plus update) is a single jitted function.
+One iteration (rollout plus update) is a single jitted function. A policy
+class other than the Gaussian (fpo.py) overrides init, act, sample,
+make_update and exploration.
 """
 
 from __future__ import annotations
@@ -47,8 +49,7 @@ class Batch:
     actor_obs: jax.Array
     critic_obs: jax.Array
     action: jax.Array
-    log_prob: jax.Array
-    mean: jax.Array
+    policy: dict             # what the update needs of each action (sample()): log_prob, mean
     value: jax.Array
     reward: jax.Array
     discount: jax.Array      # gamma * (1 - delta) * (1 - done) for the step
@@ -87,6 +88,17 @@ class PPO:
         """Deterministic action (the exported policy)."""
         return self.actor_net.apply(ts.params["actor"], ts.actor_norm(actor_obs))
 
+    def sample(self, ts: TrainState, actor_obs, key):
+        """Exploration action and what the update needs of it."""
+        p = ts.params
+        mean = self.actor_net.apply(p["actor"], ts.actor_norm(actor_obs))
+        action = mean + jp.exp(p["log_std"]) * jax.random.normal(key, mean.shape)
+        return action, {"log_prob": gaussian_log_prob(action, mean, p["log_std"]), "mean": mean}
+
+    def exploration(self, ts: TrainState, batch: Batch):
+        """Action noise for the training log (action_std)."""
+        return jp.mean(jp.exp(ts.params["log_std"]))
+
     # ------------------------------------------------------------ environment
     def make_env_fns(self, model, in_axes, model_params):
         env = self.env
@@ -122,7 +134,6 @@ class PPO:
 
     # ------------------------------------------------------------ iteration
     def make_iteration(self, autoreset_step):
-        env = self.env
         t = self.cfg
         gamma, lam = t["gamma"], t["lam"]
 
@@ -131,9 +142,7 @@ class PPO:
                 state, ep_ret, ep_len = carry
                 k_act, k_reset = jax.random.split(key)
                 p = ts.params
-                mean = self.actor_net.apply(p["actor"], ts.actor_norm(state.obs["actor"]))
-                action = mean + jp.exp(p["log_std"]) * jax.random.normal(k_act, mean.shape)
-                log_prob = gaussian_log_prob(action, mean, p["log_std"])
+                action, policy = self.sample(ts, state.obs["actor"], k_act)
                 value = self.critic_net.apply(p["critic"], ts.critic_norm(state.obs["critic"]))[:, 0]
                 nxt = autoreset_step(state, action, k_reset)
                 timeout = ((nxt.done > 0) & (nxt.terminated == 0)).astype(jp.float32)
@@ -148,8 +157,7 @@ class PPO:
                          "episodes": jp.sum(finished.astype(jp.float32)),
                          "falls": jp.sum(nxt.terminated),
                          **{f"m/{k}": jp.mean(v) for k, v in nxt.metrics.items()}}
-                batch = Batch(state.obs["actor"], state.obs["critic"], action, log_prob, mean, value,
-                              reward, discount)
+                batch = Batch(state.obs["actor"], state.obs["critic"], action, policy, value, reward, discount)
                 return (nxt, jp.where(finished, 0.0, ep_ret), jp.where(finished, 0.0, ep_len)), (batch, stats)
 
             rng, key = jax.random.split(runner.rng)
@@ -171,6 +179,47 @@ class PPO:
                                   (batch.reward, batch.discount, batch.value), reverse=True)
             return adv, adv + batch.value
 
+        update = self.make_update()
+
+        def iteration(ts: TrainState, runner: Runner):
+            runner, batch, stats, last_value = rollout(ts, runner)
+            adv, ret = gae(batch, last_value)
+            rng, key = jax.random.split(runner.rng)
+            ts, info = update(ts, batch, adv, ret, key)
+            # The normalisers move between iterations only, so the stored log
+            # probabilities stay consistent within one update.
+            ts = ts.replace(actor_norm=ts.actor_norm.update(batch.actor_obs),
+                            critic_norm=ts.critic_norm.update(batch.critic_obs))
+            summary = {k: jp.sum(v) for k, v in stats.items() if not k.startswith("m/")}
+            summary.update({k: jp.mean(v) for k, v in stats.items() if k.startswith("m/")})
+            summary.update(info)
+            summary["learning_rate"] = ts.learning_rate
+            summary["action_std"] = self.exploration(ts, batch)
+            summary["reward_per_step"] = jp.mean(batch.reward)
+            return ts, runner.replace(rng=rng), summary
+
+        return jax.jit(iteration, donate_argnums=(1,))
+
+    @staticmethod
+    def flatten(batch: Batch, adv, ret) -> dict:
+        """The rollout as one sample axis."""
+        n = adv.size
+        flat = {"actor_obs": batch.actor_obs.reshape(n, -1), "critic_obs": batch.critic_obs.reshape(n, -1),
+                "action": batch.action.reshape(n, -1), "value": batch.value.reshape(n),
+                "adv": adv.reshape(n), "ret": ret.reshape(n)}
+        flat.update({k: v.reshape((n,) + v.shape[2:]) for k, v in batch.policy.items()})
+        return flat
+
+    def value_loss(self, params, ts: TrainState, mb, clip):
+        value = self.critic_net.apply(params["critic"], ts.critic_norm(mb["critic_obs"]))[:, 0]
+        v_clipped = mb["value"] + jp.clip(value - mb["value"], -clip, clip)
+        return jp.mean(jp.maximum((value - mb["ret"]) ** 2, (v_clipped - mb["ret"]) ** 2))
+
+    def make_update(self):
+        """update(ts, batch, adv, ret, rng) -> (ts, info): epochs of minibatch steps on one rollout."""
+        env = self.env
+        t = self.cfg
+
         def loss_fn(params, ts: TrainState, mb):
             obs_a = ts.actor_norm(mb["actor_obs"])
             mean = self.actor_net.apply(params["actor"], obs_a)
@@ -180,9 +229,7 @@ class PPO:
             adv = mb["adv"]
             adv = (adv - adv.mean()) / (adv.std() + 1e-8)
             surrogate = -jp.mean(jp.minimum(ratio * adv, jp.clip(ratio, 1 - t["clip"], 1 + t["clip"]) * adv))
-            value = self.critic_net.apply(params["critic"], ts.critic_norm(mb["critic_obs"]))[:, 0]
-            v_clipped = mb["value"] + jp.clip(value - mb["value"], -t["clip"], t["clip"])
-            value_loss = jp.mean(jp.maximum((value - mb["ret"]) ** 2, (v_clipped - mb["ret"]) ** 2))
+            value_loss = self.value_loss(params, ts, mb, t["clip"])
             entropy = jp.sum(log_std + 0.5 * jp.log(2 * jp.pi * jp.e))
             loss = surrogate + t["value_coef"] * value_loss - t["entropy_coef"] * entropy
             sym = jp.float32(0.0)
@@ -198,10 +245,7 @@ class PPO:
 
         def update(ts: TrainState, batch: Batch, adv, ret, rng):
             n = adv.size
-            flat = {"actor_obs": batch.actor_obs.reshape(n, -1), "critic_obs": batch.critic_obs.reshape(n, -1),
-                    "action": batch.action.reshape(n, -1), "log_prob": batch.log_prob.reshape(n),
-                    "mean": batch.mean.reshape(n, -1), "value": batch.value.reshape(n),
-                    "adv": adv.reshape(n), "ret": ret.reshape(n)}
+            flat = self.flatten(batch, adv, ret)
             mb_size = n // t["minibatches"]
             log_std_old = ts.params["log_std"]
 
@@ -230,21 +274,4 @@ class PPO:
             ts, info = jax.lax.scan(epoch, ts, jax.random.split(rng, t["epochs"]))
             return ts, jax.tree.map(jp.mean, info)
 
-        def iteration(ts: TrainState, runner: Runner):
-            runner, batch, stats, last_value = rollout(ts, runner)
-            adv, ret = gae(batch, last_value)
-            rng, key = jax.random.split(runner.rng)
-            ts, info = update(ts, batch, adv, ret, key)
-            # The normalisers move between iterations only, so the stored log
-            # probabilities stay consistent within one update.
-            ts = ts.replace(actor_norm=ts.actor_norm.update(batch.actor_obs),
-                            critic_norm=ts.critic_norm.update(batch.critic_obs))
-            summary = {k: jp.sum(v) for k, v in stats.items() if not k.startswith("m/")}
-            summary.update({k: jp.mean(v) for k, v in stats.items() if k.startswith("m/")})
-            summary.update(info)
-            summary["learning_rate"] = ts.learning_rate
-            summary["action_std"] = jp.mean(jp.exp(ts.params["log_std"]))
-            summary["reward_per_step"] = jp.mean(batch.reward)
-            return ts, runner.replace(rng=rng), summary
-
-        return jax.jit(iteration, donate_argnums=(1,))
+        return update
