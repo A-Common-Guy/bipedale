@@ -75,6 +75,8 @@ const std::vector<DoubleParameter> &double_parameters() {
        "Wheel torque per unit action (torque mode)."},
       {"action.wheel_filter_hz", &RlPolicySettings::wheel_filter_hz,
        "First-order low-pass on the wheel commands, Hz; 0 disables it."},
+      {"action.wheel_differential_filter_hz", &RlPolicySettings::wheel_differential_filter_hz,
+       "First-order low-pass on the opposed half of the wheel commands (yaw), Hz; 0 disables it."},
       {"safety.fall_angle_rad", &RlPolicySettings::fall_angle_rad,
        "Tilt beyond which the drives go limp until re-activation."},
       {"safety.imu_timeout_s", &RlPolicySettings::imu_timeout_s,

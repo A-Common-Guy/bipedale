@@ -149,6 +149,40 @@ class DriveBus:
         self.current = [None] * len(self.current)
 
 
+class Gear:
+    """A wheel drive's rotor behind a gear with play: the rotor (the drive's
+    reflected inertia, output-side units) is its own body, driven by the
+    motor torque and coupled to the wheel by a spring and damper that act
+    only beyond half the play either way. The drive's encoder, its MIT loop
+    and so the policy see the rotor, not the wheel. Integrated in substeps
+    within each physics step, with the wheel's state held; the drive law
+    runs every substep, as the drive's own loop runs far above the physics
+    rate (its damping on the light rotor is unstable at 1200 Hz)."""
+
+    def __init__(self, inertia: float, play: float, stiffness: float, damping: float, substeps: int = 16):
+        self.j, self.half, self.k, self.c, self.n = inertia, 0.5 * play, stiffness, damping, substeps
+        self.q = self.v = 0.0
+
+    def reset(self, q: float, v: float) -> None:
+        self.q, self.v = q, v
+
+    def step(self, law, wheel_q: float, wheel_v: float, dt: float) -> tuple[float, float]:
+        """Advances the rotor by dt under law(q, v) -> motor torque; the mean
+        motor torque and the mean torque the gear passed to the wheel."""
+        h, passed, motor = dt / self.n, 0.0, 0.0
+        for _ in range(self.n):
+            tau = law(self.q, self.v)
+            delta = self.q - wheel_q
+            over = math.copysign(max(abs(delta) - self.half, 0.0), delta)
+            torque = self.k * over + (self.c * (self.v - wheel_v) if over else 0.0)
+            self.v += (tau - torque) / self.j * h
+            self.q += self.v * h
+            wheel_q += wheel_v * h
+            passed += torque
+            motor += tau
+        return motor / self.n, passed / self.n
+
+
 @dataclass
 class SimOptions:
     imu_delay_s: float
@@ -159,6 +193,16 @@ class SimOptions:
     command_delay_s: float
     imu_noise: bool = True
     wheel_lag_s: float = 0.0
+    # The wheel gear (Gear): total play (rad, output side), stiffness and
+    # damping beyond it; 0 play keeps the rigid drive.
+    wheel_backlash_rad: float = 0.0
+    gear_stiffness_nm_rad: float = 100.0
+    gear_damping_nm_s_rad: float = 0.02
+    rotor_inertia_scale: float = 1.0
+    # Deployment option: low-pass (Hz) on the opposed part of the wheel actions.
+    wheel_differential_filter_hz: float = 0.0
+    # Factor on the tyres' torsional (scrub) friction.
+    tyre_torsion_scale: float = 1.0
     unpowered_s: float = 0.03
     settle_s: float = 3.0
     command_rate_hz: float = 20.0
@@ -171,7 +215,11 @@ class SimOptions:
                 latency.joint_stagger, latency.command_delay_s)
         names = {"imu_delay": "imu_delay_s", "imu_rate": "imu_rate_hz", "joint_delay": "joint_delay_s",
                  "joint_rate": "joint_rate_hz", "command_delay": "command_delay_s", "settle": "settle_s",
-                 "seed": "seed", "wheel_lag": "wheel_lag_s"}
+                 "seed": "seed", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
+                 "gear_stiffness": "gear_stiffness_nm_rad", "gear_damping": "gear_damping_nm_s_rad",
+                 "tyre_torsion": "tyre_torsion_scale",
+                 "rotor_inertia": "rotor_inertia_scale",
+                 "differential_filter": "wheel_differential_filter_hz"}
         for key, value in sim.items():
             if key == "joint_stagger":
                 o.joint_stagger = value in ("true", "1")
@@ -304,6 +352,7 @@ class PolicyController:
         self.ref = None
         self.fallen = False
         self.jump_timer, self.jump_height, self.jump_request = -10.0, 0.0, 0.0
+        self.differential_filter_hz, self.differential = 0.0, 0.0
 
     def reset(self, quat, gyro, accel, q, v, height_target):
         heights = self._heights(q)
@@ -352,7 +401,16 @@ class PolicyController:
             self.history = np.concatenate([frame[None], self.history[:-1]], axis=0)
             action = np.clip(self.policy(self.history[:: i.history_stride].reshape(-1)), -i.clip, i.clip)
             self.last_action = action
-            self.frames = i.frames(action)
+            applied = action
+            if self.differential_filter_hz > 0.0:
+                # Low-pass on the opposed part of the wheel actions only.
+                blend = 1.0 - math.exp(-2.0 * math.pi * self.differential_filter_hz * i.dt)
+                half = 0.5 * (action[2] - action[5])
+                self.differential += blend * (half - self.differential)
+                common = 0.5 * (action[2] + action[5])
+                applied = action.copy()
+                applied[2], applied[5] = common + self.differential, common - self.differential
+            self.frames = i.frames(applied)
         self.cycle += 1
         return self.frames
 
@@ -379,6 +437,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     # A stand-up policy is engaged lying down: no fall cut-off.
     fall_angle = math.inf if config["env"]["init"].get("fallen") else lim.fall_angle_rad
     controller = PolicyController(iface, OnnxPolicy(policy_dir / "policy.onnx"), fall_angle)
+    controller.differential_filter_hz = options.wheel_differential_filter_hz
 
     from . import terrain
     leg_boxes = bool((config["env"].get("collision") or {}).get("leg_boxes", False))
@@ -391,8 +450,23 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         from . import fallen
         d.qpos[:] = fallen.tipped_qpos(spec, m, fallen_pitch)
         options.unpowered_s = 3.0
-    mujoco.mj_forward(m, d)
     qadr, dadr, act = spec.joint_qpos, spec.joint_dof, spec.joint_actuator
+    m.geom_friction[spec.tyre_geoms, 1] *= options.tyre_torsion_scale
+    gears = {}
+    if options.wheel_backlash_rad > 0.0:
+        for i, name in enumerate(JOINTS):
+            if "wheel" in name:
+                # The reflected rotor inertia moves from the wheel joint to the rotor.
+                gears[i] = Gear(float(m.dof_armature[dadr[i]]) * options.rotor_inertia_scale,
+                                options.wheel_backlash_rad,
+                                options.gear_stiffness_nm_rad, options.gear_damping_nm_s_rad)
+                m.dof_armature[dadr[i]] = 0.0
+    mujoco.mj_forward(m, d)
+    for i, gear in gears.items():
+        gear.reset(d.qpos[qadr[i]], d.qvel[dadr[i]])
+    drive_q = lambda i: gears[i].q if i in gears else d.qpos[qadr[i]]
+    drive_v = lambda i: gears[i].v if i in gears else d.qvel[dadr[i]]
+    motor_torque = np.zeros(len(JOINTS))
     sensors = [mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SENSOR, s) for s in ("imu_quat", "imu_gyro", "imu_accel")]
     sensor_of = [0, 0, 0, 0, 1, 1, 1, 2, 2, 2]
     torso, imu_site = spec.torso_body, spec.imu_site
@@ -437,9 +511,19 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         limit = (np.minimum(limits, torque_envelope.limit(heat, iface.envelope, np)) if iface.thermal
                  else limits)
         for i in range(len(JOINTS)):
-            if frames[i] is not None:
-                d.ctrl[act[i]] = iface.mit_torque(frames[i], d.qpos[qadr[i]], d.qvel[dadr[i]], limit[i])
-        heat[:] = torque_envelope.account(heat, d.ctrl[act] ** 2, m.opt.timestep, iface.envelope)
+            if i in gears:
+                if frames[i] is not None:
+                    frame, lim_i = frames[i], limit[i]
+                    law = lambda q, v, frame=frame, lim_i=lim_i: iface.mit_torque(frame, q, v, lim_i)
+                else:
+                    law = lambda q, v, held=staged[act[i]]: held
+                motor_torque[i], d.ctrl[act[i]] = gears[i].step(law, d.qpos[qadr[i]], d.qvel[dadr[i]],
+                                                                m.opt.timestep)
+            else:
+                if frames[i] is not None:
+                    d.ctrl[act[i]] = iface.mit_torque(frames[i], drive_q(i), drive_v(i), limit[i])
+                motor_torque[i] = d.ctrl[act[i]]
+        heat[:] = torque_envelope.account(heat, motor_torque ** 2, m.opt.timestep, iface.envelope)
         for a in wheel_act:
             wheel_tau[a] += wheel_blend * (d.ctrl[a] - wheel_tau[a])
             d.ctrl[a] = wheel_tau[a]
@@ -490,9 +574,10 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         last_ns, wake_ns = now_ns, now_ns + period_ns
 
         # read()
-        pos = np.array([joint_lines[i][0].update(now, d.qpos[qadr[i]]) for i in range(6)])
-        vel = np.array([joint_lines[i][1].update(now, d.qvel[dadr[i]]) for i in range(6)])
-        eff = np.array([joint_lines[i][2].update(now, d.actuator_force[act[i]]) for i in range(6)])
+        pos = np.array([joint_lines[i][0].update(now, drive_q(i)) for i in range(6)])
+        vel = np.array([joint_lines[i][1].update(now, drive_v(i)) for i in range(6)])
+        eff = np.array([joint_lines[i][2].update(now, motor_torque[i] if i in gears else d.actuator_force[act[i]])
+                        for i in range(6)])
         qs = d.sensordata[m.sensor_adr[sensors[0]]:m.sensor_adr[sensors[0]] + 4]
         gs = d.sensordata[m.sensor_adr[sensors[1]]:m.sensor_adr[sensors[1]] + 3]
         acs = d.sensordata[m.sensor_adr[sensors[2]]:m.sensor_adr[sensors[2]] + 3]
@@ -543,7 +628,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         for i in range(6):
             delayed = [fallback_lines[i][f].update(now, frames[f, i]) for f in range(5)]
             bus.push(i, now, frames[:, i].copy())
-            staged[act[i]] = iface.mit_torque(delayed, d.qpos[qadr[i]], d.qvel[dadr[i]], limits[i])
+            staged[act[i]] = iface.mit_torque(delayed, drive_q(i), drive_v(i), limits[i])
 
         if engaged_at < 0:
             engaged_at = recording_start = now

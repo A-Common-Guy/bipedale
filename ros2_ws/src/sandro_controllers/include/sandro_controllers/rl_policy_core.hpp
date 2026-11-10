@@ -77,6 +77,11 @@ struct RlPolicySettings {
   // First-order low-pass on the wheel commands sent to the drives, Hz; 0 off.
   // The observation keeps the policy's own action, as in training.
   double wheel_filter_hz{0.0};
+  // First-order low-pass on the opposed half of the two wheel commands, Hz;
+  // 0 off. The common half (balance) passes unfiltered; the opposed half
+  // drives the body's yaw, which rings at about 9 Hz on the drive trains'
+  // compliance and backlash (DESIGN.md, the 8-10 Hz yaw mode).
+  double wheel_differential_filter_hz{0.0};
   std::array<double, 6> stand_q{};
 
   LegGeometry leg_geometry{};
@@ -242,6 +247,7 @@ private:
   double height_command_m_{};
   std::array<float, 6> last_action_{};
   std::array<float, 6> applied_action_{};
+  float applied_differential_{};  // the filtered opposed half of the wheel actions
   std::array<std::array<double, 6>, 2> oscillation_high_pass_{};  // the high-passes' low-pass states
   std::array<std::array<double, 6>, 2> oscillation_low_pass_{};
   std::array<double, 6> oscillation_mean_square_{};

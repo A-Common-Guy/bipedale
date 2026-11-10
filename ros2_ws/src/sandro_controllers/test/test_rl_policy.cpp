@@ -329,6 +329,39 @@ TEST(RlPolicy, WheelFilterSmoothsOnlyTheWheelCommands) {
   EXPECT_FALSE(filtered.configure(filtered_settings, 300, &error));
 }
 
+// The yaw filter acts on the opposed half of the wheel commands only.
+TEST(RlPolicy, DifferentialWheelFilterSmoothsOnlyTheOpposedHalf) {
+  std::string error;
+  const auto s = flat_settings();
+  auto filtered_settings = s;
+  filtered_settings.wheel_differential_filter_hz = 3.0;
+  sc::RlPolicyCore plain;
+  sc::RlPolicyCore filtered;
+  ASSERT_TRUE(plain.configure(s, 300, &error)) << error;
+  ASSERT_TRUE(filtered.configure(filtered_settings, 300, &error)) << error;
+  auto turning = standing(s);
+  turning.orientation = {0.0, std::sin(0.04), 0.0, std::cos(0.04)};
+  turning.angular_velocity = {0.0, 0.0, 1.5};
+  plain.reset(turning);
+  filtered.reset(turning);
+  ASSERT_TRUE(plain.hand_over(turning));
+  ASSERT_TRUE(filtered.hand_over(turning));
+  const auto a = plain.update(turning, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  const auto b = filtered.update(turning, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  ASSERT_TRUE(a.inferred && b.inferred);
+  const double blend = 1.0 - std::exp(-2.0 * M_PI * 3.0 * 0.01);
+  const double common_a = 0.5 * (a.frame.velocity[2] + a.frame.velocity[5]);
+  const double opposed_a = 0.5 * (a.frame.velocity[2] - a.frame.velocity[5]);
+  ASSERT_GT(std::abs(opposed_a), 0.05);
+  EXPECT_NEAR(0.5 * (b.frame.velocity[2] + b.frame.velocity[5]), common_a, 1e-4);
+  EXPECT_NEAR(0.5 * (b.frame.velocity[2] - b.frame.velocity[5]), blend * opposed_a, 1e-4);
+  for (const int j : {0, 1, 3, 4}) {
+    EXPECT_DOUBLE_EQ(a.frame.position[j], b.frame.position[j]);
+  }
+  filtered_settings.wheel_differential_filter_hz = -1.0;
+  EXPECT_FALSE(filtered.configure(filtered_settings, 300, &error));
+}
+
 TEST(RlPolicy, EngagesOnlyInsideTheTrainingStartStates) {
   sc::RlPolicyCore core;
   std::string error;

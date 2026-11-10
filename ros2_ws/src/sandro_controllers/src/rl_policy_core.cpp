@@ -144,6 +144,7 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
       !(s.yaw_rad_s > 0.0) || !(s.height_max_m > s.height_min_m) ||
       (s.command_size == 4 && !(s.roll_rad > 0.0)) || !(s.leg_kp_nm_rad > 0.0) ||
       !(s.wheel_kd_nm_s_rad > 0.0) || !(s.stand_s > 0.0) || !(s.wheel_filter_hz >= 0.0) ||
+      !(s.wheel_differential_filter_hz >= 0.0) ||
       !(s.oscillation_leg_rad_s >= 0.0) || !(s.oscillation_wheel_rad_s >= 0.0) ||
       !(s.oscillation_window_s > 0.0) || !(s.hand_over_tilt_rad > 0.0) ||
       !(s.upright_tilt_rad > 0.0)) {
@@ -327,6 +328,7 @@ void RlPolicyCore::engage(const RlPolicyState &state) {
                                  settings_.height_max_m);
   last_action_.fill(0.0F);
   applied_action_.fill(0.0F);
+  applied_differential_ = 0.0F;
   build_frame(state, frame_);
   fill_history();
   reset_oscillation(state);
@@ -396,6 +398,7 @@ bool RlPolicyCore::hand_over(const RlPolicyState &state) {
   build_frame(state, frame_);
   fill_history();
   applied_action_ = last_action_;
+  applied_differential_ = 0.5F * (applied_action_[kWheels[0]] - applied_action_[kWheels[1]]);
   policy_frame_ = frames_from_action(applied_action_);
   return true;
 }
@@ -547,6 +550,16 @@ RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCo
     }
     for (const auto j : kWheels) {
       applied_action_[j] += blend * (last_action_[j] - applied_action_[j]);
+    }
+    if (s.wheel_differential_filter_hz > 0.0) {
+      const auto right = kWheels[0], left = kWheels[1];
+      const float common = 0.5F * (applied_action_[right] + applied_action_[left]);
+      const float opposed = 0.5F * (applied_action_[right] - applied_action_[left]);
+      applied_differential_ += static_cast<float>(
+          1.0 - std::exp(-2.0 * M_PI * s.wheel_differential_filter_hz * policy_dt_s_)) *
+          (opposed - applied_differential_);
+      applied_action_[right] = common + applied_differential_;
+      applied_action_[left] = common - applied_differential_;
     }
     policy_frame_ = frames_from_action(applied_action_);
   }
