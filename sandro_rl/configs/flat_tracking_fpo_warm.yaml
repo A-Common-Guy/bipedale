@@ -1,0 +1,24 @@
+# flat_tracking_fpo that trains: stage 1 of 2. The paper's settings
+# (flat_tracking_fpo.yaml) learn this task about ten times slower than PPO,
+# and faster fixed learning rates blow up (DESIGN.md section 13). Here:
+# - desired_kl: the learning rate adapts to the per-minibatch KL;
+# - loss_clamp: null: no dead zone where a blown-up policy gets no gradient;
+# - action_scale 0.25: half the starting action noise;
+# - teacher: the first 200 iterations add the flow matching loss toward the
+#   PPO policy's action on the flow policy's own states.
+# Stage 2, flat_tracking_fpo_finetune.yaml, continues with FPO alone.
+#
+#     uv run python -m sandro_rl.train configs/flat_tracking_fpo_warm.yaml --out runs/fpo_warm
+inherit: flat_tracking_fpo.yaml
+
+train:
+  iterations: 300
+  fpo:
+    learning_rate: 3.0e-4
+    clip: 0.1
+    action_scale: 0.25
+    desired_kl: 0.005
+    loss_clamp: null
+    teacher: policies/flat_tracking_ppo
+    teacher_iterations: 200
+    teacher_weight: 1.0

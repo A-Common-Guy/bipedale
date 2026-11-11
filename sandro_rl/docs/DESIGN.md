@@ -1630,7 +1630,7 @@ the pillars, the truth rather than the box footprint. Each run writes
   `step_climb` needs a height scan, or a tilted second scanner.
 - **Not exportable to ROS** (section 11, item 10).
 
-## 13. Flow policies: FPO++ (`train.algorithm: fpo`, not trained on Sandro yet)
+## 13. Flow policies: FPO++ (`train.algorithm: fpo`)
 
 `fpo.py` trains a flow-matching policy with FPO++ (Yi et al. 2026, arXiv
 2602.02481; [RESEARCH.md](RESEARCH.md) section 7) in place of the Gaussian.
@@ -1700,3 +1700,58 @@ uv run python -m sandro_rl.train configs/avoid_fpo.yaml --out runs/avoid_fpo
 The training throughput of FPO++ at 8192 worlds and its GPU memory use
 (the update evaluates the field at 8 pairs per action) are not measured. If
 memory runs out, lower `train.fpo.mc_samples` or raise `train.minibatches`.
+
+### Trained on Sandro (2026-11-10 and 11)
+
+`flat_tracking` from scratch on the 2026-11 body, PPO against FPO++ with
+the same environment, 8192 worlds. FPO++ runs at 52k environment steps per
+second against 120–160k for PPO, with 2.9 GB of GPU memory.
+
+| Run | 400 iterations: episode s / falls per 1000 steps | 1500 iterations |
+| --- | --- | --- |
+| PPO (`policies/flat_tracking_ppo`) | 20 / 0 (from iteration 100) | 20 / 0, errors 0.06 m/s, 0.06 rad/s |
+| FPO++, the paper's settings (`flat_tracking_fpo.yaml`) | 1.6 / 6.4 | 10 / 0.8; falls in every evaluation run |
+| learning rate 3e-4, clip 0.1 | 2.7 / 3.3 | |
+| the same, `action_scale` 0.25 | 4.4 / 2.3 | blew up after 450: KL to 0.028, action noise 2.2 at 850, then KL 0 for good |
+| + `desired_kl` 0.005, `loss_clamp: null` | 8.0 / 1.0 | 18 / 0.1; tracking 0.24 m/s, 0.44 rad/s |
+
+Three things held FPO++ back here:
+
+- **A fixed learning rate.** At 1e-4 the per-update KL is about 0.0002 and
+  learning crawls; at 3e-4 the steps grow until the policy blows up.
+  `desired_kl` adapts the rate as `ppo.py` does.
+- **The loss clamp.** Once both CFM losses exceed `loss_clamp` the ratio
+  is 1 and has no gradient, so the blown-up run never recovered.
+  `loss_clamp: null` removes the dead zone (the log-ratio clamp stays).
+- **Exploration noise it cannot shed.** Both start at an action noise of
+  0.5, which tips the robot within a second. PPO learns its noise down to
+  0.37 by iteration 20; the flow has to learn to contract its base
+  distribution and was still at 0.48 at iteration 100. ASPO, built to keep
+  exploration, makes it worse here: the noise grew back from 0.10 to 0.32
+  over 700 iterations and the tracking error doubled.
+
+**The recipe that trains** (`flat_tracking_fpo_warm.yaml`, then
+`flat_tracking_fpo_finetune.yaml`): the fixes above with `action_scale`
+0.25 and, for the first 200 iterations, `teacher: policies/flat_tracking_ppo`,
+the flow matching loss toward the PPO policy's action on the flow's own
+states (at a fixed learning rate). Full 20 s episodes by iteration 150, the
+noise down to 0.10, then 100 iterations of FPO++ alone; stage 2 resumes with
+`aspo: false` for 700 iterations (noise 0.07, stable). 1000 iterations,
+about 95 minutes.
+
+`policies/flat_tracking_fpo` against `policies/flat_tracking_ppo`
+(`evaluate.py --compare`, averaged over phases):
+
+| | PPO | FPO++ |
+| --- | --- | --- |
+| Pitch RMS, rad | 0.021–0.027 | 0.015–0.019 |
+| Speed error, hardware and default sequences, m/s | 0.074–0.103 | 0.079–0.092 |
+| Speed error, push scenario, m/s | 0.037–0.039 | 0.047–0.055 |
+| Yaw-rate error, rad/s | 0.007–0.048 | 0.005–0.020 |
+| Falls | none | none |
+
+It balances more steadily in every scenario, tracks speed about as well
+except under pushes, and completes the wheel-lag sweep (5–15 Hz share
+0.17–0.31 at 50–80 ms). `RlPolicyController` cannot run it yet (the
+multi-step flow, section 11 item 11). `avoid` against `avoid_fpo` is not
+trained.

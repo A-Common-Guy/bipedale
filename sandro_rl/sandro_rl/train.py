@@ -146,6 +146,9 @@ def main() -> int:
         print(f"resumed from {args.resume}")
     runner = agent.init_runner(jax.jit(reset), k_runner)
     iteration = agent.make_iteration(autoreset_step)
+    # A flow policy's warm start from a teacher (fpo.py) runs its own iteration.
+    warm_iterations = getattr(agent, "teacher_iterations", 0)
+    warm = agent.make_iteration(autoreset_step, teacher=True) if warm_iterations else None
 
     steps_per_iter = t["num_envs"] * t["steps_per_env"]
     log_path = out / "train_log.csv"
@@ -163,8 +166,9 @@ def main() -> int:
             env, agent, reset, autoreset_step, _, _ = build(stage_config, seed=config.get("seed", 0) + 1000 * (stage + 1))
             runner = agent.init_runner(jax.jit(reset), jax.random.fold_in(k_runner, stage + 1))
             iteration = agent.make_iteration(autoreset_step)
+            warm = agent.make_iteration(autoreset_step, teacher=True) if warm_iterations else None
         t0 = time.time()
-        ts, runner, summary = iteration(ts, runner)
+        ts, runner, summary = (warm if warm is not None and i <= warm_iterations else iteration)(ts, runner)
         summary = jax.device_get(summary)
         if compile_s is None:
             compile_s = time.time() - t0

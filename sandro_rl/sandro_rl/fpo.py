@@ -19,6 +19,16 @@ FPO++ changes:
     rho A - |A| (rho - 1)^2 / (2 clip) for negative ones;
   - the CFM losses clamped before the difference, the difference before exp;
   - AdamW at a fixed learning rate, no entropy bonus.
+Two options beyond the paper, both off by default: `desired_kl` adapts the
+learning rate to the KL of each minibatch as ppo.py does (a fixed rate is
+either slow or, faster, grows its steps until the policy blows up), and
+`loss_clamp: null` drops the loss clamp, which once both losses exceed it
+leaves a ratio of 1 and no gradient, so a policy that has blown up never
+recovers. `teacher` (a Gaussian checkpoint of the same task) warm-starts
+the flow: for the first `teacher_iterations` the update adds the flow
+matching loss toward the teacher's action on the states the flow policy
+itself visits (DAgger-like), weighted by `teacher_weight`; after that it is
+FPO++ alone.
 The mirror loss becomes equivariance of the field: a left-right symmetric
 policy has v(M x, tau, M obs) = M v(x, tau, obs).
 """
@@ -37,7 +47,9 @@ from .ppo import PPO, TrainState
 
 DEFAULTS = {"flow_steps": 16, "deploy_steps": 8, "mc_samples": 8, "action_scale": 0.5, "time_features": 4,
             "clip": 0.05, "learning_rate": 1.0e-4, "weight_decay": 1.0e-4, "loss_clamp": 20.0,
-            "log_ratio_clamp": 2.0, "value_clip": 0.2, "aspo": True}
+            "log_ratio_clamp": 2.0, "value_clip": 0.2, "aspo": True,
+            "desired_kl": None, "lr_min": 1.0e-5, "lr_max": 1.0e-3,
+            "teacher": None, "teacher_iterations": 0, "teacher_weight": 1.0}
 
 
 def time_embedding(tau, features: int, xp=jp):
@@ -65,6 +77,26 @@ class FlowPPO(PPO):
             optax.inject_hyperparams(optax.adamw)(learning_rate=self.f["learning_rate"], b1=0.9, b2=0.95,
                                                   weight_decay=self.f["weight_decay"]),
         )
+        self.teacher_iterations = int(self.f["teacher_iterations"]) if self.f["teacher"] else 0
+        self._teacher_on = False
+        if self.teacher_iterations:
+            from . import checkpoint
+            payload, meta = checkpoint.load(self.f["teacher"])
+            tt = meta["config"]["train"]
+            if np.asarray(payload["actor_norm"]["mean"]).size != env.actor_obs_size:
+                raise ValueError(f"teacher {self.f['teacher']} takes another observation")
+            self.teacher_net = MLP(tuple(tt["actor_hidden"]), env.n_actions, tt["activation"], out_scale=0.01)
+            self.teacher_params = jax.tree.map(jp.asarray, payload["params"]["actor"])
+            self.teacher_norm = Normalizer(**{k: jp.asarray(v) for k, v in payload["actor_norm"].items()})
+            self.teacher_clip = float(meta["config"]["env"]["action"]["clip"])
+
+    def make_iteration(self, autoreset_step, teacher: bool = False):
+        """The jitted iteration; with teacher=True the update includes the teacher loss."""
+        self._teacher_on = bool(teacher and self.teacher_iterations)
+        try:
+            return super().make_iteration(autoreset_step)
+        finally:
+            self._teacher_on = False
 
     def init(self, rng) -> TrainState:
         k1, k2 = jax.random.split(rng)
@@ -128,14 +160,16 @@ class FlowPPO(PPO):
         t = self.cfg
         f = self.f
         clip = f["clip"]
+        teacher_on = self._teacher_on
 
         def loss_fn(params, ts: TrainState, mb):
             obs_n = ts.actor_norm(mb["actor_obs"])
             x = mb["action"] / f["action_scale"]
             cfm_new, (obs, x_tau, v) = self.cfm(params, obs_n, x, mb["tau"], mb["eps"])
             clamp = f["loss_clamp"]
-            log_ratio = jp.clip(jp.minimum(mb["cfm_old"], clamp) - jp.minimum(cfm_new, clamp),
-                                -f["log_ratio_clamp"], f["log_ratio_clamp"])
+            old, new = (mb["cfm_old"], cfm_new) if clamp is None else (
+                jp.minimum(mb["cfm_old"], clamp), jp.minimum(cfm_new, clamp))
+            log_ratio = jp.clip(old - new, -f["log_ratio_clamp"], f["log_ratio_clamp"])
             ratio = jp.exp(log_ratio)                                    # [B, N]
             adv = mb["adv"]
             adv = ((adv - adv.mean()) / (adv.std() + 1e-8))[:, None]
@@ -144,6 +178,12 @@ class FlowPPO(PPO):
             surrogate = -jp.mean(jp.where(adv >= 0, ppo, spo) if f["aspo"] else ppo)
             value_loss = self.value_loss(params, ts, mb, f["value_clip"])
             loss = surrogate + t["value_coef"] * value_loss
+            teacher_loss = jp.float32(0.0)
+            if teacher_on:
+                target = jp.clip(self.teacher_net.apply(self.teacher_params, self.teacher_norm(mb["actor_obs"])),
+                                 -self.teacher_clip, self.teacher_clip) / f["action_scale"]
+                teacher_loss = jp.mean(self.cfm(params, obs_n, target, mb["tau"], mb["eps"])[0])
+                loss = loss + f["teacher_weight"] * teacher_loss
             sym = jp.float32(0.0)
             if t.get("symmetry_coef", 0.0) > 0:
                 obs_m = ts.actor_norm(env.mirror_actor_obs(mb["actor_obs"]))
@@ -155,7 +195,7 @@ class FlowPPO(PPO):
             kl = jp.mean(ratio - 1.0 - log_ratio)
             clipped = jp.mean((jp.abs(ratio - 1.0) > clip).astype(jp.float32))
             return loss, {"surrogate": surrogate, "value_loss": value_loss, "entropy": jp.float32(0.0),
-                          "symmetry": sym, "kl": kl, "clip_fraction": clipped}
+                          "symmetry": sym, "kl": kl, "clip_fraction": clipped, "teacher_loss": teacher_loss}
 
         def update(ts: TrainState, batch, adv, ret, rng):
             n = adv.size
@@ -169,8 +209,20 @@ class FlowPPO(PPO):
                 def minibatch(ts, idx):
                     mb = jax.tree.map(lambda x: x[idx], flat)
                     (_, info), grads = jax.value_and_grad(loss_fn, has_aux=True)(ts.params, ts, mb)
-                    updates, opt_state = self.optimizer.update(grads, ts.opt_state, ts.params)
-                    return ts.replace(params=optax.apply_updates(ts.params, updates), opt_state=opt_state), info
+                    lr, opt_state = ts.learning_rate, ts.opt_state
+                    if f["desired_kl"] and not teacher_on:
+                        # The teacher loss moves the policy on purpose: the
+                        # warm start keeps the fixed rate.
+                        kl = f["desired_kl"]
+                        lr = jp.where(info["kl"] > 2.0 * kl, jp.maximum(f["lr_min"], lr / 1.5), lr)
+                        lr = jp.where(info["kl"] < 0.5 * kl, jp.minimum(f["lr_max"], lr * 1.5), lr)
+                        opt_state[1].hyperparams["learning_rate"] = lr
+                    elif teacher_on:
+                        lr = jp.float32(f["learning_rate"])
+                        opt_state[1].hyperparams["learning_rate"] = lr
+                    updates, opt_state = self.optimizer.update(grads, opt_state, ts.params)
+                    return ts.replace(params=optax.apply_updates(ts.params, updates), opt_state=opt_state,
+                                      learning_rate=lr), info
 
                 return jax.lax.scan(minibatch, ts, perm)
 

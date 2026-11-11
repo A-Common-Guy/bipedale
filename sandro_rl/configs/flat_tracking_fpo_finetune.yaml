@@ -1,0 +1,17 @@
+# flat_tracking_fpo, stage 2 of 2 (stage 1: flat_tracking_fpo_warm.yaml): FPO
+# alone from the warm-started flow, without ASPO. With ASPO (the paper's
+# entropy-preserving surrogate) the action noise grew back from 0.10 to 0.32
+# in 700 iterations and the tracking error doubled; with the plain clip it
+# shrinks to 0.07 and holds (DESIGN.md section 13).
+#
+#     uv run python -m sandro_rl.train configs/flat_tracking_fpo_finetune.yaml --resume runs/fpo_warm \
+#         --out policies/flat_tracking_fpo
+inherit: flat_tracking_fpo_warm.yaml
+
+train:
+  iterations: 700
+  fpo:
+    learning_rate: 1.0e-4
+    teacher: null
+    teacher_iterations: 0
+    aspo: false

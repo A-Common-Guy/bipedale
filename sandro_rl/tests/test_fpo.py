@@ -136,3 +136,34 @@ def test_exported_flow_matches_the_policy(tmp_path):
     assert np.max(np.abs(want)) > 0.05, "the test flow barely moves the action"
     np.testing.assert_allclose(got, want, atol=1e-5)
     np.testing.assert_allclose(jax_action, want, atol=1e-5)
+
+
+def test_teacher_warm_start_pulls_the_flow_to_the_teacher(tmp_path):
+    """A Gaussian PPO teacher of the bandit, then 30 FPO iterations with and
+    without its warm start."""
+    from sandro_rl import checkpoint
+    from sandro_rl.ppo import PPO
+
+    env, _, _, _ = _agent()
+    config = {"env": {"action": {"clip": 1.0}},
+              "train": {"actor_hidden": [64, 64], "critic_hidden": [64, 64], "activation": "elu",
+                        "max_grad_norm": 1.0, "gamma": 0.99, "lam": 0.95, "value_coef": 1.0, "steps_per_env": 4,
+                        "epochs": 4, "minibatches": 4, "symmetry_coef": 0.0, "learning_rate": 1e-3,
+                        "desired_kl": 0.01, "clip": 0.2, "entropy_coef": 0.0, "init_log_std": -0.7}}
+    ppo = PPO(env, config)
+    ts = ppo.init(jax.random.key(3))
+    runner = ppo.init_runner(lambda key: env.state(key), jax.random.key(4))
+    iteration = ppo.make_iteration(env.autoreset_step)
+    for _ in range(150):
+        ts, runner, _ = iteration(ts, runner)
+    checkpoint.save(tmp_path, ts, config, {})
+
+    errors = {}
+    for teacher in (None, str(tmp_path)):
+        env, agent, ts, runner = _agent(teacher=teacher, teacher_iterations=30, teacher_weight=1.0)
+        warm = agent.make_iteration(env.autoreset_step, teacher=True)
+        for _ in range(30):
+            ts, runner, summary = warm(ts, runner)
+        errors[teacher is not None] = _error(env, agent, ts)
+    assert float(summary["teacher_loss"]) > 0.0
+    assert errors[True] < 0.3 * errors[False], errors
