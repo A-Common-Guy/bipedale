@@ -280,17 +280,6 @@ def signals(joints, gyro, t0, t1):
     return grid, torque, yaw, rolling, legs
 
 
-def mode(a1, a2):
-    """Natural frequency (Hz) and damping ratio of z^2 - a1 z - a2 sampled at FS."""
-    import numpy as np
-    roots = np.roots([1.0, -a1, -a2])
-    z = roots[np.argmax(np.abs(roots.imag))]
-    if abs(z.imag) < 1e-9:
-        return math.nan, math.nan
-    s = np.log(z) * FS
-    return abs(s) / (2 * math.pi), -s.real / abs(s)
-
-
 def free_decay_mode(windows):
     """The dominant damped oscillation common to free-decay windows: f (Hz) and zeta.
 
@@ -311,12 +300,27 @@ def free_decay_mode(windows):
     return abs(s) / (2 * math.pi), -s.real / abs(s)
 
 
-def forced_mode(u, y):
-    """ARX(2, 2) from the input u to the output y: the dominant mode's f and zeta."""
+def yaw_model_fit(f, h, weight):
+    """Fit H = k e^(-s tau) / s * wn^2 / (s^2 + 2 zeta wn s + wn^2) to a measured response.
+
+    A rigid yaw inertia (1/s) behind one compliance resonance, as the 2026-11-12
+    chirps look: (fn Hz, zeta, tau s, k, relative error).
+    """
     import numpy as np
-    regressors = np.column_stack([y[1:-1], y[:-2], u[2:], u[1:-1], u[:-2]])
-    coef = np.linalg.lstsq(regressors, y[2:], rcond=None)[0]
-    return mode(coef[0], coef[1])
+    jw = 2j * np.pi * f
+    zetas = np.arange(0.05, 0.9, 0.01)[:, None]
+    best = None
+    for fn in np.arange(5.0, 20.01, 0.1):
+        wn = 2 * np.pi * fn
+        resonance = wn ** 2 / (jw ** 2 + 2 * zetas * wn * jw + wn ** 2)
+        for tau in np.arange(0.0, 0.0155, 0.001):
+            shape = np.exp(-jw * tau) / jw * resonance
+            k = np.real(np.sum(weight * np.conj(shape) * h, axis=1)) / np.sum(weight * abs(shape) ** 2, axis=1)
+            err = np.sum(weight * abs(h - k[:, None] * shape) ** 2, axis=1) / np.sum(weight * abs(h) ** 2)
+            i = int(np.argmin(err))
+            if best is None or err[i] < best[4]:
+                best = (fn, float(zetas[i, 0]), tau, float(k[i]), float(err[i]))
+    return best
 
 
 def response(u, y, segment=1024):
@@ -354,30 +358,25 @@ def analyse(directory):
         elif event["kind"] == "chirp":
             t0 = event["t"]
             _, torque, yaw, rolling, legs = signals(joints, gyro, t0, t0 + event["duration_s"])
-            arx_hz, arx_zeta = forced_mode(band(torque, 3.0, 30.0), band(yaw, 3.0, 30.0))
             freq, h_yaw, coherence = response(torque, yaw)
             _, h_roll, _ = response(torque, rolling)
             _, h_legs, _ = response(torque, legs)
-            sel = (freq >= 4.0) & (freq <= 20.0)
-            i = np.flatnonzero(sel)[np.argmax(abs(h_yaw[sel]))]
-            half = abs(h_yaw[i]) / math.sqrt(2)
-            lo = i
-            while lo > 0 and abs(h_yaw[lo]) > half:
-                lo -= 1
-            hi = i
-            while hi < len(freq) - 1 and abs(h_yaw[hi]) > half:
-                hi += 1
+            sel = (freq >= 2.5) & (freq <= 22.0) & np.isfinite(h_yaw)
+            fn, zeta, tau, k, err = yaw_model_fit(freq[sel], h_yaw[sel], coherence[sel])
+            i = int(np.argmin(abs(freq - fn)))
+            lever = TRACK / (2 * RADIUS)
+            inertia = 2 * lever / k            # per-wheel torque, both wheels
             row = next((r for r in reversed(rows) if r["kp"] == event["kp"] and "chirp_hz" not in r), None)
             if row is None:
                 row = {"kp": event["kp"]}
                 rows.append(row)
-            row.update(chirp_hz=arx_hz, chirp_zeta=arx_zeta, peak_hz=freq[i],
-                       peak_zeta=(freq[hi] - freq[lo]) / (2 * freq[i]),
-                       coherence=coherence[i], gain_rad_s_per_nm=abs(h_yaw[i]),
+            row.update(chirp_hz=fn, chirp_zeta=zeta, delay_ms=tau * 1000, fit_error=err,
+                       coherence=coherence[i], yaw_inertia_kgm2=inertia,
+                       wheel_stiffness_nm_rad=inertia * (2 * math.pi * fn) ** 2 / (2 * lever ** 2),
                        legs_share=abs(h_legs[i] / h_yaw[i]), rolling_share=abs(h_roll[i] / h_yaw[i]))
     reference = next((r for r in rows if r["kp"] == 12.0), rows[0] if rows else None)
-    print(f"{'kp':>5} {'pulse Hz':>8} {'zeta':>5} {'chirp Hz':>8} {'zeta':>5} {'coh':>4} "
-          f"{'rad/s/Nm':>8} {'legs':>5} {'roll':>5} {'f/f12':>6} {'all legs':>8} {'half':>6} {'legs PD share':>13}")
+    print(f"{'kp':>5} {'ring Hz':>8} {'zeta':>5} {'mode Hz':>8} {'zeta':>5} {'coh':>4} "
+          f"{'N m/rad':>8} {'legs':>5} {'roll':>5} {'f/f12':>6} {'all legs':>8} {'half':>6} {'legs PD share':>13}")
     # The chirp's fit is the precise one (the pulses scatter about 1.5 % at zeta 0.3).
     best = lambda r: r.get("chirp_hz", math.nan) if not math.isnan(r.get("chirp_hz", math.nan)) \
         else r.get("pulse_hz", math.nan)
@@ -390,12 +389,14 @@ def analyse(directory):
         share = ((1 / ratio ** 2 - 1) / (12.0 / r["kp"] - 1)) if r["kp"] != 12.0 and ratio == ratio else math.nan
         print(f"{r['kp']:5g} {r.get('pulse_hz', math.nan):8.2f} {r.get('pulse_zeta', math.nan):5.2f} "
               f"{r.get('chirp_hz', math.nan):8.2f} {r.get('chirp_zeta', math.nan):5.2f} "
-              f"{r.get('coherence', math.nan):4.2f} {r.get('gain_rad_s_per_nm', math.nan):8.2f} "
+              f"{r.get('coherence', math.nan):4.2f} {r.get('wheel_stiffness_nm_rad', math.nan):8.0f} "
               f"{r.get('legs_share', math.nan):5.2f} {r.get('rolling_share', math.nan):5.2f} "
               f"{ratio:6.3f} {all_legs:8.3f} {half:6.3f} {share:13.2f}")
-    print("f/f12: the frequency against kp 12; 'all legs' and 'half' what it would be if the leg PD held\n"
-          "all or half of the yaw compliance; legs PD share: the share these numbers give. legs, roll:\n"
-          "the legs' fore-aft yaw and the wheels' rolling against the gyro at the peak.")
+    print("ring: the pulses' free decay (under the WBC mostly its own yaw loop). mode: the chirp fitted\n"
+          "as yaw inertia behind one resonance; N m/rad its stiffness per wheel at the axle. f/f12: the\n"
+          "mode against kp 12; 'all legs' and 'half' what it would be if the leg PD held all or half of\n"
+          "the yaw compliance; legs PD share: the share these numbers give. legs, roll: the legs'\n"
+          "fore-aft yaw and the wheels' rolling against the gyro at the mode.")
     (directory / "summary.json").write_text(json.dumps(rows, indent=1, default=float))
 
 

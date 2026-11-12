@@ -1,0 +1,125 @@
+{
+ "args": {
+  "kp": [
+   12.0,
+   9.0,
+   16.0,
+   12.0
+  ],
+  "pulses": 6,
+  "pulse_nm": 0.25,
+  "pulse_s": 0.03,
+  "period": 1.5,
+  "chirp_s": 20.0,
+  "chirp_nm": 0.2,
+  "f0": 2.0,
+  "f1": 25.0,
+  "settle": 3.0,
+  "out": "/workspaces/sandro/experiments/sysid_20261112-225514",
+  "yes": false,
+  "analyse": null
+ },
+ "events": [
+  {
+   "kp": 12.0,
+   "kind": "start",
+   "t": 1794524126.7399514
+  },
+  {
+   "kp": 12.0,
+   "kind": "kp",
+   "t": 1794524126.752481
+  },
+  {
+   "kp": 12.0,
+   "amplitude_nm": 0.25,
+   "pulse_s": 0.03,
+   "period_s": 1.5,
+   "count": 6,
+   "kind": "pulses",
+   "t": 1794524129.8223739
+  },
+  {
+   "kp": 12.0,
+   "amplitude_nm": 0.2,
+   "f0_hz": 2.0,
+   "f1_hz": 25.0,
+   "duration_s": 20.0,
+   "kind": "chirp",
+   "t": 1794524139.905291
+  },
+  {
+   "kp": 9.0,
+   "kind": "kp",
+   "t": 1794524160.9790435
+  },
+  {
+   "kp": 9.0,
+   "amplitude_nm": 0.25,
+   "pulse_s": 0.03,
+   "period_s": 1.5,
+   "count": 6,
+   "kind": "pulses",
+   "t": 1794524164.041685
+  },
+  {
+   "kp": 9.0,
+   "amplitude_nm": 0.2,
+   "f0_hz": 2.0,
+   "f1_hz": 25.0,
+   "duration_s": 20.0,
+   "kind": "chirp",
+   "t": 1794524174.9951174
+  },
+  {
+   "kp": 16.0,
+   "kind": "kp",
+   "t": 1794524196.0660427
+  },
+  {
+   "kp": 16.0,
+   "amplitude_nm": 0.25,
+   "pulse_s": 0.03,
+   "period_s": 1.5,
+   "count": 6,
+   "kind": "pulses",
+   "t": 1794524199.129
+  },
+  {
+   "kp": 16.0,
+   "amplitude_nm": 0.2,
+   "f0_hz": 2.0,
+   "f1_hz": 25.0,
+   "duration_s": 20.0,
+   "kind": "chirp",
+   "t": 1794524209.266827
+  },
+  {
+   "kp": 12.0,
+   "kind": "kp",
+   "t": 1794524230.3463202
+  },
+  {
+   "kp": 12.0,
+   "amplitude_nm": 0.25,
+   "pulse_s": 0.03,
+   "period_s": 1.5,
+   "count": 6,
+   "kind": "pulses",
+   "t": 1794524233.4119914
+  },
+  {
+   "kp": 12.0,
+   "amplitude_nm": 0.2,
+   "f0_hz": 2.0,
+   "f1_hz": 25.0,
+   "duration_s": 20.0,
+   "kind": "chirp",
+   "t": 1794524243.4997218
+  },
+  {
+   "kind": "done",
+   "t": 1794524264.562877
+  }
+ ]
+}

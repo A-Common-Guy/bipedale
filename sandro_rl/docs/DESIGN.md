@@ -1341,20 +1341,43 @@ structure does not ring by itself, the policies feed it. With
 unstable and slow (0.65–0.75 rad/s of 5–15 Hz common wheel motion, a 3 Hz yaw
 wobble), `agile_terrain` stays quick and is the best to drive.
 
-`recordings/yaw_closure.py` fits the gyro's 5–15 Hz yaw rate with the
-rotors' rolling yaw and the axle line turning under the body (both legs'
-fore-aft motion from the leg encoders). At full strength the gyro follows
-the legs' term in phase at twice its size (b = 2.0, R² 0.91 alone, 0.92
-with rolling, which adds nothing: a = −0.2). Springs in series deflect in
-phase, so about half the yaw compliance is the legs' fore-aft stiffness as
-their encoders see it (the drive-side PD, kp 12 / kd 0.5) and the other half
-sits in series where no encoder sees it: play or wind-up in the leg gears,
-the wheel gears, the tyres. That agrees with the 0.9 mm of leg motion above,
-and the drivetrain training put all of the compliance in the wheel gears.
-Next: the yaw ringing frequency under the WBC at leg kp 8 / 12 / 18 (all
-compliance in the leg PD: −18 / +22 %; half of it: −11 / +10 %; none: 0),
-and `drive_train_test.py` on a leg motor with its axle clamped, on a wheel
-with its rim blocked, and on the ground.
+`recordings/yaw_closure.py` fits the gyro's 5–15 Hz yaw rate in the
+policies' runs with the rotors' rolling yaw and the axle line turning under
+the body (both legs' fore-aft motion). At full strength the gyro follows the
+legs' term in phase at twice its size (b = 2.0, R² 0.91), which first read
+as half the compliance in the legs' drive PD. The controlled measurement
+below refutes that: in those runs the policy drives the legs too.
+
+**Identified under the WBC (2026-11-12, `recordings/sysid_2026-11-12/`).**
+`deploy/pi/pi sysid` (`sandro_bringup/tools/sysid_yaw.py`, the WBC's
+`sysid.*` excitation) swept the differential wheel torque 2–25 Hz at
+0.2 Nm per wheel at leg drive kp 12, 9, 16 and 12 again (coherence
+0.9–0.99). Fitted as a yaw inertia behind one resonance, from the measured
+wheel torque to the gyro:
+
+| leg kp | resonance | zeta | yaw inertia | stiffness per wheel at the axle |
+| --- | --- | --- | --- | --- |
+| 12 | 12.2 Hz | 0.24 | 0.127 kg m² | 73 Nm/rad |
+| 9 | 12.4 Hz | 0.24 | 0.131 kg m² | 77 Nm/rad |
+| 16 | 12.5 Hz | 0.23 | 0.127 kg m² | 76 Nm/rad |
+| 12 | 12.4 Hz | 0.24 | 0.123 kg m² | 73 Nm/rad |
+
+- The legs' drive stiffness does not set the mode: −25 % and +33 % move
+  it by under 3 % and not in the predicted direction (all of the
+  compliance in the leg PD: −13 / +15 %). The legs swing at 0.6 of the
+  body's yaw at 12 Hz, driven, not as the spring.
+- Above the resonance the rotors' rolling is 1.7–2.5× the body's yaw and in
+  antiphase: the spring is between the rotors and the ground, the wheel
+  gears and the tyres, about 750 Nm/rad of yaw (75 per wheel).
+- The yaw inertia is 35 % above the model's 0.093 kg m².
+- Measured phase (gyro against wheel torque): −85° at 5 Hz, −111° at 7,
+  −137° at 9, −155° at 10, −185° at 12, −213° at 14 Hz. The policies ring
+  at 8.8–9.4 Hz, where the plant already lags 135–155°.
+- The pulses' free decay rings at 4–5 Hz: the WBC's own yaw loop.
+
+Next: the simulation's response to the same chirp against this table
+(`evaluate.Gear` at 75 Nm/rad, inertia 0.127), and `drive_train_test.py` on
+a wheel with its rim blocked and on the ground to split gear from tyre.
 
 ## 9. Deployment sketch (not executed; the owner's decision)
 
