@@ -1375,9 +1375,21 @@ wheel torque to the gyro:
   at 8.8–9.4 Hz, where the plant already lags 135–155°.
 - The pulses' free decay rings at 4–5 Hz: the WBC's own yaw loop.
 
+Amplitude (kp 12, chirps of 0.1, 0.2 and 0.4 Nm per wheel, the last near
+the policies' torque: rotor travel 11–14 mrad, yaw rate 0.5 rad/s): the
+resonance stays at 12.7 Hz and the gain within 5–10 % from 0.2 to 0.4 Nm,
+so no gear-play dead zone shows in this range (small, or held to one side).
+What grows with amplitude is the damping (zeta 0.24 → 0.30, 10–15° more
+lag from 5 to 16 Hz: −149° against −137° at 9 Hz) and the legs' share of
+the motion (0.30 → 0.51 of the body's yaw at 9 Hz): friction-like, the tyres
+starting to scrub, not a softer spring. At 0.1 Nm the WBC's wheel friction
+feed-forward (0.12 Nm, switching with the torque's sign) is as large as the
+chirp and the coherence falls to 0.5–0.9: not usable.
+
 Next: the simulation's response to the same chirp against this table
-(`evaluate.Gear` at 75 Nm/rad, inertia 0.127), and `drive_train_test.py` on
-a wheel with its rim blocked and on the ground to split gear from tyre.
+(`evaluate.Gear` at 75 Nm/rad, inertia 0.127, damping rising with
+amplitude), and `drive_train_test.py` on a wheel with its rim blocked and on
+the ground to split gear from tyre.
 
 ## 9. Deployment sketch (not executed; the owner's decision)
 

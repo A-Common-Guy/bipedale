@@ -1,0 +1,18 @@
+[WARN] [ros2bag]: Positional "topics" argument deprecated. Please use optional "--topics" argument instead.
+[INFO] [1794525333.929266606] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1794525333.929279606] [rosbag2_recorder]: Event publisher thread: Started
+[INFO] [1794525333.969063986] [rosbag2_recorder]: Starting recording to '/workspaces/sandro/experiments/sysid_20261112-231529/bag'
+[INFO] [1794525333.989893031] [rosbag2_recorder]: Subscribed to topic '/joint_states'
+[INFO] [1794525333.994420264] [rosbag2_recorder]: Subscribed to topic '/imu_broadcaster/imu'
+[INFO] [1794525334.007894444] [rosbag2_recorder]: Subscribed to topic '/health_broadcaster/dynamic_joint_states'
+[INFO] [1794525334.013907798] [rosbag2_recorder]: Subscribed to topic '/diagnostics'
+[INFO] [1794525334.016804392] [rosbag2_recorder]: Subscribed to topic '/whole_body_controller/diagnostics'
+[INFO] [1794525334.028949396] [rosbag2_recorder]: Subscribed to topic '/cmd_vel'
+[INFO] [1794525334.029456485] [rosbag2_recorder]: Listening for topics...
+[INFO] [1794525334.029560077] [rosbag2_recorder]: Recording...
+[INFO] [1794525334.029488596] [rosbag2_recorder]: Topics discovery started.
+[INFO] [1794525401.809926187] [rosbag2_recorder]: Topics discovery stopped.
+[INFO] [1794525401.811695029] [rosbag2_recorder]: Pausing recording.
+[INFO] [1794525401.811859231] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[INFO] [1794525401.843421975] [rosbag2_recorder]: Recording stopped
+[INFO] [1794525401.846495161] [rosbag2_recorder]: Event publisher thread: Exited

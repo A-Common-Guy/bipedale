@@ -1,0 +1,66 @@
+{
+ "args": {
+  "kp": [
+   12.0
+  ],
+  "pulses": 0,
+  "pulse_nm": 0.25,
+  "pulse_s": 0.03,
+  "period": 1.5,
+  "chirp_s": 20.0,
+  "chirp_nm": [
+   0.1,
+   0.2,
+   0.4
+  ],
+  "f0": 2.0,
+  "f1": 25.0,
+  "settle": 3.0,
+  "out": "/workspaces/sandro/experiments/sysid_20261112-231529",
+  "yes": false,
+  "analyse": null
+ },
+ "events": [
+  {
+   "kp": 12.0,
+   "kind": "start",
+   "t": 1794525335.3701897
+  },
+  {
+   "kp": 12.0,
+   "kind": "kp",
+   "t": 1794525335.3925648
+  },
+  {
+   "kp": 12.0,
+   "amplitude_nm": 0.1,
+   "f0_hz": 2.0,
+   "f1_hz": 25.0,
+   "duration_s": 20.0,
+   "kind": "chirp",
+   "t": 1794525338.4617274
+  },
+  {
+   "kp": 12.0,
+   "amplitude_nm": 0.2,
+   "f0_hz": 2.0,
+   "f1_hz": 25.0,
+   "duration_s": 20.0,
+   "kind": "chirp",
+   "t": 1794525359.5786338
+  },
+  {
+   "kp": 12.0,
+   "amplitude_nm": 0.4,
+   "f0_hz": 2.0,
+   "f1_hz": 25.0,
+   "duration_s": 20.0,
+   "kind": "chirp",
+   "t": 1794525380.6928008
+  },
+  {
+   "kind": "done",
+   "t": 1794525401.7626483
+  }
+ ]
+}

@@ -1,0 +1,41 @@
+[
+ {
+  "kp": 12.0,
+  "chirp_nm": 0.1,
+  "chirp_hz": 12.699999999999973,
+  "chirp_zeta": 0.23000000000000004,
+  "delay_ms": 0.0,
+  "fit_error": 0.1949649340820378,
+  "coherence": 0.6828212956768112,
+  "yaw_inertia_kgm2": 0.1543938317295256,
+  "wheel_stiffness_nm_rad": 96.07679315811188,
+  "legs_share": 0.3877978749508529,
+  "rolling_share": 1.29165766230765
+ },
+ {
+  "kp": 12.0,
+  "chirp_nm": 0.2,
+  "chirp_hz": 12.699999999999973,
+  "chirp_zeta": 0.24000000000000005,
+  "delay_ms": 0.0,
+  "fit_error": 0.15809508622532373,
+  "coherence": 0.9445254317706877,
+  "yaw_inertia_kgm2": 0.12371386911979453,
+  "wheel_stiffness_nm_rad": 76.98514688744001,
+  "legs_share": 0.6212728528906479,
+  "rolling_share": 1.2005377981901348
+ },
+ {
+  "kp": 12.0,
+  "chirp_nm": 0.4,
+  "chirp_hz": 12.699999999999973,
+  "chirp_zeta": 0.30000000000000004,
+  "delay_ms": 2.0,
+  "fit_error": 0.07802958050037336,
+  "coherence": 0.9771357513000956,
+  "yaw_inertia_kgm2": 0.1061731861115345,
+  "wheel_stiffness_nm_rad": 66.06986255024633,
+  "legs_share": 0.8509746635071849,
+  "rolling_share": 1.1992421192379903
+ }
+]
