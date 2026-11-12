@@ -58,6 +58,10 @@ bool finite_all(const WholeBodyParameters &p) {
       p.yaw_scrub_ff_smoothing_rad_s,
       p.yaw_torque_limit_nm,
       p.yaw_torque_rate_nm_s,     p.yaw_torque_sign,
+      p.sysid_mode,               p.sysid_amplitude_nm,
+      p.sysid_f0_hz,              p.sysid_f1_hz,
+      p.sysid_duration_s,         p.sysid_pulse_s,
+      p.sysid_period_s,           p.sysid_trigger,
       p.leg_fallback_damping_nm_s_rad,
       p.leg_torque_limit_nm,      p.wheel_torque_limit_nm,
       p.max_forward_velocity_m_s, p.max_yaw_rate_rad_s,
@@ -249,6 +253,13 @@ bool valid_whole_body_parameters(const WholeBodyParameters &p,
   if (p.yaw_scrub_ff_nm > p.yaw_torque_limit_nm) {
     return fail(reason, "yaw scrub feed-forward must stay within the yaw torque limit");
   }
+  if ((p.sysid_mode != 0.0 && p.sysid_mode != 1.0 && p.sysid_mode != 2.0) ||
+      p.sysid_amplitude_nm < 0.0 || p.sysid_amplitude_nm > 1.0 ||
+      !(p.sysid_f0_hz > 0.0 && p.sysid_f0_hz < p.sysid_f1_hz && p.sysid_f1_hz <= 60.0) ||
+      !(p.sysid_duration_s > 0.0 && p.sysid_duration_s <= 120.0) ||
+      !(p.sysid_pulse_s > 0.0 && p.sysid_pulse_s < p.sysid_period_s)) {
+    return fail(reason, "sysid: mode 0, 1 or 2, amplitude 0..1 Nm, 0 < f0 < f1 <= 60 Hz, duration 0..120 s, 0 < pulse < period");
+  }
   if (p.leg_torque_limit_nm <= 0.0 || p.wheel_torque_limit_nm <= 0.0) {
     return fail(reason, "torque limits must be > 0");
   }
@@ -347,9 +358,33 @@ bool build_whole_body_settings(const WholeBodyParameters &p,
   return true;
 }
 
+double sysid_excitation_nm(const WholeBodyParameters &p, const double t) {
+  if (t < 0.0 || t > p.sysid_duration_s) {
+    return 0.0;
+  }
+  if (p.sysid_mode == 1.0) {
+    const double n = std::floor(t / p.sysid_period_s);
+    if (t - n * p.sysid_period_s >= p.sysid_pulse_s) {
+      return 0.0;
+    }
+    return std::fmod(n, 2.0) == 0.0 ? p.sysid_amplitude_nm : -p.sysid_amplitude_nm;
+  }
+  if (p.sysid_mode == 2.0) {
+    constexpr double kTaperS = 0.5;
+    const double rate = (p.sysid_f1_hz - p.sysid_f0_hz) / p.sysid_duration_s;
+    const double phase = 2.0 * kPi * (p.sysid_f0_hz * t + 0.5 * rate * t * t);
+    const double edge = std::clamp(std::min(t, p.sysid_duration_s - t) / kTaperS, 0.0, 1.0);
+    return p.sysid_amplitude_nm * 0.5 * (1.0 - std::cos(kPi * edge)) * std::sin(phase);
+  }
+  return 0.0;
+}
+
 void WholeBodyCore::reset(const WholeBodyState &state,
                           const WholeBodySettings &settings) {
   const auto &p = settings.parameters;
+  // Only a trigger change after activation starts a run.
+  sysid_trigger_ = p.sysid_trigger;
+  sysid_time_s_ = -1.0;
   elapsed_s_ = 0.0;
   ramp_elapsed_s_ = 0.0;
   engaged_ = false;
@@ -825,9 +860,25 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
   // Balance keeps priority over yaw inside the per-wheel budget.
   const double available =
       std::max(0.0, p.wheel_torque_limit_nm - 0.5 * std::abs(balance_torque_nm_));
+  if (p.sysid_trigger != sysid_trigger_) {
+    sysid_trigger_ = p.sysid_trigger;
+    sysid_time_s_ = p.sysid_mode != 0.0 ? 0.0 : -1.0;
+  }
+  double excitation = 0.0;
+  if (sysid_time_s_ >= 0.0) {
+    if (!balance_active || !engaged_ || sysid_time_s_ > p.sysid_duration_s) {
+      sysid_time_s_ = -1.0;
+    } else {
+      excitation = sysid_excitation_nm(p, sysid_time_s_);
+      sysid_time_s_ += dt;
+    }
+  }
+  out.sysid_torque_nm = excitation;
+  out.sysid_active = sysid_time_s_ >= 0.0;
+  const double requested = yaw_torque_nm_ + 2.0 * excitation;
   const double differential =
-      std::clamp(yaw_torque_nm_, -2.0 * available, 2.0 * available);
-  if (differential != yaw_torque_nm_) {
+      std::clamp(requested, -2.0 * available, 2.0 * available);
+  if (differential != requested) {
     out.status |= WBC_WHEEL_TORQUE_LIMIT;
   }
   out.yaw_torque_nm = differential;

@@ -222,6 +222,20 @@ struct WholeBodyParameters {
   double yaw_torque_limit_nm{1.5};
   double yaw_torque_rate_nm_s{20.0};
   double yaw_torque_sign{1.0};
+  // System identification, off unless sysid_mode is set: a differential wheel
+  // torque of +-sysid_amplitude_nm per wheel on top of the yaw task while
+  // balancing. Mode 1: pulses of sysid_pulse_s every sysid_period_s with
+  // alternating sign, a tap on the yaw mode. Mode 2: a linear chirp from
+  // sysid_f0_hz to sysid_f1_hz with 0.5 s tapers. A run starts each time
+  // sysid_trigger changes, lasts sysid_duration_s, and ends on a disengage.
+  double sysid_mode{0.0};
+  double sysid_amplitude_nm{0.3};
+  double sysid_f0_hz{2.0};
+  double sysid_f1_hz{20.0};
+  double sysid_duration_s{20.0};
+  double sysid_pulse_s{0.03};
+  double sysid_period_s{1.5};
+  double sysid_trigger{0.0};
   // Joint damping applied to a leg whose kinematics cannot be evaluated.
   double leg_fallback_damping_nm_s_rad{0.2};
 
@@ -314,6 +328,9 @@ struct WholeBodySettings {
 bool valid_whole_body_parameters(const WholeBodyParameters &parameters,
                                  std::string *reason = nullptr);
 
+// The system-identification torque per wheel, t seconds into a run.
+double sysid_excitation_nm(const WholeBodyParameters &parameters, double t);
+
 // Validates, solves the Riccati equation at every table height and checks
 // the delay margin of each solution.
 bool build_whole_body_settings(const WholeBodyParameters &parameters,
@@ -364,6 +381,9 @@ struct WholeBodyOutput {
   double leg_offset_rate_m_s{};
   double yaw_torque_nm{};
   double yaw_feedforward_nm{};
+  // System-identification torque per wheel (right +, left -), in yaw_torque_nm.
+  double sysid_torque_nm{};
+  bool sysid_active{};
   // Per leg [inner, outer]: joint torque fed forward for the wheel torque's
   // reaction on the leg.
   std::array<std::array<double, 2>, 2> leg_reaction_torque_nm{};
@@ -407,6 +427,8 @@ private:
   std::array<Point2, 2> filtered_leg_velocity_m_s_{};
   std::array<bool, 2> have_filtered_leg_velocity_{};
   std::array<double, 2> filtered_wheel_torque_nm_{};
+  double sysid_trigger_{};
+  double sysid_time_s_{-1.0};  // into the current run; negative when none runs
 };
 
 } // namespace sandro_controllers

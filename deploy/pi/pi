@@ -7,6 +7,7 @@
 #   deploy/pi/pi launch [args]    sync + build + launch the real-hardware stack
 #   deploy/pi/pi push [branch]    the current commit into the robot's repository (panel: Software)
 #   deploy/pi/pi deploy [branch]  push, then the panel writes, builds and restarts on it
+#   deploy/pi/pi sysid [args]     yaw-mode identification with the WBC balancing (tools/sysid_yaw.py)
 #   deploy/pi/pi shell [cmd...]   shell (or one command) inside the robot container
 #   deploy/pi/pi can [args]       candump on can0 (default: all frames, timestamped)
 #   deploy/pi/pi gui [restart|log] the control panel on http://<pi>:8080 (sandro_gui)
@@ -314,6 +315,13 @@ cmd_launch() {
   in_container -t "ros2 launch sandro_bringup sandro.launch.py $LAUNCH_DEFAULTS $*"
 }
 
+# The WBC taps and sweeps the yaw mode at several leg stiffnesses while it
+# balances; recorded and analysed into ~/sandro/experiments/sysid_<time>.
+cmd_sysid() {
+  ensure_container
+  in_container -t "python3 ros2_ws/src/sandro_bringup/tools/sysid_yaw.py $*"
+}
+
 cmd_shell() {
   ensure_container
   if [ $# -eq 0 ]; then
@@ -396,7 +404,7 @@ cmd_setup() {
 cmd=${1:-help}
 shift || true
 case "$cmd" in
-  setup|sync|build|launch|push|deploy|shell|can|gui|status|reset) "cmd_$cmd" "$@" ;;
+  setup|sync|build|launch|push|deploy|sysid|shell|can|gui|status|reset) "cmd_$cmd" "$@" ;;
   imu-cal) cmd_imu_cal "$@" ;;
-  *) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac

@@ -1163,6 +1163,88 @@ TEST(WholeBodyCore, DrivePdFallsBackToDampingAndZeroesOnAFall) {
   }
 }
 
+TEST(WholeBodySysid, PulsesAlternateAndTheChirpTapers) {
+  WholeBodyParameters p = test_parameters();
+  p.sysid_mode = 1.0;
+  p.sysid_amplitude_nm = 0.4;
+  p.sysid_pulse_s = 0.03;
+  p.sysid_period_s = 1.5;
+  p.sysid_duration_s = 6.0;
+  EXPECT_DOUBLE_EQ(sysid_excitation_nm(p, 0.01), 0.4);
+  EXPECT_DOUBLE_EQ(sysid_excitation_nm(p, 0.05), 0.0);
+  EXPECT_DOUBLE_EQ(sysid_excitation_nm(p, 1.51), -0.4);
+  EXPECT_DOUBLE_EQ(sysid_excitation_nm(p, 3.01), 0.4);
+  EXPECT_DOUBLE_EQ(sysid_excitation_nm(p, 7.0), 0.0);
+  p.sysid_mode = 2.0;
+  p.sysid_f0_hz = 2.0;
+  p.sysid_f1_hz = 20.0;
+  p.sysid_duration_s = 10.0;
+  EXPECT_NEAR(sysid_excitation_nm(p, 0.0), 0.0, 1e-12);
+  EXPECT_NEAR(sysid_excitation_nm(p, 10.0), 0.0, 1e-9);
+  double peak = 0.0;
+  int crossings = 0;
+  double previous = 0.0;
+  for (double t = 0.0; t <= 10.0; t += 1e-4) {
+    const double value = sysid_excitation_nm(p, t);
+    peak = std::max(peak, std::abs(value));
+    if (t > 0.6 && t < 1.6 && previous < 0.0 && value >= 0.0) {
+      ++crossings;  // 2 + 1.8 t Hz: 3.1 to 4.9 Hz in this second, 3.98 cycles
+    }
+    previous = value;
+  }
+  EXPECT_NEAR(peak, 0.4, 1e-3);
+  EXPECT_GE(crossings, 3);
+  EXPECT_LE(crossings, 4);
+  p.sysid_f1_hz = 80.0;
+  EXPECT_FALSE(valid_whole_body_parameters(p));
+}
+
+TEST(WholeBodySysid, RunsOnATriggerWhileBalancingAndEndsByItself) {
+  WholeBodyParameters p = test_parameters();
+  WholeBodySettings settings = test_settings(p);
+  PlanarPlant plant;
+  WholeBodyCore core;
+  core.reset(plant.observe(settings.parameters, kPeriod), settings);
+  auto out = run(plant, core, settings, 2.0, still);
+  ASSERT_TRUE(out.engaged);
+  EXPECT_FALSE(out.sysid_active);
+  const double before = out.effort_nm[2] - out.effort_nm[5];
+
+  p.sysid_mode = 1.0;
+  p.sysid_amplitude_nm = 0.3;
+  p.sysid_pulse_s = 0.05;
+  p.sysid_period_s = 0.5;
+  p.sysid_duration_s = 1.0;
+  p.sysid_trigger = 1.0;
+  settings = test_settings(p);
+  WholeBodyState state = plant.observe(settings.parameters, kPeriod);
+  out = core.update(state, WholeBodyCommand{}, settings, kPeriod);
+  EXPECT_TRUE(out.sysid_active);
+  EXPECT_DOUBLE_EQ(out.sysid_torque_nm, 0.3);
+  // The right wheel pushes 0.3 Nm more and the left 0.3 Nm less.
+  EXPECT_NEAR(out.effort_nm[2] - out.effort_nm[5] - before, 0.6, 0.1);
+
+  out = run(plant, core, settings, 1.2, still);
+  EXPECT_FALSE(out.sysid_active);
+  EXPECT_DOUBLE_EQ(out.sysid_torque_nm, 0.0);
+  EXPECT_FALSE(out.fallen);
+
+  // A trigger before the robot balances starts nothing.
+  WholeBodyCore idle;
+  p.sysid_trigger = 0.0;
+  settings = test_settings(p);
+  PlanarPlant held;
+  held.pitch = 0.5;
+  idle.reset(held.observe(settings.parameters, kPeriod), settings);
+  p.sysid_trigger = 2.0;
+  settings = test_settings(p);
+  out = idle.update(held.observe(settings.parameters, kPeriod), WholeBodyCommand{}, settings,
+                    kPeriod);
+  EXPECT_FALSE(out.engaged);
+  EXPECT_FALSE(out.sysid_active);
+  EXPECT_DOUBLE_EQ(out.sysid_torque_nm, 0.0);
+}
+
 TEST(WholeBodyCore, GravitySupportIsFedForwardThroughTheJacobian) {
   const WholeBodySettings settings = test_settings();
   const auto &p = settings.parameters;

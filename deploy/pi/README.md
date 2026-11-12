@@ -138,6 +138,11 @@ dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=23
   (run it on the Pi, outside ROS) for wiring and bring-up problems.
 * `deploy/pi/pi status` shows container, CAN, SPI and CPU state;
   `deploy/pi/pi can` runs `candump`.
+* `deploy/pi/pi sysid` identifies the 9 Hz yaw mode with the WBC balancing: it steps the
+  legs' drive stiffness, taps and sweeps the yaw with the WBC's `sysid.*` excitation,
+  records everything into `~/sandro/experiments/sysid_<time>` and prints the fit
+  (`ros2_ws/src/sandro_bringup/tools/sysid_yaw.py`, `--help` for the knobs). It asks for
+  Enter before it starts and stops on Ctrl-C or the first sign the robot is not balancing.
 
 ## Latency notes
 
