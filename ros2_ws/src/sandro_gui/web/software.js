@@ -80,9 +80,9 @@ function renderVersions() {
       data.source && (same(data.source, data.build) ? badge("built", "ok") : badge("not built", "warn"))],
     ["Built", data.build, "install/: what the next launch and panel start run", null],
     ["Panel", data.panel, "this page's server, from the build when it started",
-      data.panel && (same(data.panel, data.build) ? badge("current", "ok") : badge("restart it", "warn"))],
+      data.panel && (same(data.panel, data.build) ? badge("runs the latest build", "ok") : badge("restart it", "warn"))],
     ["Stack", run?.version, run ? "the running launch, from the build when it started" : "not running",
-      run?.version && (same(run.version, data.build) ? badge("current", "ok") : badge("restart it", "warn"))],
+      run?.version && (same(run.version, data.build) ? badge("runs the latest build", "ok") : badge("restart it", "warn"))],
   ];
   replace($("#sw-versions"),
     h("tr", {}, h("th", {}, ""), h("th", {}, "Commit"), h("th", {}, "Subject"), h("th", {}, "When"), h("th", {}, "")),
@@ -124,6 +124,7 @@ function renderCommits() {
     return;
   }
   const disk = data.source?.commit;
+  const built = same(data.source, data.build);
   const head = data.commits?.[0];
   const blocked = stackRunning() ? "stop the robot stack first" : jobRunning() ? "an update is running" : null;
   const summary = data.behind === 0 ? badge("on disk is the newest", "ok")
@@ -131,7 +132,7 @@ function renderCommits() {
     : disk ? badge(`on disk: ${label(data.source)}, not on this branch`, "warn") : null;
   replace(box,
     h("div", { class: "sw-head" }, summary,
-      head ? h("button", { class: "primary small", disabled: !!blocked || (head.commit === disk && !data.source?.dirty),
+      head ? h("button", { class: "primary small", disabled: !!blocked || (head.commit === disk && !data.source?.dirty && built),
         title: blocked || "", onclick: () => deploy(head) }, `Deploy newest (${head.short})`) : null,
       blocked ? h("span", { class: "muted small" }, blocked) : null),
     data.error ? h("p", { class: "hint warn-text" }, data.error) : null,
@@ -141,7 +142,8 @@ function renderCommits() {
         h("td", { class: "sw-subject" }, c.subject),
         h("td", { class: "sw-when" }, when(c.time)),
         h("td", { class: "actions" },
-          c.commit === disk ? badge(data.source?.dirty ? "on disk, edited" : "on disk", data.source?.dirty ? "warn" : "ok") : null,
+          c.commit === disk ? (data.source?.dirty ? badge("on disk, edited", "warn")
+            : built ? badge("on disk, built", "ok") : badge("on disk, not built", "warn")) : null,
           h("button", { class: "small", disabled: !!blocked, title: blocked || `deploy ${c.short}`,
             onclick: () => deploy(c) }, "Deploy"))))));
 }

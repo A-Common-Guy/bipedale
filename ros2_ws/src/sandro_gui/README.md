@@ -62,9 +62,12 @@ changed and restarts the panel; see `deploy/pi/README.md`.
   `repo.git` with `git archive`, writes only the files that differ (with the
   current time, so make rebuilds exactly those; as root, handed back to the
   owner of `ros2_ws/src` so `pi sync` can still overwrite them), builds the
-  packages `pi build`'s change_scope would, and exits so `panel.sh` starts the
-  panel on the new build; the browser reloads when the panel's start time
-  changes. Refused while a launch runs.
+  packages `pi build`'s change_scope would (the whole workspace when the last
+  build never finished), and stops the panel so `panel.sh` starts it on the new
+  build; the browser reloads when the panel's start time changes. Refused while
+  a launch runs. Each deploy, build or fetch runs as its own process
+  (`python3 -m sandro_gui.software job`, state in `gui_runs/software-job.json`,
+  output in its log), so a panel restart halfway does not end it.
 - **Launch.** Start runs `ros2 launch sandro_bringup sandro.launch.py ...
   arm_hardware:=false controller:=<name>` (or `imu_check.launch.py`) in its
   own session with the output going to `gui_runs/run-*.log` (the last

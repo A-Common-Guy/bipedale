@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import time
+from pathlib import Path
 
 import pytest
 
@@ -108,8 +109,23 @@ def wait(service, timeout=10.0):
     raise AssertionError("job did not finish")
 
 
-@needs_git
-def test_deploy_writes_the_commit_builds_what_changed_and_restarts(tmp_path):
+FAKE_COLCON = """#!/bin/sh
+echo "$@" >> "$(dirname "$0")/colcon_calls"
+if [ "$1" = list ]; then echo sandro_controllers; exit 0; fi
+echo "Starting >>> sandro_controllers"; echo "Finished <<< sandro_controllers"
+"""
+
+
+def fake_colcon(tmp_path):
+    script = tmp_path / "colcon"
+    script.write_text(FAKE_COLCON)
+    script.chmod(0o755)
+    calls = tmp_path / "colcon_calls"
+    return script, lambda: [line.split() for line in calls.read_text().splitlines()
+                            if line.startswith("build")] if calls.exists() else []
+
+
+def robot_with_commit(tmp_path):
     work = tmp_path / "work"
     pkg = work / "ros2_ws" / "src" / "sandro_controllers"
     (pkg / "src").mkdir(parents=True)
@@ -127,10 +143,16 @@ def test_deploy_writes_the_commit_builds_what_changed_and_restarts(tmp_path):
     (root / "install").mkdir(parents=True)
     (root / "install" / "setup.bash").write_text("")
     (root / "install" / "sandro_controllers").mkdir()
-    builds, restarts = [], []
-    service = Software(root, Logbook(), Launcher(), {"remote": ""},
-                       restart=lambda: restarts.append(1))
-    service._stream = lambda command: builds.append(command) or 0
+    return work, pkg, root
+
+
+@needs_git
+def test_deploy_writes_the_commit_builds_what_changed_and_restarts(tmp_path):
+    work, pkg, root = robot_with_commit(tmp_path)
+    colcon, builds = fake_colcon(tmp_path)
+    restarts = []
+    service = Software(root, Logbook(), Launcher(), {"remote": "", "colcon": [str(colcon)]},
+                       restart=lambda: restarts.append(1), detach=False)
     git(work, "push", "-q", _bare(service), "HEAD:refs/heads/main")
 
     service.deploy("main")
@@ -139,26 +161,71 @@ def test_deploy_writes_the_commit_builds_what_changed_and_restarts(tmp_path):
     src = root / "ros2_ws" / "src"
     assert (src / "sandro_controllers" / "src" / "core.cpp").read_text() == "int a;"
     assert not (src / "sandro_sim").exists() and not (root / "ros2_ws" / "README.md").exists()
-    assert builds and "--packages-select" in builds[0] and "sandro_controllers" in builds[0]
+    # The build state was unknown before the first deploy: the whole workspace.
+    assert builds() and "--packages-select" not in builds()[0]
     source, build = service.source_version(), service.build_version()
     assert source["subject"] == "first" and same_version(source, build)
-    time.sleep(1.7)
+    time.sleep(1.5)
     assert restarts == [1]
+    assert "colcon" in " ".join(service.tail()) or "Finished" in " ".join(service.tail())
 
-    # The same commit again: nothing written, nothing built, no restart.
-    builds.clear()
+    # The same commit again, built: nothing written, nothing built, no restart.
     service.deploy("main")
-    assert "already on disk" in wait(service)["message"] and builds == []
+    assert "already on disk and built" in wait(service)["message"] and len(builds()) == 1
 
     # An edit to a module is live through --symlink-install: written, not built.
     (pkg / "sandro_controllers" / "tools.py").write_text("x = 1")
     git(work, "commit", "-qam", "python only")
     git(work, "push", "-q", str(service.repo), "HEAD:refs/heads/main")
     service.deploy("main")
-    assert "nothing to compile" in wait(service)["message"] and builds == []
+    assert "nothing to compile" in wait(service)["message"] and len(builds()) == 1
     assert (src / "sandro_controllers" / "sandro_controllers" / "tools.py").read_text() == "x = 1"
     status = service.status()
     assert status["commits"][0]["subject"] == "python only" and status["behind"] == 0
+
+    # A C++ edit builds just that package.
+    (pkg / "src" / "core.cpp").write_text("int b;")
+    git(work, "commit", "-qam", "cpp")
+    git(work, "push", "-q", str(service.repo), "HEAD:refs/heads/main")
+    service.deploy("main")
+    assert wait(service)["state"] == "done"
+    assert builds()[-1][builds()[-1].index("--packages-select") + 1] == "sandro_controllers"
+
+
+@needs_git
+def test_a_deploy_after_an_interrupted_build_builds_the_workspace(tmp_path):
+    work, _, root = robot_with_commit(tmp_path)
+    colcon, builds = fake_colcon(tmp_path)
+    service = Software(root, Logbook(), Launcher(), {"remote": "", "colcon": [str(colcon)]},
+                       detach=False)
+    git(work, "push", "-q", _bare(service), "HEAD:refs/heads/main")
+    service.deploy("main")
+    wait(service)
+    # The files of the commit are on disk, but install/ is from an older build.
+    software.write_version(root / "version" / "build.json", {"commit": "0" * 40, "short": "0000000"})
+    service.deploy("main")
+    job = wait(service)
+    assert job["state"] == "done" and "built" in job["message"], job
+    assert len(builds()) == 2 and "--packages-select" not in builds()[1]
+    assert any("stopped halfway" in line for line in service.tail())
+    assert same_version(service.source_version(), service.build_version())
+
+
+@needs_git
+def test_a_detached_deploy_outlives_the_panel_and_reports_back(tmp_path, monkeypatch):
+    work, _, root = robot_with_commit(tmp_path)
+    colcon, builds = fake_colcon(tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(Path(software.__file__).resolve().parents[1]))
+    panel = Software(root, Logbook(), Launcher(), {"remote": "", "colcon": [str(colcon)]})
+    git(work, "push", "-q", _bare(panel), "HEAD:refs/heads/main")
+    started = panel.deploy("main")["job"]
+    assert started["state"] == "running"
+    # A new panel process (after a restart) sees the same job from its files.
+    later = Software(root, Logbook(), Launcher(), {"remote": "", "colcon": [str(colcon)]})
+    job = wait(later, timeout=30)
+    assert job["state"] == "done", (job, later.tail())
+    assert job["id"] == started["id"] and builds()
+    assert same_version(later.source_version(), later.build_version())
 
 
 def _bare(service):
@@ -174,7 +241,8 @@ def test_fetch_is_a_job_that_runs_beside_the_stack(tmp_path):
     git(tmp_path, "init", "-q", "-b", "main", str(upstream))
     git(upstream, "add", "-A")
     git(upstream, "commit", "-qm", "upstream commit")
-    service = Software(tmp_path / "robot", Logbook(), Launcher("running"), {"remote": str(upstream)})
+    service = Software(tmp_path / "robot", Logbook(), Launcher("running"), {"remote": str(upstream)},
+                       detach=False)
     service.fetch()
     job = wait(service)
     assert job["state"] == "done" and "main updated" in job["message"], job

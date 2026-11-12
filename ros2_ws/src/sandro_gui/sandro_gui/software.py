@@ -14,9 +14,14 @@ deploy/pi/pi's change_scope), stamps both versions and restarts the panel onto
 the new build. `pi sync` and `pi build` stamp the same two files, so the
 version shown is right whichever way the code arrived.
 
-Also a script, for deploy/pi/pi (no ROS environment needed):
+Deploys, builds and fetches run as their own process (JobRunner), so a panel
+that restarts or dies halfway does not end them; the panel reads their state
+(gui_runs/software-job.json) and log back.
+
+Also a script, for deploy/pi/pi and the panel (no ROS environment needed):
 
     python3 software.py stamp-build [ROOT]   version/build.json from source.json
+    python3 -m sandro_gui.software job FILE  run the job FILE describes
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ import io
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -221,36 +227,255 @@ def sync_tree(entries: dict[str, tuple[str, int, bytes]], target: Path, skip_pac
     return changes
 
 
-# The software service ------------------------------------------------------------
+# Jobs ----------------------------------------------------------------------------
+
+def _alive(pid) -> bool:
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def _panel_pids(exclude: int) -> list[int]:
+    """Running control panels (ros2 run sandro_gui sandro_gui), by command line."""
+    pids = []
+    for entry in Path("/proc").glob("[0-9]*"):
+        try:
+            argv = (entry / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        if int(entry.name) != exclude and any(a.endswith(b"lib/sandro_gui/sandro_gui") for a in argv):
+            pids.append(int(entry.name))
+    return pids
+
+
+def _git(binary: str, repo: Path, *args: str, timeout: float = GIT_TIMEOUT_S, raw: bool = False):
+    if not binary:
+        raise RuntimeError("git is not installed in the robot container (deploy/pi/Dockerfile)")
+    result = subprocess.run([binary, "--git-dir", str(repo), *args], capture_output=True,
+                            timeout=timeout)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.decode(errors="replace").strip() or f"git {args[0]} failed")
+    return result.stdout if raw else result.stdout.decode(errors="replace")
+
+
+class JobRunner:
+    """One deploy, build or fetch: state in gui_runs/software-job.json, output in its log.
+
+    On the robot it runs in its own process (python3 -m sandro_gui.software job FILE,
+    started by the panel in a new session), so a panel that restarts or dies halfway
+    does not take the build with it; the panel reads the state and the log back.
+    """
+
+    def __init__(self, state_path: Path, restart=None) -> None:
+        self.state_path = Path(state_path)
+        self.state = json.loads(self.state_path.read_text())
+        cfg = self.state["config"]
+        self.root = Path(cfg["root"])
+        self.repo = Path(cfg["repo"])
+        self.src = self.root / "ros2_ws" / "src"
+        self.versions_dir = self.root / "version"
+        self.log_path = Path(cfg["runs"]) / self.state["log"]
+        self.remote = cfg.get("remote", "")
+        self.skip = set(cfg.get("skip_packages", []))
+        self.colcon = list(cfg.get("colcon", ["colcon"]))
+        self.colcon_args = list(cfg.get("colcon_args", []))
+        self.git = cfg.get("git") or shutil.which("git")
+        self.restart = restart if restart is not None else self._restart_panels
+        self.changed_what_runs = False
+
+    def save(self, **changes) -> None:
+        self.state.update(changes)
+        tmp = self.state_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.state, indent=1))
+        os.replace(tmp, self.state_path)
+
+    def line(self, text: str) -> None:
+        with open(self.log_path, "a") as stream:
+            stream.write(text + "\n")
+
+    def step(self, step: str, message: str = "") -> None:
+        self.save(step=step, message=message)
+        if message:
+            self.line(message)
+
+    def run(self) -> None:
+        self.save(pid=os.getpid(), state="running")
+        try:
+            work = {"deploy": self.deploy, "build": self.build, "fetch": self.fetch}[self.state["kind"]]
+            message, state = work(), "done"
+        except Exception as error:  # noqa: BLE001 - reported on the page
+            message, state = str(error), "failed"
+        self.line(message)
+        self.save(state=state, step=state, message=message, ended=time.time())
+        if state == "done" and self.changed_what_runs and self.state.get("restart"):
+            self.line("restarting the panel on the new build")
+            time.sleep(1.0)
+            self.restart()
+
+    def _restart_panels(self) -> None:
+        for pid in _panel_pids(os.getpid()):
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
+
+    # The work ---------------------------------------------------------------------
+
+    def fetch(self) -> str:
+        self.step("fetch", f"fetching {self.remote}")
+        refs = lambda: _git(self.git, self.repo, "for-each-ref", "--format=%(refname) %(objectname)")
+        before = refs()
+        proc = subprocess.Popen(
+            [self.git, "--git-dir", str(self.repo), "fetch", "--progress", "--prune", "--no-tags",
+             "origin", "+refs/heads/*:refs/remotes/origin/*"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
+        timer = threading.Timer(FETCH_TIMEOUT_S, proc.kill)
+        timer.start()
+        last = 0.0
+        try:
+            # git redraws its progress with \r: log finished phases, show the rest as the step.
+            for line in _lines(proc.stderr):
+                if line.endswith("done.") or not line.split(":")[0].endswith(("objects", "deltas")):
+                    self.line(line)
+                elif time.monotonic() - last > 1.0:
+                    last = time.monotonic()
+                    self.save(message=line)
+            code = proc.wait()
+        finally:
+            timer.cancel()
+        if code != 0:
+            raise RuntimeError(f"git fetch failed (exit {code}): is the robot online? "
+                               "deploy/pi/pi push works without internet")
+        after = refs()
+        old = dict(line.split() for line in before.splitlines())
+        changed = [ref.rsplit("/", 1)[-1] for ref, sha in (l.split() for l in after.splitlines())
+                   if old.get(ref) != sha]
+        return "fetched: " + (", ".join(changed) + " updated" if changed else "nothing new")
+
+    def deploy(self) -> str:
+        sha = self.state["params"]["commit"]
+        short, subject, date, author = (self.state["params"]["info"] + [""] * 4)[:4]
+        previous_source = read_version(self.versions_dir / "source.json")
+        previous_build = read_version(self.versions_dir / "build.json")
+        was_built = same_version(previous_source, previous_build)
+        self.step("export", f"exporting {short} {subject}")
+        archive = _git(self.git, self.repo, "archive", "--format=tar", sha, "--", "ros2_ws/src",
+                       raw=True, timeout=120)
+        entries = export_tree(archive, self.skip)
+        self.step("sync", f"writing the files that differ ({len(entries)} in the commit)")
+        self.src.mkdir(parents=True, exist_ok=True)
+        stat = self.src.stat()
+        owner = (stat.st_uid, stat.st_gid) if hasattr(os, "geteuid") and os.geteuid() == 0 else None
+        packages = {rel for rel, (kind, _, _) in entries.items()
+                    if kind == "dir" and f"{rel}/package.xml" in entries}
+        packages |= {p.name for p in self.src.iterdir() if (p / "package.xml").is_file()}
+        changes = sync_tree(entries, self.src, self.skip, owner)
+        version = {"commit": sha, "short": short, "describe": short, "subject": subject,
+                   "date": date, "author": author, "dirty": False, "changes": [],
+                   "via": "panel", "at": now_iso()}
+        write_version(self.versions_dir / "source.json", version)
+        if changes:
+            shown = ", ".join(f"{kind} {rel}" for kind, rel in changes[:8])
+            more = f" and {len(changes) - 8} more" if len(changes) > 8 else ""
+            self.line(f"{len(changes)} change(s): {shown}{more}")
+        select, above = build_scope(changes, packages)
+        installed = (self.root / "install" / "setup.bash").is_file()
+        if installed and not was_built:
+            self.line(f"the build ({label(previous_build)}) does not match what was on disk "
+                      f"({label(previous_source)}), an update stopped halfway: building the workspace")
+        full = not installed or not was_built
+        if not full and not select and not above:
+            self._stamp_build(version, [])
+            self.changed_what_runs = bool(changes)
+            return (f"{short} deployed: " + ("live through --symlink-install, nothing to compile"
+                                             if changes else "already on disk and built"))
+        built = self._colcon(select, above, full)
+        self._stamp_build(version, built)
+        self.changed_what_runs = True
+        return f"{short} deployed and built ({', '.join(built) if built else 'the workspace'})"
+
+    def build(self) -> str:
+        source = read_version(self.versions_dir / "source.json")
+        if source is None:
+            raise RuntimeError("version/source.json is missing: deploy a commit, or deploy/pi/pi sync")
+        built = self._colcon(set(), set(), full=True)
+        self._stamp_build(source, built)
+        self.changed_what_runs = True
+        return f"{label(source)} built"
+
+    def _stamp_build(self, version: dict, packages: list[str]) -> None:
+        write_version(self.versions_dir / "build.json",
+                      dict(version, built_at=now_iso(), packages=packages or "all"))
+
+    def _colcon_list(self, *args: str) -> list[str]:
+        result = subprocess.run([*self.colcon, "list", "--base-paths", "ros2_ws/src", "--names-only",
+                                 *args], cwd=self.root, capture_output=True, text=True, timeout=60)
+        return result.stdout.split()
+
+    def _colcon(self, select: set[str], above: set[str], full: bool) -> list[str]:
+        packages: list[str] = []
+        if not full:
+            names = set(select)
+            if above:
+                names |= set(self._colcon_list("--packages-above", *sorted(above)))
+            new = [p for p in names if not (self.root / "install" / p).is_dir()]
+            if new:
+                names |= set(self._colcon_list("--packages-up-to", *sorted(new)))
+            packages = sorted(names)
+        self.step("build", "building " + (", ".join(packages) if packages else "the workspace"))
+        command = [*self.colcon, "build", "--base-paths", "ros2_ws/src", "--symlink-install"]
+        if packages:
+            command += ["--packages-select", *packages]
+        command += self.colcon_args
+        proc = subprocess.Popen(command, cwd=self.root, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+        for raw in proc.stdout:
+            text = raw.decode(errors="replace").rstrip()
+            if text:
+                self.line(text)
+        code = proc.wait()
+        if code != 0:
+            raise RuntimeError(f"colcon build failed (exit {code}): the log above names the package")
+        return packages
+
+
+# The panel's side -------------------------------------------------------------------
 
 class Software:
+    """Versions, the robot's repository, and the jobs: what the Software page shows and starts."""
+
     def __init__(self, root: str | Path, log, launcher, cfg: dict | None = None,
-                 restart=None) -> None:
+                 restart=None, detach: bool = True) -> None:
         cfg = cfg or {}
         self.root = Path(root)
         self.log = log
         self.launcher = launcher
         self.repo = self.root / cfg.get("repo", "repo.git")
-        self.src = self.root / "ros2_ws" / "src"
         self.versions_dir = self.root / "version"
         self.runs = self.root / cfg.get("runs_dir", "gui_runs")
+        self.job_path = self.runs / "software-job.json"
         self.remote = cfg.get("remote", "")
         self.branch = cfg.get("branch", "main")
-        self.skip = set(cfg.get("skip_packages", ["sandro_sim"]))
-        self.colcon_args = list(cfg.get("colcon_args", [
-            "--cmake-args", "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTING=OFF",
-            "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", "--event-handlers", "console_cohesion+"]))
         self.restart = restart
+        self.detach = detach
         self.git = shutil.which("git")
-        self._lock = threading.Lock()
-        self._job: dict | None = None
-        self._tail: deque[str] = deque(maxlen=400)
+        self.config = {
+            "root": str(self.root), "repo": str(self.repo), "runs": str(self.runs),
+            "remote": self.remote, "skip_packages": list(cfg.get("skip_packages", ["sandro_sim"])),
+            "colcon": list(cfg.get("colcon", ["colcon"])),
+            "colcon_args": list(cfg.get("colcon_args", [
+                "--cmake-args", "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTING=OFF",
+                "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", "--event-handlers", "console_cohesion+"])),
+            "git": self.git}
         self._cache: tuple[float, dict] | None = None
         self._stamp_cache: dict[str, tuple[float, dict | None]] = {}
-        self._job_seq = 0
-        self._restart_after = False
+        self._job_cache: tuple[int | None, dict | None] = (None, None)
         self.panel = self.build_version()
         self.boot = time.time()
+        job = self.job()
+        self._seen = (job.get("id"), job.get("state")) if job else None
 
     # Versions -------------------------------------------------------------------
 
@@ -271,25 +496,49 @@ class Software:
     def build_version(self) -> dict | None:
         return self._stamp("build")
 
+    def job(self) -> dict | None:
+        try:
+            mtime = self.job_path.stat().st_mtime_ns
+        except OSError:
+            return None
+        if self._job_cache[0] != mtime:
+            try:
+                job = json.loads(self.job_path.read_text())
+            except (OSError, ValueError):
+                return self._job_cache[1]
+            job.pop("config", None)
+            self._job_cache = (mtime, job)
+        job = dict(self._job_cache[1])
+        if job.get("state") == "running" and time.time() - job.get("started", 0) > 10 \
+                and not _alive(job.get("pid")):
+            job.update(state="failed", step="failed", message="interrupted: its process is gone")
+        return job
+
     def summary(self) -> dict:
-        """The cheap part, for every slow snapshot."""
-        with self._lock:
-            job = dict(self._job) if self._job else None
+        """The cheap part, for every slow snapshot; notes a job's start and end in the log."""
+        job = self.job()
+        key = (job.get("id"), job.get("state")) if job else None
+        if key != self._seen and job:
+            level = {"failed": ERROR, "done": INFO}.get(job["state"], INFO)
+            text = (f"{job['kind']} {job['target']} started" if job["state"] == "running"
+                    else f"{job['kind']} {job['target']} {job['state']}: {job.get('message', '')}")
+            self.log.add(level, "software", text, origin="software")
+        self._seen = key
         return {"source": self.source_version(), "build": self.build_version(),
                 "panel": self.panel, "boot": self.boot, "job": job,
                 "repo": self.repo.is_dir(), "git": bool(self.git)}
 
-    # Git ------------------------------------------------------------------------
+    def tail(self, lines: int = 400) -> list[str]:
+        job = self.job()
+        if not job:
+            return []
+        try:
+            with open(self.runs / job["log"], errors="replace") as stream:
+                return [line.rstrip("\n") for line in deque(stream, maxlen=lines)]
+        except OSError:
+            return []
 
-    def _git(self, *args: str, timeout: float = GIT_TIMEOUT_S, binary: bool = False):
-        if not self.git:
-            raise RuntimeError("git is not installed in the robot container (deploy/pi/Dockerfile)")
-        result = subprocess.run([self.git, "--git-dir", str(self.repo), *args],
-                                capture_output=True, timeout=timeout)
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.decode(errors="replace").strip()
-                               or f"git {args[0]} failed")
-        return result.stdout if binary else result.stdout.decode(errors="replace")
+    # The repository ---------------------------------------------------------------
 
     def _ensure_repo(self) -> None:
         if not self.git:
@@ -298,16 +547,16 @@ class Software:
             subprocess.run([self.git, "init", "--bare", "-q", str(self.repo)], check=True,
                            capture_output=True, timeout=GIT_TIMEOUT_S)
         if self.remote:
-            remotes = self._git("remote").split()
+            remotes = _git(self.git, self.repo, "remote").split()
             if "origin" not in remotes:
-                self._git("remote", "add", "origin", self.remote)
-            elif self._git("remote", "get-url", "origin").strip() != self.remote:
-                self._git("remote", "set-url", "origin", self.remote)
+                _git(self.git, self.repo, "remote", "add", "origin", self.remote)
+            elif _git(self.git, self.repo, "remote", "get-url", "origin").strip() != self.remote:
+                _git(self.git, self.repo, "remote", "set-url", "origin", self.remote)
 
     def refs(self) -> list[dict]:
-        out = self._git("for-each-ref", "--sort=-committerdate",
-                        "--format=%(refname)%00%(objectname)%00%(committerdate:unix)%00%(subject)",
-                        "refs/heads", "refs/remotes/origin")
+        out = _git(self.git, self.repo, "for-each-ref", "--sort=-committerdate",
+                   "--format=%(refname)%00%(objectname)%00%(committerdate:unix)%00%(subject)",
+                   "refs/heads", "refs/remotes/origin")
         refs = []
         for line in out.splitlines():
             name, sha, when, subject = (line.split("\0") + ["", "", "", ""])[:4]
@@ -322,7 +571,8 @@ class Software:
         return refs
 
     def commits(self, ref: str, limit: int = 15) -> list[dict]:
-        out = self._git("log", f"-n{limit}", "--format=%H%x00%h%x00%ct%x00%an%x00%s", ref, "--")
+        out = _git(self.git, self.repo, "log", f"-n{limit}",
+                   "--format=%H%x00%h%x00%ct%x00%an%x00%s", ref, "--")
         rows = []
         for line in out.splitlines():
             sha, short, when, author, subject = (line.split("\0") + [""] * 5)[:5]
@@ -332,7 +582,7 @@ class Software:
 
     def _known(self, sha: str) -> bool:
         try:
-            self._git("cat-file", "-e", f"{sha}^{{commit}}")
+            _git(self.git, self.repo, "cat-file", "-e", f"{sha}^{{commit}}")
             return True
         except RuntimeError:
             return False
@@ -340,7 +590,7 @@ class Software:
     def status(self, ref: str | None = None) -> dict:
         """Everything the Software page shows; git answers are cached briefly."""
         result = self.summary()
-        result.update(remote=self.remote, branch=self.branch, tail=list(self._tail))
+        result.update(remote=self.remote, branch=self.branch, tail=self.tail())
         if not self.git or not self.repo.is_dir():
             return dict(result, refs=[], commits=[], ref=None)
         cached = self._cache
@@ -355,8 +605,8 @@ class Software:
                 source = (self.source_version() or {}).get("commit")
                 behind = None
                 if chosen and source and self._known(source):
-                    behind = int(self._git("rev-list", "--count", "--first-parent",
-                                           f"{source}..{chosen}").strip())
+                    behind = int(_git(self.git, self.repo, "rev-list", "--count", "--first-parent",
+                                      f"{source}..{chosen}").strip())
                 git = {"key": key, "refs": refs, "ref": chosen, "commits": commits,
                        "behind": behind, "error": None}
             except (RuntimeError, subprocess.TimeoutExpired) as error:
@@ -365,201 +615,60 @@ class Software:
             self._cache = cached = (time.monotonic(), git)
         return dict(result, **{k: v for k, v in cached[1].items() if k != "key"})
 
-    # Jobs -----------------------------------------------------------------------
+    # Starting jobs ------------------------------------------------------------------
 
     def _guard(self, stack_stopped: bool = True) -> None:
-        with self._lock:
-            if self._job and self._job["state"] == "running":
-                raise RuntimeError(f"{self._job['kind']} {self._job['target']} is still running")
+        job = self.job()
+        if job and job["state"] == "running":
+            raise RuntimeError(f"{job['kind']} {job['target']} is still running")
         state = self.launcher.status().get("state") if self.launcher else "stopped"
         if stack_stopped and state != "stopped":
             raise RuntimeError("stop the robot stack first: a build under a running stack can "
                                "crash it, and its CPU load disturbs the control loop")
 
-    def _start(self, kind: str, target: str, work, *args, stack_stopped: bool = True) -> dict:
+    def _start(self, kind: str, target: str, params: dict | None = None,
+               stack_stopped: bool = True) -> dict:
         self._guard(stack_stopped)
         self.runs.mkdir(parents=True, exist_ok=True)
-        with self._lock:
-            self._job_seq += 1
-            log_name = f"{kind}-{time.strftime('%Y%m%d-%H%M%S')}.log"
-            self._job = {"id": self._job_seq, "kind": kind, "target": target, "state": "running",
-                         "step": "starting", "message": "", "started": time.time(),
-                         "ended": None, "log": log_name}
-            self._tail.clear()
-            job = dict(self._job)
-        threading.Thread(target=self._run, args=(work, args), name=kind, daemon=True).start()
-        return job
-
-    def _step(self, step: str, message: str = "") -> None:
-        with self._lock:
-            if self._job:
-                self._job.update(step=step, message=message)
-        if message:
-            self._line(message, INFO, "software")
-
-    def _line(self, text: str, level: int = INFO, source: str = "colcon") -> None:
-        self._tail.append(text)
-        with self._lock:
-            name = self._job["log"] if self._job else None
-        if name:
-            with open(self.runs / name, "a") as stream:
-                stream.write(text + "\n")
-        self.log.add(level, source, text, origin="software")
-
-    def _run(self, work, args) -> None:
-        try:
-            message = work(*args)
-            state, level = "done", INFO
-        except Exception as error:  # noqa: BLE001 - reported on the page
-            message, state, level = str(error), "failed", ERROR
-        with self._lock:
-            if self._job:
-                self._job.update(state=state, step=state, message=message, ended=time.time())
+        state = {"id": int(time.time() * 1000), "kind": kind, "target": target,
+                 "state": "running", "step": "starting", "message": "", "started": time.time(),
+                 "ended": None, "log": f"{kind}-{time.strftime('%Y%m%d-%H%M%S')}.log", "pid": None,
+                 "restart": self.restart is not None, "params": params or {},
+                 "config": self.config}
+        tmp = self.job_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state, indent=1))
+        os.replace(tmp, self.job_path)
+        if self.detach:
+            with open(self.runs / state["log"], "ab") as log:
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "sandro_gui.software", "job", str(self.job_path)],
+                    cwd=self.root, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                    start_new_session=True, env=dict(os.environ, PYTHONUNBUFFERED="1"))
+            state["pid"] = proc.pid
+        else:
+            runner = JobRunner(self.job_path, restart=self.restart or (lambda: None))
+            threading.Thread(target=runner.run, name=kind, daemon=True).start()
         self._cache = None
-        self._line(message, level, "software")
-        if state == "done" and self.restart is not None and getattr(self, "_restart_after", False):
-            self._restart_after = False
-            self._line("restarting the panel on the new build", WARN, "software")
-            threading.Timer(1.5, self.restart).start()
-
-    def job(self) -> dict | None:
-        with self._lock:
-            return dict(self._job) if self._job else None
-
-    # Actions --------------------------------------------------------------------
+        return self.job() or state
 
     def fetch(self) -> dict:
-        """A job: the first fetch of a fresh repository takes minutes; the stack may run."""
+        """The first fetch of a fresh repository takes minutes; the stack may run meanwhile."""
         if not self.remote:
             raise RuntimeError("no GitHub remote configured (gui.yaml software.remote)")
         self._ensure_repo()
-        return {"job": self._start("fetch", "GitHub", self._fetch, stack_stopped=False)}
-
-    def _fetch(self) -> str:
-        self._step("fetch", f"fetching {self.remote}")
-        before = {r["ref"]: r["commit"] for r in self.refs()}
-        proc = subprocess.Popen(
-            [self.git, "--git-dir", str(self.repo), "fetch", "--progress", "--prune", "--no-tags",
-             "origin", "+refs/heads/*:refs/remotes/origin/*"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
-            start_new_session=True)
-        timer = threading.Timer(FETCH_TIMEOUT_S, proc.kill)
-        timer.start()
-        last = 0.0
-        try:
-            # git redraws its progress with \r: log finished phases, show the rest as the step.
-            for line in _lines(proc.stderr):
-                if line.endswith("done.") or not line.split(":")[0].endswith(("objects", "deltas")):
-                    self._line(line, INFO, "git")
-                elif time.monotonic() - last > 1.0:
-                    last = time.monotonic()
-                    self._step("fetch", line)
-            code = proc.wait()
-        finally:
-            timer.cancel()
-        if code != 0:
-            raise RuntimeError(f"git fetch failed (exit {code}): is the robot online? "
-                               "deploy/pi/pi push works without internet")
-        self._cache = None
-        after = {r["ref"]: r["commit"] for r in self.refs()}
-        changed = [ref.rsplit("/", 1)[-1] for ref, sha in after.items() if before.get(ref) != sha]
-        return "fetched: " + (", ".join(changed) + " updated" if changed else "nothing new")
+        return {"job": self._start("fetch", "GitHub", stack_stopped=False)}
 
     def deploy(self, ref: str) -> dict:
         if not ref:
             raise ValueError("deploy needs a commit or branch")
         self._ensure_repo()
-        sha = self._git("rev-parse", "--verify", f"{ref}^{{commit}}").strip()
-        info = self._git("log", "-1", "--format=%h%x00%s%x00%cI%x00%an", sha).strip().split("\0")
-        return self._start("deploy", info[0], self._deploy, sha, info)
+        sha = _git(self.git, self.repo, "rev-parse", "--verify", f"{ref}^{{commit}}").strip()
+        info = _git(self.git, self.repo, "log", "-1", "--format=%h%x00%s%x00%cI%x00%an",
+                    sha).strip().split("\0")
+        return {"job": self._start("deploy", info[0], {"commit": sha, "info": info})}
 
     def build(self) -> dict:
-        source = self.source_version()
-        return self._start("build", label(source), self._build_synced)
-
-    def _deploy(self, sha: str, info: list[str]) -> str:
-        short, subject, date, author = (info + [""] * 4)[:4]
-        self._step("export", f"exporting {short} {subject}")
-        archive = self._git("archive", "--format=tar", sha, "--", "ros2_ws/src", binary=True,
-                            timeout=120)
-        entries = export_tree(archive, self.skip)
-        self._step("sync", f"writing the files that differ ({len(entries)} in the commit)")
-        self.src.mkdir(parents=True, exist_ok=True)
-        stat = self.src.stat()
-        owner = (stat.st_uid, stat.st_gid) if hasattr(os, "geteuid") and os.geteuid() == 0 else None
-        packages = {rel for rel, (kind, _, _) in entries.items()
-                    if kind == "dir" and f"{rel}/package.xml" in entries}
-        packages |= {p.name for p in self.src.iterdir() if (p / "package.xml").is_file()}
-        changes = sync_tree(entries, self.src, self.skip, owner)
-        version = {"commit": sha, "short": short, "describe": short, "subject": subject,
-                   "date": date, "author": author, "dirty": False, "changes": [],
-                   "via": "panel", "at": now_iso()}
-        write_version(self.versions_dir / "source.json", version)
-        if changes:
-            shown = ", ".join(f"{kind} {rel}" for kind, rel in changes[:8])
-            more = f" and {len(changes) - 8} more" if len(changes) > 8 else ""
-            self._line(f"{len(changes)} change(s): {shown}{more}", INFO, "software")
-        select, above = build_scope(changes, packages)
-        full = not (self.root / "install" / "setup.bash").is_file()
-        if not full and not select and not above:
-            self._stamp_build(version, [])
-            self._restart_after = bool(changes)
-            return (f"{short} deployed: " + ("live through --symlink-install, nothing to compile"
-                                             if changes else "already on disk"))
-        built = self._colcon(select, above, full)
-        self._stamp_build(version, built)
-        self._restart_after = True
-        return f"{short} deployed and built ({', '.join(built) if built else 'everything'})"
-
-    def _build_synced(self) -> str:
-        source = self.source_version()
-        if source is None:
-            raise RuntimeError("version/source.json is missing: deploy a commit, or deploy/pi/pi sync")
-        built = self._colcon(set(), set(), full=True)
-        self._stamp_build(source, built)
-        self._restart_after = True
-        return f"{label(source)} built"
-
-    def _stamp_build(self, version: dict, packages: list[str]) -> None:
-        write_version(self.versions_dir / "build.json",
-                      dict(version, built_at=now_iso(), packages=packages or "all"))
-
-    def _colcon_list(self, *args: str) -> list[str]:
-        result = subprocess.run(["colcon", "list", "--base-paths", "ros2_ws/src", "--names-only",
-                                 *args], cwd=self.root, capture_output=True, text=True,
-                                timeout=60)
-        return result.stdout.split()
-
-    def _colcon(self, select: set[str], above: set[str], full: bool) -> list[str]:
-        packages: list[str] = []
-        if not full:
-            names = set(select)
-            if above:
-                names |= set(self._colcon_list("--packages-above", *sorted(above)))
-            new = [p for p in names if not (self.root / "install" / p).is_dir()]
-            if new:
-                names |= set(self._colcon_list("--packages-up-to", *sorted(new)))
-            packages = sorted(names)
-        self._step("build", "building " + (", ".join(packages) if packages else "the workspace"))
-        command = ["colcon", "build", "--base-paths", "ros2_ws/src", "--symlink-install"]
-        if packages:
-            command += ["--packages-select", *packages]
-        command += self.colcon_args
-        code = self._stream(command)
-        if code != 0:
-            raise RuntimeError(f"colcon build failed (exit {code}): the log above names the package")
-        return packages
-
-    def _stream(self, command: list[str]) -> int:
-        proc = subprocess.Popen(command, cwd=self.root, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                start_new_session=True)
-        for raw in proc.stdout:
-            text = raw.decode(errors="replace").rstrip()
-            if text:
-                failed = "Failed" in text or "error:" in text or "Error" in text
-                self._line(text, ERROR if failed else INFO)
-        return proc.wait()
+        return {"job": self._start("build", label(self.source_version()))}
 
 
 def _lines(stream):
@@ -615,6 +724,9 @@ def check(software: dict | None, launch: dict | None) -> tuple[str, str, str, st
 
 
 def main(argv: list[str]) -> int:
+    if len(argv) >= 2 and argv[0] == "job":
+        JobRunner(Path(argv[1])).run()
+        return 0
     if len(argv) >= 1 and argv[0] == "stamp-build":
         root = Path(argv[1] if len(argv) > 1 else ".")
         source = read_version(root / "version" / "source.json")
