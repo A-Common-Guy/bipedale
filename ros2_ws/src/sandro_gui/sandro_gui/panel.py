@@ -18,6 +18,7 @@ from .control import ArmFailed, Control, condition, owning, short_type
 from .errors import Busy
 from .launcher import build_command
 from .logbook import ERROR, Logbook
+from .software import check as software_check
 
 OK, WARN, ERR, OFF = "ok", "warn", "error", "off"
 MANAGER = "ros2_control_node"
@@ -309,6 +310,10 @@ def health(slow: dict, fast: dict, expect: dict, simulation: bool,
         notes.append(f"load {load[0]:.1f}")
     checks.append(_check("host", system.get("host") or "Computer", level,
                          f"{temp:.0f} °C" if temp is not None else "—", " · ".join(notes)))
+
+    if slow.get("software") is not None:
+        level, value, detail, short = software_check(slow["software"], launch)
+        checks.append(_check("software", "Software", level, value, detail, short))
     return checks
 
 
@@ -351,6 +356,7 @@ class Panel:
         self.pad = sources["pad"]
         self.bt = sources["bt"]
         self.ros = sources.get("ros")
+        self.software = sources.get("software")
         self.expect = cfg.get("expect", {})
         robot = cfg.get("robot", {})
         self.component = robot.get("hardware_component", "SandroSystem")
@@ -434,6 +440,8 @@ class Panel:
             "estop": {"ros": self.ros is not None, "can": self.estop_bus is not None},
             "bluetooth": getattr(self.bt, "available", False),
             "can_monitor": self.can is not None,
+            "software": {"boot": self.software.boot, "panel": self.software.panel}
+            if self.software else None,
         }
 
     def sample(self) -> None:
@@ -542,6 +550,7 @@ class Panel:
                         "last_controller": None if last == "none" else last},
             "waiting": list(self._waiting),
             "busy": self._busy,
+            "software": self.software.summary() if self.software else None,
         }
 
     def checks(self, slow: dict, fast: dict) -> list[dict]:
@@ -659,6 +668,21 @@ class Panel:
         if action == "problems/clear":
             self.log.clear_problems()
             return {"message": "cleared"}
+        if action.startswith("software/"):
+            if self.software is None:
+                raise RuntimeError("software updates are not available in this process")
+            verb = action[len("software/"):]
+            if verb == "fetch":
+                return self.software.fetch()
+            if verb == "deploy":
+                return {"job": self.software.deploy(body.get("ref", ""))}
+            if verb == "build":
+                return {"job": self.software.build()}
+            if verb == "restart_panel":
+                if self.software.restart is None:
+                    raise RuntimeError("this panel is not run by deploy/pi/panel.sh")
+                threading.Timer(0.5, self.software.restart).start()
+                return {"message": "panel restarting"}
         if action.startswith("bt/"):
             verb = action[3:]
             if verb == "watch":

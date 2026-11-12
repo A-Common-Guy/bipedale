@@ -121,4 +121,13 @@ Create + Options on the pad).
 
 Every launch's output is kept on the Pi in `~/sandro/gui_runs/run-*.log`
 (Run → Log → Past runs), the last 30 runs and at most 200 MB, so a run can be
-read after the fact.
+read after the fact. Its first lines name the commit it ran.
+
+## Updating the robot
+
+Software page, with the stack stopped: pick the branch (pushed from the laptop
+with `deploy/pi/pi push`, or *Fetch from GitHub* when the robot has internet)
+and *Deploy* a commit. The panel writes it, builds what changed, restarts and
+the page reloads; the Versions table and the SW chip then read the new commit.
+A yellow SW chip says what is out of step: source not built, panel or stack
+started from an older build.

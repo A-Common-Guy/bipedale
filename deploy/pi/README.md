@@ -30,6 +30,26 @@ A launch the panel started keeps running when the panel restarts, and its output
 kept in `~/sandro/gui_runs/run-*.log`. `deploy/pi/pi launch` still works; the panel
 shows that run as external and can stop it.
 
+## Versions and updates
+
+The panel's **Software** page (and the SW chip in its header) shows which commit is
+on disk, built, running in the panel and in the stack, and updates the robot with one
+button: *Deploy* writes that commit's `ros2_ws/src` (only the files that differ), builds
+the packages they need with the same rules as `pi build`, and restarts the panel on
+the new build. The robot stack must be stopped. Every launch log starts with the
+version it ran.
+
+The commits come from the robot's own repository, `~/sandro/repo.git`:
+
+```bash
+deploy/pi/pi push      # the laptop's current commit, over SSH; no internet on the robot needed
+deploy/pi/pi deploy    # push, then the panel deploys it (progress on the Software page)
+```
+
+or *Fetch from GitHub* on the page, when the robot has internet (the repository is
+public, no key needed). `pi sync` and `pi build` keep working for uncommitted work and
+stamp the version too: the commit plus "uncommitted changes", synced from which host.
+
 ## Why it is fast
 
 | Change                                     | Cost on the next `launch`                          |

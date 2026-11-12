@@ -15,11 +15,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # bluez only for bluetoothctl: the panel pairs the gamepad through the host's
 # bluetoothd over the D-Bus socket the container mounts; no daemon runs here.
+# git for the panel's Software page (repo.git, deploy/pi/pi push); ros-base
+# usually brings it already.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       bluez \
       build-essential \
       ccache \
       can-utils \
+      git \
       iproute2 \
       libeigen3-dev \
       python3-colcon-common-extensions \

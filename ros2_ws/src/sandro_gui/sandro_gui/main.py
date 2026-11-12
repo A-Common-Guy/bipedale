@@ -113,6 +113,14 @@ def main(argv: list[str] | None = None) -> None:
         except ImportError as error:
             log.note(f"ROS 2 is not available ({error}); launch and status only", ERROR)
 
+    from .software import Software
+    # On the robot, deploy/pi/panel.sh starts the panel again when it exits.
+    sources["software"] = Software(
+        cwd, log, sources["launcher"], cfg.get("software", {}),
+        restart=None if args.demo else lambda: os.kill(os.getpid(), signal.SIGTERM))
+    if not args.demo:
+        sources["launcher"].version = sources["software"].build_version
+
     from .panel import Panel
     from .server import serve
     panel = Panel(cfg, {k: str(v) if isinstance(v, Path) else v for k, v in paths.items()},

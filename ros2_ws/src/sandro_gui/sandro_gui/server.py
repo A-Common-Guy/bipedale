@@ -229,6 +229,10 @@ class Handler(BaseHTTPRequestHandler):
                 text = self.panel._ros().changed_yaml().encode()
                 return self._send(200, text, "text/yaml; charset=utf-8",
                                   {"Content-Disposition": 'attachment; filename="tuned.yaml"'})
+            if path == "/api/software":
+                if self.panel.software is None:
+                    return self._json({"error": "software updates are not available"}, 404)
+                return self._json(self.panel.software.status(query.get("ref") or None))
             if path == "/api/runs":
                 return self._json(self.panel.launcher.runs_list())
             if path.startswith("/api/runs/"):

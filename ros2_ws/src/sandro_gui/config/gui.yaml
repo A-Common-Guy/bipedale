@@ -74,6 +74,15 @@ expect:
   # effort_limit is below it is being protected from heat.
   drive_peak_nm: 9.0
 
+software:
+  # The Software page, under the working directory (/workspaces/sandro on the
+  # robot): a bare repository that deploy/pi/pi push fills from the laptop and
+  # Fetch from GitHub; a deploy writes one commit's ros2_ws/src and builds it.
+  repo: repo.git
+  remote: https://github.com/A-Common-Guy/bipedale.git
+  branch: main               # the branch the page opens on
+  skip_packages: [sandro_sim]  # not built on the robot (deploy/pi/pi sync skips it too)
+
 log:
   # Launch output lines containing any of these are dropped. joy_node logs
   # every DualSense touchpad and motion event SDL does not map.

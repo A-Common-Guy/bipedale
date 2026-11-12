@@ -50,8 +50,21 @@ deploy/pi/pi gui log      # the panel's own output
 `deploy/pi/pi launch` still works from a terminal; the panel then shows that
 launch as *external* and can stop it, but its output stays in the terminal.
 
+Updates: the Software page deploys a commit from `~/sandro/repo.git`
+(`deploy/pi/pi push` from the laptop, or Fetch from GitHub), builds what it
+changed and restarts the panel; see `deploy/pi/README.md`.
+
 ## How it works
 
+- **Software** (`software.py`). `version/source.json` is what `ros2_ws/src`
+  holds and `version/build.json` what `install/` was built from; `pi sync`,
+  `pi build` and a deploy write them. A deploy exports one commit of
+  `repo.git` with `git archive`, writes only the files that differ (with the
+  current time, so make rebuilds exactly those; as root, handed back to the
+  owner of `ros2_ws/src` so `pi sync` can still overwrite them), builds the
+  packages `pi build`'s change_scope would, and exits so `panel.sh` starts the
+  panel on the new build; the browser reloads when the panel's start time
+  changes. Refused while a launch runs.
 - **Launch.** Start runs `ros2 launch sandro_bringup sandro.launch.py ...
   arm_hardware:=false controller:=<name>` (or `imu_check.launch.py`) in its
   own session with the output going to `gui_runs/run-*.log` (the last

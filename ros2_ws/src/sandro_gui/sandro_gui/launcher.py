@@ -184,6 +184,8 @@ class Launcher:
         self._tail = None
         self._partial = b""
         self._listeners = []
+        # Returns the build's version record (software.Software.build_version).
+        self.version = None
         self._restore()
         threading.Thread(target=self._watch, name="launch-watch", daemon=True).start()
 
@@ -226,9 +228,15 @@ class Launcher:
             log_path = self.runs / f"run-{stamp}.log"
             env = dict(os.environ, PYTHONUNBUFFERED="1", RCUTILS_COLORIZED_OUTPUT="0",
                        RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}] [{time}] [{name}]: {message}")
+            version = self.version() if self.version else None
             with open(log_path, "wb") as stream:
                 stream.write(f"# {time.strftime('%Y-%m-%d %H:%M:%S')} "
                              f"{shlex.join(command)}\n".encode())
+                if version:
+                    stream.write(f"# version {version.get('commit')}"
+                                 f"{' with uncommitted changes' if version.get('dirty') else ''}"
+                                 f" ({version.get('subject', '')}), built "
+                                 f"{version.get('built_at', '?')}\n".encode())
                 stream.flush()
                 proc = subprocess.Popen(command, stdout=stream, stderr=subprocess.STDOUT,
                                         stdin=subprocess.DEVNULL, cwd=self.cwd, env=env,
@@ -236,7 +244,7 @@ class Launcher:
             self._proc = proc
             self._run = {"pid": proc.pid, "pgid": proc.pid, "ticks": _start_ticks(proc.pid),
                          "log": log_path.name, "started": time.time(), "request": request,
-                         "command": shlex.join(command), "died": []}
+                         "command": shlex.join(command), "died": [], "version": version}
             self._state = "starting"
             self._open_tail(log_path, from_start=True)
             self._save()

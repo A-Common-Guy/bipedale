@@ -18,6 +18,7 @@
       <button data-page="imu">IMU</button>
       <button data-page="pad">Gamepad</button>
       <button data-page="guide">Guide</button>
+      <button data-page="software">Software</button>
     </nav>
     <div id="chips" class="chips"></div>
     <button id="estop" class="estop" title="Send the CAN E-stop to the drives (from the panel and through the E-stop node) and deactivate every controller">E-STOP</button>
@@ -155,6 +156,34 @@
           <div class="panel"><div id="guide-pad" class="pad-live"></div><p class="hint center">Point at a row to see its buttons.</p></div>
           <div class="panel"><div id="guide-lights"></div></div>
         </div>
+      </div>
+    </section>
+
+    <section id="page-software" class="page" hidden>
+      <div class="grid software-top">
+        <div class="panel">
+          <div class="panel-head"><h2>Versions</h2>
+            <div class="tools">
+              <button id="sw-build" class="small" title="colcon build of what is in ros2_ws/src now, e.g. after deploy/pi/pi sync">Build what's on disk</button>
+              <button id="sw-restart" class="small" title="The panel only; a running launch keeps running">Restart panel</button>
+            </div>
+          </div>
+          <table id="sw-versions" class="table"></table>
+          <p class="hint">A deploy writes one commit's ros2_ws/src, builds what changed and restarts the panel on it. Every launch log starts with the version it ran.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Update</h2>
+            <div class="tools">
+              <select id="sw-ref" title="Branches pushed from the laptop (deploy/pi/pi push) and fetched from GitHub"></select>
+              <button id="sw-fetch" class="small">Fetch from GitHub</button>
+            </div>
+          </div>
+          <div id="sw-commits"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Last update</h2><span id="sw-job" class="muted small"></span></div>
+        <pre id="sw-tail" class="log sw-tail"></pre>
       </div>
     </section>
   </main>

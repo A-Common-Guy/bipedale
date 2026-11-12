@@ -7,8 +7,9 @@ import * as tune from "./tune.js";
 import * as imu from "./imu.js";
 import * as pad from "./pad.js";
 import * as guide from "./guide.js";
+import * as software from "./software.js";
 
-const PAGES = { overview, run, tune, imu, pad, guide };
+const PAGES = { overview, run, tune, imu, pad, guide, software };
 const listeners = {};
 const state = { info: null, fast: null, slow: null, logs: [], logSeq: 0, page: null };
 
@@ -105,6 +106,12 @@ function connect() {
   source.addEventListener("slow", (e) => {
     lastMessage = performance.now();
     state.slow = JSON.parse(e.data);
+    // A new panel process (after a deploy) may serve new pages: load them.
+    const boot = state.info?.software?.boot;
+    if (boot && state.slow.software?.boot && state.slow.software.boot !== boot) {
+      location.reload();
+      return;
+    }
     emit("slow", state.slow);
     header(state.slow);
   });
@@ -133,14 +140,14 @@ setInterval(() => {
 // Header -----------------------------------------------------------------
 
 const CHIPS = [["stack", "Stack"], ["can", "CAN"], ["drives", "Drives"], ["imu", "IMU"],
-  ["controller", "Ctrl"], ["pad", "Pad"]];
+  ["controller", "Ctrl"], ["pad", "Pad"], ["software", "SW"]];
 
 function header(slow) {
   const checks = Object.fromEntries((slow.checks || []).map((c) => [c.id, c]));
   replace($("#chips"), CHIPS.map(([id, label]) => {
     const check = checks[id];
     if (!check) return null;
-    return h("button", { class: `chip ${check.level}`, title: `${check.label}: ${check.value}${check.detail ? "\n" + check.detail : ""}`, onclick: () => go("overview") },
+    return h("button", { class: `chip ${check.level}`, title: `${check.label}: ${check.value}${check.detail ? "\n" + check.detail : ""}`, onclick: () => go(id === "software" ? "software" : "overview") },
       dot(check.level), h("span", { class: "chip-label" }, label),
       check.level === "off" ? null : h("span", { class: "chip-value" }, check.short || check.value));
   }));

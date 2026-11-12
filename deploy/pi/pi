@@ -5,6 +5,8 @@
 #   deploy/pi/pi sync             rsync ros2_ws/src to the Pi (about a second)
 #   deploy/pi/pi build [args]     sync + build the changed packages on the Pi (--all: everything)
 #   deploy/pi/pi launch [args]    sync + build + launch the real-hardware stack
+#   deploy/pi/pi push [branch]    the current commit into the robot's repository (panel: Software)
+#   deploy/pi/pi deploy [branch]  push, then the panel writes, builds and restarts on it
 #   deploy/pi/pi shell [cmd...]   shell (or one command) inside the robot container
 #   deploy/pi/pi can [args]       candump on can0 (default: all frames, timestamped)
 #   deploy/pi/pi gui [restart|log] the control panel on http://<pi>:8080 (sandro_gui)
@@ -14,7 +16,8 @@
 #
 # Python, YAML, URDF and launch changes are live as soon as they are synced
 # (--symlink-install). C++ changes and new files rebuild only their packages, and the
-# compiler only the files that changed.
+# compiler only the files that changed. sync and build stamp the version the panel
+# shows (version/source.json, build.json): the commit, and any uncommitted changes.
 #
 # Environment: PI_HOST (default pi@10.42.0.169), PI_DIR (default ~/sandro on the Pi),
 # PI_LAUNCH_DEFAULTS (arguments prepended to every `launch`).
@@ -179,6 +182,41 @@ cmd_sync() {
     NEEDS_BUILD=1
   fi
   [ -n "$changes" ] && echo "synced $(grep -c '^[<>ch.]f' <<<"$changes" || true) file(s)" || echo "already in sync"
+  if stamp_source "pi sync from $(hostname -s)" "$changes" && [ "$NEEDS_BUILD" = 0 ]; then
+    stamp_build  # live through --symlink-install: the build is this version already
+  fi
+}
+
+# version/source.json on the robot: the laptop's commit and the uncommitted
+# changes synced with it, for the panel's Software page and every launch log.
+# A sync that changed nothing keeps the stamp, so its time still matches the build.
+stamp_source() {  # stamp_source <via> <rsync changes>; fails when nothing was stamped
+  local json
+  json=$(python3 - "$REPO" "$1" "${2:+1}" <<'EOF'
+import json, subprocess, sys, time
+repo, via, synced = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+def git(*args):
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout.strip()
+changes = [line[3:] for line in git("status", "--porcelain", "--", "ros2_ws/src").splitlines()
+           if "/sandro_sim/" not in line]
+if not synced and changes:
+    sys.exit(1)
+print(json.dumps({
+    "commit": git("rev-parse", "HEAD"), "short": git("rev-parse", "--short=7", "HEAD"),
+    "describe": git("describe", "--always", "--tags"), "subject": git("log", "-1", "--format=%s"),
+    "date": git("log", "-1", "--format=%cI"), "author": git("log", "-1", "--format=%an"),
+    "branch": git("rev-parse", "--abbrev-ref", "HEAD"), "dirty": bool(changes),
+    "changes": changes[:20], "via": via, "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}))
+EOF
+  ) || return 1
+  if ! remote "docker exec -i $CONTAINER sh -c 'mkdir -p version && cat > version/source.json'" <<<"$json"; then
+    echo "(version not stamped: the robot container is not running)"
+    return 1
+  fi
+}
+
+stamp_build() {
+  remote "docker exec $CONTAINER python3 ros2_ws/src/sandro_gui/sandro_gui/software.py stamp-build" >/dev/null || true
 }
 
 # deploy/pi/pi build            the packages the sync changed (nothing if none)
@@ -210,6 +248,43 @@ cmd_build() {
   in_container -i "${scope:-set --;} colcon build --base-paths ros2_ws/src --symlink-install \
     \"\$@\" --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     -DCMAKE_CXX_COMPILER_LAUNCHER=ccache --event-handlers console_cohesion+ $*"
+  stamp_build
+}
+
+# The laptop's commit into the robot's repository (repo.git, through git inside
+# the container so it stays root's like the rest), for the panel's Software
+# page. Needs no internet on the robot. Sets PUSHED to the commit.
+PUSHED=""
+cmd_push() {
+  ensure_container
+  local branch
+  branch=${1:-$(git -C "$REPO" rev-parse --abbrev-ref HEAD)}
+  [ "$branch" = HEAD ] && branch=detached
+  remote "docker exec $CONTAINER sh -c 'test -d repo.git || git init --bare -q repo.git'"
+  if [ -n "$(git -C "$REPO" status --porcelain -- ros2_ws/src)" ]; then
+    echo "note: uncommitted changes under ros2_ws/src are not pushed (deploy/pi/pi sync sends them)"
+  fi
+  GIT_SSH_COMMAND="ssh ${SSH_OPTS[*]}" git -C "$REPO" push -q --force \
+    --receive-pack="docker exec -i $CONTAINER git receive-pack" \
+    "ssh://$PI/workspaces/sandro/repo.git" "HEAD:refs/heads/$branch"
+  PUSHED=$(git -C "$REPO" rev-parse HEAD)
+  echo "pushed $(git -C "$REPO" log -1 --format='%h %s') as $branch"
+}
+
+# push, then the panel deploys it: writes the files that differ, builds what
+# changed and restarts itself; the Software page shows the progress.
+cmd_deploy() {
+  cmd_push "$@"
+  local answer
+  answer=$(curl -sS -m 30 -X POST "http://${PI#*@}:8080/api/software/deploy" \
+    -H 'Content-Type: application/json' -d "{\"ref\": \"$PUSHED\"}")
+  python3 - "$answer" <<'EOF'
+import json, sys
+answer = json.loads(sys.argv[1])
+if "error" in answer:
+    sys.exit("the panel refused: " + answer["error"])
+print("deploying " + answer["job"]["target"] + ": follow it on the panel's Software page")
+EOF
 }
 
 cmd_launch() {
@@ -306,7 +381,7 @@ cmd_setup() {
 cmd=${1:-help}
 shift || true
 case "$cmd" in
-  setup|sync|build|launch|shell|can|gui|status|reset) "cmd_$cmd" "$@" ;;
+  setup|sync|build|launch|push|deploy|shell|can|gui|status|reset) "cmd_$cmd" "$@" ;;
   imu-cal) cmd_imu_cal "$@" ;;
-  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac

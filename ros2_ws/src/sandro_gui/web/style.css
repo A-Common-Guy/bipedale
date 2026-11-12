@@ -363,8 +363,16 @@ dialog h3 { font-size: 15px; margin-bottom: 8px; color: var(--bright); }
 dialog label.check { margin-top: 10px; color: var(--muted); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
+.software-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: start; }
+.sw-tail { height: 300px; margin: 0; padding: 6px 10px; white-space: pre-wrap; word-break: break-word; }
+.sw-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+/* Takes what the other columns leave and cuts the rest. */
+.sw-subject { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sw-when { white-space: nowrap; color: var(--muted); font-size: 12px; }
+.table tr.sw-current td { background: #15201a; }
+
 @media (max-width: 1180px) {
-  .overview-top, .run-top, .guide, .pad-grid { grid-template-columns: minmax(0, 1fr); }
+  .overview-top, .run-top, .guide, .pad-grid, .software-top { grid-template-columns: minmax(0, 1fr); }
   .readings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sticky { position: static; }
   .chip-value { display: none; }
