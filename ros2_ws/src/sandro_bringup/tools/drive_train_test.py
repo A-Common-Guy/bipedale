@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Backlash and stiffness of one wheel drive train, with the wheel blocked.
+"""Backlash and stiffness of one drive train, with its output blocked.
 
 The drive's encoder sits on the motor, before the 8:1 gear, so with the wheel
-held still a slow torque triangle moves the motor through the gear's play
+(or, for a leg motor, the axle) held still a slow torque triangle moves the motor
+through the gear's play
 (at almost no torque) and then against the drive train's stiffness. A short
 sine at a few Hz follows, for the dynamic stiffness. The motor position comes
 from /joint_states (output-side rad); the torque is the commanded one.
@@ -13,6 +14,9 @@ Two setups, one wheel at a time:
   block between tyre and frame). Play and stiffness of gear, shaft and hub.
 - ground: robot standing on the floor, the body pressed down and held so it
   cannot roll or turn. Adds the tyre's fore-aft compliance on the floor.
+- leg: a leg motor (right_motor_inner ...) with that leg's axle clamped to the
+  body or a fixed block, robot lifted. Play and stiffness of the leg's gear and
+  links, which the 2026-11 yaw mode points at (recordings/yaw_closure.py).
 
 On the robot, for each wheel and setup (the commissioning controller clamps
 at 0.5 Nm and zeroes 0.1 s after the last command):
@@ -123,7 +127,7 @@ def analyse(path):
     (s_pos, c_pos), (s_neg, c_neg) = fit(pos), fit(neg)
     play = c_pos - c_neg
     print(f"{meta['joint']} ({meta['setup']}), {slow.sum()} samples over {slow_end:.0f} s of triangles:")
-    print(f"  play {play * 1e3:.1f} mrad ({math.degrees(play):.2f} deg) at the wheel")
+    print(f"  play {play * 1e3:.1f} mrad ({math.degrees(play):.2f} deg) at the gear output")
     print(f"  stiffness beyond it {1 / s_pos:.0f} Nm/rad (positive torque), {1 / s_neg:.0f} Nm/rad (negative)")
     # Hysteresis inside each side: rising against falling torque at the same load.
     rising = np.gradient(tau_s) > 0
@@ -147,8 +151,10 @@ def analyse(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--joint", choices=["right_wheel", "left_wheel"])
-    parser.add_argument("--setup", choices=["gear", "ground"], default="gear")
+    parser.add_argument("--joint", choices=["right_wheel", "left_wheel", "right_motor_inner",
+                                            "right_motor_outer", "left_motor_inner",
+                                            "left_motor_outer"])
+    parser.add_argument("--setup", choices=["gear", "ground", "leg"], default="gear")
     parser.add_argument("--amplitude", type=float, default=0.45, help="Nm, at most 0.5")
     parser.add_argument("--period", type=float, default=4.0, help="s per triangle")
     parser.add_argument("--cycles", type=int, default=4)

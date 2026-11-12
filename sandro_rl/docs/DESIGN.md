@@ -1253,8 +1253,9 @@ scripts: `recordings/buzz_2026-11-09/` (`buzz_spectrum.py` in
 - **The mode:** 8–10 Hz, in yaw. The wheels move against each other (5–15 Hz
   right/left wheel velocity correlation −0.6 to −0.83, against +1.00 in the
   0.5–3 Hz forward rocking), the yaw rate is 2–4× the pitch rate, the legs
-  move in height (inner against outer, −0.76 to −0.93) and the IMU sees it
-  sideways. The noise is the wheel torque reversing through the gear
+  move fore-aft (inner against outer, −0.76 to −0.93: in the five-bar's
+  convention opposite crank motion moves the axle along planar x; the first
+  version of this note said height) and the IMU sees it sideways. The noise is the wheel torque reversing through the gear
   backlash about ten times a second.
 - **The policy drives it:** in `rl_flat_level` the wheel actions carry it
   (5–15 Hz RMS 0.05–0.06, as much as everything below 5 Hz).
@@ -1329,6 +1330,31 @@ the 5–15 Hz yaw is 0.004–0.008 rad/s against up to 0.16 for
 has no slow-IMU chatter and no fall in the worst-case shoves, and its yaw
 error rises from 0.011 to 0.013 rad/s; `flat_level_fast_drivetrain` is on
 par with `flat_level_fast`.
+
+**On the robot (2026-11-12, `recordings/buzz_2026-11-12/`).** Both
+drivetrain policies pump the mode as hard as any: `rl_flat_level_drivetrain`
+0.95 rad/s of 5–15 Hz yaw at 8.8 Hz (watchdog 0.97 of 1.0). The WBC, also
+while turning at 1.5 rad/s, stays at 0.03–0.04 with no 9 Hz peak: the
+structure does not ring by itself, the policies feed it. With
+`action.wheel_differential_filter_hz: 3` (`buzz_yaw_filter_3hz.yaml`) the
+9 Hz mode goes (0.10 rad/s, peak 3 Hz); the drivetrain policies then feel
+unstable and slow (0.65–0.75 rad/s of 5–15 Hz common wheel motion, a 3 Hz yaw
+wobble), `agile_terrain` stays quick and is the best to drive.
+
+`recordings/yaw_closure.py` fits the gyro's 5–15 Hz yaw rate with the
+rotors' rolling yaw and the axle line turning under the body (both legs'
+fore-aft motion from the leg encoders). At full strength the gyro follows
+the legs' term in phase at twice its size (b = 2.0, R² 0.91 alone, 0.92
+with rolling, which adds nothing: a = −0.2). Springs in series deflect in
+phase, so about half the yaw compliance is the legs' fore-aft stiffness as
+their encoders see it (the drive-side PD, kp 12 / kd 0.5) and the other half
+sits in series where no encoder sees it: play or wind-up in the leg gears,
+the wheel gears, the tyres. That agrees with the 0.9 mm of leg motion above,
+and the drivetrain training put all of the compliance in the wheel gears.
+Next: the yaw ringing frequency under the WBC at leg kp 8 / 12 / 18 (all
+compliance in the leg PD: −18 / +22 %; half of it: −11 / +10 %; none: 0),
+and `drive_train_test.py` on a leg motor with its axle clamped, on a wheel
+with its rim blocked, and on the ground.
 
 ## 9. Deployment sketch (not executed; the owner's decision)
 

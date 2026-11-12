@@ -1,0 +1,276 @@
+# 2026-11-12 21:28:52 ros2 launch sandro_bringup sandro.launch.py hardware:=real imu_transport:=spi imu_spi_device:=/dev/spidev6.0 rviz:=false arm_hardware:=false state_source:=mit controller:=whole_body_controller teleop:=true extra_params:=/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml
+# version ebbaef913230fb129942b7edc72248a1524a91ab (fix(gui): fetch as a background job; pi sync/build restart the panel when its code changes), built 2026-11-12T21:14:03+0000
+[INFO] [launch]: All log files can be found below /var/log/ros/2026-11-12-21-28-53-884183-robot-1118
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [launch.user]: REAL SAFE STATE: drives are not armed; SandroSystem starts inactive (no torque) and whole_body_controller waits inactive. Arm from the control panel, or: ros2 control set_hardware_component_state SandroSystem active, then ros2 control switch_controllers --activate <controller>. arm_hardware:=true arms at launch; use it only after commissioning checks.
+[INFO] [robot_state_publisher-1]: process started with pid [1132]
+[INFO] [gim6010_estop-2]: process started with pid [1133]
+[INFO] [ros2_control_node-3]: process started with pid [1134]
+[INFO] [spawner-4]: process started with pid [1135]
+[INFO] [spawner-5]: process started with pid [1136]
+[INFO] [joy_node-6]: process started with pid [1137]
+[INFO] [joy_teleop-7]: process started with pid [1139]
+[INFO] [joy_estop-8]: process started with pid [1140]
+[ros2_control_node-3] [INFO] [1794518935.988423981] [controller_manager]: Using Steady (Monotonic) clock for triggering controller manager cycles.
+[robot_state_publisher-1] [INFO] [1794518936.151255690] [robot_state_publisher]: Robot initialized
+[ros2_control_node-3] [INFO] [1794518936.199465951] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[ros2_control_node-3] [INFO] [1794518936.597773238] [controller_manager]: update rate is 300 Hz
+[ros2_control_node-3] [INFO] [1794518936.597960052] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-3] [INFO] [1794518936.598004237] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-3] [INFO] [1794518936.649603533] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 50.
+[ros2_control_node-3] [INFO] [1794518936.673148333] [controller_manager]: Received robot description from topic.
+[ros2_control_node-3] [INFO] [1794518936.674908545] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[ros2_control_node-3] [INFO] [1794518936.809450630] [controller_manager]: Loading hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794518936.827788629] [controller_manager]: Loaded hardware 'SandroSystem' from plugin 'sandro_hardware/GIM6010System'
+[ros2_control_node-3] [INFO] [1794518936.828208052] [controller_manager]: Initialize hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794518936.897462721] [controller_manager]: Successful initialization of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794518936.909034965] [controller_manager]: Loading hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794518936.911894448] [controller_manager]: Loaded hardware 'SandroImu' from plugin 'sandro_hardware/BNO085Sensor'
+[ros2_control_node-3] [INFO] [1794518936.912816146] [controller_manager]: Initialize hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794518937.014728005] [controller_manager]: Successful initialization of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794518937.022113996] [controller_manager]: Setting component 'SandroSystem' to 'inactive' state.
+[ros2_control_node-3] [INFO] [1794518937.022429365] [resource_manager]: 'configure' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794518937.022675308] [GIM6010System]: CAN send buffer 32768 bytes (kernel accounting)
+[ros2_control_node-3] [INFO] [1794518937.050619137] [resource_manager]: Successful 'configure' of hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794518937.051039523] [controller_manager]: Activating component 'SandroImu'.
+[ros2_control_node-3] [INFO] [1794518937.055424348] [resource_manager]: 'configure' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794518937.056686933] [resource_manager]: Successful 'configure' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794518937.056772044] [resource_manager]: 'activate' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794518937.417665839] [resource_manager]: Successful 'activate' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794518937.417953522] [controller_manager]: Registering statistics for : SandroImu
+[ros2_control_node-3] [INFO] [1794518937.418252316] [controller_manager]: Registering statistics for : SandroSystem
+[ros2_control_node-3] [INFO] [1794518937.418577148] [controller_manager]: Resource Manager has been successfully initialized. Starting Controller Manager services...
+[ros2_control_node-3] [INFO] [1794518937.618823832] [controller_manager]: Loading controller : 'joint_state_broadcaster' of type 'joint_state_broadcaster/JointStateBroadcaster'
+[ros2_control_node-3] [INFO] [1794518937.618954571] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1794518937.664670700] [controller_manager]: Controller 'joint_state_broadcaster' node arguments: --ros-args --params-file /tmp/launch_params_86bb2zer --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /tmp/launch_params__7tdqs8l --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_w36ehm_0 --params-file /tmp/launch_params_cs3q121u 
+[spawner-4] [INFO] [1794518937.833177188] [spawner_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[ros2_control_node-3] [INFO] [1794518937.843195275] [controller_manager]: Configuring controller: 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1794518937.843517866] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[joy_teleop-7] [INFO] [1794518937.861953012] [joy_teleop]: gamepad teleop: hold button 9 to drive; switch policy with 9+3 among ['rl_flat_level', 'rl_agile_terrain', 'rl_flat_level_fast', 'rl_flat_level_drivetrain', 'rl_flat_level_fast_drivetrain']; button 1 tells the running one
+[ros2_control_node-3] [INFO] [1794518937.880920711] [controller_manager]: Activating controllers: [ joint_state_broadcaster ]
+[ros2_control_node-3] [INFO] [1794518937.884010415] [controller_manager]: Successfully switched controllers!
+[spawner-4] [INFO] [1794518937.891756164] [spawner_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[ros2_control_node-3] [INFO] [1794518937.901687233] [controller_manager]: Loading controller : 'health_broadcaster' of type 'joint_state_broadcaster/JointStateBroadcaster'
+[ros2_control_node-3] [INFO] [1794518937.901805973] [controller_manager]: Loading controller 'health_broadcaster'
+[ros2_control_node-3] [INFO] [1794518937.906102261] [controller_manager]: Controller 'health_broadcaster' node arguments: --ros-args --params-file /tmp/launch_params_86bb2zer --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /tmp/launch_params__7tdqs8l --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_w36ehm_0 --params-file /tmp/launch_params_cs3q121u 
+[spawner-4] [INFO] [1794518937.974821804] [spawner_joint_state_broadcaster]: Loaded health_broadcaster
+[ros2_control_node-3] [INFO] [1794518937.981111210] [controller_manager]: Configuring controller: 'health_broadcaster'
+[ros2_control_node-3] [INFO] [1794518937.981341042] [health_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[joy_estop-8] [INFO] [1794518938.009302927] [joy_estop]: gamepad E-stop armed on axes [4, 5] (press together); re-arm by holding buttons [4, 6] for 2.0 s, twice
+[ros2_control_node-3] [INFO] [1794518938.035976634] [controller_manager]: Activating controllers: [ health_broadcaster ]
+[ros2_control_node-3] [INFO] [1794518938.040764105] [controller_manager]: Successfully switched controllers!
+[spawner-4] [INFO] [1794518938.051665446] [spawner_joint_state_broadcaster]: Configured and activated health_broadcaster
+[ros2_control_node-3] [INFO] [1794518938.059211474] [controller_manager]: Loading controller : 'imu_broadcaster' of type 'imu_sensor_broadcaster/IMUSensorBroadcaster'
+[ros2_control_node-3] [INFO] [1794518938.059332103] [controller_manager]: Loading controller 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794518938.070876291] [controller_manager]: Controller 'imu_broadcaster' node arguments: --ros-args --params-file /tmp/launch_params_86bb2zer --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /tmp/launch_params__7tdqs8l --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_w36ehm_0 --params-file /tmp/launch_params_cs3q121u 
+[spawner-4] [INFO] [1794518938.129246250] [spawner_joint_state_broadcaster]: Loaded imu_broadcaster
+[ros2_control_node-3] [INFO] [1794518938.132531211] [controller_manager]: Configuring controller: 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794518938.152842050] [controller_manager]: Activating controllers: [ imu_broadcaster ]
+[ros2_control_node-3] [INFO] [1794518938.153637304] [controller_manager]: Successfully switched controllers!
+[spawner-4] [INFO] [1794518938.162930470] [spawner_joint_state_broadcaster]: Configured and activated imu_broadcaster
+[INFO] [spawner-4]: process has finished cleanly [pid 1135]
+[ros2_control_node-3] [INFO] [1794518939.055612534] [controller_manager]: Loading controller : 'whole_body_controller' of type 'sandro_controllers/WholeBodyController'
+[ros2_control_node-3] [INFO] [1794518939.055763885] [controller_manager]: Loading controller 'whole_body_controller'
+[ros2_control_node-3] [INFO] [1794518939.073031261] [controller_manager]: Controller 'whole_body_controller' node arguments: --ros-args --params-file /tmp/launch_params_86bb2zer --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /tmp/launch_params__7tdqs8l --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml --params-file /tmp/launch_params_w36ehm_0 --params-file /tmp/launch_params_cs3q121u 
+[spawner-5] [INFO] [1794518939.303332188] [spawner_whole_body_controller]: Loaded whole_body_controller
+[ros2_control_node-3] [INFO] [1794518939.318419892] [controller_manager]: Configuring controller: 'whole_body_controller'
+[ros2_control_node-3] [INFO] [1794518939.329455991] [whole_body_controller]: Whole-body LQR at 0.170 m leg height (leg lag 70 ms): wheel gains [x -1.43, v -1.21, pitch -14.47, rate -1.20, offset cmd -7.99, offset -18.48] Nm; leg gains [x 1.38, v 1.07, pitch 0.81, rate 0.20, offset cmd 11.39, offset 4.76] m/s; input-delay margin 20.0 ms over the gain table
+[INFO] [spawner-5]: process has finished cleanly [pid 1136]
+[ros2_control_node-3] [INFO] [1794518946.429256469] [resource_manager]: 'activate' hardware 'SandroSystem' 
+[ros2_control_node-3] [ERROR] [1794518947.929661466] [GIM6010System]: activation failed: no CAN frame at all in 1.500000 s on 'can0': the bus is silent (drives unpowered, cut-off engaged, or the adapter-to-drive cable is off); silent: right_motor_inner (node 1: no heartbeat), right_motor_outer (node 2: no heartbeat), right_wheel (node 3: no heartbeat), left_motor_inner (node 5: no heartbeat), left_motor_outer (node 4: no heartbeat), left_wheel (node 6: no heartbeat)
+[ros2_control_node-3] [ERROR] [1794518947.930082538] [resource_manager]: Failed to 'activate' hardware 'SandroSystem'
+[ros2_control_node-3] [INFO] [1794518952.145325050] [resource_manager]: 'configure' hardware 'SandroSystem' 
+[ros2_control_node-3] [INFO] [1794518952.178904049] [GIM6010System]: CAN send buffer 32768 bytes (kernel accounting)
+[ros2_control_node-3] [INFO] [1794518952.179154547] [resource_manager]: Successful 'configure' of hardware 'SandroSystem'
+[ros2_control_node-3] [WARN] [1794518952.179195825] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/position' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179277436] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/velocity' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179303917] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179326139] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/feedback_age' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179347972] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/raw_position_rev' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179367342] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/raw_velocity_rev_s' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179388842] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/online' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179413157] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/iq' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179434416] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/temperature' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179454879] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/error' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179475990] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/requested_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179495897] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/applied_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179516267] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/saturation_count' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179537378] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/dropped_frames' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179559452] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/effort_limit' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179580971] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/position' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179602378] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/velocity' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179623452] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179640989] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/feedback_age' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179712285] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/raw_position_rev' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179752173] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/raw_velocity_rev_s' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179772988] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/online' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179794821] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/iq' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179820321] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/temperature' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179840543] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/error' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179861080] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/requested_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179881524] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/applied_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179902654] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/saturation_count' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179920320] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/dropped_frames' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179940061] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/effort_limit' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179960709] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/position' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.179980505] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/velocity' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180000616] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180230967] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/feedback_age' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180324262] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/raw_position_rev' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180350040] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/raw_velocity_rev_s' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180373410] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/online' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180399781] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/iq' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180419762] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/temperature' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180471725] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/error' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180497539] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/requested_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180520872] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/applied_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180543650] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/saturation_count' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180567483] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/dropped_frames' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180588742] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/effort_limit' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180606983] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/position' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180627927] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/velocity' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180649335] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180671057] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/feedback_age' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180692871] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/raw_position_rev' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180714816] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/raw_velocity_rev_s' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180736723] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/online' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180757389] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/iq' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180778741] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/temperature' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180800760] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/error' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180819222] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/requested_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180842611] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/applied_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180868111] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/saturation_count' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180889426] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/dropped_frames' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180943777] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/effort_limit' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180970518] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/position' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.180990981] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/velocity' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181012073] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181033629] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/feedback_age' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181056240] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/raw_position_rev' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181087462] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/raw_velocity_rev_s' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181109239] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/online' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181130721] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/iq' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181152017] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/temperature' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181185424] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/error' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181206646] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/requested_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181229387] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/applied_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181251516] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/saturation_count' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181275812] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/dropped_frames' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181296442] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/effort_limit' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181319034] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/position' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181339627] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/velocity' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181358145] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181476922] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/feedback_age' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181537348] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/raw_position_rev' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181567347] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/raw_velocity_rev_s' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181589625] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/online' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181611532] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/iq' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181637588] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/temperature' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181659421] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/error' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181680736] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/requested_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181702569] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/applied_effort' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181722921] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/saturation_count' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181745643] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/dropped_frames' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181770494] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/effort_limit' state interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181803457] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/effort' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181826013] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/position' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181848346] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/velocity' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181869772] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/kp' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181889920] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_inner/kd' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181910790] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/effort' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181933623] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/position' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181955141] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/velocity' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.181975938] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/kp' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182026697] [controller_manager]: (hardware 'SandroSystem'): 'right_motor_outer/kd' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182061307] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/effort' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182081085] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/position' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182102585] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/velocity' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182121548] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/kp' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182143159] [controller_manager]: (hardware 'SandroSystem'): 'right_wheel/kd' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182165233] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/effort' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182186807] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/position' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182207770] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/velocity' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182228918] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/kp' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182249529] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_inner/kd' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182268325] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/effort' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182289399] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/position' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182310269] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/velocity' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182331213] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/kp' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182351324] [controller_manager]: (hardware 'SandroSystem'): 'left_motor_outer/kd' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182371435] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/effort' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182392861] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/position' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182413416] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/velocity' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182434250] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/kp' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [WARN] [1794518952.182455083] [controller_manager]: (hardware 'SandroSystem'): 'left_wheel/kd' command interface already in available list. This can happen due to multiple calls to 'configure'
+[ros2_control_node-3] [INFO] [1794518952.182507934] [resource_manager]: 'activate' hardware 'SandroSystem' 
+[ros2_control_node-3] [ERROR] [1794518953.684350768] [GIM6010System]: activation failed: no CAN frame at all in 1.500000 s on 'can0': the bus is silent (drives unpowered, cut-off engaged, or the adapter-to-drive cable is off); silent: right_motor_inner (node 1: no heartbeat), right_motor_outer (node 2: no heartbeat), right_wheel (node 3: no heartbeat), left_motor_inner (node 5: no heartbeat), left_motor_outer (node 4: no heartbeat), left_wheel (node 6: no heartbeat)
+[ros2_control_node-3] [ERROR] [1794518953.684540803] [GIM6010System]: stop frames not sent to left_motor_inner, left_motor_outer, left_wheel; their CAN deadman idles them within 300 ms
+[ros2_control_node-3] [ERROR] [1794518953.684574766] [resource_manager]: Failed to 'activate' hardware 'SandroSystem'
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[gim6010_estop-2] [INFO] [1794518963.347856377] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1794518963.347910525] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1794518963.348020080] [controller_manager]: Shutdown request received....
+[ros2_control_node-3] [INFO] [1794518963.348184635] [controller_manager]: Shutting down all controllers in the controller manager.
+[INFO] [joy_estop-8]: sending signal 'SIGINT' to process[joy_estop-8]
+[INFO] [joy_teleop-7]: sending signal 'SIGINT' to process[joy_teleop-7]
+[INFO] [joy_node-6]: sending signal 'SIGINT' to process[joy_node-6]
+[INFO] [ros2_control_node-3]: sending signal 'SIGINT' to process[ros2_control_node-3]
+[INFO] [gim6010_estop-2]: sending signal 'SIGINT' to process[gim6010_estop-2]
+[INFO] [robot_state_publisher-1]: sending signal 'SIGINT' to process[robot_state_publisher-1]
+[ros2_control_node-3] [INFO] [1794518963.348250282] [controller_manager]: Shutting down controller 'whole_body_controller'
+[ros2_control_node-3] [INFO] [1794518963.348864427] [controller_manager]: Deactivating controller 'health_broadcaster'
+[ros2_control_node-3] [INFO] [1794518963.349107166] [controller_manager]: Shutting down controller 'health_broadcaster'
+[ros2_control_node-3] [INFO] [1794518963.349419349] [controller_manager]: Deactivating controller 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794518963.349557386] [controller_manager]: Shutting down controller 'imu_broadcaster'
+[ros2_control_node-3] [INFO] [1794518963.349785606] [controller_manager]: Deactivating controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1794518963.349954420] [controller_manager]: Shutting down controller 'joint_state_broadcaster'
+[ros2_control_node-3] [INFO] [1794518963.350170826] [resource_manager]: 'deactivate' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794518963.365570548] [resource_manager]: Successful 'deactivate' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794518963.365634362] [resource_manager]: 'shutdown' hardware 'SandroImu' 
+[ros2_control_node-3] [INFO] [1794518963.365648973] [resource_manager]: Successful 'shutdown' of hardware 'SandroImu'
+[ros2_control_node-3] [INFO] [1794518963.365868694] [resource_manager]: 'shutdown' hardware 'SandroSystem' 
+[robot_state_publisher-1] [INFO] [1794518963.352961717] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[joy_estop-8] Traceback (most recent call last):
+[joy_estop-8]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop", line 33, in <module>
+[joy_estop-8]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_estop')())
+[joy_estop-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_estop.py", line 550, in main
+[joy_estop-8]     node.destroy_node()
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1960, in destroy_node
+[joy_teleop-7] Traceback (most recent call last):
+[joy_teleop-7]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop", line 33, in <module>
+[joy_teleop-7]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_teleop')())
+[joy_teleop-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_teleop.py", line 634, in main
+[joy_teleop-7]     node.destroy_node()
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1960, in destroy_node
+[joy_teleop-7]     self.destroy_client(self._clients[0])
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1870, in destroy_client
+[joy_teleop-7]     client.destroy()
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/client.py", line 232, in destroy
+[ros2_control_node-3] [INFO] [1794518963.401827864] [resource_manager]: Successful 'shutdown' of hardware 'SandroSystem'
+[joy_estop-8]     self.destroy_client(self._clients[0])
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1870, in destroy_client
+[joy_teleop-7]     self.__client.destroy_when_not_in_use()
+[joy_teleop-7] KeyboardInterrupt
+[joy_estop-8]     client.destroy()
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/client.py", line 232, in destroy
+[joy_estop-8]     self.__client.destroy_when_not_in_use()
+[joy_estop-8] KeyboardInterrupt
+[ros2_control_node-3] [INFO] [1794518963.405654267] [controller_manager]: Shutting down the controller manager.
+[ros2_control_node-3] [ERROR] [1794518963.406802538] [controller_manager.pal_statistics]: Exception in publisher thread: context cannot be slept with because it's invalid!. Aborting!
+[ros2_control_node-3] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[ros2_control_node-3] [ERROR] [1794518963.408489102] [controller_manager.pal_statistics]: Exception in publisher thread: context cannot be slept with because it's invalid!. Aborting!
+[gim6010_estop-2] [INFO] [1794518963.414440732] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[robot_state_publisher-1] [INFO] [1794518963.422276536] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1794518963.436130711] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] [INFO] [1794518963.453933899] [controller_manager.pal_statistics]: Async messages lost 0
+[ros2_control_node-3] [INFO] [1794518963.455129966] [controller_manager.pal_statistics]: publish_async_failures_ 3
+[ros2_control_node-3] [INFO] [1794518963.472728396] [controller_manager.pal_statistics]: Async messages lost 0
+[ros2_control_node-3] [INFO] [1794518963.472869414] [controller_manager.pal_statistics]: publish_async_failures_ 0
+[INFO] [robot_state_publisher-1]: process has finished cleanly [pid 1132]
+[INFO] [gim6010_estop-2]: process has finished cleanly [pid 1133]
+[INFO] [joy_node-6]: process has finished cleanly [pid 1137]
+[ERROR] [joy_estop-8]: process has died [pid 1140, exit code -2, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop --ros-args -r __node:=joy_estop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml --params-file /tmp/launch_params_zxn1s3_w'].
+[ERROR] [joy_teleop-7]: process has died [pid 1139, exit code -2, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop --ros-args -r __node:=joy_teleop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml'].
+[INFO] [ros2_control_node-3]: process has finished cleanly [pid 1134]

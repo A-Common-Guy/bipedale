@@ -1,0 +1,184 @@
+# 2026-11-12 21:52:57 ros2 launch sandro_bringup sandro.launch.py hardware:=real imu_transport:=spi imu_spi_device:=/dev/spidev6.0 rviz:=false arm_hardware:=false state_source:=mit controller:=whole_body_controller teleop:=true extra_params:=/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/sandro_real_overrides.yaml extra_params:=/workspaces/sandro/experiments/buzz_yaw_filter_3hz.yaml
+# version ebbaef913230fb129942b7edc72248a1524a91ab (fix(gui): fetch as a background job; pi sync/build restart the panel when its code changes), built 2026-11-12T21:14:03+0000
+[INFO] [launch]: All log files can be found below /var/log/ros/2026-11-12-21-52-58-858754-robot-1005
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [launch.user]: REAL SAFE STATE: drives are not armed; SandroSystem starts inactive (no torque) and whole_body_controller waits inactive. Arm from the control panel, or: ros2 control set_hardware_component_state SandroSystem active, then ros2 control switch_controllers --activate <controller>. arm_hardware:=true arms at launch; use it only after commissioning checks.
+[INFO] [robot_state_publisher-1]: process started with pid [1011]
+[INFO] [gim6010_estop-2]: process started with pid [1012]
+[INFO] [ros2_control_node-3]: process started with pid [1013]
+[INFO] [spawner-4]: process started with pid [1014]
+[INFO] [spawner-5]: process started with pid [1015]
+[INFO] [joy_node-6]: process started with pid [1016]
+[INFO] [joy_teleop-7]: process started with pid [1017]
+[INFO] [joy_estop-8]: process started with pid [1018]
+[robot_state_publisher-1] [INFO] [1794520380.419342458] [robot_state_publisher]: Robot initialized
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [joy_estop-8]: sending signal 'SIGINT' to process[joy_estop-8]
+[ERROR] [joy_node-6]: process has died [pid 1016, exit code -6, cmd '/opt/ros/jazzy/lib/joy/joy_node --ros-args --log-level warn --ros-args --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml'].
+[ERROR] [spawner-4]: process has died [pid 1014, exit code -2, cmd '/opt/ros/jazzy/lib/controller_manager/spawner joint_state_broadcaster health_broadcaster imu_broadcaster --controller-manager /controller_manager --controller-manager-timeout 30 --ros-args'].
+[INFO] [joy_teleop-7]: sending signal 'SIGINT' to process[joy_teleop-7]
+[INFO] [spawner-5]: sending signal 'SIGINT' to process[spawner-5]
+[INFO] [ros2_control_node-3]: sending signal 'SIGINT' to process[ros2_control_node-3]
+[ERROR] [spawner-5]: process has died [pid 1015, exit code -2, cmd '/opt/ros/jazzy/lib/controller_manager/spawner whole_body_controller --inactive --controller-manager /controller_manager --controller-manager-timeout 30 --ros-args'].
+[ERROR] [ros2_control_node-3]: process has died [pid 1013, exit code -6, cmd '/opt/ros/jazzy/lib/controller_manager/ros2_control_node --ros-args --params-file /tmp/launch_params_uf66wyrc --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/controllers.yaml --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/rl_policies.yaml --params-file /tmp/launch_params_ua5v_jmo --params-file /workspaces/sandro/experiments/buzz_yaw_filter_3hz.yaml --params-file /tmp/launch_params_4p43k61r --params-file /tmp/launch_params_mlv9nebl'].
+[INFO] [gim6010_estop-2]: sending signal 'SIGINT' to process[gim6010_estop-2]
+[INFO] [robot_state_publisher-1]: sending signal 'SIGINT' to process[robot_state_publisher-1]
+[ros2_control_node-3] [INFO] [1794520380.637524686] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ros2_control_node-3] terminate called after throwing an instance of 'rclcpp::exceptions::RCLError'
+[ros2_control_node-3]   what():  could not create subscription: rcl node's context is invalid, at ./src/rcl/node.c:404
+[ros2_control_node-3] Stack trace (most recent call last):
+[ros2_control_node-3] #20   Object "/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1", at 0xffffffffffffffff, in 
+[ros2_control_node-3] #19   Object "/opt/ros/jazzy/lib/controller_manager/ros2_control_node", at 0x5588025eaf, in _start
+[ros2_control_node-3] #18   Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7faf868597, in __libc_start_main
+[ros2_control_node-3] #17   Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7faf8684c3, in 
+[ros2_control_node-3] #16   Object "/opt/ros/jazzy/lib/controller_manager/ros2_control_node", at 0x5588024a8b, in main
+[ros2_control_node-3] #15   Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fb005cacf, in controller_manager::ControllerManager::ControllerManager(std::shared_ptr<rclcpp::Executor>, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp::NodeOptions const&)
+[ros2_control_node-3] #14   Object "/opt/ros/jazzy/lib/libcontroller_manager.so", at 0x7fb005c18b, in controller_manager::ControllerManager::ControllerManager(std::shared_ptr<rclcpp::Executor>, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp::NodeOptions const&)
+[ros2_control_node-3] #13   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fafe39b83, in rclcpp::Node::Node(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp::NodeOptions const&)
+[ros2_control_node-3] #12   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fafe619df, in rclcpp::node_interfaces::NodeTimeSource::NodeTimeSource(std::shared_ptr<rclcpp::node_interfaces::NodeBaseInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeTopicsInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeGraphInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeServicesInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeLoggingInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeClockInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeParametersInterface>, rclcpp::QoS const&, bool)
+[ros2_control_node-3] #11   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fafec4d33, in rclcpp::TimeSource::attachNode(std::shared_ptr<rclcpp::node_interfaces::NodeBaseInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeTopicsInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeGraphInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeServicesInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeLoggingInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeClockInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeParametersInterface>)
+[ros2_control_node-3] #10   Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fafec1807, in 
+[ros2_control_node-3] #9    Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fafed3717, in std::_Function_handler<std::shared_ptr<rclcpp::SubscriptionBase> (rclcpp::node_interfaces::NodeBaseInterface*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp::QoS const&), rclcpp::create_subscription_factory<rcl_interfaces::msg::ParameterEvent_<std::allocator<void> >, rclcpp::TimeSource::NodeState::attachNode(std::shared_ptr<rclcpp::node_interfaces::NodeBaseInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeTopicsInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeGraphInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeServicesInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeLoggingInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeClockInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeParametersInterface>)::{lambda(std::shared_ptr<rcl_interfaces::msg::ParameterEvent_<std::allocator<void> > const>)#1}, std::allocator<void>, rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent_<std::allocator<void> >, std::allocator<void>, rcl_interfaces::msg::ParameterEvent_<std::allocator<void> >, rcl_interfaces::msg::ParameterEvent_<std::allocator<void> >, rclcpp::message_memory_strategy::MessageMemoryStrategy<rcl_interfaces::msg::ParameterEvent_<std::allocator<void> >, std::allocator<void> > >, rclcpp::message_memory_strategy::MessageMemoryStrategy<rcl_interfaces::msg::ParameterEvent_<std::allocator<void> >, std::allocator<void> > >(rclcpp::TimeSource::NodeState::attachNode(std::shared_ptr<rclcpp::node_interfaces::NodeBaseInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeTopicsInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeGraphInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeServicesInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeLoggingInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeClockInterface>, std::shared_ptr<rclcpp::node_interfaces::NodeParametersInterface>)::{lambda(std::shared_ptr<rcl_interfaces::msg::ParameterEvent_<std::allocator<void> > const>)#1}&&, rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void> > const&, rclcpp::message_memory_strategy::MessageMemoryStrategy<rcl_interfaces::msg::ParameterEvent_<std::allocator<void> >, std::allocator<void> >::SharedPtr, std::shared_ptr<rclcpp::topic_statistics::SubscriptionTopicStatistics>)::{lambda(rclcpp::node_interfaces::NodeBaseInterface*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp::QoS const&)#1}>::_M_invoke(std::_Any_data const&, rclcpp::node_interfaces::NodeBaseInterface*&&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp::QoS const&)
+[ros2_control_node-3] #8    Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fafeb970b, in rclcpp::SubscriptionBase::SubscriptionBase(rclcpp::node_interfaces::NodeBaseInterface*, rosidl_message_type_support_t const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rcl_subscription_options_s const&, rclcpp::SubscriptionEventCallbacks const&, bool, rclcpp::DeliveredMessageKind)
+[ros2_control_node-3] #7    Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7fafddd613, in rclcpp::exceptions::throw_from_rcl_error(int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rcutils_error_state_s const*, void (*)())
+[ros2_control_node-3] #6    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fafaea547, in std::rethrow_exception(std::__exception_ptr::exception_ptr)
+[joy_node-6] terminate called after throwing an instance of 'rclcpp::exceptions::RCLError'
+[joy_node-6]   what():  could not create publisher: rcl node's context is invalid, at ./src/rcl/node.c:404
+[robot_state_publisher-1] [INFO] [1794520380.637878925] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[spawner-4] Traceback (most recent call last):
+[spawner-4]   File "/opt/ros/jazzy/lib/controller_manager/spawner", line 10, in <module>
+[spawner-4]     from importlib.metadata import distribution
+[spawner-4]   File "/usr/lib/python3.12/importlib/metadata/__init__.py", line 19, in <module>
+[spawner-4]     from . import _adapters, _meta
+[spawner-4]   File "/usr/lib/python3.12/importlib/metadata/_adapters.py", line 5, in <module>
+[spawner-4]     import email.message
+[spawner-4]   File "/usr/lib/python3.12/email/message.py", line 17, in <module>
+[spawner-4]     from email._policybase import compat32
+[spawner-4]   File "/usr/lib/python3.12/email/_policybase.py", line 7, in <module>
+[spawner-4]     from email import header
+[spawner-4]   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+[spawner-4]   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+[spawner-4]   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+[spawner-4]   File "<frozen importlib._bootstrap_external>", line 991, in exec_module
+[spawner-4]   File "<frozen importlib._bootstrap_external>", line 1087, in get_code
+[spawner-4]   File "<frozen importlib._bootstrap_external>", line 1187, in get_data
+[spawner-4] KeyboardInterrupt
+[gim6010_estop-2] [INFO] [1794520380.645894571] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[spawner-5] Traceback (most recent call last):
+[spawner-5]   File "/opt/ros/jazzy/lib/controller_manager/spawner", line 10, in <module>
+[spawner-5]     from importlib.metadata import distribution
+[spawner-5]   File "/usr/lib/python3.12/importlib/metadata/__init__.py", line 19, in <module>
+[spawner-5]     from . import _adapters, _meta
+[spawner-5]   File "/usr/lib/python3.12/importlib/metadata/_adapters.py", line 5, in <module>
+[spawner-5]     import email.message
+[spawner-5]   File "/usr/lib/python3.12/email/message.py", line 15, in <module>
+[spawner-5]     from email import utils
+[spawner-5]   File "/usr/lib/python3.12/email/utils.py", line 33, in <module>
+[spawner-5]     from email._parseaddr import quote
+[spawner-5]   File "/usr/lib/python3.12/email/_parseaddr.py", line 16, in <module>
+[spawner-5]     import time, calendar
+[spawner-5]   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+[spawner-5]   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+[spawner-5]   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+[spawner-5]   File "<frozen importlib._bootstrap_external>", line 991, in exec_module
+[spawner-5]   File "<frozen importlib._bootstrap_external>", line 1124, in get_code
+[spawner-5]   File "<frozen importlib._bootstrap_external>", line 755, in _compile_bytecode
+[spawner-5]   File "<frozen importlib._bootstrap>", line 491, in _verbose_message
+[spawner-5] KeyboardInterrupt
+[ros2_control_node-3] #5    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fafae0e03, in std::terminate()
+[ros2_control_node-3] #4    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fafaea56f, in 
+[ros2_control_node-3] #3    Object "/usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.33", at 0x7fafaed4d7, in __gnu_cxx::__verbose_terminate_handler()
+[ros2_control_node-3] #2    Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7faf867dff, in abort
+[ros2_control_node-3] #1    Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7faf87cb3b, in raise
+[ros2_control_node-3] #0    Object "/usr/lib/aarch64-linux-gnu/libc.so.6", at 0x7faf8c74d8, in 
+[ros2_control_node-3] Aborted (Signal sent by tkill() 1013 0)
+[gim6010_estop-2] [INFO] [1794520380.898791834] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[robot_state_publisher-1] [INFO] [1794520380.904216789] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[joy_teleop-7] KeyboardInterrupt
+[joy_teleop-7] 
+[joy_teleop-7] The above exception was the direct cause of the following exception:
+[joy_teleop-7] 
+[joy_teleop-7] Traceback (most recent call last):
+[joy_teleop-7]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop", line 33, in <module>
+[joy_teleop-7]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_teleop')())
+[joy_teleop-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop", line 25, in importlib_load_entry_point
+[joy_teleop-7]     return next(matches).load()
+[joy_teleop-7]            ^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "/usr/lib/python3.12/importlib/metadata/__init__.py", line 205, in load
+[joy_teleop-7]     module = import_module(match.group('module'))
+[joy_teleop-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+[joy_teleop-7]     return _bootstrap._gcd_import(name[level:], package, level)
+[joy_teleop-7]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+[joy_teleop-7]   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+[joy_teleop-7]   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+[joy_teleop-7]   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+[joy_teleop-7]   File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+[joy_teleop-7]   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+[joy_teleop-7]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_teleop.py", line 44, in <module>
+[joy_teleop-7]     import rclpy
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 49, in <module>
+[joy_teleop-7]     from rclpy.signals import install_signal_handlers
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/signals.py", line 15, in <module>
+[joy_teleop-7]     from rclpy.exceptions import InvalidHandle
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/exceptions.py", line 16, in <module>
+[joy_teleop-7]     from rclpy.impl.implementation_singleton import rclpy_implementation as _rclpy
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/impl/implementation_singleton.py", line 32, in <module>
+[joy_teleop-7]     rclpy_implementation = import_c_library('._rclpy_pybind11', package)
+[joy_teleop-7]                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rpyutils/import_c_library.py", line 39, in import_c_library
+[joy_teleop-7]     return importlib.import_module(name, package=package)
+[joy_teleop-7]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7]   File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+[joy_teleop-7]     return _bootstrap._gcd_import(name[level:], package, level)
+[joy_teleop-7]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_teleop-7] ImportError: initialization failed
+[joy_teleop-7] The C extension '/opt/ros/jazzy/lib/python3.12/site-packages/_rclpy_pybind11.cpython-312-aarch64-linux-gnu.so' isn't present on the system. Please refer to 'https://docs.ros.org/en/jazzy/How-To-Guides/Installation-Troubleshooting.html#import-failing-without-library-present-on-the-system' for possible solutions
+[ERROR] [joy_teleop-7]: process has died [pid 1017, exit code 1, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_teleop --ros-args -r __node:=joy_teleop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml'].
+[joy_estop-8] KeyboardInterrupt
+[joy_estop-8] 
+[joy_estop-8] The above exception was the direct cause of the following exception:
+[joy_estop-8] 
+[joy_estop-8] Traceback (most recent call last):
+[joy_estop-8]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop", line 33, in <module>
+[joy_estop-8]     sys.exit(load_entry_point('sandro-bringup', 'console_scripts', 'joy_estop')())
+[joy_estop-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop", line 25, in importlib_load_entry_point
+[joy_estop-8]     return next(matches).load()
+[joy_estop-8]            ^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "/usr/lib/python3.12/importlib/metadata/__init__.py", line 205, in load
+[joy_estop-8]     module = import_module(match.group('module'))
+[joy_estop-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+[joy_estop-8]     return _bootstrap._gcd_import(name[level:], package, level)
+[joy_estop-8]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+[joy_estop-8]   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+[joy_estop-8]   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+[joy_estop-8]   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+[joy_estop-8]   File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+[joy_estop-8]   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+[joy_estop-8]   File "/workspaces/sandro/build/sandro_bringup/sandro_bringup/joy_estop.py", line 44, in <module>
+[joy_estop-8]     import rclpy
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 49, in <module>
+[joy_estop-8]     from rclpy.signals import install_signal_handlers
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/signals.py", line 15, in <module>
+[joy_estop-8]     from rclpy.exceptions import InvalidHandle
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/exceptions.py", line 16, in <module>
+[joy_estop-8]     from rclpy.impl.implementation_singleton import rclpy_implementation as _rclpy
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/impl/implementation_singleton.py", line 32, in <module>
+[joy_estop-8]     rclpy_implementation = import_c_library('._rclpy_pybind11', package)
+[joy_estop-8]                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rpyutils/import_c_library.py", line 39, in import_c_library
+[joy_estop-8]     return importlib.import_module(name, package=package)
+[joy_estop-8]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8]   File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+[joy_estop-8]     return _bootstrap._gcd_import(name[level:], package, level)
+[joy_estop-8]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[joy_estop-8] ImportError: initialization failed
+[joy_estop-8] The C extension '/opt/ros/jazzy/lib/python3.12/site-packages/_rclpy_pybind11.cpython-312-aarch64-linux-gnu.so' isn't present on the system. Please refer to 'https://docs.ros.org/en/jazzy/How-To-Guides/Installation-Troubleshooting.html#import-failing-without-library-present-on-the-system' for possible solutions
+[ERROR] [joy_estop-8]: process has died [pid 1018, exit code 1, cmd '/workspaces/sandro/install/sandro_bringup/lib/sandro_bringup/joy_estop --ros-args -r __node:=joy_estop --params-file /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/config/teleop.yaml --params-file /tmp/launch_params_l0z9h5h3'].
+[INFO] [gim6010_estop-2]: process has finished cleanly [pid 1012]
+[INFO] [robot_state_publisher-1]: process has finished cleanly [pid 1011]
