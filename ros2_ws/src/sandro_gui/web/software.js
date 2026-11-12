@@ -178,7 +178,7 @@ async function deploy(commit) {
 
 async function fetchRemote() {
   $("#sw-fetch").disabled = true;
-  await ctx.act("software/fetch", {}).catch(() => {});
+  await ctx.act("software/fetch", {}, "fetching from GitHub: progress below").catch(() => {});
   refresh();
 }
 

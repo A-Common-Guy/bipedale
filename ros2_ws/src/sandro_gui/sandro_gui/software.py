@@ -37,7 +37,8 @@ INFO, WARN, ERROR = 20, 30, 40
 SOURCE_PREFIX = "ros2_ws/src/"
 SKIP_PARTS = {"__pycache__", ".pytest_cache"}
 GIT_TIMEOUT_S = 20.0
-FETCH_TIMEOUT_S = 90.0
+# The first fetch brings the whole history, recordings included (130 MB in 2026-11).
+FETCH_TIMEOUT_S = 900.0
 CACHE_S = 3.0
 
 
@@ -366,17 +367,17 @@ class Software:
 
     # Jobs -----------------------------------------------------------------------
 
-    def _guard(self) -> None:
+    def _guard(self, stack_stopped: bool = True) -> None:
         with self._lock:
             if self._job and self._job["state"] == "running":
                 raise RuntimeError(f"{self._job['kind']} {self._job['target']} is still running")
         state = self.launcher.status().get("state") if self.launcher else "stopped"
-        if state != "stopped":
+        if stack_stopped and state != "stopped":
             raise RuntimeError("stop the robot stack first: a build under a running stack can "
                                "crash it, and its CPU load disturbs the control loop")
 
-    def _start(self, kind: str, target: str, work, *args) -> dict:
-        self._guard()
+    def _start(self, kind: str, target: str, work, *args, stack_stopped: bool = True) -> dict:
+        self._guard(stack_stopped)
         self.runs.mkdir(parents=True, exist_ok=True)
         with self._lock:
             self._job_seq += 1
@@ -428,18 +429,41 @@ class Software:
     # Actions --------------------------------------------------------------------
 
     def fetch(self) -> dict:
-        self._ensure_repo()
+        """A job: the first fetch of a fresh repository takes minutes; the stack may run."""
         if not self.remote:
             raise RuntimeError("no GitHub remote configured (gui.yaml software.remote)")
+        self._ensure_repo()
+        return {"job": self._start("fetch", "GitHub", self._fetch, stack_stopped=False)}
+
+    def _fetch(self) -> str:
+        self._step("fetch", f"fetching {self.remote}")
+        before = {r["ref"]: r["commit"] for r in self.refs()}
+        proc = subprocess.Popen(
+            [self.git, "--git-dir", str(self.repo), "fetch", "--progress", "--prune", "--no-tags",
+             "origin", "+refs/heads/*:refs/remotes/origin/*"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+            start_new_session=True)
+        timer = threading.Timer(FETCH_TIMEOUT_S, proc.kill)
+        timer.start()
+        last = 0.0
         try:
-            self._git("fetch", "--prune", "--no-tags", "origin",
-                      "+refs/heads/*:refs/remotes/origin/*", timeout=FETCH_TIMEOUT_S)
-        except subprocess.TimeoutExpired as error:
-            raise RuntimeError(f"no answer from {self.remote} within {FETCH_TIMEOUT_S:.0f} s: "
-                               "is the robot online? deploy/pi/pi push works without it") from error
+            # git redraws its progress with \r: log finished phases, show the rest as the step.
+            for line in _lines(proc.stderr):
+                if line.endswith("done.") or not line.split(":")[0].endswith(("objects", "deltas")):
+                    self._line(line, INFO, "git")
+                elif time.monotonic() - last > 1.0:
+                    last = time.monotonic()
+                    self._step("fetch", line)
+            code = proc.wait()
+        finally:
+            timer.cancel()
+        if code != 0:
+            raise RuntimeError(f"git fetch failed (exit {code}): is the robot online? "
+                               "deploy/pi/pi push works without internet")
         self._cache = None
-        self.log.note(f"fetched {self.remote}")
-        return {"message": "fetched from GitHub"}
+        after = {r["ref"]: r["commit"] for r in self.refs()}
+        changed = [ref.rsplit("/", 1)[-1] for ref, sha in after.items() if before.get(ref) != sha]
+        return "fetched: " + (", ".join(changed) + " updated" if changed else "nothing new")
 
     def deploy(self, ref: str) -> dict:
         if not ref:
@@ -536,6 +560,24 @@ class Software:
                 failed = "Failed" in text or "error:" in text or "Error" in text
                 self._line(text, ERROR if failed else INFO)
         return proc.wait()
+
+
+def _lines(stream):
+    """Lines of a byte stream split at \\n and \\r, decoded and stripped."""
+    pending = b""
+    while True:
+        chunk = stream.read1(4096) if hasattr(stream, "read1") else stream.read(4096)
+        if not chunk:
+            break
+        pending += chunk
+        parts = pending.replace(b"\r", b"\n").split(b"\n")
+        pending = parts.pop()
+        for part in parts:
+            text = part.decode(errors="replace").strip()
+            if text:
+                yield text
+    if pending.strip():
+        yield pending.decode(errors="replace").strip()
 
 
 def check(software: dict | None, launch: dict | None) -> tuple[str, str, str, str]:

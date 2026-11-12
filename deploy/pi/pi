@@ -156,6 +156,7 @@ change_scope() {
 NEEDS_BUILD=0
 BUILD_PACKAGES=()
 BUILD_DEPENDENTS=()
+PANEL_CHANGED=0  # the panel runs the Python it started with: restart it once its code is in place
 cmd_sync() {
   local changes line flags path pkg
   changes=$(rsync -az --delete --itemize-changes \
@@ -182,9 +183,21 @@ cmd_sync() {
     NEEDS_BUILD=1
   fi
   [ -n "$changes" ] && echo "synced $(grep -c '^[<>ch.]f' <<<"$changes" || true) file(s)" || echo "already in sync"
+  grep -qE '^[^ ]+ +sandro_gui/' <<<"$changes" && PANEL_CHANGED=1
   if stamp_source "pi sync from $(hostname -s)" "$changes" && [ "$NEEDS_BUILD" = 0 ]; then
     stamp_build  # live through --symlink-install: the build is this version already
   fi
+  if [ "$PANEL_CHANGED" = 1 ] && [ "$NEEDS_BUILD" = 0 ]; then
+    restart_panel
+  elif [ "$PANEL_CHANGED" = 1 ]; then
+    echo "the panel's code changed: it restarts after deploy/pi/pi build"
+  fi
+}
+
+restart_panel() {
+  remote "docker exec $CONTAINER pkill -f $PANEL_PATTERN" >/dev/null 2>&1 || true
+  echo "panel restarted on the new code (a running launch keeps running)"
+  PANEL_CHANGED=0
 }
 
 # version/source.json on the robot: the laptop's commit and the uncommitted
@@ -249,6 +262,8 @@ cmd_build() {
     \"\$@\" --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     -DCMAKE_CXX_COMPILER_LAUNCHER=ccache --event-handlers console_cohesion+ $*"
   stamp_build
+  [ "$PANEL_CHANGED" = 1 ] && restart_panel
+  return 0
 }
 
 # The laptop's commit into the robot's repository (repo.git, through git inside

@@ -167,6 +167,25 @@ def _bare(service):
 
 
 @needs_git
+def test_fetch_is_a_job_that_runs_beside_the_stack(tmp_path):
+    upstream = tmp_path / "upstream"
+    (upstream / "ros2_ws" / "src").mkdir(parents=True)
+    (upstream / "ros2_ws" / "src" / "a.txt").write_text("a")
+    git(tmp_path, "init", "-q", "-b", "main", str(upstream))
+    git(upstream, "add", "-A")
+    git(upstream, "commit", "-qm", "upstream commit")
+    service = Software(tmp_path / "robot", Logbook(), Launcher("running"), {"remote": str(upstream)})
+    service.fetch()
+    job = wait(service)
+    assert job["state"] == "done" and "main updated" in job["message"], job
+    status = service.status()
+    assert [r["name"] for r in status["refs"]] == ["origin/main"]
+    assert status["commits"][0]["subject"] == "upstream commit"
+    service.fetch()
+    assert wait(service)["message"] == "fetched: nothing new"
+
+
+@needs_git
 def test_deploy_is_refused_while_the_stack_runs(tmp_path):
     service = Software(tmp_path, Logbook(), Launcher("running"), {"remote": ""})
     _bare(service)
