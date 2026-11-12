@@ -141,10 +141,12 @@ class Session:
         current = self.get(names)
         self.restore = {KP: current[KP], "sysid.mode": 0.0}
         trigger = current["sysid.trigger"]
-        per_kp = args.settle + args.pulses * args.period + 1.0 + args.chirp_s + 1.0
+        pulses_s = args.pulses * args.period + 1.0 if args.pulses else 0.0
+        per_kp = args.settle + pulses_s + len(args.chirp_nm) * (args.chirp_s + 1.0)
         print(f"leg kp {current[KP]:g} now; plan: kp {' -> '.join(f'{k:g}' for k in args.kp)}, "
-              f"each {args.pulses} pulses of {args.pulse_nm} Nm and a {args.chirp_s:g} s chirp "
-              f"of {args.chirp_nm} Nm ({args.f0:g}-{args.f1:g} Hz): {per_kp * len(args.kp):.0f} s")
+              f"each {args.pulses} pulses of {args.pulse_nm} Nm and {args.chirp_s:g} s chirps of "
+              f"{', '.join(f'{a:g}' for a in args.chirp_nm)} Nm ({args.f0:g}-{args.f1:g} Hz): "
+              f"{per_kp * len(args.kp):.0f} s")
         if not args.yes:
             input("watch the robot, hand on the E-stop; Enter starts, Ctrl-C cancels ")
 
@@ -164,20 +166,22 @@ class Session:
             self.set({KP: kp})
             self.event("kp", kp=kp)
             self.watch(args.settle, "settle")
-            trigger += 1
-            self.set({"sysid.mode": 1, "sysid.amplitude_nm": args.pulse_nm,
-                      "sysid.pulse_s": args.pulse_s, "sysid.period_s": args.period,
-                      "sysid.duration_s": args.pulses * args.period, "sysid.trigger": trigger})
-            self.event("pulses", kp=kp, amplitude_nm=args.pulse_nm, pulse_s=args.pulse_s,
-                       period_s=args.period, count=args.pulses)
-            self.watch(args.pulses * args.period + 1.0, "pulses")
-            trigger += 1
-            self.set({"sysid.mode": 2, "sysid.amplitude_nm": args.chirp_nm, "sysid.f0_hz": args.f0,
-                      "sysid.f1_hz": args.f1, "sysid.duration_s": args.chirp_s,
-                      "sysid.trigger": trigger})
-            self.event("chirp", kp=kp, amplitude_nm=args.chirp_nm, f0_hz=args.f0, f1_hz=args.f1,
-                       duration_s=args.chirp_s)
-            self.watch(args.chirp_s + 1.0, "chirp")
+            if args.pulses:
+                trigger += 1
+                self.set({"sysid.mode": 1, "sysid.amplitude_nm": args.pulse_nm,
+                          "sysid.pulse_s": args.pulse_s, "sysid.period_s": args.period,
+                          "sysid.duration_s": args.pulses * args.period, "sysid.trigger": trigger})
+                self.event("pulses", kp=kp, amplitude_nm=args.pulse_nm, pulse_s=args.pulse_s,
+                           period_s=args.period, count=args.pulses)
+                self.watch(pulses_s, "pulses")
+            for amplitude in args.chirp_nm:
+                trigger += 1
+                self.set({"sysid.mode": 2, "sysid.amplitude_nm": amplitude, "sysid.f0_hz": args.f0,
+                          "sysid.f1_hz": args.f1, "sysid.duration_s": args.chirp_s,
+                          "sysid.trigger": trigger})
+                self.event("chirp", kp=kp, amplitude_nm=amplitude, f0_hz=args.f0, f1_hz=args.f1,
+                           duration_s=args.chirp_s)
+                self.watch(args.chirp_s + 1.0, f"chirp {amplitude:g} Nm")
         self.event("done")
 
     def close(self, reason=None):
@@ -370,12 +374,13 @@ def analyse(directory):
             if row is None:
                 row = {"kp": event["kp"]}
                 rows.append(row)
-            row.update(chirp_hz=fn, chirp_zeta=zeta, delay_ms=tau * 1000, fit_error=err,
+            row.update(chirp_nm=event.get("amplitude_nm"), chirp_hz=fn, chirp_zeta=zeta,
+                       delay_ms=tau * 1000, fit_error=err,
                        coherence=coherence[i], yaw_inertia_kgm2=inertia,
                        wheel_stiffness_nm_rad=inertia * (2 * math.pi * fn) ** 2 / (2 * lever ** 2),
                        legs_share=abs(h_legs[i] / h_yaw[i]), rolling_share=abs(h_roll[i] / h_yaw[i]))
     reference = next((r for r in rows if r["kp"] == 12.0), rows[0] if rows else None)
-    print(f"{'kp':>5} {'ring Hz':>8} {'zeta':>5} {'mode Hz':>8} {'zeta':>5} {'coh':>4} "
+    print(f"{'kp':>5} {'Nm':>4} {'ring Hz':>8} {'zeta':>5} {'mode Hz':>8} {'zeta':>5} {'coh':>4} "
           f"{'N m/rad':>8} {'legs':>5} {'roll':>5} {'f/f12':>6} {'all legs':>8} {'half':>6} {'legs PD share':>13}")
     # The chirp's fit is the precise one (the pulses scatter about 1.5 % at zeta 0.3).
     best = lambda r: r.get("chirp_hz", math.nan) if not math.isnan(r.get("chirp_hz", math.nan)) \
@@ -387,7 +392,7 @@ def analyse(directory):
         all_legs = math.sqrt(r["kp"] / 12.0)
         half = math.sqrt((1 / (12.0 / r["kp"] + 1)) / 0.5)
         share = ((1 / ratio ** 2 - 1) / (12.0 / r["kp"] - 1)) if r["kp"] != 12.0 and ratio == ratio else math.nan
-        print(f"{r['kp']:5g} {r.get('pulse_hz', math.nan):8.2f} {r.get('pulse_zeta', math.nan):5.2f} "
+        print(f"{r['kp']:5g} {r.get('chirp_nm') or math.nan:4.2f} {r.get('pulse_hz', math.nan):8.2f} {r.get('pulse_zeta', math.nan):5.2f} "
               f"{r.get('chirp_hz', math.nan):8.2f} {r.get('chirp_zeta', math.nan):5.2f} "
               f"{r.get('coherence', math.nan):4.2f} {r.get('wheel_stiffness_nm_rad', math.nan):8.0f} "
               f"{r.get('legs_share', math.nan):5.2f} {r.get('rolling_share', math.nan):5.2f} "
@@ -404,12 +409,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--kp", type=float, nargs="+", default=[12.0, 9.0, 16.0, 12.0],
                         help="leg drive stiffnesses to step through, Nm/rad")
-    parser.add_argument("--pulses", type=int, default=6)
+    parser.add_argument("--pulses", type=int, default=6, help="0 skips the pulses")
     parser.add_argument("--pulse-nm", type=float, default=0.25, help="per wheel")
     parser.add_argument("--pulse-s", type=float, default=0.03)
     parser.add_argument("--period", type=float, default=1.5, help="s between pulses")
     parser.add_argument("--chirp-s", type=float, default=20.0)
-    parser.add_argument("--chirp-nm", type=float, default=0.2, help="per wheel")
+    parser.add_argument("--chirp-nm", type=float, nargs="+", default=[0.2],
+                        help="per wheel; several: one chirp each, e.g. 0.1 0.2 0.4 for linearity")
     parser.add_argument("--f0", type=float, default=2.0)
     parser.add_argument("--f1", type=float, default=25.0)
     parser.add_argument("--settle", type=float, default=3.0, help="s after each kp change")
@@ -420,7 +426,7 @@ def main():
     if args.analyse:
         analyse(args.analyse)
         return 0
-    if max(args.pulse_nm, args.chirp_nm) > 0.5 or min(args.kp) < 6 or max(args.kp) > 25:
+    if max(args.pulse_nm, *args.chirp_nm) > 0.5 or min(args.kp) < 6 or max(args.kp) > 25:
         sys.exit("refused: torques above 0.5 Nm per wheel or leg kp outside 6-25 Nm/rad")
     session = Session(args)
     reason = None
