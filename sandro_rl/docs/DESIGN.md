@@ -1386,10 +1386,41 @@ starting to scrub, not a softer spring. At 0.1 Nm the WBC's wheel friction
 feed-forward (0.12 Nm, switching with the torque's sign) is as large as the
 chirp and the coherence falls to 0.5–0.9: not usable.
 
-Next: the simulation's response to the same chirp against this table
-(`evaluate.Gear` at 75 Nm/rad, inertia 0.127, damping rising with
-amplitude), and `drive_train_test.py` on a wheel with its rim blocked and on
-the ground to split gear from tyre.
+**The simulation under the same chirp (2026-11-13).** `evaluate.py
+--scenario sysid --sim yaw_chirp=0.2` adds the WBC's chirp to the wheels of
+a balancing policy (`flat_level_drivetrain`) and the response is fitted
+with `sysid_yaw.py`'s own functions:
+
+| Simulation | resonance | zeta | yaw inertia | phase 5 / 9 / 12 Hz |
+| --- | --- | --- | --- | --- |
+| robot (kp 12, 0.2 Nm) | 12.7 Hz | 0.24 | 0.124 kg m² | −85 / −137 / −185° |
+| MJCF as trained | none below 20 Hz | | 1.66 | −81 / −93 / −121° |
+| tyre torsion × 0.01 | none | | 0.45 | −94 / −110 / −131° |
+| tyre torsion × 0.01, no wheel frictionloss | none | | 0.147 | −105 / −124 / −138° |
+
+- **The simulated robot barely yaws at small amplitude.** MuJoCo's
+  torsional friction (0.07 m × 24 N, up to 1.7 Nm per tyre) and the wheels'
+  0.2 Nm `frictionloss`, both Coulomb, stick at the chirp's 0.9 Nm of yaw
+  torque: the apparent inertia is 13 × the robot's. The robot's small yaw
+  motions are nearly free inertia. Every policy so far trained on a yaw that
+  friction holds still and damps.
+- **No drive-train spring reproduces the resonance** while the rotor is the
+  MJCF armature (0.000168 kg m² at the wheel): a spring behind a massless
+  rotor passes the torque through. The robot's numbers read as a two-mass
+  system (rotors on a spring to the ground, the body's yaw on the rolling):
+  the low-frequency inertia 0.124 is body plus rotors, the rolling share at
+  the resonance (1.2) is their ratio, the resonance gives the spring. That
+  is a body of about 0.068 kg m², rotors of about 0.0055 kg m² per wheel at
+  the gear output (33 × the armature; the suspected ratio-once-not-squared
+  error, `armature_scale`) and about 19 Nm/rad per wheel, gear damping
+  about 0.11 Nm s/rad. Not confirmed: with the armature × 32 the simulation's
+  low-frequency gain stays at half the robot's.
+
+`drive_train_test.py` now ends with a 2–45 Hz chirp: with the rim blocked
+the rotor rings at sqrt(k / J), 9 Hz for a 0.0055 kg m² rotor on 19 Nm/rad
+and above 50 Hz for the armature, and the tool prints the rotor inertia.
+That measurement decides the rotor, then the tyre-ground contact (torsion,
+`frictionloss`) is fitted to the chirp table above.
 
 ## 9. Deployment sketch (not executed; the owner's decision)
 

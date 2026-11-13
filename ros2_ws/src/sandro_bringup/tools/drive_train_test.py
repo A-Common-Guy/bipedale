@@ -5,8 +5,13 @@ The drive's encoder sits on the motor, before the 8:1 gear, so with the wheel
 (or, for a leg motor, the axle) held still a slow torque triangle moves the motor
 through the gear's play
 (at almost no torque) and then against the drive train's stiffness. A short
-sine at a few Hz follows, for the dynamic stiffness. The motor position comes
-from /joint_states (output-side rad); the torque is the commanded one.
+sine at a few Hz follows, for the dynamic stiffness, then a chirp (2-45 Hz):
+with the output blocked the rotor rings on the gear's stiffness at
+sqrt(k / J), which gives the rotor's inertia at the gear output. The
+2026-11-12 yaw identification reads as a rotor of about 0.0055 kg m2 on
+about 19 Nm/rad (9 Hz here); the MJCF's armature, 0.000168 kg m2, would ring
+above 50 Hz. The motor position comes from /joint_states (output-side rad);
+the torque is the commanded one.
 
 Two setups, one wheel at a time:
 
@@ -36,14 +41,24 @@ import time
 import numpy as np
 
 
-def profile(t, amplitude, slow_period, slow_cycles, sine_hz, sine_s):
-    """Commanded torque at t (s): triangle cycles, then a sine at sine_hz."""
+CHIRP_HZ = (2.0, 45.0)
+
+
+def profile(t, amplitude, slow_period, slow_cycles, sine_hz, sine_s, chirp_s=0.0, chirp_nm=0.3):
+    """Commanded torque at t (s): triangle cycles, a sine at sine_hz, then a
+    linear chirp over CHIRP_HZ with 0.5 s tapers."""
     slow = slow_period * slow_cycles
     if t < slow:
         phase = (t / slow_period) % 1.0
         return amplitude * (4 * phase if phase < 0.25 else 2 - 4 * phase if phase < 0.75 else 4 * phase - 4)
     if t < slow + sine_s:
         return amplitude * math.sin(2 * math.pi * sine_hz * (t - slow))
+    tc = t - slow - sine_s
+    if tc < chirp_s:
+        f0, f1 = CHIRP_HZ
+        phase = 2 * math.pi * (f0 * tc + 0.5 * (f1 - f0) / chirp_s * tc * tc)
+        edge = min(max(min(tc, chirp_s - tc) / 0.5, 0.0), 1.0)
+        return chirp_nm * 0.5 * (1 - math.cos(math.pi * edge)) * math.sin(phase)
     return None
 
 
@@ -75,12 +90,14 @@ def run(args):
     if publisher.get_subscription_count() == 0:
         sys.exit(f"nobody subscribes {topic}: launch commissioning with target:={args.joint} activate:=true")
     print(f"{args.joint} ({args.setup}): +-{args.amplitude} Nm, {args.cycles} triangles of {args.period} s, "
-          f"then {args.sine_s} s at {args.sine_hz} Hz. The wheel must be blocked.")
+          f"then {args.sine_s} s at {args.sine_hz} Hz and a {args.chirp_s} s chirp of {args.chirp_nm} Nm. "
+          "The output must be blocked.")
     start = time.monotonic()
     try:
         while True:
             t = time.monotonic() - start
-            tau = profile(t, args.amplitude, args.period, args.cycles, args.sine_hz, args.sine_s)
+            tau = profile(t, args.amplitude, args.period, args.cycles, args.sine_hz, args.sine_s,
+                          args.chirp_s, args.chirp_nm)
             if tau is None:
                 break
             command[0] = tau
@@ -96,7 +113,8 @@ def run(args):
     with open(args.output, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["# joint", args.joint, "setup", args.setup, "amplitude_nm", args.amplitude,
-                    "period_s", args.period, "cycles", args.cycles, "sine_hz", args.sine_hz, "sine_s", args.sine_s])
+                    "period_s", args.period, "cycles", args.cycles, "sine_hz", args.sine_hz, "sine_s", args.sine_s,
+                    "chirp_s", args.chirp_s, "chirp_nm", args.chirp_nm])
         w.writerow(["t_s", "position_rad", "velocity_rad_s", "effort_nm", "command_nm"])
         t0 = rows[0][0]
         w.writerows([(r[0] - t0, *r[1:]) for r in rows])
@@ -136,7 +154,37 @@ def analyse(path):
         if up.sum() > 20 and down.sum() > 20:
             gap = np.polyfit(tau_s[up], q_s[up], 1)[1] - np.polyfit(tau_s[down], q_s[down], 1)[1]
             print(f"  hysteresis on the {name} side {abs(gap) * 1e3:.1f} mrad (friction in the train)")
-    sine = t > slow_end + 0.5
+    k_static = 2.0 / (s_pos + s_neg)
+    sine_end = slow_end + float(meta["sine_s"])
+    sine = (t > slow_end + 0.5) & (t < sine_end)
+    chirp_s = float(meta.get("chirp_s", 0.0))
+    if chirp_s > 0:
+        chirp = (t > sine_end) & (t < sine_end + chirp_s)
+        grid = np.arange(t[chirp][0], t[chirp][-1], 1 / 300.0)
+        qc = np.interp(grid, t, q)
+        tc = np.interp(grid, t, tau)
+        seg, window = 256, np.hanning(256)
+        suu = suq = sqq = 0
+        for start in range(0, len(grid) - seg + 1, seg // 2):
+            u = np.fft.rfft((tc[start:start + seg] - tc[start:start + seg].mean()) * window)
+            y = np.fft.rfft((qc[start:start + seg] - qc[start:start + seg].mean()) * window)
+            suu, suq, sqq = suu + abs(u) ** 2, suq + np.conj(u) * y, sqq + abs(y) ** 2
+        f = np.fft.rfftfreq(seg, 1 / 300.0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            compliance, coherence = suq / suu, abs(suq) ** 2 / (suu * sqq)
+        band = (f >= CHIRP_HZ[0] + 1) & (f <= CHIRP_HZ[1] - 2)
+        static = abs(compliance[band][0])
+        peak = int(np.argmax(abs(compliance[band])))
+        fr, gain = f[band][peak], abs(compliance[band][peak]) / static
+        print(f"  chirp {CHIRP_HZ[0]:g}-{CHIRP_HZ[1]:g} Hz: motor angle per Nm peaks at {fr:.1f} Hz, "
+              f"{gain:.1f} x its {f[band][0]:.0f} Hz value (coherence {coherence[band][peak]:.2f})")
+        at_edge = peak >= int(band.sum()) - 3
+        if gain > 1.5 and not at_edge:
+            print(f"  rotor inertia at the gear output, k / (2 pi f)^2 with the triangles' {k_static:.0f} Nm/rad: "
+                  f"{k_static / (2 * math.pi * fr) ** 2:.5f} kg m2 (MJCF armature 0.000168)")
+        else:
+            print(f"  no resonance inside the chirp (still rising at its end): the rotor inertia is under "
+                  f"{k_static / (2 * math.pi * CHIRP_HZ[1]) ** 2:.5f} kg m2")
     if sine.sum() > 100:
         hz = float(meta["sine_hz"])
         ts, qs, ts_tau = t[sine], q[sine] - q[sine].mean(), tau[sine]
@@ -160,6 +208,8 @@ def main():
     parser.add_argument("--cycles", type=int, default=4)
     parser.add_argument("--sine-hz", type=float, default=3.0)
     parser.add_argument("--sine-s", type=float, default=4.0)
+    parser.add_argument("--chirp-s", type=float, default=15.0, help="s of 2-45 Hz chirp, 0 skips it")
+    parser.add_argument("--chirp-nm", type=float, default=0.3)
     parser.add_argument("--output")
     parser.add_argument("--analyse", metavar="CSV", help="analyse a recording instead of running")
     args = parser.parse_args()
@@ -170,6 +220,8 @@ def main():
         parser.error("--joint and --output are needed for a run")
     if not 0.0 < args.amplitude <= 0.5:
         parser.error("--amplitude must be in (0, 0.5] Nm: the commissioning controller's limit")
+    if not 0.0 < args.chirp_nm <= 0.5:
+        parser.error("--chirp-nm must be in (0, 0.5] Nm: the commissioning controller's limit")
     run(args)
 
 

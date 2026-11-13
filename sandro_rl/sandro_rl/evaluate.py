@@ -149,6 +149,15 @@ class DriveBus:
         self.current = [None] * len(self.current)
 
 
+def yaw_chirp_nm(amplitude: float, t: float, f0: float = 2.0, f1: float = 25.0, duration: float = 20.0) -> float:
+    """whole_body_core.cpp sysid_excitation_nm, mode 2: a linear chirp with 0.5 s tapers."""
+    if amplitude <= 0.0 or t < 0.0 or t > duration:
+        return 0.0
+    phase = 2.0 * math.pi * (f0 * t + 0.5 * (f1 - f0) / duration * t * t)
+    edge = min(max(min(t, duration - t) / 0.5, 0.0), 1.0)
+    return amplitude * 0.5 * (1.0 - math.cos(math.pi * edge)) * math.sin(phase)
+
+
 class Gear:
     """A wheel drive's rotor behind a gear with play: the rotor (the drive's
     reflected inertia, output-side units) is its own body, driven by the
@@ -201,8 +210,15 @@ class SimOptions:
     rotor_inertia_scale: float = 1.0
     # Deployment option: low-pass (Hz) on the opposed part of the wheel actions.
     wheel_differential_filter_hz: float = 0.0
-    # Factor on the tyres' torsional (scrub) friction.
+    # The WBC's sysid chirp (sysid_excitation_nm, mode 2): +-amplitude per
+    # wheel, opposed, added to the drives' torque from yaw_chirp_start_s
+    # after engaging, 2-25 Hz over 20 s; 0 off.
+    yaw_chirp_nm: float = 0.0
+    yaw_chirp_start_s: float = 2.0
+    # Factor on the tyres' torsional (scrub) friction and on the wheel joints'
+    # Coulomb friction (frictionloss).
     tyre_torsion_scale: float = 1.0
+    wheel_friction_scale: float = 1.0
     unpowered_s: float = 0.03
     settle_s: float = 3.0
     command_rate_hz: float = 20.0
@@ -217,9 +233,10 @@ class SimOptions:
                  "joint_rate": "joint_rate_hz", "command_delay": "command_delay_s", "settle": "settle_s",
                  "seed": "seed", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
                  "gear_stiffness": "gear_stiffness_nm_rad", "gear_damping": "gear_damping_nm_s_rad",
-                 "tyre_torsion": "tyre_torsion_scale",
+                 "tyre_torsion": "tyre_torsion_scale", "wheel_friction": "wheel_friction_scale",
                  "rotor_inertia": "rotor_inertia_scale",
-                 "differential_filter": "wheel_differential_filter_hz"}
+                 "differential_filter": "wheel_differential_filter_hz",
+                 "yaw_chirp": "yaw_chirp_nm", "yaw_chirp_start": "yaw_chirp_start_s"}
         for key, value in sim.items():
             if key == "joint_stagger":
                 o.joint_stagger = value in ("true", "1")
@@ -258,6 +275,8 @@ EXTRA_SCENARIOS = {
     # is the cruise speed, the yaw rate is unused; the goals are the course's.
     "avoid": ["45,0.6,0"],
     "avoid_fast": ["45,1.0,0"],
+    # Standing through the yaw chirp (--sim yaw_chirp=0.2): 2 s, 20 s of chirp, 2 s.
+    "sysid": ["24,0,0"],
 }
 SCENARIOS = {**closed_loop.SCENARIOS, **EXTRA_SCENARIOS}
 
@@ -507,6 +526,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         options.unpowered_s = 3.0
     qadr, dadr, act = spec.joint_qpos, spec.joint_dof, spec.joint_actuator
     m.geom_friction[spec.tyre_geoms, 1] *= options.tyre_torsion_scale
+    m.dof_frictionloss[dadr[spec.wheel_index]] *= options.wheel_friction_scale
     gears = {}
     if options.wheel_backlash_rad > 0.0:
         for i, name in enumerate(JOINTS):
@@ -522,6 +542,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     drive_q = lambda i: gears[i].q if i in gears else d.qpos[qadr[i]]
     drive_v = lambda i: gears[i].v if i in gears else d.qvel[dadr[i]]
     motor_torque = np.zeros(len(JOINTS))
+    opposed = np.array([1.0 if name == "right_wheel" else -1.0 if name == "left_wheel" else 0.0 for name in JOINTS])
     sensors = [mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SENSOR, s) for s in ("imu_quat", "imu_gyro", "imu_accel")]
     sensor_of = [0, 0, 0, 0, 1, 1, 1, 2, 2, 2]
     torso, imu_site = spec.torso_body, spec.imu_site
@@ -624,24 +645,26 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
             dist = np.where(rng.uniform(size=iface.n_rays) < rays_cfg.get("dropout", 0.0), r_max, dist)
             controller.ray_obs = interface.ray_observation(dist, r_max)
 
-    def step(push_force):
+    def step(push_force, chirp=0.0):
         nonlocal last_frame_t
         d.ctrl[:] = staged
         frames = bus.due(d.time)
         limit = (np.minimum(limits, torque_envelope.limit(heat, iface.envelope, np)) if iface.thermal
                  else limits)
         for i in range(len(JOINTS)):
+            extra = chirp * opposed[i]
             if i in gears:
                 if frames[i] is not None:
                     frame, lim_i = frames[i], limit[i]
-                    law = lambda q, v, frame=frame, lim_i=lim_i: iface.mit_torque(frame, q, v, lim_i)
+                    law = lambda q, v, frame=frame, lim_i=lim_i, extra=extra: iface.mit_torque(frame, q, v, lim_i) + extra
                 else:
-                    law = lambda q, v, held=staged[act[i]]: held
+                    law = lambda q, v, held=staged[act[i]] + extra: held
                 motor_torque[i], d.ctrl[act[i]] = gears[i].step(law, d.qpos[qadr[i]], d.qvel[dadr[i]],
                                                                 m.opt.timestep)
             else:
                 if frames[i] is not None:
                     d.ctrl[act[i]] = iface.mit_torque(frames[i], drive_q(i), drive_v(i), limit[i])
+                d.ctrl[act[i]] += extra
                 motor_torque[i] = d.ctrl[act[i]]
         heat[:] = torque_envelope.account(heat, motor_torque ** 2, m.opt.timestep, iface.envelope)
         for a in wheel_act:
@@ -685,7 +708,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
             for start, force, duration in pushes:
                 if start <= t < start + duration:
                     push += force
-        step(push)
+        step(push, yaw_chirp_nm(options.yaw_chirp_nm, d.time - phase_start - options.yaw_chirp_start_s)
+             if phase_start >= 0 else 0.0)
         now_ns = step_ns()
         if now_ns < wake_ns:
             continue
