@@ -10,8 +10,11 @@ with the output blocked the rotor rings on the gear's stiffness at
 sqrt(k / J), which gives the rotor's inertia at the gear output. The
 2026-11-12 yaw identification reads as a rotor of about 0.0055 kg m2 on
 about 19 Nm/rad (9 Hz here); the MJCF's armature, 0.000168 kg m2, would ring
-above 50 Hz. The motor position comes from /joint_states (output-side rad);
-the torque is the commanded one.
+above 50 Hz. A chirp about zero torque crosses the play every cycle and the
+rotor reads heavier (by about 30 % at 10 mrad of play, 77 % at 20);
+--chirp-bias-nm holds the gear on one flank when it exceeds the chirp's peak
+response, e.g. --chirp-bias-nm 0.35 --chirp-nm 0.12. The motor position comes
+from /joint_states (output-side rad); the torque is the commanded one.
 
 Two setups, one wheel at a time:
 
@@ -28,14 +31,18 @@ at 0.5 Nm and zeroes 0.1 s after the last command):
 
     ros2 launch sandro_bringup commissioning.launch.py target:=right_wheel activate:=true
     python3 drive_train_test.py --joint right_wheel --setup gear --output right_gear.csv
+    python3 drive_train_test.py --joint right_wheel --setup gear --chirp-bias-nm 0.35 --chirp-nm 0.12 \
+        --output right_gear_bias.csv
 
 and afterwards, anywhere: python3 drive_train_test.py --analyse right_gear.csv
 """
 
 import argparse
+import bisect
 import csv
 import math
 import sys
+import threading
 import time
 
 import numpy as np
@@ -44,9 +51,10 @@ import numpy as np
 CHIRP_HZ = (2.0, 45.0)
 
 
-def profile(t, amplitude, slow_period, slow_cycles, sine_hz, sine_s, chirp_s=0.0, chirp_nm=0.3):
+def profile(t, amplitude, slow_period, slow_cycles, sine_hz, sine_s, chirp_s=0.0, chirp_nm=0.3, chirp_bias=0.0):
     """Commanded torque at t (s): triangle cycles, a sine at sine_hz, then a
-    linear chirp over CHIRP_HZ with 0.5 s tapers."""
+    linear chirp over CHIRP_HZ with 0.5 s tapers, on chirp_bias Nm that holds
+    the gear on one flank of its play."""
     slow = slow_period * slow_cycles
     if t < slow:
         phase = (t / slow_period) % 1.0
@@ -58,12 +66,13 @@ def profile(t, amplitude, slow_period, slow_cycles, sine_hz, sine_s, chirp_s=0.0
         f0, f1 = CHIRP_HZ
         phase = 2 * math.pi * (f0 * tc + 0.5 * (f1 - f0) / chirp_s * tc * tc)
         edge = min(max(min(tc, chirp_s - tc) / 0.5, 0.0), 1.0)
-        return chirp_nm * 0.5 * (1 - math.cos(math.pi * edge)) * math.sin(phase)
+        return 0.5 * (1 - math.cos(math.pi * edge)) * (chirp_bias + chirp_nm * math.sin(phase))
     return None
 
 
 def run(args):
     import rclpy
+    from rclpy.executors import SingleThreadedExecutor
     from rclpy.node import Node
     from sensor_msgs.msg import JointState
     from std_msgs.msg import Float64MultiArray
@@ -72,19 +81,29 @@ def run(args):
     node = Node("drive_train_test")
     topic = f"/commission_{args.joint}/commands"
     publisher = node.create_publisher(Float64MultiArray, topic, 10)
-    rows, command = [], [0.0]
+    # Each state is paired with the command in effect at its stamp: /joint_states
+    # comes at 300 Hz, faster than the command loop, and is taken on its own thread.
+    rows, sent_t, sent_tau = [], [-math.inf], [0.0]
+
+    def send(tau):
+        sent_t.append(node.get_clock().now().nanoseconds * 1e-9)
+        sent_tau.append(tau)
+        publisher.publish(Float64MultiArray(data=[tau]))
 
     def on_state(msg):
         if args.joint in msg.name:
             i = msg.name.index(args.joint)
             stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
             rows.append((stamp, msg.position[i], msg.velocity[i], msg.effort[i] if msg.effort else math.nan,
-                         command[0]))
+                         sent_tau[bisect.bisect_right(sent_t, stamp) - 1]))
 
     node.create_subscription(JointState, "/joint_states", on_state, 100)
+    executor = SingleThreadedExecutor()
+    executor.add_node(node)
+    threading.Thread(target=executor.spin, daemon=True).start()
     deadline = time.monotonic() + 5.0
     while not rows and time.monotonic() < deadline:
-        rclpy.spin_once(node, timeout_sec=0.1)
+        time.sleep(0.1)
     if not rows:
         sys.exit("no /joint_states: is the commissioning launch running?")
     if publisher.get_subscription_count() == 0:
@@ -97,24 +116,22 @@ def run(args):
         while True:
             t = time.monotonic() - start
             tau = profile(t, args.amplitude, args.period, args.cycles, args.sine_hz, args.sine_s,
-                          args.chirp_s, args.chirp_nm)
+                          args.chirp_s, args.chirp_nm, args.chirp_bias_nm)
             if tau is None:
                 break
-            command[0] = tau
-            publisher.publish(Float64MultiArray(data=[tau]))
-            rclpy.spin_once(node, timeout_sec=0.0)
+            send(tau)
             time.sleep(0.005)
     finally:
-        command[0] = 0.0
         for _ in range(5):
-            publisher.publish(Float64MultiArray(data=[0.0]))
+            send(0.0)
             time.sleep(0.01)
-    rclpy.spin_once(node, timeout_sec=0.1)
+    time.sleep(0.1)
+    executor.shutdown()
     with open(args.output, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["# joint", args.joint, "setup", args.setup, "amplitude_nm", args.amplitude,
                     "period_s", args.period, "cycles", args.cycles, "sine_hz", args.sine_hz, "sine_s", args.sine_s,
-                    "chirp_s", args.chirp_s, "chirp_nm", args.chirp_nm])
+                    "chirp_s", args.chirp_s, "chirp_nm", args.chirp_nm, "chirp_bias_nm", args.chirp_bias_nm])
         w.writerow(["t_s", "position_rad", "velocity_rad_s", "effort_nm", "command_nm"])
         t0 = rows[0][0]
         w.writerows([(r[0] - t0, *r[1:]) for r in rows])
@@ -210,6 +227,9 @@ def main():
     parser.add_argument("--sine-s", type=float, default=4.0)
     parser.add_argument("--chirp-s", type=float, default=15.0, help="s of 2-45 Hz chirp, 0 skips it")
     parser.add_argument("--chirp-nm", type=float, default=0.3)
+    parser.add_argument("--chirp-bias-nm", type=float, default=0.0,
+                        help="steady torque under the chirp; above the chirp's peak response it keeps the gear "
+                             "out of its play")
     parser.add_argument("--output")
     parser.add_argument("--analyse", metavar="CSV", help="analyse a recording instead of running")
     args = parser.parse_args()
@@ -220,8 +240,8 @@ def main():
         parser.error("--joint and --output are needed for a run")
     if not 0.0 < args.amplitude <= 0.5:
         parser.error("--amplitude must be in (0, 0.5] Nm: the commissioning controller's limit")
-    if not 0.0 < args.chirp_nm <= 0.5:
-        parser.error("--chirp-nm must be in (0, 0.5] Nm: the commissioning controller's limit")
+    if not 0.0 < args.chirp_nm + abs(args.chirp_bias_nm) <= 0.5:
+        parser.error("--chirp-nm plus --chirp-bias-nm must be in (0, 0.5] Nm: the commissioning controller's limit")
     run(args)
 
 
