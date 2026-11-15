@@ -1422,6 +1422,40 @@ and above 50 Hz for the armature, and the tool prints the rotor inertia.
 That measurement decides the rotor, then the tyre-ground contact (torsion,
 `frictionloss`) is fitted to the chirp table above.
 
+**On the bench (2026-11-15, `recordings/drivetrain_2026-11-15/`).** The
+right wheel, robot lifted, tyre blocked against the frame. The left wheel
+was not measured (the drives stopped answering after a power cycle) and is
+taken as equal. As first written the tool paired each joint state with the
+command of 0.34 s later (one `/joint_states` message per loop at 300 Hz);
+fixed before these runs. `frf_table.py` fits the chirp, commanded torque
+to motor angle, as a rotor on a spring and damper behind the pipeline's
+delay (6–9 ms):
+
+| Run | rotor J | k | c | mode |
+| --- | --- | --- | --- | --- |
+| 0.3 Nm chirp about zero | 0.0039 kg m² (roll-off 0.0036) | 11 Nm/rad | 0.17 Nm s/rad | 8.6 Hz, zeta 0.41 |
+| 0.12 Nm chirp on 0.35 Nm | 0.0025 (roll-off 0.0034) | 40 | 0.45 | 20 Hz, zeta 0.72; poor fit, 0.12 Nm is near the train's friction |
+| the robot's yaw, two-mass reading above | 0.0055 | 19 | 0.11 | |
+
+- **The motor side is heavy:** 0.0035–0.0039 kg m² at the gear output,
+  21–23 × the MJCF armature. The whole wheel is 0.00047 in the MJCF, so
+  the rotor alone is at least about 18 ×. Same order as the yaw
+  identification's 0.0055.
+- **Soft and damped about zero torque:** once the clamp has settled (the
+  first run's first two triangles crept 70 mrad) the motor angle at zero
+  torque differs by about 30 mrad between rising and falling torque, play
+  and friction; beyond it 18–35 Nm/rad in the triangles, 11 Nm/rad at the
+  chirp's 0.3 Nm, about 40 held on 0.35 Nm. The spring includes the tyre
+  against the block.
+- The tool's own summary ("no resonance inside the chirp", rotor under
+  0.0003 kg m²) misreads a mode this damped: it wants a peak 1.5 × the
+  low-frequency value, and this one is 1.1 ×.
+
+The drivetrain policies trained on rotors of 1–4 × the armature,
+25–400 Nm/rad and 0.005–0.05 Nm s/rad: all three miss the bench. Next:
+ranges that cover it (rotor about 15–35 ×, 8–60 Nm/rad, 0.05–0.3 Nm s/rad),
+the simulation's yaw chirp against the robot's table, then retrain.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that
