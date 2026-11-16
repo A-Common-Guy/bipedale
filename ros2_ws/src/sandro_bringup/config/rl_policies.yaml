@@ -61,6 +61,9 @@ rl_flat_level:
       wheel_scale_rad_s: 20.0
       wheel_kd_nm_s_rad: 0.4
       wheel_scale_nm: 3.0
+      # Low-pass (Hz) on the opposed half of the wheel commands, the yaw; 0
+      # off. Not trained with; the robot overrides set it per policy.
+      wheel_differential_filter_hz: 0.0
       stand_q: [0.41133484, 0.21714621, -1.48937, 0.21523191, 0.41288111, 0.438598]
 
 rl_agile_terrain:
@@ -108,6 +111,9 @@ rl_agile_terrain:
       wheel_scale_rad_s: 25.0
       wheel_kd_nm_s_rad: 0.4
       wheel_scale_nm: 3.0
+      # Low-pass (Hz) on the opposed half of the wheel commands, the yaw; 0
+      # off. Not trained with; the robot overrides set it per policy.
+      wheel_differential_filter_hz: 0.0
       stand_q: [0.41133484, 0.21714621, -1.48937, 0.21523191, 0.41288111, 0.438598]
 
 rl_stand_up:
@@ -155,6 +161,9 @@ rl_stand_up:
       wheel_scale_rad_s: 20.0
       wheel_kd_nm_s_rad: 0.4
       wheel_scale_nm: 3.0
+      # Low-pass (Hz) on the opposed half of the wheel commands, the yaw; 0
+      # off. Not trained with; the robot overrides set it per policy.
+      wheel_differential_filter_hz: 0.0
       stand_q: [0.41133484, 0.21714621, -1.48937, 0.21522591, 0.41287811, 2.14299]
     safety:
       start_lying: true
@@ -207,6 +216,9 @@ rl_flat_level_fast:
       wheel_scale_rad_s: 20.0
       wheel_kd_nm_s_rad: 0.4
       wheel_scale_nm: 3.0
+      # Low-pass (Hz) on the opposed half of the wheel commands, the yaw; 0
+      # off. Not trained with; the robot overrides set it per policy.
+      wheel_differential_filter_hz: 0.0
       stand_q: [0.41133484, 0.21714621, -1.48937, 0.21522591, 0.41287811, 2.14299]
 
 rl_flat_level_sysid:
@@ -254,6 +266,9 @@ rl_flat_level_sysid:
       wheel_scale_rad_s: 20.0
       wheel_kd_nm_s_rad: 0.4
       wheel_scale_nm: 3.0
+      # Low-pass (Hz) on the opposed half of the wheel commands, the yaw; 0
+      # off. Not trained with; the robot overrides set it per policy.
+      wheel_differential_filter_hz: 0.0
       stand_q: [0.41133484, 0.21714621, -1.48937, 0.21522591, 0.41287811, 2.14299]
 
 rl_flat_level_fast_sysid:
@@ -301,4 +316,7 @@ rl_flat_level_fast_sysid:
       wheel_scale_rad_s: 20.0
       wheel_kd_nm_s_rad: 0.4
       wheel_scale_nm: 3.0
+      # Low-pass (Hz) on the opposed half of the wheel commands, the yaw; 0
+      # off. Not trained with; the robot overrides set it per policy.
+      wheel_differential_filter_hz: 0.0
       stand_q: [0.41133484, 0.21714621, -1.48937, 0.21522591, 0.41287811, 2.14299]
