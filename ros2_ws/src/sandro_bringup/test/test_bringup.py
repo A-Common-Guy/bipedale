@@ -391,8 +391,7 @@ def test_real_launch_starts_one_session_with_the_drives_inactive(monkeypatch, ro
     # first failure); one loads the controller and its switch partner inactive.
     assert [(names, inactive) for names, inactive, _ in spawners] == [
         (list(module.BROADCASTERS), False),
-        (["rl_flat_level", "rl_agile_terrain", "rl_flat_level_fast", "rl_flat_level_sysid",
-          "rl_flat_level_fast_sysid"], True)]
+        (["rl_flat_level", "rl_agile_terrain", "rl_flat_level_fast"], True)]
     assert module.BROADCASTERS[-1] == "imu_broadcaster"
     assert "REAL SAFE STATE" in logs and "not armed" in logs
     # Teleop starts too: nothing moves before the operator arms.
@@ -420,7 +419,7 @@ def test_armed_real_launch_keeps_everything_active(monkeypatch, ros_stubs):
     assert module.REALTIME in manager.kwargs["parameters"]
     assert [(names, inactive) for names, inactive, _ in spawners] == [
         (list(module.BROADCASTERS), False), (["rl_agile_terrain"], False),
-        (["rl_flat_level", "rl_flat_level_fast", "rl_flat_level_sysid", "rl_flat_level_fast_sysid"], True)]
+        (["rl_flat_level", "rl_flat_level_fast"], True)]
     assert "REAL SAFE STATE" not in logs
 
 

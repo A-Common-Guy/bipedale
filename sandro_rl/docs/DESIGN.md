@@ -1491,6 +1491,21 @@ their yaw error is 0.028–0.047 against 0.012–0.016. Deployed as
 `rl_flat_level_sysid` and `rl_flat_level_fast_sysid` in place of the
 drivetrain controllers.
 
+**On the robot (2026-11-16).** Both sysid policies respond more slowly
+than the policies they came from and still buzz. The 3 Hz differential
+filter never reached them that evening (the override file used, from
+2026-11-12, names the drivetrain controllers), but on 2026-11-12 the same
+filter made the drivetrain policies quiet and slow, and these are slow
+already. The WBC stays the steadiest, with no buzz; `rl_agile_terrain` with
+the 3 Hz filter is quick and buzzes little. Two retrains on drive trains
+fitted ever closer to the robot left the buzz where it was: this line is
+closed. `sandro_real_overrides.yaml` now sets
+`action.wheel_differential_filter_hz: 3.0` on `rl_agile_terrain` (shipped
+as 0 for every policy, which never trained with it); the sysid policies
+are off the gamepad switch and the panel's Run page, their controllers
+still defined. Untried: `agile_terrain` fine-tuned with the filter in the
+training loop.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that
