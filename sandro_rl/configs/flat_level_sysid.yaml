@@ -1,0 +1,35 @@
+# flat_level on the identified yaw plant. The 2026-11-12 yaw chirp and the
+# 2026-11-15 bench (recordings/sysid_2026-11-12, drivetrain_2026-11-15) put
+# a heavy rotor (0.0035-0.0039 kg m2 at the gear output, about 22 x the MJCF
+# armature) behind a soft, damped drive train (11-40 Nm/rad, 0.17-0.45
+# Nm s/rad, about 30 mrad of play and friction at zero torque) and show the
+# robot's small yaw motions nearly free, where MuJoCo's tyre torsional
+# friction and the wheels' frictionloss hold the simulated robot still.
+# With the rotor at 22 x, 19 Nm/rad, 0.1 Nm s/rad, tyre torsion x 0.01 and
+# no wheel frictionloss the evaluator rings the policies at 8.0-8.4 Hz,
+# flat_level_fast hardest and agile_terrain least, as on the robot
+# (recordings/sysid_2026-11-12/sim_ringing.py); flat_level_drivetrain's
+# ranges (rotor 1-4 x, 25-400 Nm/rad, 0.005-0.05) missed it.
+#
+#     uv run python -m sandro_rl.train configs/flat_level_sysid.yaml --resume policies/flat_level_drivetrain
+inherit: flat_level_drivetrain.yaml
+
+env:
+  randomization:
+    drives:
+      gear:
+        probability: 0.9
+        stiffness_nm_rad: [8.0, 60.0]         # log-uniform, per wheel
+        play_rad: [0.0, 0.03]
+        damping_nm_s_rad: [0.05, 0.3]
+        rotor_inertia_scale: [15.0, 35.0]     # x the MJCF wheel armature
+        substeps: 8
+    model:
+      tyre_torsional_scale: [0.005, 0.5]      # log-uniform; the MJCF's 0.07 m holds small yaw still
+      wheel_frictionloss_scale: [0.02, 1.0]   # log-uniform; 0.2 Nm sticks at small torque
+
+train:
+  iterations: 1000
+  learning_rate: 1.0e-4
+  curriculum_offset: 300
+  resume_log_std: -3.0

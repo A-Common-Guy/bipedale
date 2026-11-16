@@ -44,7 +44,7 @@ robot:
   # the drives are armed again (their read error deactivates them).
   broadcasters: [joint_state_broadcaster, imu_broadcaster, health_broadcaster]
   # Controllers the Run page offers, in this order.
-  controllers: [whole_body_controller, rl_flat_level_drivetrain, rl_flat_level_fast_drivetrain,
+  controllers: [whole_body_controller, rl_flat_level_sysid, rl_flat_level_fast_sysid,
                 rl_flat_level, rl_flat_level_fast, rl_agile_terrain, rl_stand_up, lqr_balancer,
                 driving_balancer]
 

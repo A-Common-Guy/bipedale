@@ -1456,6 +1456,41 @@ The drivetrain policies trained on rotors of 1–4 × the armature,
 ranges that cover it (rotor about 15–35 ×, 8–60 Nm/rad, 0.05–0.3 Nm s/rad),
 the simulation's yaw chirp against the robot's table, then retrain.
 
+**The fitted plant and the sysid policies (2026-11-16).**
+`recordings/sysid_2026-11-12/sim_fit.py` runs the yaw chirp in the
+evaluator over a grid with the bench's rotor (22 ×) and ranks against the
+robot's response. Best: 19 Nm/rad, 0.1 Nm s/rad, no play, tyre torsion
+× 0.01 and no wheel `frictionloss` (complex error 0.29): the resonance's
+phase within 2–20° (−115 / −158° at 8 / 12 Hz against −117 / −178°), the
+gain at 4 Hz half the robot's (0.96 against 1.96 rad/s per Nm), not
+explained. `sim_ringing.py` stands the policies on it:
+
+| Policy | fitted plant: 5–15 Hz yaw | robot |
+| --- | --- | --- |
+| `flat_level_fast` | 0.47 rad/s at 8.0 Hz | 0.88, watchdog |
+| `flat_level_drivetrain` | 0.16 at 8.4 Hz | 0.95 |
+| `agile_terrain` | 0.016 | 0.10 |
+| `flat_level_real` | 0.005 | 0.37 |
+| all four, the MJCF as trained | 0.001 | |
+
+The first simulation that rings the policies at the robot's frequency, in
+its order except `flat_level_real`, at half to a fifth of the amplitude.
+
+`flat_level_sysid` (from `flat_level_drivetrain`, 1000 iterations) and
+`flat_level_fast_sysid` (from `flat_level_fast_drivetrain`, 800) train on
+it: in 90 % of the episodes rotor 15–35 ×, 8–60 Nm/rad, 0–30 mrad of play,
+0.05–0.3 Nm s/rad, and tyre torsion × 0.005–0.5 and wheel `frictionloss`
+× 0.02–1.0 (log-uniform) in every episode. On the fitted plant and seven
+neighbours (rotor 15–30 ×, 11–40 Nm/rad, play to 30 mrad, torsion to
+× 0.1 with friction) their 5–15 Hz yaw is 0.001–0.025 rad/s, against
+0.16–0.66 for the policies they started from. On the fitted plant they
+track best of all (yaw-rate error 0.014–0.018 rad/s, `flat_level_real`
+0.028–0.036, `flat_level_fast` 0.37–0.41), clean under every latency
+profile (worst phase wheel torque 0.38–0.63 Nm). On the MJCF as trained
+their yaw error is 0.028–0.047 against 0.012–0.016. Deployed as
+`rl_flat_level_sysid` and `rl_flat_level_fast_sysid` in place of the
+drivetrain controllers.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that

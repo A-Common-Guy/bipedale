@@ -67,11 +67,11 @@ rl_flat_level_fast:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
-rl_flat_level_drivetrain:
+rl_flat_level_sysid:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
-rl_flat_level_fast_drivetrain:
+rl_flat_level_fast_sysid:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016

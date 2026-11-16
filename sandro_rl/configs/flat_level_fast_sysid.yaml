@@ -1,0 +1,23 @@
+# flat_level_fast on the identified yaw plant of flat_level_sysid.yaml (see
+# there). On the fitted plant the evaluator rings flat_level_fast at 8 Hz
+# with 0.47 rad/s of yaw, its hardest, as on the robot.
+#
+#     uv run python -m sandro_rl.train configs/flat_level_fast_sysid.yaml --resume policies/flat_level_fast_drivetrain
+inherit: flat_level_fast_drivetrain.yaml
+
+env:
+  randomization:
+    drives:
+      gear:
+        probability: 0.9
+        stiffness_nm_rad: [8.0, 60.0]
+        play_rad: [0.0, 0.03]
+        damping_nm_s_rad: [0.05, 0.3]
+        rotor_inertia_scale: [15.0, 35.0]
+        substeps: 8
+    model:
+      tyre_torsional_scale: [0.005, 0.5]
+      wheel_frictionloss_scale: [0.02, 1.0]
+
+train:
+  iterations: 800

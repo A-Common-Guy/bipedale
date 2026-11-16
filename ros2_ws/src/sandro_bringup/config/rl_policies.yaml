@@ -11,9 +11,9 @@ controller_manager:
       type: sandro_controllers/RlPolicyController
     rl_flat_level_fast:
       type: sandro_controllers/RlPolicyController
-    rl_flat_level_drivetrain:
+    rl_flat_level_sysid:
       type: sandro_controllers/RlPolicyController
-    rl_flat_level_fast_drivetrain:
+    rl_flat_level_fast_sysid:
       type: sandro_controllers/RlPolicyController
 
 rl_flat_level:
@@ -209,13 +209,13 @@ rl_flat_level_fast:
       wheel_scale_nm: 3.0
       stand_q: [0.41133484, 0.21714621, -1.48937, 0.21522591, 0.41287811, 2.14299]
 
-rl_flat_level_drivetrain:
+rl_flat_level_sysid:
   ros__parameters:
     joints: [right_motor_inner, right_motor_outer, right_wheel, left_motor_inner, left_motor_outer, left_wheel]
     imu_name: imu
     command_topic: /cmd_vel
-    policy_file: package://sandro_controllers/policies/flat_level_drivetrain.bin
-    policy_fingerprint: 929ab315b470cdb60855da5df8435a4dedf597caffd7d76df4de688b4e74af0f
+    policy_file: package://sandro_controllers/policies/flat_level_sysid.bin
+    policy_fingerprint: 581c0685d0ed81ce7e40c7f9be8175daff496e078bcf4e05ecf9877985f3eba2
     policy_rate_hz: 100.0
     observation:
       history: 4
@@ -256,12 +256,12 @@ rl_flat_level_drivetrain:
       wheel_scale_nm: 3.0
       stand_q: [0.41133484, 0.21714621, -1.48937, 0.21522591, 0.41287811, 2.14299]
 
-rl_flat_level_fast_drivetrain:
+rl_flat_level_fast_sysid:
   ros__parameters:
     joints: [right_motor_inner, right_motor_outer, right_wheel, left_motor_inner, left_motor_outer, left_wheel]
     imu_name: imu
     command_topic: /cmd_vel
-    policy_file: package://sandro_controllers/policies/flat_level_fast_drivetrain.bin
+    policy_file: package://sandro_controllers/policies/flat_level_fast_sysid.bin
     policy_fingerprint: 581c0685d0ed81ce7e40c7f9be8175daff496e078bcf4e05ecf9877985f3eba2
     policy_rate_hz: 300.0
     observation:
