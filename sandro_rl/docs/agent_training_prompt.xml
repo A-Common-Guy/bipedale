@@ -64,20 +64,30 @@
       policies/flat_level_sysid:rl_flat_level_sysid
       policies/flat_level_fast_sysid:rl_flat_level_fast_sysid
       Check rl_policies.yaml for the current list before relying on this one.
+      The gamepad switch cycles rl_flat_level, rl_agile_terrain and
+      rl_flat_level_fast; rl_agile_terrain runs with
+      action.wheel_differential_filter_hz 3.0 from sandro_real_overrides.yaml.
+      The sysid controllers stay defined but are off the switch and the panel.
     </deployed_controllers>
 
     <what_the_robot_has_taught>
+      - Every policy so far buzzes on the robot in an 8-10 Hz yaw mode; the WBC does
+        not. rl_agile_terrain (trained with lateral and yaw disturbances) with the
+        3 Hz differential wheel filter is quick and buzzes least; it is the
+        baseline to beat. The filter was never in a policy's training loop; that
+        is untried.
       - The MJCF's yaw is wrong at small amplitude. The tyres' torsional friction
         (0.07 m, up to 1.7 Nm per tyre) and the wheels' 0.2 Nm frictionloss hold
         the simulated robot still, and the wheel rotor is about 22 x the MJCF
         armature behind a soft, damped drive train (11-40 Nm/rad, 0.1-0.45 Nm s/rad,
         about 30 mrad of play and friction). configs/flat_level_sysid.yaml
-        randomises all of it; start new balancing tasks from those ranges.
-      - The fitted plant for checks (evaluate.py --sim, comma-separated):
+        randomises all of it.
+      - A fitted plant for checks (evaluate.py --sim, comma-separated):
         wheel_lag=0,wheel_backlash=0.000001,rotor_inertia=22,gear_stiffness=19,gear_damping=0.1,tyre_torsion=0.01,wheel_friction=0
-        On it the old policies ring at 8-8.4 Hz in the robot's order
-        (flat_level_fast worst, agile_terrain least); the sysid policies do not.
-        Its low-frequency yaw gain is half the robot's, so it is a check, not the truth.
+        On it the old policies ring at 8-8.4 Hz roughly in the robot's order.
+        The sysid policies, trained on it, are calm there but still buzzed on the
+        robot and responded more slowly (2026-11-16); DESIGN.md closes that line.
+        Passing this check is necessary, not sufficient: say so when reporting.
       - The wheel drive train lags the torque (about 50 ms first order in the older
         model); policies trained without it rang at 7.5 Hz in pitch.
       - Slow SPI timing (IMU at 180 Hz, 15 ms) has made fine-tuned policies chatter
@@ -148,7 +158,9 @@ cd ros2_ws/src/sandro_controllers && g++ -std=c++17 -O1 -Iinclude -I$HOME/.cache
        has shown problems. When a policy is deployed: export_ros.py with every
        deployed policy; a sandro_real_overrides.yaml block (observation.imu_offset_rad
        equal to tasks.roll.imu_offset_rad); teleop.yaml policies, policy_colors and
-       switch_policies; gui.yaml controllers; the controller sets in
+       switch_policies (only for policies that should be on the switch); gui.yaml
+       controllers; any per-policy action.wheel_differential_filter_hz in the
+       overrides (export_ros.py ships it as 0); the controller sets in
        sandro_bringup/test/test_bringup.py and the name list in
        sandro_controllers/test/test_rl_policy.cpp; regenerate the user guide's
        table with `python3 -m sandro_gui.main --print-guide`.
