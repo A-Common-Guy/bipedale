@@ -1,0 +1,31 @@
+{
+ "args": {
+  "label": "rl_flat_level_sysid",
+  "stand": 30.0,
+  "drive": 30.0,
+  "out": "/workspaces/sandro/experiments/buzz_rl_flat_level_sysid_20261116-235221",
+  "yes": true,
+  "analyse": null
+ },
+ "label": "rl_flat_level_sysid",
+ "events": [
+  {
+   "kind": "phase",
+   "name": "stand",
+   "t": 1794873144.6228852,
+   "duration_s": 30.0
+  },
+  {
+   "kind": "phase",
+   "name": "drive",
+   "t": 1794873174.6607955,
+   "duration_s": 30.0
+  },
+  {
+   "kind": "phase",
+   "name": "stand again",
+   "t": 1794873204.714294,
+   "duration_s": 30.0
+  }
+ ]
+}
