@@ -13,7 +13,8 @@ import optax
 import pytest
 
 from sandro_rl import checkpoint
-from sandro_rl.loop_margin import Channels, YawLoop, load_plant
+from sandro_rl.loop_margin import (Channels, OpposedLoop, YawLoop, eigenvalues3, load_opposed_plant,
+                                   load_plant)
 from sandro_rl.networks import MLP, Normalizer
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -147,3 +148,105 @@ def test_a_plant_table_is_used_up_to_its_first_incoherent_frequency(tmp_path):
     plant = load_plant("yaw_plant_2026-11-16.json")
     assert 3.0 < plant["f_hz"][0] < 3.5 and 30.0 < plant["f_hz"][-1] < 33.0
     assert abs(plant["to_gyro"][-1]) < 0.2 < abs(plant["to_gyro"][0])
+
+
+OPPOSED = "opposed_plant_2026-11-17.json"
+
+
+def test_eigenvalues_of_a_3x3_and_their_gradient():
+    rng = np.random.default_rng(3)
+    for scale in (0.05, 1.0, 20.0):
+        m = scale * (rng.normal(size=(3, 3)) + 1j * rng.normal(size=(3, 3)))
+        found = np.asarray(eigenvalues3(jp.asarray(m, dtype=jp.complex64)))
+        reference = np.linalg.eigvals(m)
+        for value in reference:
+            assert abs(found - value).min() < 2e-4 * max(scale, 1.0)
+    # The gradient of the largest real part, against a finite difference.
+    m = rng.normal(size=(3, 3)) + 1j * rng.normal(size=(3, 3))
+    worst = lambda re, im: jp.max(jp.real(eigenvalues3((re + 1j * im).astype(jp.complex64))))
+    re, im = jp.asarray(m.real, dtype=jp.float32), jp.asarray(m.imag, dtype=jp.float32)
+    grad = np.asarray(jax.grad(worst)(re, im))
+    numeric = np.zeros((3, 3))
+    for i in range(3):
+        for j in range(3):
+            step = np.zeros((3, 3))
+            step[i, j] = 1e-4
+            numeric[i, j] = (np.linalg.eigvals(m + step).real.max()
+                             - np.linalg.eigvals(m - step).real.max()) / 2e-4
+    np.testing.assert_allclose(grad, numeric, atol=5e-3)
+
+
+def opposed_channels(policy, meta):
+    wheels, legs = meta["action"]["wheels"], meta["action"]["legs"]
+    return Channels(frame=policy.frame, history=policy.history, stride=policy.stride, rate_hz=policy.rate,
+                    gravity_z=2, gyro_z=5, wheel_right=14, wheel_left=15, last_action=16, n_actions=6,
+                    action_right=2, action_left=5, gyro_scale=0.25, wheel_scale=0.05,
+                    torque_per_action=wheels["scale_rad_s"] * wheels["kd_nm_s_rad"],
+                    drive_kd=wheels["kd_nm_s_rad"], leg_scale=legs["scale_rad"], leg_kp=legs["kp"],
+                    leg_kd=legs["kd"])
+
+
+def onnx_tool():
+    spec = importlib.util.spec_from_file_location("tool", ROOT.parent / "recordings/yaw_loop_margin.py")
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    return tool
+
+
+# agile_terrain at a tall stance: lower, its front leg actions sit on the action clip, where
+# the exported policy's response is zero and the checkpoint's (the unclipped mean the loss
+# differentiates, the cautious side) is not.
+@pytest.mark.parametrize("name,height", [("flat_level_sysid", None), ("agile_terrain", 0.8)])
+def test_the_opposed_loop_matches_the_onnx_tool(name, height):
+    """The whole left-against-right loop: the checkpoint in JAX with the cubic's roots
+    against policy.onnx in numpy with an eigensolver."""
+    directory = ROOT / "policies" / name
+    tool = onnx_tool()
+    policy = tool.Policy(directory)
+    plant = load_opposed_plant(OPPOSED)
+    frame = policy.operating_point(height=height)
+    assert abs(frame[16:22]).max() < 0.95
+    reference = tool.opposed_loop(policy, policy.jacobian(frame), plant["f_hz"], plant["plant"])
+    loop = OpposedLoop(opposed_channels(policy, json.loads((directory / "policy.json").read_text())),
+                       plant, rolloff_hz=(40.0, 45.0))
+    apply, params = actor(directory)
+    obs = jp.asarray(np.tile(frame, policy.history), dtype=jp.float32)
+    inside, above = loop.loop(jax.jacrev(lambda o: apply(params, o))(obs))
+    inside = np.asarray(inside)
+    assert inside.shape == reference.shape and above.shape == (2,)
+    for found, wanted in zip(inside, reference):
+        for value in wanted:
+            assert abs(found - value).min() < 0.03 + 0.03 * abs(value)
+    # Both buzz in roll on the robot, at 13-15 Hz, through the legs: the loop is past the margin there.
+    band = (plant["f_hz"] > 12.0) & (plant["f_hz"] < 17.0)
+    assert inside.real[band].max() > 0.7
+    worst, high = loop.measure(jax.jacrev(lambda o: apply(params, o))(obs))
+    assert float(worst) == pytest.approx(inside.real.max(), rel=1e-4) and float(high) > 0.0
+
+
+def test_descending_the_opposed_penalty_restores_the_margin():
+    directory = ROOT / "policies/agile_terrain"
+    tool = onnx_tool()
+    policy = tool.Policy(directory)
+    apply, params = actor(directory)
+    loop = OpposedLoop(opposed_channels(policy, json.loads((directory / "policy.json").read_text())),
+                       load_opposed_plant(OPPOSED), rolloff_hz=(40.0, 45.0))
+    frame = policy.operating_point(height=0.8)
+    obs = jp.asarray(np.tile(frame, (8, policy.history)), dtype=jp.float32)
+    obs = obs + 0.01 * jax.random.normal(jax.random.key(0), obs.shape)
+    loss = lambda p: loop.penalty(lambda o: apply(p, o), obs)
+    start, info = loss(params)
+    assert float(start) > 0.1 and float(info["loop_re"]) > 1.0
+    optimizer = optax.adam(1e-4)
+    state = optimizer.init(params)
+
+    @jax.jit
+    def step(p, s):
+        (value, aux), grads = jax.value_and_grad(loss, has_aux=True)(p)
+        updates, s = optimizer.update(grads, s)
+        return optax.apply_updates(p, updates), s, value, aux
+
+    for _ in range(500):
+        params, state, value, info = step(params, state)
+    assert np.isfinite(float(value))
+    assert float(info["loop_re"]) < 0.6 and float(info["loop_rolloff"]) < 0.6

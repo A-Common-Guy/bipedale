@@ -159,8 +159,10 @@ through the legs. It needs the software with the leg sweeps on the robot
    line: the wheels twitch (twice), the body rocks side to side by up to
    about 2 degrees (twice), the legs scissor fore-aft (twice).
 4. Results should read *good* with how far each of yaw, roll and fore-aft
-   answered cleanly. Download **Recording** (the `.tar` holds the bag,
-   `response.json` and `yaw_plant.json`) and untar it under `recordings/`.
+   answered cleanly. Download **Opposed plant** (`opposed_plant_<time>.json`),
+   put it in `sandro_rl/data/` on the training machine and set
+   `train.loop_margin.plant` to its name. **Recording** downloads the whole
+   run as a `.tar` for `recordings/`.
 
 If Start answers that this whole_body_controller cannot sweep the legs, the
 running stack is older than the page: stop it, deploy, start it again.

@@ -250,7 +250,8 @@ class Handler(BaseHTTPRequestHandler):
                     if file is not None:
                         # The plant table is named after its run, ready for sandro_rl/data/.
                         stamp = run.split("_", 1)[-1]
-                        download = f"yaw_plant_{stamp}.json" if name == "yaw_plant.json" else f"{run}_{name}"
+                        download = (f"{name[:-5]}_{stamp}.json" if name in ("yaw_plant.json", "opposed_plant.json")
+                                    else f"{run}_{name}")
                         return self._send(200, file.read_bytes(), "application/octet-stream",
                                           {"Content-Disposition": f'attachment; filename="{download}"'})
                 return self._send(404, b"no such run or file", "text/plain")

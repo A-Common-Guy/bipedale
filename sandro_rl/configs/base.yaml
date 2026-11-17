@@ -174,11 +174,14 @@ train:
   # plant"). Off by default: configs/*_margin.yaml switch it on.
   loop_margin:
     coef: 0.0                   # loss weight; 0 disables
-    # In data/: the panel's Sysid page (or sysid_yaw.py) writes it. Used up to
-    # the first frequency whose coherence is under 0.7 (3.2-31.6 Hz of this one).
-    plant: yaw_plant_2026-11-16.json
-    margin: 0.5                 # Re L allowed inside the measured band; |L| allowed above it
-    rolloff_hz: [32.0, 35.0, 40.0, 45.0]   # above the band, below the policy's Nyquist rate
+    # In data/, written by the panel's Sysid page (sysid_yaw.py). A
+    # yaw_plant_*.json closes the yaw loop through the wheels alone; an
+    # opposed_plant_*.json (a run of all three sweeps) the whole
+    # left-against-right loop, wheels and legs: the yaw and the roll buzz.
+    # Used up to the first frequency whose coherence is under 0.7.
+    plant: opposed_plant_2026-11-17.json
+    margin: 0.5                 # Re of the loop (of its eigenvalues) allowed inside the measured band; its gain above
+    rolloff_hz: [40.0, 45.0]    # above the band (3.2-36.9 Hz), below the policy's Nyquist rate
     command_delay_s: 0.001      # sandro.launch.py's nominal command delay
     samples: 64                 # observations linearised per minibatch
   checkpoint_every: 100

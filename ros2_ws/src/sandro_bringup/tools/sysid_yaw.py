@@ -490,8 +490,10 @@ def write_responses(directory, band=None):
                 i = int(np.argmin(abs(f[keep] - q)))
                 h_out = complex(*entry["signals"][out][i])
                 cells.append(f"{q} Hz {abs(h_out):.2f} [{entry['coherence'][out][i]:.2f}]")
-        clean = np.array(entry["coherence"][out]) >= 0.7
-        top = f[keep][int(np.argmin(clean)) - 1] if not clean.all() and clean[0] else (f[keep][-1] if clean.all() else lo)
+        # Judged by the torque the sweep drove: an output can pass through a
+        # null (the roll rate does near 6 and 20 Hz) without the sweep being bad.
+        clean = np.array(entry["coherence"][drive]) >= 0.7
+        top = f[keep][-1] if clean.all() else (f[keep][max(int(np.argmin(clean)) - 1, 0)] if clean[0] else lo)
         brief.append({"axis": axis, "amplitude": amplitude, "unit": "Nm" if axis == "yaw" else "m",
                       "output": out, "clean_hz": float(top),
                       "drive_coherence": float(min(entry["coherence"][drive]))})
@@ -506,6 +508,60 @@ def write_responses(directory, band=None):
     axes = sorted({s["axis"] for s in sweeps})
     print(f"{path}: {len(sweeps)} sweeps, axes {', '.join(axes)}"
           + ("" if len(axes) == 3 else "; the whole opposed plant needs yaw, roll and fore_aft"))
+    return path
+
+
+PLANT_INPUTS = ("wheel_torque", "rear_torque", "front_torque")
+PLANT_OUTPUTS = ("roll_rate", "yaw_rate", "rear_angle", "front_angle", "wheel_velocity")
+
+
+def opposed_plant(sweeps):
+    """(f, plant[f, output, input], coherence[f], condition[f]) from a run's sweeps of all
+    three axes (the larger amplitude of each): per frequency outputs = plant x torques over
+    the three sweeps, solved for the plant from the opposed wheel, rear and front motor
+    torques (Nm) to the roll and yaw rates (rad/s), the rear and front leg angles (rad) and
+    the wheel velocity (rad/s). The WBC's own loops are inside neither side: both are
+    measured. coherence: the weakest of the three driven torques."""
+    import numpy as np
+    best = {}
+    for sweep in sweeps:
+        size = sweep.get("amplitude_nm") or sweep.get("amplitude_m") or 0.0
+        if sweep["axis"] not in best or size > best[sweep["axis"]][0]:
+            best[sweep["axis"]] = (size, sweep)
+    missing = [a for a in ("yaw", "roll", "fore_aft") if a not in best]
+    if missing:
+        raise ValueError("no sweep of " + ", ".join(missing))
+    chosen = [best[a][1] for a in ("yaw", "roll", "fore_aft")]
+    cplx = lambda sweep, name: np.array([complex(re, im) for re, im in sweep["signals"][name]])
+    torques = np.stack([np.stack([cplx(s, n) for s in chosen], -1) for n in PLANT_INPUTS], 1)
+    outputs = np.stack([np.stack([cplx(s, n) for s in chosen], -1) for n in PLANT_OUTPUTS], 1)
+    driven = {"yaw": "wheel_torque", "roll": "rear_torque", "fore_aft": "front_torque"}
+    coherence = np.min([s["coherence"][driven[s["axis"]]] for s in chosen], 0)
+    return (np.array(chosen[0]["f_hz"]), outputs @ np.linalg.inv(torques), coherence,
+            np.linalg.cond(torques))
+
+
+def write_opposed_plant(directory):
+    """opposed_plant.json from response.json: what sandro_rl's train.loop_margin closes a
+    policy's whole left-against-right loop on (copy it into sandro_rl/data/)."""
+    import numpy as np
+    directory = Path(directory)
+    sweeps = json.loads((directory / "response.json").read_text())["sweeps"]
+    f, plant, coherence, condition = opposed_plant(sweeps)
+    rows = [f' "source": {json.dumps(directory.name)}',
+            ' "inputs": ' + json.dumps([f"{n}, Nm, (right - left) / 2" for n in PLANT_INPUTS]),
+            ' "outputs": ' + json.dumps([f"{n}, (right - left) / 2 for the joints" for n in PLANT_OUTPUTS]),
+            ' "f_hz": ' + json.dumps([round(float(v), 4) for v in f]),
+            ' "coherence": ' + json.dumps([round(float(v), 3) for v in coherence]),
+            ' "plant": [\n  ' + ",\n  ".join(
+                json.dumps([[[float(f"{v.real:.5g}"), float(f"{v.imag:.5g}")] for v in row] for row in at])
+                for at in plant) + "\n ]"]
+    path = directory / "opposed_plant.json"
+    path.write_text("{\n" + ",\n".join(rows) + "\n}\n")
+    roll = np.abs(plant[:, 0, 1])
+    print(f"{path}: {len(f)} frequencies, {f[0]:.1f}-{f[-1]:.1f} Hz; the sweeps' torques are "
+          f"independent (condition number at most {condition.max():.1f}) and coherent "
+          f"({coherence.min():.2f} at least); the roll answers the legs most at {f[int(roll.argmax())]:.1f} Hz")
     return path
 
 
@@ -593,7 +649,7 @@ def analyse(directory):
           "the yaw compliance; legs PD share: the share these numbers give. legs, roll: the legs'\n"
           "fore-aft yaw and the wheels' rolling against the gyro at the mode.")
     (directory / "summary.json").write_text(json.dumps(rows, indent=1, default=float))
-    for write in (write_plant, write_responses):
+    for write in (write_plant, write_responses, write_opposed_plant):
         try:
             write(directory)
         except Exception as error:  # noqa: BLE001 - the fit above stands without it

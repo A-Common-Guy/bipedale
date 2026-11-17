@@ -140,13 +140,13 @@ function renderRuns() {
         h("td", {}, run.name === active ? badge("running", "info") : verdict(run)),
         h("td", { class: "actions" },
           run.name === active ? null : [
-            run.result?.response ? link(run, "response.json", "Response table", "every left-against-right signal against each sweep: send it with the recording") : null,
+            run.files.includes("opposed_plant.json") ? link(run, "opposed_plant.json", "Opposed plant", "opposed_plant_<run>.json for sandro_rl/data/: wheels and legs, the yaw and the roll loop") : null,
             run.result?.plant ? link(run, "yaw_plant.json", "Plant table", "yaw_plant_<run>.json for sandro_rl/data/") : null,
             run.files.includes("summary.json") ? link(run, "summary.json", "Summary", "the analysis as JSON") : null,
             link(run, null, `Recording (${bytes(run.bytes)})`, "the whole run as a .tar: bag, plan, log, results"),
           ])))),
     h("p", { class: "hint sysid-next" },
-      "Plant table: save it into sandro_rl/data/ on the training machine and set train.loop_margin.plant to its file name. ",
+      "Opposed plant (or the yaw-only Plant table): save it into sandro_rl/data/ on the training machine and set train.loop_margin.plant to its file name. ",
       "Recording: untar it under recordings/ to keep it with the others."));
 }
 

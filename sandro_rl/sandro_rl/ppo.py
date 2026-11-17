@@ -26,7 +26,7 @@ import jax.numpy as jp
 import optax
 from flax import struct
 
-from .loop_margin import YawLoop
+from .loop_margin import make_loop
 from .networks import MLP, Normalizer
 
 
@@ -76,7 +76,7 @@ class PPO:
         margin = t.get("loop_margin") or {}
         self.loop_margin_coef = float(margin.get("coef", 0.0))
         self.loop_margin_samples = int(margin.get("samples", 64))
-        self.yaw_loop = YawLoop.from_config(env, margin) if self.loop_margin_coef > 0 else None
+        self.yaw_loop = make_loop(env, margin) if self.loop_margin_coef > 0 else None
 
     def init(self, rng) -> TrainState:
         k1, k2 = jax.random.split(rng)
