@@ -9,7 +9,9 @@ Gaussian. Additions:
     reports a termination probability delta per step and the return is
     discounted by gamma * (1 - delta);
   - a mirror loss on the actor mean (Mittal et al. 2024) using the robot's
-    left-right symmetry.
+    left-right symmetry;
+  - optionally (train.loop_margin) a penalty on the actor's yaw loop gain
+    against the robot's measured yaw response (loop_margin.py).
 One iteration (rollout plus update) is a single jitted function. A policy
 class other than the Gaussian (fpo.py) overrides init, act, sample,
 make_update and exploration.
@@ -24,6 +26,7 @@ import jax.numpy as jp
 import optax
 from flax import struct
 
+from .loop_margin import make_loop
 from .networks import MLP, Normalizer
 
 
@@ -70,6 +73,10 @@ class PPO:
             optax.clip_by_global_norm(t["max_grad_norm"]),
             optax.inject_hyperparams(optax.adam)(learning_rate=t["learning_rate"]),
         )
+        margin = t.get("loop_margin") or {}
+        self.loop_margin_coef = float(margin.get("coef", 0.0))
+        self.loop_margin_samples = int(margin.get("samples", 64))
+        self.yaw_loop = make_loop(env, margin) if self.loop_margin_coef > 0 else None
 
     def init(self, rng) -> TrainState:
         k1, k2 = jax.random.split(rng)
@@ -237,11 +244,19 @@ class PPO:
                 mirrored = self.actor_net.apply(params["actor"], ts.actor_norm(env.mirror_actor_obs(mb["actor_obs"])))
                 sym = jp.mean(jp.sum((mirrored - env.mirror_action(mean)) ** 2, -1))
                 loss = loss + t["symmetry_coef"] * sym
+            margin = {"loop_margin": jp.float32(0.0), "loop_re": jp.float32(0.0), "loop_rolloff": jp.float32(0.0)}
+            if self.yaw_loop is not None:
+                # The minibatch is a random draw already: its first rows.
+                mean_fn = lambda o: self.actor_net.apply(params["actor"], ts.actor_norm(o))
+                margin["loop_margin"], extra = self.yaw_loop.penalty(
+                    mean_fn, mb["actor_obs"][: self.loop_margin_samples])
+                margin.update(extra)
+                loss = loss + self.loop_margin_coef * margin["loop_margin"]
             old_std, new_std = jp.exp(mb["log_std_old"]), jp.exp(log_std)
             kl = jp.mean(jp.sum(log_std - mb["log_std_old"]
                                 + (old_std ** 2 + (mb["mean"] - mean) ** 2) / (2 * new_std ** 2) - 0.5, -1))
             return loss, {"surrogate": surrogate, "value_loss": value_loss, "entropy": entropy,
-                          "symmetry": sym, "kl": kl}
+                          "symmetry": sym, "kl": kl, **margin}
 
         def update(ts: TrainState, batch: Batch, adv, ret, rng):
             n = adv.size

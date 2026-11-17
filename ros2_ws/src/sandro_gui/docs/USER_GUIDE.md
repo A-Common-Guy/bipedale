@@ -130,3 +130,52 @@ and *Deploy* a commit. The panel writes it, builds what changed, restarts and
 the page reloads; the Versions table and the SW chip then read the new commit.
 A yellow SW chip says what is out of step: source not built, panel or stack
 started from an older build.
+
+## Measurements (Sysid page)
+
+Three runs, each one button. A greyed Start says next to it what is missing.
+
+**Yaw response to 45 Hz** (about 75 s): what the RL training holds a policy's
+yaw loop against.
+
+1. Run page: start the stack with `whole_body_controller`, Arm and start.
+2. Flat floor, a metre of room, hands off the sticks.
+3. Sysid page: Start, tick the box. The wheels twitch against each other,
+   faster and faster, twice (0.2 and 0.4 Nm).
+4. In Results the run should read *good*. Download **Plant table**
+   (`yaw_plant_<time>.json`), put it in `sandro_rl/data/` on the training
+   machine and set `train.loop_margin.plant` to its name.
+5. Optional, each its own run: crouch to the lowest height with the pad and
+   repeat, then the highest.
+
+**Roll and yaw response, wheels and legs** (about 3 min 20 s): the plant
+behind both buzzes, the 9 Hz yaw one through the wheels and the 14 Hz roll one
+through the legs. It needs the software with the leg sweeps on the robot
+(Software page: deploy, then start the stack again).
+
+1. Run page: start the stack with `whole_body_controller`, Arm and start.
+2. Flat floor, a metre of room, the default standing height, hands off the
+   sticks.
+3. Sysid page: Start, tick the box. Six sweeps follow, named in the large
+   line: the wheels twitch (twice), the body rocks side to side by up to
+   about 2 degrees (twice), the legs scissor fore-aft (twice).
+4. Results should read *good* with how far each of yaw, roll and fore-aft
+   answered cleanly. Download **Opposed plant** (`opposed_plant_<time>.json`),
+   put it in `sandro_rl/data/` on the training machine and set
+   `train.loop_margin.plant` to its name. **Recording** downloads the whole
+   run as a `.tar` for `recordings/`.
+
+If Start answers that this whole_body_controller cannot sweep the legs, the
+running stack is older than the page: stop it, deploy, start it again.
+
+**Record a controller's buzz** (about 95 s): where a buzz is.
+
+1. Run page: start the controller under test (for example
+   `rl_flat_level_sysid`) and let it stand.
+2. Sysid page: Start, tick the box, then do what the large line says: stand
+   still 30 s, drive and turn gently 30 s, stand still 30 s.
+3. Results gives the verdict (quiet, or the mode, its size and frequency);
+   **Recording** downloads the whole run as a `.tar` for `recordings/`.
+
+Stop measurement ends a run cleanly at any time; so does the E-stop. A run
+that ends early keeps what it recorded.

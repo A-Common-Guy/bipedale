@@ -1548,6 +1548,177 @@ which it did not at the 6 Nm wheel limit it trained with (2026-11-10): the
 page) next to `rl_agile_terrain`; the 3 Hz filter can be added through the
 overrides if it buzzes.
 
+### The yaw loop on the measured plant (2026-11-16)
+
+A review of the same recordings without the simulator. Not yet tried on the
+robot; no policy has been trained with the loss on a GPU.
+
+- **The policies' yaw-rate gain.** Linearised about standing still (the
+  Jacobian of `policy.onnx`, with the stacked frames and the last-action
+  recursion), the flat policies command 2.4-3.6 Nm per wheel per rad/s of
+  gyro yaw rate at 9 Hz, `agile_terrain` 1.6-2.1, the sysid policies
+  0.7-0.9. The WBC's yaw kp is 0.15 Nm per wheel.
+- **Closed on the WBC chirp** (`recordings/sysid_2026-11-12`: measured
+  opposed wheel torque to gyro and to opposed wheel velocity, the drive's kd
+  closed first), the loop feeds back in phase at 8.9-9.4 Hz with a gain of
+  1.4-2.1 for `flat_level_real`, `flat_level_fast` and
+  `flat_level_drivetrain`, about 1.0 for `flat_level_fast_drivetrain`,
+  0.8-1.07 at 10.5-11 Hz for `agile_terrain` (worst crouched), and nowhere
+  for the WBC. With the 3 Hz opposed-wheel filter `agile_terrain` drops to
+  0.43-0.55 and the flat policies stay at 1.1-1.4 near 6.5 Hz.
+- **In the buzz bags** the measured opposed torque follows the gyro with the
+  linearised policy's phase (+145 deg measured, +147 predicted for
+  `flat_level_real`; +124 against +140 for `flat_level_drivetrain` at full
+  amplitude, where the measured gain is half the small-signal one).
+- **The gain follows the command.** It is highest standing still and falls
+  three to four times when turning at 1 rad/s (`flat_level_real` loop gain
+  1.6 standing, 1.2 at 0.5 m/s, 0.3 turning; the plant was measured standing
+  only): quiet while driving, back after stopping.
+- **Open.** The sysid policies come out at 0.3-0.55 at 17 Hz, inside the
+  margin, and were reported buzzing on 2026-11-16 with no recording. Every
+  policy's yaw gain rises again above 20 Hz (2-4.5 Nm per rad/s at 25 Hz),
+  past the chirp's 25 Hz. The pitch and leg loops have no measured response.
+
+`recordings/yaw_loop_margin.py` prints these numbers for any policy folder
+and is the check before a policy goes on the robot; `--export` writes the
+plant table to `data/`.
+
+`train.loop_margin` (`loop_margin.py`, off in base.yaml) puts the same loop
+in the PPO loss: the actor mean is linearised at 64 upright observations of
+each minibatch and closed on the plant table. Penalised are the largest
+Re L above `margin` (0.5) inside the measured band, which keeps the Nyquist
+curve left of 0.5 (gain margin 2, phase margin 60 deg, sensitivity peak at
+most 2), and above the band the loop's magnitude with the plant held at its
+last measured magnitudes, so the policy cannot differentiate the gyro where
+nothing is known. The log gains `loop_margin`, `loop_re` and `loop_rolloff`.
+`tests/test_loop_margin.py` checks the transfer function against a
+time-domain run and against the ONNX tool on `flat_level_real`, and that
+descending the term alone brings that policy inside the margin.
+`configs/agile_terrain_margin.yaml` is the first fine-tune to run. On the
+CPU backend (8 environments) `agile_terrain` starts at Re L 0.80 and a
+roll-off bound of 1.0.
+
+**Two recordings from the panel's Sysid page (2026-11-16).**
+
+- **The yaw response to 45 Hz** (`data/yaw_plant_2026-11-16.json`, WBC, 0.2
+  and 0.4 Nm per wheel averaged; only the table was kept, not the bag).
+  Inside 3-22 Hz it repeats the 2026-11-12 chirp: the gain within 10 %, 5-15
+  deg more lag at 7-10 Hz (the larger amplitude's damping). Above the
+  resonance the yaw answer falls fast: 0.38 rad/s per Nm at 22 Hz, 0.30 at
+  25, 0.14 at 31, under 0.1 beyond 36, where the coherence is gone (0.7 or
+  more up to 31.6 Hz). The loss and the gate now use this table up to
+  31.6 Hz and assume the last magnitude above it. On it the flat policies
+  stand at 1.3-1.6 at 8.8-9.2 Hz, `flat_level_fast_drivetrain` at 0.82,
+  `agile_terrain` at 0.65-0.89 (0.47-0.53 behind the 3 Hz filter), the
+  sysid policies at 0.24-0.49: lower than on the small-signal table, the
+  same order. A policy near 1 on the averaged table can still start a buzz
+  at small amplitude, where the plant is less damped.
+- **`rl_flat_level_sysid` buzzing** (`recordings/buzz_2026-11-16`, stand,
+  drive, stand). Not the yaw loop: a roll mode at 14.1-14.4 Hz, 0.30 rad/s of
+  roll rate against 0.13 of yaw and pitch, always on (0.12-0.40 rad/s over
+  the standing phases) and 0.40 while driving. The outer leg motors of the
+  two sides move against each other; the opposed leg reference (from the
+  drive law, q + (tau + kd v) / kp) is 28 mrad RMS per joint and follows the
+  roll rate at 0.097 rad per rad/s, +111 deg, coherence 0.99. The linearised
+  policy gives 0.108 at +124 deg: the policy's own loop from the gyro's roll
+  rate to the legs.
+- **The same mode in the older bags**, 11-18 Hz roll rate against each
+  policy's linearised roll-rate gain at 14 Hz (opposed leg reference per
+  joint):
+
+  | Controller | gain, rad per rad/s | roll rate, rad/s |
+  | --- | --- | --- |
+  | WBC | | 0.02 |
+  | `flat_level_real` | 0.044 | 0.04 |
+  | `flat_level_drivetrain` | 0.071 | 0.10 (3 Hz filter), 0.18 |
+  | `agile_terrain`, 3 Hz filter | 0.094 | 0.27 at 13.2 Hz |
+  | `flat_level_sysid` | 0.104 | 0.30 at 14.4 Hz |
+
+  What is left of `agile_terrain`'s buzz behind the 3 Hz filter is this
+  mode (0.27 rad/s of roll against 0.08 of yaw), which a wheel filter cannot
+  touch. `flat_level_fast` (0.129), `flat_level_fast_sysid` (0.157) and
+  `flat_level_fast_drivetrain` (0.197) are higher still. The retrains that
+  quietened the wheels' yaw loop raised the legs' roll gain 1.6-2.4 times.
+- **Next.** The roll loop has no measured plant: only the one point the
+  self-oscillation gives (the loop gain is 1 at 14.4 Hz with that policy).
+  `recordings/yaw_loop_margin.py` prints the roll-rate gain meanwhile: keep
+  it near `flat_level_real`'s 0.044.
+
+**The sweeps for the whole left-against-right plant (2026-11-17, built, not
+yet run on the robot).** A policy's actions that change sign under the
+robot's mirror are three: the wheel torques against each other, and the rear
+and the front leg motors against each other (the motor names are mirrored:
+the right inner and the left outer are the rear ones). The yaw and roll
+buzzes live in those and in the gyro's yaw and roll rates, the opposed leg
+angles and the opposed wheel velocity. The WBC's `sysid.axis` now sweeps
+three independent directions while it balances: 0 the wheel torques (as
+before), 1 the leg heights against each other (roll), 2 the axles fore-aft
+against each other. `sysid_yaw.py --axis yaw roll fore_aft` (the panel's
+"Roll and yaw response, wheels and legs") runs them in one recording and
+writes `response.json`: every opposed signal against each sweep's chirp.
+Per frequency the three sweeps give three columns of (torques, outputs), so
+outputs = plant x torques solves for the 3-input plant whatever loops the
+WBC closed meanwhile; the leg drives' own PD closes analytically, as the
+wheel kd does now. In `closed_loop.py` (`--scenario sysid`, the real
+controller core in MuJoCo with the latency emulation) all three sweeps
+complete at 3 and 4 mm per leg: the body rolls 1.9 deg at most, the leg
+torques stay under 1.5 Nm, and the driven torques are coherent with the
+chirp (0.9 or more from 5 Hz) to
+37 Hz. Then: the loss on the whole opposed loop (the largest eigenvalue of
+the 3 x 3 loop in place of the scalar L), which covers roll and the yaw
+through the legs with the same code.
+
+**The opposed plant measured, and the loss on the whole loop (2026-11-17).**
+`recordings/sysid_2026-11-17/full_20261117-002455`: the six sweeps under the
+WBC on the robot (wheels 0.2 and 0.4 Nm, roll and fore-aft 2 and 4 mm per
+leg, 2-40 Hz). The larger sweep of each axis gives the 3-input plant
+(`data/opposed_plant_2026-11-17.json`, 3.2-36.9 Hz): the three torque
+directions are independent (condition number at most 3.7) and coherent with
+their chirps (0.82 at least).
+
+- **The robot has a roll resonance at 12-14 Hz.** Roll rate per Nm of
+  opposed leg torque: 0.07 rad/s at 6 Hz, 0.32-0.35 at 9, 0.76-0.89 at
+  12-14, 0.2-0.4 at 16, under 0.1 beyond 22, the phase turning through
+  -90 deg at 13 Hz. In `closed_loop.py` the same sweep falls smoothly from
+  3 Hz with no peak: the simulated robot has no such mode, so no policy
+  could learn to leave it alone.
+- **The whole loop on it.** A policy's three opposed actions (wheels, rear
+  and front leg motors) closed on the plant, the drives' kd and PD first:
+  the loop is a 3 x 3 matrix and oscillates where one of its eigenvalues is
+  real and reaches 1. Standing, per policy and for the wheels and the legs
+  alone:
+
+  | Policy | wheels alone | legs alone | robot |
+  | --- | --- | --- | --- |
+  | `flat_level_real` | 9.3-9.7 Hz, 1.04-1.19 | none near 14 Hz | yaw buzz, roll quiet |
+  | `flat_level_fast` | 9.3-9.7 Hz, 1.2-1.6 | 15.5 Hz, 0.4-0.8 | yaw buzz, watchdog |
+  | `flat_level_drivetrain` | 9.2-10.1 Hz, 0.9-1.14 | 14.5 Hz, 0.4-0.5 | yaw buzz, roll 0.10-0.18 rad/s |
+  | `flat_level_sysid` | 17.5 Hz, 0.6 | 14.5 Hz, 0.67-0.91 | roll buzz 0.30 rad/s at 14.4 Hz |
+  | `flat_level_fast_sysid` | none | 15.1 Hz, 0.76-0.86 | buzzes |
+  | `agile_terrain` | 11 Hz, 0.6-0.85 | 14.6-15.4 Hz, 0.7-1.09 | roll buzz 0.27 rad/s at 13.2 Hz |
+
+  The roll crossing sits where the robot rings and is absent for the one
+  policy that is quiet in roll. `rl_flat_level_sysid` rings at a computed
+  0.8-0.9, so the measure is somewhat low at the buzz's amplitude (the plant
+  is the 4 mm sweep's); 0.5 is the target. Several policies also come near 1
+  at 29-35 Hz through the legs (`flat_level_fast` 1.3 at 34 Hz,
+  `flat_level_sysid` 1.0 at 29 Hz), where the buzz bag has 28-32 Hz content.
+  At low stances `agile_terrain`'s front leg actions sit on the action
+  clip, where the exported policy's response is zero; the loss
+  differentiates the unclipped mean, the cautious side.
+- **The loss.** `loop_margin.OpposedLoop`, selected by the plant file
+  (`make_loop`): the same linearisation, the loop's eigenvalues from the
+  characteristic cubic (Durand-Kerner, with one Newton step carrying the
+  gradient; jax's eigensolver is CPU only), Re of each held under `margin`
+  inside the band and the loop's gain (Frobenius norm on the last measured
+  magnitudes) above it. Tested against the ONNX tool with numpy's
+  eigensolver on `flat_level_sysid` and `agile_terrain`, and descending it
+  alone brings `agile_terrain` inside the margin. base.yaml's plant is now
+  the opposed one; `agile_terrain_margin.yaml` on the CPU backend starts at
+  Re 0.81 and a roll-off bound of 0.69. Not yet trained on a GPU.
+- `recordings/yaw_loop_margin.py` prints both: the yaw loop on the yaw
+  table and the whole loop on the opposed plant.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that

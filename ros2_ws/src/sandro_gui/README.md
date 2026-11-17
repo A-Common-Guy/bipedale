@@ -12,6 +12,7 @@ How to drive it, step by step and button by button: [docs/USER_GUIDE.md](docs/US
 | Tune | Any node's parameters, set live through the parameter services, changes marked against the launch values, revert, and an export of the changes as a `ros__parameters` file. |
 | IMU | Attitude, rates, acceleration, topic rate against new-sample rate, sample age, strip charts. |
 | Gamepad | Bluetooth scan, pair, connect, forget, rfkill unblock; the pad's live input as the robot sees it and the `/cmd_vel` teleop sends. |
+| Sysid | The measurements the RL training needs, one button each: the yaw response to 45 Hz under the WBC (result: `yaw_plant.json` for `sandro_rl`'s `train.loop_margin`), the same sweep on the wheels, the leg heights (roll) and the axles fore-aft in one recording (result: `response.json`, the whole left-against-right plant), and a stand-drive-stand recording of any controller that says which loop its buzz is in. Each run checks the robot's state first, shows the instruction of the moment, and keeps its recording and result to download. |
 | Guide | The start-up procedure and every gamepad combination, generated from `teleop.yaml`. |
 
 ## Running it
@@ -106,6 +107,15 @@ changed and restarts the panel; see `deploy/pi/README.md`.
   panel's own CAN socket (the only frame the panel ever transmits), then calls
   the E-stop node's service and deactivates the controllers in parallel, and
   aborts any action still in flight.
+- **Sysid** (`sysid.py`). A measurement is a `sandro_bringup/tools` script
+  (`sysid_yaw.py`, `buzz_record.py`) run as its own process with arguments
+  fixed in `sysid.command`, its output in `experiments/<run>/panel.log`.
+  It starts only when the snapshot shows what it needs (the WBC engaged for
+  the sweep, any controller running for the recording) and after the
+  operator has ticked that they are watching. Stop is one SIGINT to the
+  tool, which switches the excitation off and restores the leg stiffness;
+  the E-stop does the same first. One runs at a time, and a panel restart
+  picks a running one up again by its pid.
 - **3D model.** Built once from `sandro_description/mjcf/robot_full_floating.xml`
   and cached in `gui_runs/cache/`: visual meshes grouped into the rigid bodies
   of each five-bar (two cranks, two lower links, the wheel), clustered on a

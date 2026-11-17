@@ -1,0 +1,26 @@
+# agile_terrain with its left-against-right loops held inside the robot's
+# measured margin. On the robot the policies buzz in two loops they close
+# themselves: the yaw through the wheels at 9-11 Hz (1.6-3.6 Nm per wheel per
+# rad/s of gyro yaw rate; the WBC: 0.15) and the roll through the legs at
+# 13-15 Hz, where the real robot has a roll resonance the simulation lacks.
+# agile_terrain is quiet in yaw only behind the 3 Hz opposed-wheel filter and
+# keeps the roll buzz (0.27 rad/s). train.loop_margin (loop_margin.py) closes
+# the linearised policy on the plant measured under the WBC
+# (data/opposed_plant_2026-11-17.json, recordings/sysid_2026-11-17) and
+# penalises the loop where an eigenvalue passes Re = 0.5, and its gain above
+# the measured band.
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_margin.yaml --resume policies/agile_terrain
+#     uv run python ../recordings/yaw_loop_margin.py policies/agile_terrain_margin   # after export: the gate
+#
+# Deploy without action.wheel_differential_filter_hz: the margin is for the
+# unfiltered command.
+inherit: agile_terrain.yaml
+
+train:
+  iterations: 600
+  learning_rate: 3.0e-4          # with the action noise below, the lag refit's values (scripts/refit_lag.sh)
+  curriculum_offset: 900        # the last stage of agile_terrain's curriculum from the first iteration
+  resume_log_std: -1.2
+  loop_margin:
+    coef: 0.3

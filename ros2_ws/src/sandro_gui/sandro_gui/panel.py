@@ -357,6 +357,7 @@ class Panel:
         self.bt = sources["bt"]
         self.ros = sources.get("ros")
         self.software = sources.get("software")
+        self.sysid = sources.get("sysid")
         self.expect = cfg.get("expect", {})
         robot = cfg.get("robot", {})
         self.component = robot.get("hardware_component", "SandroSystem")
@@ -442,6 +443,7 @@ class Panel:
             "can_monitor": self.can is not None,
             "software": {"boot": self.software.boot, "panel": self.software.panel}
             if self.software else None,
+            "sysid": self.sysid is not None,
         }
 
     def sample(self) -> None:
@@ -551,7 +553,13 @@ class Panel:
             "waiting": list(self._waiting),
             "busy": self._busy,
             "software": self.software.summary() if self.software else None,
+            "sysid": self.sysid.summary() if self.sysid else None,
         }
+
+    def sysid_status(self) -> dict:
+        if self.sysid is None:
+            raise RuntimeError("measurements are not available in this process")
+        return self.sysid.status(self._ros_slow(), self.launcher.status())
 
     def checks(self, slow: dict, fast: dict) -> list[dict]:
         return health(slow, fast, self.expect, self.simulation, self.component, self.topic_hz)
@@ -590,6 +598,8 @@ class Panel:
         else:
             raise RuntimeError("ROS is not available: use the power cut-off")
         self.session["estopped"] = True
+        if self.sysid is not None and self.sysid.stop():
+            message += "; the running measurement stopped"
         self.log.note("E-STOP from the panel: " + message, ERROR)
         return message
 
@@ -683,6 +693,19 @@ class Panel:
                     raise RuntimeError("this panel is not run by deploy/pi/panel.sh")
                 threading.Timer(0.5, self.software.restart).start()
                 return {"message": "panel restarting"}
+        if action.startswith("sysid/"):
+            if self.sysid is None:
+                raise RuntimeError("measurements are not available in this process")
+            verb = action[len("sysid/"):]
+            if verb == "start":
+                if not body.get("watching"):
+                    raise ValueError("confirm first that you are watching the robot with the "
+                                     "E-stop in reach")
+                return {"job": self.sysid.start(body.get("kind", ""), self._ros_slow(),
+                                                self.launcher.status())}
+            if verb == "stop":
+                job = self.sysid.stop()
+                return {"message": f"stopping {job['title']}" if job else "nothing is running"}
         if action.startswith("bt/"):
             verb = action[3:]
             if verb == "watch":

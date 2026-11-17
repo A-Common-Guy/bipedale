@@ -222,14 +222,18 @@ struct WholeBodyParameters {
   double yaw_torque_limit_nm{1.5};
   double yaw_torque_rate_nm_s{20.0};
   double yaw_torque_sign{1.0};
-  // System identification, off unless sysid_mode is set: a differential wheel
-  // torque of +-sysid_amplitude_nm per wheel on top of the yaw task while
-  // balancing. Mode 1: pulses of sysid_pulse_s every sysid_period_s with
-  // alternating sign, a tap on the yaw mode. Mode 2: a linear chirp from
-  // sysid_f0_hz to sysid_f1_hz with 0.5 s tapers. A run starts each time
-  // sysid_trigger changes, lasts sysid_duration_s, and ends on a disengage.
+  // System identification, off unless sysid_mode is set: an excitation on top
+  // of the tasks while balancing, on sysid_axis. Axis 0, the yaw through the
+  // wheels: a differential wheel torque of +-sysid_amplitude_nm per wheel.
+  // Axis 1, the roll through the legs: the leg heights against each other,
+  // +-sysid_amplitude_m per leg. Axis 2, the yaw through the legs: the axles
+  // fore-aft against each other, +-sysid_amplitude_m per leg. Mode 1: pulses
+  // of sysid_pulse_s every sysid_period_s with alternating sign, a tap on the
+  // mode. Mode 2: a linear chirp from
   double sysid_mode{0.0};
+  double sysid_axis{0.0};
   double sysid_amplitude_nm{0.3};
+  double sysid_amplitude_m{0.002};
   double sysid_f0_hz{2.0};
   double sysid_f1_hz{20.0};
   double sysid_duration_s{20.0};
@@ -329,6 +333,9 @@ bool valid_whole_body_parameters(const WholeBodyParameters &parameters,
                                  std::string *reason = nullptr);
 
 // The system-identification torque per wheel, t seconds into a run.
+// The excitation's shape at t seconds into a run, within +-1 (0 outside it).
+double sysid_waveform(const WholeBodyParameters &parameters, double t);
+// The wheel-torque excitation of axis 0, Nm per wheel: the waveform times sysid_amplitude_nm.
 double sysid_excitation_nm(const WholeBodyParameters &parameters, double t);
 
 // Validates, solves the Riccati equation at every table height and checks
@@ -383,6 +390,7 @@ struct WholeBodyOutput {
   double yaw_feedforward_nm{};
   // System-identification torque per wheel (right +, left -), in yaw_torque_nm.
   double sysid_torque_nm{};
+  double sysid_offset_m{};  // per leg, axes 1 and 2
   bool sysid_active{};
   // Per leg [inner, outer]: joint torque fed forward for the wheel torque's
   // reaction on the leg.

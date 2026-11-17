@@ -1,0 +1,18 @@
+$ /usr/bin/python3 -u /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/tools/buzz_record.py --label rl_flat_level_sysid --stand 30 --drive 30 --yes --out /workspaces/sandro/experiments/buzz_rl_flat_level_sysid_20261116-235221
+recording rl_flat_level_sysid for 90 s into /workspaces/sandro/experiments/buzz_rl_flat_level_sysid_20261116-235221
+NOW: stand still, hands off the sticks (30 s)
+NOW: drive and turn gently, stop now and then (30 s)
+NOW: stand still again, hands off the sticks (30 s)
+NOW: done, recording closed
+recorded: /workspaces/sandro/experiments/buzz_rl_flat_level_sysid_20261116-235221
+rl_flat_level_sysid: RMS (rad/s) and strongest frequency per phase
+  stand (29 s)
+    5-15 Hz   gyro yaw 0.10 @ 14.3 Hz   wheels opposed (as yaw) 0.13 @ 14.3 Hz   gyro pitch 0.12 @ 14.3 Hz   wheels together 0.11 @ 14.3 Hz   gyro roll 0.31 @ 14.3 Hz
+    15-45 Hz  gyro yaw 0.08 @ 31.4 Hz   wheels opposed (as yaw) 0.15 @ 31.4 Hz   gyro pitch 0.07 @ 28.4 Hz   wheels together 0.18 @ 28.1 Hz   gyro roll 0.07 @ 15.1 Hz
+  drive (29 s)
+    5-15 Hz   gyro yaw 0.15 @ 12.2 Hz   wheels opposed (as yaw) 0.21 @ 12.1 Hz   gyro pitch 0.19 @ 12.2 Hz   wheels together 0.34 @ 8.6 Hz   gyro roll 0.41 @ 13.4 Hz
+    15-45 Hz  gyro yaw 0.07 @ 15.5 Hz   wheels opposed (as yaw) 0.10 @ 15.1 Hz   gyro pitch 0.09 @ 15.7 Hz   wheels together 0.28 @ 26.8 Hz   gyro roll 0.06 @ 15.1 Hz
+  stand again (29 s)
+    5-15 Hz   gyro yaw 0.10 @ 14.0 Hz   wheels opposed (as yaw) 0.10 @ 14.7 Hz   gyro pitch 0.10 @ 14.7 Hz   wheels together 0.13 @ 14.7 Hz   gyro roll 0.26 @ 14.0 Hz
+    15-45 Hz  gyro yaw 0.10 @ 15.1 Hz   wheels opposed (as yaw) 0.19 @ 32.1 Hz   gyro pitch 0.09 @ 15.1 Hz   wheels together 0.18 @ 29.4 Hz   gyro roll 0.11 @ 15.1 Hz
+buzz standing: 0.31 rad/s of gyro roll at 14.3 Hz, roll, the legs: no measured response yet

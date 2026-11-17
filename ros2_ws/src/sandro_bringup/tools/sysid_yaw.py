@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
-"""System identification of the 9 Hz yaw mode, with the whole-body controller balancing.
+"""System identification of the robot's left-against-right modes, with the whole-body controller balancing.
 
     deploy/pi/pi sysid                 # on the robot, from the laptop (stack running,
                                        # WBC armed and balancing, someone watching)
-    python3 sysid_yaw.py --analyse DIR # afterwards, anywhere
+    python3 sysid_yaw.py --analyse DIR # afterwards, anywhere; also writes DIR/yaw_plant.json
+
+--axis picks what is swept, left against right (the WBC's sysid.axis): yaw, the
+wheel torques (the default); roll, the leg heights; fore_aft, the axles
+fore-aft. Several axes run one after the other in one recording, and
+response.json then holds every opposed signal (the three torques, the gyro's
+roll and yaw rates, the rear and front leg angles, the wheel velocity) against each sweep:
+with all three axes, the whole plant a policy's opposed actions close their
+loops on.
 
 For each leg drive stiffness in --kp (tasks.legs.drive_kp_nm_rad, live) the WBC
 taps the yaw mode with short differential wheel-torque pulses of alternating
@@ -15,7 +23,8 @@ put the leg stiffness back and close the recording.
 The analysis fits each pulse's ringing (frequency, damping) and the chirp's
 frequency response from the measured differential wheel torque to the gyro's
 yaw rate, the wheels' rolling and the legs' fore-aft yaw (recordings/
-yaw_closure.py). How the frequency moves with the leg stiffness gives the
+yaw_closure.py), and writes yaw_plant.json, the measured response sandro_rl's
+train.loop_margin closes a policy's yaw loop on. How the frequency moves with the leg stiffness gives the
 share of the yaw compliance in the legs' drive PD: all of it moves the
 frequency with sqrt(kp), none of it not at all.
 """
@@ -39,6 +48,8 @@ JOINTS = ["right_motor_inner", "right_motor_outer", "right_wheel",
 BASE, UPPER, LOWER, RADIUS, TRACK = 0.09, 0.08, 0.13, 0.0672, 0.304
 FORWARD = {"right": 1.0, "left": -1.0}
 FS = 300.0
+# --axis names and the WBC's sysid.axis; what each chirp's amplitude is in.
+AXES = {"yaw": 0.0, "roll": 1.0, "fore_aft": 2.0}
 
 
 # Running ------------------------------------------------------------------------
@@ -125,7 +136,8 @@ class Session:
                 raise Aborted(f"{label}: the WBC is no longer balancing")
             remaining = end - time.time()
             print(f"\r  {label}: {remaining:4.1f} s  yaw rate {d.get('yaw_rate_rad_s', 0):+.2f} rad/s"
-                  f"  sysid torque {d.get('sysid_torque_nm', 0):+.2f} Nm   ", end="", flush=True)
+                  f"  sysid torque {d.get('sysid_torque_nm', 0):+.2f} Nm"
+                  f"  offset {1e3 * d.get('sysid_offset_m', 0):+.1f} mm   ", end="", flush=True)
             time.sleep(0.1)
         print()
 
@@ -141,12 +153,24 @@ class Session:
         current = self.get(names)
         self.restore = {KP: current[KP], "sysid.mode": 0.0}
         trigger = current["sysid.trigger"]
+        legs = [a for a in args.axis if a != "yaw"]
+        if legs:
+            # A controller from before the leg axes has no sysid.axis.
+            try:
+                self.set({"sysid.axis": 0.0})
+            except Aborted as error:
+                raise Aborted(f"this whole_body_controller cannot sweep the legs ({error}): "
+                              "build and restart the stack on the current software") from error
+            self.restore["sysid.axis"] = 0.0
+        sweeps = [(axis, amplitude) for axis in args.axis
+                  for amplitude in (args.chirp_nm if axis == "yaw" else args.chirp_m)]
         pulses_s = args.pulses * args.period + 1.0 if args.pulses else 0.0
-        per_kp = args.settle + pulses_s + len(args.chirp_nm) * (args.chirp_s + 1.0)
+        per_kp = args.settle + pulses_s + len(sweeps) * (args.chirp_s + 1.0)
         print(f"leg kp {current[KP]:g} now; plan: kp {' -> '.join(f'{k:g}' for k in args.kp)}, "
-              f"each {args.pulses} pulses of {args.pulse_nm} Nm and {args.chirp_s:g} s chirps of "
-              f"{', '.join(f'{a:g}' for a in args.chirp_nm)} Nm ({args.f0:g}-{args.f1:g} Hz): "
-              f"{per_kp * len(args.kp):.0f} s")
+              f"each {args.pulses} pulses of {args.pulse_nm} Nm and {args.chirp_s:g} s chirps "
+              f"({args.f0:g}-{args.f1:g} Hz) of "
+              + ", ".join(f"{axis} {amplitude:g} {'Nm' if axis == 'yaw' else 'm'}" for axis, amplitude in sweeps)
+              + f": {per_kp * len(args.kp):.0f} s")
         if not args.yes:
             input("watch the robot, hand on the E-stop; Enter starts, Ctrl-C cancels ")
 
@@ -169,19 +193,27 @@ class Session:
             if args.pulses:
                 trigger += 1
                 self.set({"sysid.mode": 1, "sysid.amplitude_nm": args.pulse_nm,
+                          **({"sysid.axis": 0.0} if legs else {}),
                           "sysid.pulse_s": args.pulse_s, "sysid.period_s": args.period,
                           "sysid.duration_s": args.pulses * args.period, "sysid.trigger": trigger})
                 self.event("pulses", kp=kp, amplitude_nm=args.pulse_nm, pulse_s=args.pulse_s,
                            period_s=args.period, count=args.pulses)
                 self.watch(pulses_s, "pulses")
-            for amplitude in args.chirp_nm:
+            for axis, amplitude in sweeps:
                 trigger += 1
-                self.set({"sysid.mode": 2, "sysid.amplitude_nm": amplitude, "sysid.f0_hz": args.f0,
-                          "sysid.f1_hz": args.f1, "sysid.duration_s": args.chirp_s,
-                          "sysid.trigger": trigger})
-                self.event("chirp", kp=kp, amplitude_nm=amplitude, f0_hz=args.f0, f1_hz=args.f1,
-                           duration_s=args.chirp_s)
-                self.watch(args.chirp_s + 1.0, f"chirp {amplitude:g} Nm")
+                unit = "Nm" if axis == "yaw" else "m"
+                values = {"sysid.mode": 2, "sysid.f0_hz": args.f0, "sysid.f1_hz": args.f1,
+                          "sysid.duration_s": args.chirp_s, "sysid.trigger": trigger,
+                          "sysid.amplitude_nm" if axis == "yaw" else "sysid.amplitude_m": amplitude}
+                if legs:
+                    values["sysid.axis"] = AXES[axis]
+                self.set(values)
+                self.event("chirp", kp=kp, axis=axis, f0_hz=args.f0, f1_hz=args.f1,
+                           duration_s=args.chirp_s,
+                           **{"amplitude_nm" if axis == "yaw" else "amplitude_m": amplitude})
+                print(f"NOW: {axis} sweep, {amplitude:g} {unit} ({args.chirp_s:.0f} s): hands off the sticks",
+                      flush=True)
+                self.watch(args.chirp_s + 1.0, f"{axis} chirp {amplitude:g} {unit}")
         self.event("done")
 
     def close(self, reason=None):
@@ -208,7 +240,7 @@ class Session:
 # Analysis -----------------------------------------------------------------------
 
 def read_bag(path):
-    """Joint positions, velocities, efforts; gyro z; WBC diagnostics, by header stamp."""
+    """Joint positions, velocities, efforts; gyro (z, x, y); WBC diagnostics, by header stamp."""
     import numpy as np
     joints, gyro, diag = [], [], []
 
@@ -223,7 +255,8 @@ def read_bag(path):
             joints.append([t] + [msg.position[i] for i in index] + [msg.velocity[i] for i in index]
                           + [msg.effort[i] for i in index])
         elif topic == "/imu_broadcaster/imu":
-            gyro.append((t, msg.angular_velocity.z))
+            g = msg.angular_velocity
+            gyro.append((t, g.z, g.x, g.y))
         elif topic == f"/{WBC}/diagnostics":
             values = {}
             for status in msg.status[:1]:
@@ -341,6 +374,219 @@ def response(u, y, segment=1024):
         return f, puy / puu, abs(puy) ** 2 / (puu * pyy)
 
 
+def chirps_of(plan, axis=None):
+    """A run's chirp events, of one axis if given (runs from before the axes are yaw)."""
+    return [e for e in plan["events"] if e["kind"] == "chirp"
+            and (axis is None or e.get("axis", "yaw") == axis)]
+
+
+def plant_band(plan):
+    """Hz of a run's chirps to trust: inside the sweep, clear of its ends."""
+    chirps = chirps_of(plan)
+    if not chirps:
+        raise ValueError("the run has no chirp")
+    return (max(3.0, max(e["f0_hz"] for e in chirps) + 1.0), min(e["f1_hz"] for e in chirps) - 3.0)
+
+
+def plant_table(directory, band=None):
+    """(f, to_gyro, to_wheel, coherence): the yaw plant per Nm of opposed wheel torque
+    (per wheel, measured) to the gyro's yaw rate and to the opposed wheel velocity
+    (right - left) / 2, the mean of the run's chirps inside `band` (default plant_band)."""
+    import numpy as np
+    directory = Path(directory)
+    plan = json.loads((directory / "plan.json").read_text())
+    lo, hi = band or plant_band(plan)
+    joints, gyro, _ = read_bag(directory / "bag")
+    to_gyro, to_wheel, coherence = [], [], []
+    if not chirps_of(plan, "yaw"):
+        raise ValueError("the run has no yaw chirp")
+    for e in chirps_of(plan, "yaw"):
+        _, torque, yaw, rolling, _ = signals(joints, gyro, e["t"], e["t"] + e["duration_s"])
+        f, h, c = response(torque, yaw)
+        _, hw, _ = response(torque, rolling * TRACK / (2 * RADIUS))
+        to_gyro.append(h)
+        to_wheel.append(hw)
+        coherence.append(c)
+    keep = (f >= lo) & (f <= hi)
+    return f[keep], np.mean(to_gyro, 0)[keep], np.mean(to_wheel, 0)[keep], np.min(coherence, 0)[keep]
+
+
+OPPOSED = ("wheel_torque", "rear_torque", "front_torque", "roll_rate", "yaw_rate",
+           "rear_angle", "front_angle", "wheel_velocity")
+# The leg motors by where they sit: the names are mirrored between the sides
+# (right inner is the rear motor, left inner the front one), and the robot's
+# left-right mirror maps rear to rear.
+REAR = ("right_motor_inner", "left_motor_outer")
+FRONT = ("right_motor_outer", "left_motor_inner")
+
+
+def opposed_signals(joints, gyro, t0, t1):
+    """Every left-against-right signal on the 300 Hz grid, (right - left) / 2 for the joints:
+    the wheel, rear-motor and front-motor torques (Nm), the gyro's roll and yaw rates (rad/s),
+    the rear and front leg angles (rad) and the wheel velocity (rad/s). The joints share one
+    sign convention on both sides, so these are the signals that change sign when the robot is
+    mirrored: the yaw and roll modes live in them, the pitch and height modes in the sums."""
+    import numpy as np
+    grid = np.arange(t0, t1, 1 / FS)
+    col = lambda name, k: np.interp(grid, joints[:, 0], joints[:, 1 + 6 * k + JOINTS.index(name)])
+    half = lambda pair, k: 0.5 * (col(pair[0], k) - col(pair[1], k))
+    wheels = ("right_wheel", "left_wheel")
+    return grid, {
+        "wheel_torque": half(wheels, 2), "rear_torque": half(REAR, 2), "front_torque": half(FRONT, 2),
+        "roll_rate": np.interp(grid, gyro[:, 0], gyro[:, 2]),
+        "yaw_rate": np.interp(grid, gyro[:, 0], gyro[:, 1]),
+        "rear_angle": half(REAR, 0), "front_angle": half(FRONT, 0),
+        "wheel_velocity": half(wheels, 1)}
+
+
+def chirp_reference(event, grid):
+    """The WBC's chirp of an event on a time grid, unit amplitude (whole_body_core.cpp
+    sysid_waveform). The run starts a few milliseconds after the event's time: a delay
+    common to every signal, which cancels when one response is divided by another."""
+    import numpy as np
+    t = grid - event["t"]
+    rate = (event["f1_hz"] - event["f0_hz"]) / event["duration_s"]
+    edge = np.clip(np.minimum(t, event["duration_s"] - t) / 0.5, 0.0, 1.0)
+    return 0.5 * (1.0 - np.cos(np.pi * edge)) * np.sin(2 * np.pi * (event["f0_hz"] * t + 0.5 * rate * t * t))
+
+
+def write_responses(directory, band=None):
+    """response.json: every opposed signal against each sweep's own chirp, per frequency.
+
+    One entry per chirp: its axis and amplitude, and per signal the complex response to the
+    unit chirp with its coherence. Three axes give, per frequency, three independent columns
+    of (torques, outputs): outputs = plant x torques solves for the plant from the three
+    opposed torques to every output, whatever loops the WBC closed meanwhile."""
+    import numpy as np
+    directory = Path(directory)
+    plan = json.loads((directory / "plan.json").read_text())
+    if not chirps_of(plan):
+        return None
+    lo, hi = band or plant_band(plan)
+    joints, gyro, _ = read_bag(directory / "bag")
+    sweeps = []
+    brief = []
+    print(f"opposed responses, {lo:g}-{hi:g} Hz (coherence with the chirp in brackets):")
+    for e in chirps_of(plan):
+        grid, measured = opposed_signals(joints, gyro, e["t"], e["t"] + e["duration_s"])
+        reference = chirp_reference(e, grid)
+        axis = e.get("axis", "yaw")
+        entry = {"axis": axis, "kp": e["kp"], "signals": {}, "coherence": {},
+                 **{k: e[k] for k in ("amplitude_nm", "amplitude_m") if e.get(k) is not None}}
+        for name in OPPOSED:
+            f, h, c = response(reference, measured[name])
+            keep = (f >= lo) & (f <= hi)
+            entry["signals"][name] = [[float(f"{v.real:.5g}"), float(f"{v.imag:.5g}")] for v in h[keep]]
+            entry["coherence"][name] = [round(float(v), 3) for v in c[keep]]
+        entry["f_hz"] = [round(float(v), 4) for v in f[keep]]
+        sweeps.append(entry)
+        # What the sweep was for: the body's answer, and the torque that made it.
+        out, drive = {"yaw": ("yaw_rate", "wheel_torque"), "roll": ("roll_rate", "rear_torque"),
+                      "fore_aft": ("yaw_rate", "front_torque")}[axis]
+        amplitude = e.get("amplitude_nm") or e.get("amplitude_m")
+        cells = []
+        for q in (5, 9, 14, 20, 30):
+            if lo <= q <= hi:
+                i = int(np.argmin(abs(f[keep] - q)))
+                h_out = complex(*entry["signals"][out][i])
+                cells.append(f"{q} Hz {abs(h_out):.2f} [{entry['coherence'][out][i]:.2f}]")
+        # Judged by the torque the sweep drove: an output can pass through a
+        # null (the roll rate does near 6 and 20 Hz) without the sweep being bad.
+        clean = np.array(entry["coherence"][drive]) >= 0.7
+        top = f[keep][-1] if clean.all() else (f[keep][max(int(np.argmin(clean)) - 1, 0)] if clean[0] else lo)
+        brief.append({"axis": axis, "amplitude": amplitude, "unit": "Nm" if axis == "yaw" else "m",
+                      "output": out, "clean_hz": float(top),
+                      "drive_coherence": float(min(entry["coherence"][drive]))})
+        print(f"  {axis:8s} {amplitude:g} {'Nm' if axis == 'yaw' else 'm'}: {out} " + ", ".join(cells)
+              + f" rad/s; clean up to {top:.0f} Hz; {drive} [{min(entry['coherence'][drive]):.2f} at least]")
+    path = directory / "response.json"
+    path.write_text(json.dumps({"signals": "(right - left) / 2: torques Nm, rates rad/s, angles rad, "
+                                           "wheel velocity rad/s; [real, imaginary] per frequency, "
+                                           "against the unit chirp of each sweep",
+                                "sweeps": sweeps}, separators=(",", ":")) + "\n")
+    (directory / "response_summary.json").write_text(json.dumps(brief, indent=1))
+    axes = sorted({s["axis"] for s in sweeps})
+    print(f"{path}: {len(sweeps)} sweeps, axes {', '.join(axes)}"
+          + ("" if len(axes) == 3 else "; the whole opposed plant needs yaw, roll and fore_aft"))
+    return path
+
+
+PLANT_INPUTS = ("wheel_torque", "rear_torque", "front_torque")
+PLANT_OUTPUTS = ("roll_rate", "yaw_rate", "rear_angle", "front_angle", "wheel_velocity")
+
+
+def opposed_plant(sweeps):
+    """(f, plant[f, output, input], coherence[f], condition[f]) from a run's sweeps of all
+    three axes (the larger amplitude of each): per frequency outputs = plant x torques over
+    the three sweeps, solved for the plant from the opposed wheel, rear and front motor
+    torques (Nm) to the roll and yaw rates (rad/s), the rear and front leg angles (rad) and
+    the wheel velocity (rad/s). The WBC's own loops are inside neither side: both are
+    measured. coherence: the weakest of the three driven torques."""
+    import numpy as np
+    best = {}
+    for sweep in sweeps:
+        size = sweep.get("amplitude_nm") or sweep.get("amplitude_m") or 0.0
+        if sweep["axis"] not in best or size > best[sweep["axis"]][0]:
+            best[sweep["axis"]] = (size, sweep)
+    missing = [a for a in ("yaw", "roll", "fore_aft") if a not in best]
+    if missing:
+        raise ValueError("no sweep of " + ", ".join(missing))
+    chosen = [best[a][1] for a in ("yaw", "roll", "fore_aft")]
+    cplx = lambda sweep, name: np.array([complex(re, im) for re, im in sweep["signals"][name]])
+    torques = np.stack([np.stack([cplx(s, n) for s in chosen], -1) for n in PLANT_INPUTS], 1)
+    outputs = np.stack([np.stack([cplx(s, n) for s in chosen], -1) for n in PLANT_OUTPUTS], 1)
+    driven = {"yaw": "wheel_torque", "roll": "rear_torque", "fore_aft": "front_torque"}
+    coherence = np.min([s["coherence"][driven[s["axis"]]] for s in chosen], 0)
+    return (np.array(chosen[0]["f_hz"]), outputs @ np.linalg.inv(torques), coherence,
+            np.linalg.cond(torques))
+
+
+def write_opposed_plant(directory):
+    """opposed_plant.json from response.json: what sandro_rl's train.loop_margin closes a
+    policy's whole left-against-right loop on (copy it into sandro_rl/data/)."""
+    import numpy as np
+    directory = Path(directory)
+    sweeps = json.loads((directory / "response.json").read_text())["sweeps"]
+    f, plant, coherence, condition = opposed_plant(sweeps)
+    rows = [f' "source": {json.dumps(directory.name)}',
+            ' "inputs": ' + json.dumps([f"{n}, Nm, (right - left) / 2" for n in PLANT_INPUTS]),
+            ' "outputs": ' + json.dumps([f"{n}, (right - left) / 2 for the joints" for n in PLANT_OUTPUTS]),
+            ' "f_hz": ' + json.dumps([round(float(v), 4) for v in f]),
+            ' "coherence": ' + json.dumps([round(float(v), 3) for v in coherence]),
+            ' "plant": [\n  ' + ",\n  ".join(
+                json.dumps([[[float(f"{v.real:.5g}"), float(f"{v.imag:.5g}")] for v in row] for row in at])
+                for at in plant) + "\n ]"]
+    path = directory / "opposed_plant.json"
+    path.write_text("{\n" + ",\n".join(rows) + "\n}\n")
+    roll = np.abs(plant[:, 0, 1])
+    print(f"{path}: {len(f)} frequencies, {f[0]:.1f}-{f[-1]:.1f} Hz; the sweeps' torques are "
+          f"independent (condition number at most {condition.max():.1f}) and coherent "
+          f"({coherence.min():.2f} at least); the roll answers the legs most at {f[int(roll.argmax())]:.1f} Hz")
+    return path
+
+
+def write_plant(directory, path=None, band=None):
+    """yaw_plant.json: the table sandro_rl's train.loop_margin reads (copy it into sandro_rl/data/)."""
+    directory = Path(directory)
+    f, to_gyro, to_wheel, coherence = plant_table(directory, band)
+    pairs = lambda h: [[round(float(v.real), 5), round(float(v.imag), 5)] for v in h]
+    head = {"source": directory.name,
+            "input": "opposed wheel torque, Nm per wheel (measured, MIT replies)",
+            "outputs": "to_gyro: gyro yaw rate, rad/s; to_wheel: opposed wheel velocity (right - left) / 2, "
+                       "rad/s; [real, imaginary] per frequency"}
+    rows = [f' "{k}": {json.dumps(v)}' for k, v in head.items()]
+    rows += [f' "{k}": {json.dumps(v)}' for k, v in (
+        ("f_hz", [round(float(v), 4) for v in f]), ("to_gyro", pairs(to_gyro)), ("to_wheel", pairs(to_wheel)),
+        ("coherence", [round(float(v), 3) for v in coherence]))]
+    path = Path(path) if path else directory / "yaw_plant.json"
+    path.write_text("{\n" + ",\n".join(rows) + "\n}\n")
+    below = [i for i, c in enumerate(coherence) if c < 0.7]
+    top = f[below[0] - 1] if below and below[0] > 0 else f[-1]
+    print(f"{path}: {len(f)} frequencies, {f[0]:.1f}-{f[-1]:.1f} Hz; coherence 0.7 or more up to "
+          f"{top:.1f} Hz, the band the training uses")
+    return path
+
+
 def analyse(directory):
     import numpy as np
     directory = Path(directory)
@@ -359,7 +605,7 @@ def analyse(directory):
                 windows.append(yaw[start:stop])
             f, z = free_decay_mode(windows)
             rows.append({"kp": event["kp"], "pulse_hz": f, "pulse_zeta": z})
-        elif event["kind"] == "chirp":
+        elif event["kind"] == "chirp" and event.get("axis", "yaw") == "yaw":
             t0 = event["t"]
             _, torque, yaw, rolling, legs = signals(joints, gyro, t0, t0 + event["duration_s"])
             freq, h_yaw, coherence = response(torque, yaw)
@@ -403,6 +649,11 @@ def analyse(directory):
           "the yaw compliance; legs PD share: the share these numbers give. legs, roll: the legs'\n"
           "fore-aft yaw and the wheels' rolling against the gyro at the mode.")
     (directory / "summary.json").write_text(json.dumps(rows, indent=1, default=float))
+    for write in (write_plant, write_responses, write_opposed_plant):
+        try:
+            write(directory)
+        except Exception as error:  # noqa: BLE001 - the fit above stands without it
+            print(f"{write.__name__} failed: {error}")
 
 
 def main():
@@ -416,6 +667,10 @@ def main():
     parser.add_argument("--chirp-s", type=float, default=20.0)
     parser.add_argument("--chirp-nm", type=float, nargs="+", default=[0.2],
                         help="per wheel; several: one chirp each, e.g. 0.1 0.2 0.4 for linearity")
+    parser.add_argument("--axis", nargs="+", choices=sorted(AXES), default=["yaw"],
+                        help="what to sweep, left against right; several run one after the other")
+    parser.add_argument("--chirp-m", type=float, nargs="+", default=[0.002, 0.004],
+                        help="roll and fore_aft: offset per leg, m; several: one chirp each")
     parser.add_argument("--f0", type=float, default=2.0)
     parser.add_argument("--f1", type=float, default=25.0)
     parser.add_argument("--settle", type=float, default=3.0, help="s after each kp change")
@@ -428,6 +683,8 @@ def main():
         return 0
     if max(args.pulse_nm, *args.chirp_nm) > 0.5 or min(args.kp) < 6 or max(args.kp) > 25:
         sys.exit("refused: torques above 0.5 Nm per wheel or leg kp outside 6-25 Nm/rad")
+    if max(args.chirp_m) > 0.005:
+        sys.exit("refused: leg offsets above 5 mm per leg")
     session = Session(args)
     reason = None
     try:

@@ -44,8 +44,12 @@ robot:
   # the drives are armed again (their read error deactivates them).
   broadcasters: [joint_state_broadcaster, imu_broadcaster, health_broadcaster]
   # Controllers the Run page offers, in this order.
+  # The two sysid policies are listed for the Sysid page's buzz recording only
+  # (they buzz and are slow: sandro_rl/docs/DESIGN.md); they are not on the
+  # gamepad switch.
   controllers: [whole_body_controller, rl_agile_terrain_v3, rl_agile_terrain, rl_flat_level, rl_flat_level_fast,
-                rl_stand_up, lqr_balancer, driving_balancer]
+                rl_stand_up, lqr_balancer, driving_balancer,
+                rl_flat_level_sysid, rl_flat_level_fast_sysid]
 
 # Topics watched for rate and freshness. expect_hz is what a healthy running
 # stack delivers (the 300 Hz control loop publishes the sensors every cycle).
@@ -81,6 +85,12 @@ software:
   remote: https://github.com/A-Common-Guy/bipedale.git
   branch: main               # the branch the page opens on
   skip_packages: [sandro_sim]  # not built on the robot (deploy/pi/pi sync skips it too)
+
+sysid:
+  # The Sysid page's runs (recording, analysis, yaw_plant.json), under the
+  # working directory: ~/sandro/experiments on the robot, where
+  # deploy/pi/pi sysid writes too.
+  dir: experiments
 
 log:
   # Launch output lines containing any of these are dropped. joy_node logs

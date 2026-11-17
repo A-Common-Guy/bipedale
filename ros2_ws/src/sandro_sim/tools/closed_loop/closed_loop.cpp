@@ -480,6 +480,9 @@ int main(int argc, char **argv) {
     }
     if (engaged_at >= 0.0 && phase_start < 0.0 && now - engaged_at >= options.settle_s) {
       phase_start = now;
+      // A sysid run given by --param (sysid.mode, axis, ...) starts with the
+      // first phase: the controller runs one on a trigger change.
+      if (settings.parameters.sysid_mode != 0.0) settings.parameters.sysid_trigger += 1.0;
     }
     if (engaged_at < 0.0 && now > options.engage_timeout_s) {
       std::printf("never engaged within %.0f s (status %u)\n", options.engage_timeout_s, output.status);

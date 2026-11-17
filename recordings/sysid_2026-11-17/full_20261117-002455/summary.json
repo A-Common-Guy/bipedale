@@ -1,0 +1,28 @@
+[
+ {
+  "kp": 12.0,
+  "chirp_nm": 0.2,
+  "chirp_hz": 13.099999999999971,
+  "chirp_zeta": 0.23000000000000004,
+  "delay_ms": 3.0,
+  "fit_error": 0.10545876302331322,
+  "coherence": 0.9501758406803861,
+  "yaw_inertia_kgm2": 0.13577591639628397,
+  "wheel_stiffness_nm_rad": 89.89725798854418,
+  "legs_share": 0.6122891851054151,
+  "rolling_share": 1.4016500202087976
+ },
+ {
+  "kp": 12.0,
+  "chirp_nm": 0.4,
+  "chirp_hz": 13.19999999999997,
+  "chirp_zeta": 0.30000000000000004,
+  "delay_ms": 4.0,
+  "fit_error": 0.06493595438740006,
+  "coherence": 0.9798234867088393,
+  "yaw_inertia_kgm2": 0.11122661649239571,
+  "wheel_stiffness_nm_rad": 74.77177662631183,
+  "legs_share": 0.8899432734289814,
+  "rolling_share": 1.4768814723023722
+ }
+]

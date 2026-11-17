@@ -416,6 +416,7 @@ void WholeBodyController::publish_diagnostics(const rclcpp::Time &time,
   add("yaw_torque_nm", output.yaw_torque_nm);
   add("yaw_feedforward_nm", output.yaw_feedforward_nm);
   add("sysid_torque_nm", output.sysid_torque_nm);
+  add("sysid_offset_m", output.sysid_offset_m);
   add("sysid_active", output.sysid_active ? 1 : 0);
   add("right_leg_reaction_inner_nm", output.leg_reaction_torque_nm[0][0]);
   add("right_leg_reaction_outer_nm", output.leg_reaction_torque_nm[0][1]);

@@ -168,5 +168,21 @@ train:
   critic_hidden: [512, 256, 128]
   activation: elu
   symmetry_coef: 0.5            # mirror loss weight (Mittal et al. 2024); 0 disables
+  # The actor's yaw loop (gyro yaw rate -> opposed wheel command) closed on
+  # the robot's measured yaw response, penalised where it would ring on the
+  # robot (loop_margin.py; docs/DESIGN.md "The yaw loop on the measured
+  # plant"). Off by default: configs/*_margin.yaml switch it on.
+  loop_margin:
+    coef: 0.0                   # loss weight; 0 disables
+    # In data/, written by the panel's Sysid page (sysid_yaw.py). A
+    # yaw_plant_*.json closes the yaw loop through the wheels alone; an
+    # opposed_plant_*.json (a run of all three sweeps) the whole
+    # left-against-right loop, wheels and legs: the yaw and the roll buzz.
+    # Used up to the first frequency whose coherence is under 0.7.
+    plant: opposed_plant_2026-11-17.json
+    margin: 0.5                 # Re of the loop (of its eigenvalues) allowed inside the measured band; its gain above
+    rolloff_hz: [40.0, 45.0]    # above the band (3.2-36.9 Hz), below the policy's Nyquist rate
+    command_delay_s: 0.001      # sandro.launch.py's nominal command delay
+    samples: 64                 # observations linearised per minibatch
   checkpoint_every: 100
   eval_every: 50
