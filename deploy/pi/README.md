@@ -138,6 +138,9 @@ dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=23
   (run it on the Pi, outside ROS) for wiring and bring-up problems.
 * `deploy/pi/pi status` shows container, CAN, SPI and CPU state;
   `deploy/pi/pi can` runs `candump`.
+* The panel's **Sysid** page runs the same identification with fixed arguments (2-45 Hz) and
+  a stand-drive-stand buzz recording, with the checks, the analysis and the downloads in the
+  browser: prefer it to the command below (`ros2_ws/src/sandro_gui/docs/USER_GUIDE.md`).
 * `deploy/pi/pi sysid` identifies the 9 Hz yaw mode with the WBC balancing: it steps the
   legs' drive stiffness, taps and sweeps the yaw with the WBC's `sysid.*` excitation,
   records everything into `~/sandro/experiments/sysid_<time>` and prints the fit

@@ -233,6 +233,27 @@ class Handler(BaseHTTPRequestHandler):
                 if self.panel.software is None:
                     return self._json({"error": "software updates are not available"}, 404)
                 return self._json(self.panel.software.status(query.get("ref") or None))
+            if path == "/api/sysid":
+                return self._json(self.panel.sysid_status())
+            if path.startswith("/api/sysid/runs/"):
+                # <run>.tar: the whole run; <run>/<file>: one result file.
+                rest = unquote(path[len("/api/sysid/runs/"):])
+                sysid = self.panel.sysid
+                if sysid is not None and rest.endswith(".tar") and "/" not in rest:
+                    data = sysid.archive(rest[:-4])
+                    if data is not None:
+                        return self._send(200, data, "application/x-tar",
+                                          {"Content-Disposition": f'attachment; filename="{rest}"'})
+                elif sysid is not None and rest.count("/") == 1:
+                    run, name = rest.split("/")
+                    file = sysid.file(run, name)
+                    if file is not None:
+                        # The plant table is named after its run, ready for sandro_rl/data/.
+                        stamp = run.split("_", 1)[-1]
+                        download = f"yaw_plant_{stamp}.json" if name == "yaw_plant.json" else f"{run}_{name}"
+                        return self._send(200, file.read_bytes(), "application/octet-stream",
+                                          {"Content-Disposition": f'attachment; filename="{download}"'})
+                return self._send(404, b"no such run or file", "text/plain")
             if path == "/api/runs":
                 return self._json(self.panel.launcher.runs_list())
             if path.startswith("/api/runs/"):

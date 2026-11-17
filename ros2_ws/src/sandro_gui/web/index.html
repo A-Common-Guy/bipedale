@@ -18,6 +18,7 @@
       <button data-page="imu">IMU</button>
       <button data-page="pad">Gamepad</button>
       <button data-page="guide">Guide</button>
+      <button data-page="sysid">Sysid</button>
       <button data-page="software">Software</button>
     </nav>
     <div id="chips" class="chips"></div>
@@ -156,6 +157,23 @@
           <div class="panel"><div id="guide-pad" class="pad-live"></div><p class="hint center">Point at a row to see its buttons.</p></div>
           <div class="panel"><div id="guide-lights"></div></div>
         </div>
+      </div>
+    </section>
+
+    <section id="page-sysid" class="page" hidden>
+      <div class="page-head"><p class="hint">The measurements the RL training needs, one button each. Each run checks the robot first, records everything, analyses it here and leaves its result below to download. The arguments are fixed; nothing is typed.</p></div>
+      <div id="sysid-cards" class="grid sysid-cards"></div>
+      <div class="panel">
+        <div class="panel-head"><h2>Running</h2>
+          <div class="tools"><span id="sysid-job" class="muted small"></span><button id="sysid-stop" class="danger small" title="One SIGINT, as Ctrl-C: the excitation stops, the leg stiffness goes back, the recording closes">Stop measurement</button></div>
+        </div>
+        <div id="sysid-now" class="sysid-now"></div>
+        <div id="sysid-progress" class="sysid-progress"><div></div></div>
+        <pre id="sysid-tail" class="log sw-tail"></pre>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Results</h2><span id="sysid-dir" class="muted small"></span></div>
+        <div id="sysid-runs"></div>
       </div>
     </section>
 

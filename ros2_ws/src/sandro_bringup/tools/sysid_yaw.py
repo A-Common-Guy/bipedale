@@ -3,7 +3,7 @@
 
     deploy/pi/pi sysid                 # on the robot, from the laptop (stack running,
                                        # WBC armed and balancing, someone watching)
-    python3 sysid_yaw.py --analyse DIR # afterwards, anywhere
+    python3 sysid_yaw.py --analyse DIR # afterwards, anywhere; also writes DIR/yaw_plant.json
 
 For each leg drive stiffness in --kp (tasks.legs.drive_kp_nm_rad, live) the WBC
 taps the yaw mode with short differential wheel-torque pulses of alternating
@@ -15,7 +15,8 @@ put the leg stiffness back and close the recording.
 The analysis fits each pulse's ringing (frequency, damping) and the chirp's
 frequency response from the measured differential wheel torque to the gyro's
 yaw rate, the wheels' rolling and the legs' fore-aft yaw (recordings/
-yaw_closure.py). How the frequency moves with the leg stiffness gives the
+yaw_closure.py), and writes yaw_plant.json, the measured response sandro_rl's
+train.loop_margin closes a policy's yaw loop on. How the frequency moves with the leg stiffness gives the
 share of the yaw compliance in the legs' drive PD: all of it moves the
 frequency with sqrt(kp), none of it not at all.
 """
@@ -341,6 +342,57 @@ def response(u, y, segment=1024):
         return f, puy / puu, abs(puy) ** 2 / (puu * pyy)
 
 
+def plant_band(plan):
+    """Hz of a run's chirps to trust: inside the sweep, clear of its ends."""
+    chirps = [e for e in plan["events"] if e["kind"] == "chirp"]
+    if not chirps:
+        raise ValueError("the run has no chirp")
+    return (max(3.0, max(e["f0_hz"] for e in chirps) + 1.0), min(e["f1_hz"] for e in chirps) - 3.0)
+
+
+def plant_table(directory, band=None):
+    """(f, to_gyro, to_wheel, coherence): the yaw plant per Nm of opposed wheel torque
+    (per wheel, measured) to the gyro's yaw rate and to the opposed wheel velocity
+    (right - left) / 2, the mean of the run's chirps inside `band` (default plant_band)."""
+    import numpy as np
+    directory = Path(directory)
+    plan = json.loads((directory / "plan.json").read_text())
+    lo, hi = band or plant_band(plan)
+    joints, gyro, _ = read_bag(directory / "bag")
+    to_gyro, to_wheel, coherence = [], [], []
+    for e in (e for e in plan["events"] if e["kind"] == "chirp"):
+        _, torque, yaw, rolling, _ = signals(joints, gyro, e["t"], e["t"] + e["duration_s"])
+        f, h, c = response(torque, yaw)
+        _, hw, _ = response(torque, rolling * TRACK / (2 * RADIUS))
+        to_gyro.append(h)
+        to_wheel.append(hw)
+        coherence.append(c)
+    keep = (f >= lo) & (f <= hi)
+    return f[keep], np.mean(to_gyro, 0)[keep], np.mean(to_wheel, 0)[keep], np.min(coherence, 0)[keep]
+
+
+def write_plant(directory, path=None, band=None):
+    """yaw_plant.json: the table sandro_rl's train.loop_margin reads (copy it into sandro_rl/data/)."""
+    directory = Path(directory)
+    f, to_gyro, to_wheel, coherence = plant_table(directory, band)
+    pairs = lambda h: [[round(float(v.real), 5), round(float(v.imag), 5)] for v in h]
+    head = {"source": directory.name,
+            "input": "opposed wheel torque, Nm per wheel (measured, MIT replies)",
+            "outputs": "to_gyro: gyro yaw rate, rad/s; to_wheel: opposed wheel velocity (right - left) / 2, "
+                       "rad/s; [real, imaginary] per frequency"}
+    rows = [f' "{k}": {json.dumps(v)}' for k, v in head.items()]
+    rows += [f' "{k}": {json.dumps(v)}' for k, v in (
+        ("f_hz", [round(float(v), 4) for v in f]), ("to_gyro", pairs(to_gyro)), ("to_wheel", pairs(to_wheel)),
+        ("coherence", [round(float(v), 3) for v in coherence]))]
+    path = Path(path) if path else directory / "yaw_plant.json"
+    path.write_text("{\n" + ",\n".join(rows) + "\n}\n")
+    below = [i for i, c in enumerate(coherence) if c < 0.7]
+    top = f[below[0] - 1] if below and below[0] > 0 else f[-1]
+    print(f"{path}: {len(f)} frequencies, {f[0]:.1f}-{f[-1]:.1f} Hz; coherence 0.7 or more up to "
+          f"{top:.1f} Hz, the band the training uses")
+    return path
+
+
 def analyse(directory):
     import numpy as np
     directory = Path(directory)
@@ -403,6 +455,10 @@ def analyse(directory):
           "the yaw compliance; legs PD share: the share these numbers give. legs, roll: the legs'\n"
           "fore-aft yaw and the wheels' rolling against the gyro at the mode.")
     (directory / "summary.json").write_text(json.dumps(rows, indent=1, default=float))
+    try:
+        write_plant(directory)
+    except Exception as error:  # noqa: BLE001 - the fit above stands without it
+        print(f"no plant table: {error}")
 
 
 def main():

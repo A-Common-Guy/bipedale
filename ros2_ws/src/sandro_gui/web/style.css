@@ -364,6 +364,16 @@ dialog label.check { margin-top: 10px; color: var(--muted); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 .software-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: start; }
+.sysid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.sysid-cards ol { margin: 8px 0; padding-left: 20px; }
+.sysid-cards li { margin: 4px 0; }
+.sysid-start { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.sysid-now { font-size: 20px; font-weight: 600; min-height: 30px; margin: 4px 0 8px; }
+.sysid-now.idle { font-size: 13px; font-weight: 400; color: var(--muted); }
+.sysid-progress { height: 4px; background: var(--well); border-radius: 2px; margin-bottom: 8px; overflow: hidden; }
+.sysid-progress > div { height: 100%; width: 0; background: var(--accent, #4c9aff); transition: width 1s linear; }
+.sysid-next { margin: 6px 0 0; }
+@media (max-width: 900px) { .sysid-cards { grid-template-columns: minmax(0, 1fr); } }
 .sw-tail { height: 300px; margin: 0; padding: 6px 10px; white-space: pre-wrap; word-break: break-word; }
 .sw-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 /* Takes what the other columns leave and cuts the rest. */

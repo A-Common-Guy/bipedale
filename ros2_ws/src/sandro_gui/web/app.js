@@ -8,8 +8,9 @@ import * as imu from "./imu.js";
 import * as pad from "./pad.js";
 import * as guide from "./guide.js";
 import * as software from "./software.js";
+import * as sysid from "./sysid.js";
 
-const PAGES = { overview, run, tune, imu, pad, guide, software };
+const PAGES = { overview, run, tune, imu, pad, guide, sysid, software };
 const listeners = {};
 const state = { info: null, fast: null, slow: null, logs: [], logSeq: 0, page: null };
 

@@ -129,3 +129,32 @@ and *Deploy* a commit. The panel writes it, builds what changed, restarts and
 the page reloads; the Versions table and the SW chip then read the new commit.
 A yellow SW chip says what is out of step: source not built, panel or stack
 started from an older build.
+
+## Measurements (Sysid page)
+
+Two runs, each one button. A greyed Start says next to it what is missing.
+
+**Yaw response to 45 Hz** (about 75 s): what the RL training holds a policy's
+yaw loop against.
+
+1. Run page: start the stack with `whole_body_controller`, Arm and start.
+2. Flat floor, a metre of room, hands off the sticks.
+3. Sysid page: Start, tick the box. The wheels twitch against each other,
+   faster and faster, twice (0.2 and 0.4 Nm).
+4. In Results the run should read *good*. Download **Plant table**
+   (`yaw_plant_<time>.json`), put it in `sandro_rl/data/` on the training
+   machine and set `train.loop_margin.plant` to its name.
+5. Optional, each its own run: crouch to the lowest height with the pad and
+   repeat, then the highest.
+
+**Record a controller's buzz** (about 95 s): where a buzz is.
+
+1. Run page: start the controller under test (for example
+   `rl_flat_level_sysid`) and let it stand.
+2. Sysid page: Start, tick the box, then do what the large line says: stand
+   still 30 s, drive and turn gently 30 s, stand still 30 s.
+3. Results gives the verdict (quiet, or the mode, its size and frequency);
+   **Recording** downloads the whole run as a `.tar` for `recordings/`.
+
+Stop measurement ends a run cleanly at any time; so does the E-stop. A run
+that ends early keeps what it recorded.

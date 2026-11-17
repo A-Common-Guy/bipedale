@@ -38,6 +38,7 @@ def resolve_paths(cfg: dict, cwd: Path) -> dict:
         "overrides": str(bringup / "config" / overrides) if overrides else None,
         "mjcf": description / "mjcf" / cfg.get("model", {}).get("mjcf", "robot_full_floating.xml"),
         "ros2_control": description / "urdf" / "sandro.ros2_control.xacro",
+        "tools": bringup / "tools",
         "cache": cwd / launch.get("runs_dir", "gui_runs") / "cache",
     }
 
@@ -120,6 +121,10 @@ def main(argv: list[str] | None = None) -> None:
         restart=None if args.demo else lambda: os.kill(os.getpid(), signal.SIGTERM))
     if not args.demo:
         sources["launcher"].version = sources["software"].build_version
+
+    from .sysid import Sysid, demo_runner
+    sources["sysid"] = Sysid(cwd, log, paths["tools"], cfg.get("sysid", {}),
+                             runner=demo_runner if args.demo else None)
 
     from .panel import Panel
     from .server import serve
