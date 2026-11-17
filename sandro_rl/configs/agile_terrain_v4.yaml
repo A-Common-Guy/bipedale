@@ -1,0 +1,17 @@
+# agile_terrain_v3 with its left-against-right loops held inside the robot's
+# measured margin (train.loop_margin, as in agile_terrain_margin.yaml). v3
+# brought the yaw loop through the wheels to 0.37-0.56 on the measured plant
+# but keeps a roll crossing through the legs of 0.82 at 15 Hz, where the robot
+# has a resonance the simulation lacks (recordings/sysid_2026-11-17) and where
+# agile_terrain rings behind the 3 Hz wheel filter.
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v4.yaml --resume policies/agile_terrain_v3
+#     uv run python ../recordings/yaw_loop_margin.py policies/agile_terrain_v4   # after export: the gate
+#
+# Deploy without action.wheel_differential_filter_hz.
+inherit: agile_terrain_v3.yaml
+
+train:
+  iterations: 600
+  loop_margin:
+    coef: 0.3

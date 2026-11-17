@@ -13,7 +13,7 @@ import optax
 import pytest
 
 from sandro_rl import checkpoint
-from sandro_rl.loop_margin import (Channels, OpposedLoop, YawLoop, eigenvalues3, load_opposed_plant,
+from sandro_rl.loop_margin import (Channels, Loops, OpposedLoop, YawLoop, eigenvalues3, load_opposed_plant,
                                    load_plant)
 from sandro_rl.networks import MLP, Normalizer
 
@@ -124,6 +124,22 @@ def test_descending_the_penalty_restores_the_margin():
         params, state, value, info = step(params, state)
     assert np.isfinite(float(value))
     assert float(info["loop_re"]) < 0.6 and float(info["loop_rolloff"]) < 0.6
+
+
+def test_several_plants_count_by_their_worst():
+    """Loops: the worst Re L and roll-off bound over the plants, and the same penalty code."""
+    apply, params = actor(ROOT / "policies/flat_level_real")
+    loops = [YawLoop(channels(), load_plant(PLANT), rolloff_hz=(30.0, 40.0)),
+             YawLoop(channels(), load_plant("yaw_plant_2026-11-16.json"))]
+    frame = np.zeros(25, dtype=np.float32)
+    frame[2] = -1.0
+    obs = jp.asarray(np.tile(frame, (2, 4)))
+    mean = lambda o: apply(params, o)
+    single = [loop.penalty(mean, obs) for loop in loops]
+    value, info = Loops(loops).penalty(mean, obs)
+    assert float(info["loop_re"]) == pytest.approx(max(float(i["loop_re"]) for _, i in single), rel=1e-5)
+    assert float(info["loop_rolloff"]) == pytest.approx(float(single[0][1]["loop_rolloff"]), rel=1e-5)
+    assert float(value) >= max(float(v) for v, _ in single) - 1e-6
 
 
 def test_fallen_observations_are_left_out():

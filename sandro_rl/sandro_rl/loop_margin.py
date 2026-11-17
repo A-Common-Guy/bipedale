@@ -320,9 +320,30 @@ class OpposedLoop(YawLoop):
         return inside, above
 
 
+class Loops:
+    """One policy on several measured plants: the robot's yaw answers 40-70 % more to a
+    0.2 Nm sweep than to a 0.4 Nm one, and a policy trained inside the margin of one table
+    came out at 0.9 on another (docs/DESIGN.md). The worst of them counts, per observation;
+    the Jacobian is taken once."""
+
+    def __init__(self, loops):
+        self.loops = list(loops)
+        self.ch, self.margin, self.upright = loops[0].ch, loops[0].margin, loops[0].upright
+
+    def measure(self, jacobian):
+        worst, high = zip(*(loop.measure(jacobian) for loop in self.loops))
+        return jp.max(jp.stack(worst)), jp.max(jp.stack(high))
+
+    penalty = YawLoop.penalty
+
+
 def make_loop(env, cfg: dict):
     """The loop a plant file is for: an opposed_plant.json (a "plant" entry) closes the whole
-    left-against-right loop, a yaw_plant.json the yaw loop through the wheels alone."""
+    left-against-right loop, a yaw_plant.json the yaw loop through the wheels alone. A list
+    of files: all of them (Loops), the roll-off bound on the first only."""
+    if not isinstance(cfg["plant"], str):
+        return Loops([make_loop(env, {**cfg, "plant": plant, **({"rolloff_hz": ()} if i else {})})
+                      for i, plant in enumerate(cfg["plant"])])
     path = Path(cfg["plant"])
     if not path.is_file():
         path = DATA_DIR / path.name

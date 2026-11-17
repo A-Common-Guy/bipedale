@@ -1,0 +1,20 @@
+# agile_terrain_v4 with the margin held on every measured plant at once. The
+# robot's yaw answers a 0.2 Nm sweep 40-70 % more than a 0.4 Nm one, and a
+# fine-tune inside the margin on the opposed plant alone (the 0.4 Nm and 4 mm
+# sweeps) came out at 0.8-0.9 on the yaw tables: the whole left-against-right
+# loop on the opposed plant, and the yaw loop through the wheels on the
+# 2026-11-16 table (0.2 and 0.4 Nm averaged, to 32 Hz) and on the 2026-11-12
+# one (small signal, to 22 Hz).
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v5.yaml --resume policies/agile_terrain_v3
+#     uv run python ../recordings/yaw_loop_margin.py policies/agile_terrain_v5
+#     uv run python ../recordings/yaw_loop_margin.py policies/agile_terrain_v5 --opposed none --plant data/yaw_plant_2026-11-12.json
+#
+# policies/agile_terrain_v5 is this run's iteration-200 checkpoint: the obstacle
+# course varies between checkpoints while the margin holds (DESIGN.md).
+# Deploy without action.wheel_differential_filter_hz.
+inherit: agile_terrain_v4.yaml
+
+train:
+  loop_margin:
+    plant: [opposed_plant_2026-11-17.json, yaw_plant_2026-11-16.json, yaw_plant_2026-11-12.json]

@@ -1719,6 +1719,64 @@ their chirps (0.82 at least).
 - `recordings/yaw_loop_margin.py` prints both: the yaw loop on the yaw
   table and the whole loop on the opposed plant.
 
+**The loss trained: `agile_terrain_v5` (2026-11-17).** Three fine-tunes of
+600 iterations at 6144 worlds (16 min each), `train.loop_margin.coef` 0.3,
+margin 0.5. Worst standing values over three heights
+(`recordings/yaw_loop_margin.py`; the yaw loop on the 2026-11-16 and the
+2026-11-12 tables, the whole loop on the opposed plant), and the
+planks-and-hill course at 0.5 m/s
+(`recordings/sysid_2026-11-12/course_runs.py`: the MJCF, the fitted plant
+and the same with leg rotors at 35 ×, three latency profiles, three seeds):
+
+| Policy | yaw loop, 11-16 / 11-12 | whole loop | legs alone near 14 Hz | roll-rate gain at 14 Hz | course |
+| --- | --- | --- | --- | --- | --- |
+| `agile_terrain` | 0.89 / 1.04 | 1.00 | 1.09 | 0.094 | 27 of 27 (24 behind the 3 Hz filter) |
+| `agile_terrain_v3` | 0.55 / 0.66 | 0.82 | 0.64 | 0.096 | 27 |
+| `agile_terrain_margin` (from `agile_terrain`) | 0.88 / – | 0.56 | 0.71 | 0.091 | 26 |
+| `agile_terrain_v4` (v3's configuration, from v3) | 0.47 / 0.52 | 0.51 | none | 0.034 | 15 |
+| `agile_terrain_v5` (v4 on three plants, iteration 200) | 0.37 / 0.41 | 0.42 | none | 0.029 | 27 |
+
+- **One plant is not enough.** `agile_terrain_margin` met the margin on the
+  opposed plant (the 0.4 Nm and 4 mm sweeps) and stayed at 0.88 on the yaw
+  table. The robot's yaw answers the 0.2 Nm sweep of the same recording
+  40–70 % more than the 0.4 Nm one (0.71 against 0.52 rad/s per Nm at 9 Hz,
+  0.61 against 0.36 at 14 Hz) and its roll about half as much; the small
+  sweeps' opposed plant is too noisy to train on (coherence 0.55–0.8).
+  `train.loop_margin.plant` now takes a list (`loop_margin.Loops`): the
+  worst of the plants counts per observation, the roll-off bound on the
+  first only. `agile_terrain_v5` uses the opposed plant and both yaw tables.
+- **The margin costs little on flat ground.** On the fitted plant
+  (`compare_agile.py`) v5's yaw error is 0.035–0.043 rad/s in the
+  hardware/default sequences (v3 0.024–0.028, `agile_terrain` with its filter
+  0.059–0.082) and 0.14–0.15 in the 3 rad/s manoeuvres (0.105–0.117,
+  0.30–0.32); speed error and pitch RMS as v3. Roll and height commands
+  follow as before (`--scenario expressive`: roll error 0.033 rad RMS against
+  0.031–0.032, height 0.122–0.183 m for all three). All 12 standard runs and
+  the lag sweep complete. Under the slow-SPI profile on the MJCF as trained
+  it chatters like the others (wheel torque 8.3–9.3 Nm RMS in the worst
+  phase; 0.5–1.3 on the fitted plant). `agile_terrain_margin` does not
+  (1.0–1.4 Nm), at a yaw error of 0.09–0.13 on the fitted plant.
+- **The course does not follow the margin.** Along the two runs from v3 the
+  loop stays inside the margin from iteration 100 on (0.27–0.54 on every
+  plant), while the course goes 12, 12, 7, 9, 24, 15 of 27 for v4's
+  checkpoints 100–600 and 16, 27, 26, 20, 23, 8 for v5's. The falls are
+  forward, at the 25 mm plank and the hill, on the fitted plant mostly; the
+  fall rate in training equals v3's throughout (0.13–0.15 per 1000 steps).
+  The course sits at the edge of these policies' ability and moves with the
+  checkpoint. `agile_terrain_v5` is the iteration-200 checkpoint of its run
+  (`meta.json` says so; `train_log.csv` and `curves.png` are the whole run's).
+  A longer run with a lower learning rate, or planks at 25 mm more often in
+  training, is the next thing to try for a checkpoint that does not need
+  picking.
+- Deployed as `rl_agile_terrain_v5` (gamepad switch, purple; first of the
+  policies on the panel's Run page), without the differential wheel filter.
+  `agile_terrain_margin` and `agile_terrain_v4` are kept, not deployed. Not
+  yet on the robot. Expected there: no 13–15 Hz roll buzz standing (the
+  legs' roll-rate gain is under `flat_level_real`'s 0.044, the one policy
+  quiet in roll) and no 9–11 Hz yaw buzz without a filter. The computed
+  loop is the 4 mm and 0.4 Nm plants'; at 26–32 Hz the legs come to
+  0.48–0.62, where the buzz bags have some content.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that

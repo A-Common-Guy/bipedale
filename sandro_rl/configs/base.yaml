@@ -179,6 +179,7 @@ train:
     # opposed_plant_*.json (a run of all three sweeps) the whole
     # left-against-right loop, wheels and legs: the yaw and the roll buzz.
     # Used up to the first frequency whose coherence is under 0.7.
+    # A list of files holds the policy inside the margin on each of them.
     plant: opposed_plant_2026-11-17.json
     margin: 0.5                 # Re of the loop (of its eigenvalues) allowed inside the measured band; its gain above
     rolloff_hz: [40.0, 45.0]    # above the band (3.2-36.9 Hz), below the policy's Nyquist rate
