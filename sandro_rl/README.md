@@ -56,6 +56,11 @@ uv run python -m sandro_rl.train configs/agile_terrain.yaml --out runs/terrain
 #   override any key:  --set train.num_envs=4096 --set seed=3
 #   fine-tune:         --resume policies/flat_tracking
 
+#   yaw loop held inside the robot's measured margin (DESIGN.md 8, train.loop_margin):
+uv run python -m sandro_rl.train configs/agile_terrain_margin.yaml --resume policies/agile_terrain --out runs/agile_margin
+#   the same loop for any exported policy (after sandro_rl.export), before it goes on the robot:
+uv run python ../recordings/yaw_loop_margin.py runs/agile_margin
+
 # export ONNX + policy.json (the deployment contract), verified with onnxruntime
 uv run python -m sandro_rl.export runs/flat
 

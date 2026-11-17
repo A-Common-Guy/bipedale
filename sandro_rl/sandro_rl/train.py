@@ -35,6 +35,8 @@ def make_agent(env, config: dict):
     """train.algorithm: ppo (Gaussian policy, the default) or fpo (flow policy, fpo.py)."""
     algorithm = config["train"].get("algorithm", "ppo")
     if algorithm == "fpo":
+        if (config["train"].get("loop_margin") or {}).get("coef", 0.0) > 0:
+            raise ValueError("train.loop_margin needs the Gaussian policy's mean (train.algorithm: ppo)")
         from .fpo import FlowPPO
         return FlowPPO(env, config)
     if algorithm != "ppo":
@@ -195,7 +197,10 @@ def main() -> int:
                   f"len {row['episode_length_s']:5.1f}s falls/1k {row['fall_rate']:6.3f} | "
                   f"err v {row['m/err_forward']:.3f} yaw {row['m/err_yaw']:.3f} h {row['m/err_height']:.4f} | "
                   f"cat {row['m/cat_delta']:.4f} kl {row['kl']:.4f} lr {row['learning_rate']:.1e} "
-                  f"std {row['action_std']:.3f} sym {row['symmetry']:.4f}", flush=True)
+                  f"std {row['action_std']:.3f} sym {row['symmetry']:.4f}"
+                  + (f" loop Re {row['loop_re']:.2f} roll-off {row['loop_rolloff']:.2f}"
+                     if getattr(agent, "yaw_loop", None) is not None else ""),
+                  flush=True)
         extra = {"iteration": i, "env_steps": i * steps_per_iter, "wall_s": time.time() - start,
                  "compile_s": compile_s, "curriculum_stage": stage, "base_config": config}
         if i % t["checkpoint_every"] == 0 or i == t["iterations"]:

@@ -1506,6 +1506,104 @@ are off the gamepad switch and the panel's Run page, their controllers
 still defined. Untried: `agile_terrain` fine-tuned with the filter in the
 training loop.
 
+### The yaw loop on the measured plant (2026-11-16)
+
+A review of the same recordings without the simulator. Not yet tried on the
+robot; no policy has been trained with the loss on a GPU.
+
+- **The policies' yaw-rate gain.** Linearised about standing still (the
+  Jacobian of `policy.onnx`, with the stacked frames and the last-action
+  recursion), the flat policies command 2.4-3.6 Nm per wheel per rad/s of
+  gyro yaw rate at 9 Hz, `agile_terrain` 1.6-2.1, the sysid policies
+  0.7-0.9. The WBC's yaw kp is 0.15 Nm per wheel.
+- **Closed on the WBC chirp** (`recordings/sysid_2026-11-12`: measured
+  opposed wheel torque to gyro and to opposed wheel velocity, the drive's kd
+  closed first), the loop feeds back in phase at 8.9-9.4 Hz with a gain of
+  1.4-2.1 for `flat_level_real`, `flat_level_fast` and
+  `flat_level_drivetrain`, about 1.0 for `flat_level_fast_drivetrain`,
+  0.8-1.07 at 10.5-11 Hz for `agile_terrain` (worst crouched), and nowhere
+  for the WBC. With the 3 Hz opposed-wheel filter `agile_terrain` drops to
+  0.43-0.55 and the flat policies stay at 1.1-1.4 near 6.5 Hz.
+- **In the buzz bags** the measured opposed torque follows the gyro with the
+  linearised policy's phase (+145 deg measured, +147 predicted for
+  `flat_level_real`; +124 against +140 for `flat_level_drivetrain` at full
+  amplitude, where the measured gain is half the small-signal one).
+- **The gain follows the command.** It is highest standing still and falls
+  three to four times when turning at 1 rad/s (`flat_level_real` loop gain
+  1.6 standing, 1.2 at 0.5 m/s, 0.3 turning; the plant was measured standing
+  only): quiet while driving, back after stopping.
+- **Open.** The sysid policies come out at 0.3-0.55 at 17 Hz, inside the
+  margin, and were reported buzzing on 2026-11-16 with no recording. Every
+  policy's yaw gain rises again above 20 Hz (2-4.5 Nm per rad/s at 25 Hz),
+  past the chirp's 25 Hz. The pitch and leg loops have no measured response.
+
+`recordings/yaw_loop_margin.py` prints these numbers for any policy folder
+and is the check before a policy goes on the robot; `--export` writes the
+plant table to `data/`.
+
+`train.loop_margin` (`loop_margin.py`, off in base.yaml) puts the same loop
+in the PPO loss: the actor mean is linearised at 64 upright observations of
+each minibatch and closed on the plant table. Penalised are the largest
+Re L above `margin` (0.5) inside the measured band, which keeps the Nyquist
+curve left of 0.5 (gain margin 2, phase margin 60 deg, sensitivity peak at
+most 2), and above the band the loop's magnitude with the plant held at its
+last measured magnitudes, so the policy cannot differentiate the gyro where
+nothing is known. The log gains `loop_margin`, `loop_re` and `loop_rolloff`.
+`tests/test_loop_margin.py` checks the transfer function against a
+time-domain run and against the ONNX tool on `flat_level_real`, and that
+descending the term alone brings that policy inside the margin.
+`configs/agile_terrain_margin.yaml` is the first fine-tune to run. On the
+CPU backend (8 environments) `agile_terrain` starts at Re L 0.80 and a
+roll-off bound of 1.0.
+
+**Two recordings from the panel's Sysid page (2026-11-16).**
+
+- **The yaw response to 45 Hz** (`data/yaw_plant_2026-11-16.json`, WBC, 0.2
+  and 0.4 Nm per wheel averaged; only the table was kept, not the bag).
+  Inside 3-22 Hz it repeats the 2026-11-12 chirp: the gain within 10 %, 5-15
+  deg more lag at 7-10 Hz (the larger amplitude's damping). Above the
+  resonance the yaw answer falls fast: 0.38 rad/s per Nm at 22 Hz, 0.30 at
+  25, 0.14 at 31, under 0.1 beyond 36, where the coherence is gone (0.7 or
+  more up to 31.6 Hz). The loss and the gate now use this table up to
+  31.6 Hz and assume the last magnitude above it. On it the flat policies
+  stand at 1.3-1.6 at 8.8-9.2 Hz, `flat_level_fast_drivetrain` at 0.82,
+  `agile_terrain` at 0.65-0.89 (0.47-0.53 behind the 3 Hz filter), the
+  sysid policies at 0.24-0.49: lower than on the small-signal table, the
+  same order. A policy near 1 on the averaged table can still start a buzz
+  at small amplitude, where the plant is less damped.
+- **`rl_flat_level_sysid` buzzing** (`recordings/buzz_2026-11-16`, stand,
+  drive, stand). Not the yaw loop: a roll mode at 14.1-14.4 Hz, 0.30 rad/s of
+  roll rate against 0.13 of yaw and pitch, always on (0.12-0.40 rad/s over
+  the standing phases) and 0.40 while driving. The outer leg motors of the
+  two sides move against each other; the opposed leg reference (from the
+  drive law, q + (tau + kd v) / kp) is 28 mrad RMS per joint and follows the
+  roll rate at 0.097 rad per rad/s, +111 deg, coherence 0.99. The linearised
+  policy gives 0.108 at +124 deg: the policy's own loop from the gyro's roll
+  rate to the legs.
+- **The same mode in the older bags**, 11-18 Hz roll rate against each
+  policy's linearised roll-rate gain at 14 Hz (opposed leg reference per
+  joint):
+
+  | Controller | gain, rad per rad/s | roll rate, rad/s |
+  | --- | --- | --- |
+  | WBC | | 0.02 |
+  | `flat_level_real` | 0.044 | 0.04 |
+  | `flat_level_drivetrain` | 0.071 | 0.10 (3 Hz filter), 0.18 |
+  | `agile_terrain`, 3 Hz filter | 0.094 | 0.27 at 13.2 Hz |
+  | `flat_level_sysid` | 0.104 | 0.30 at 14.4 Hz |
+
+  What is left of `agile_terrain`'s buzz behind the 3 Hz filter is this
+  mode (0.27 rad/s of roll against 0.08 of yaw), which a wheel filter cannot
+  touch. `flat_level_fast` (0.129), `flat_level_fast_sysid` (0.157) and
+  `flat_level_fast_drivetrain` (0.197) are higher still. The retrains that
+  quietened the wheels' yaw loop raised the legs' roll gain 1.6-2.4 times.
+- **Next.** The roll loop has no measured plant: only the one point the
+  self-oscillation gives (the loop gain is 1 at 14.4 Hz with that policy).
+  It needs an opposed leg-height chirp under the WBC (a `sysid.*` mode that
+  does not exist yet), then the same loss term on the roll channel.
+  `recordings/yaw_loop_margin.py` prints the roll-rate gain meanwhile: keep
+  it near `flat_level_real`'s 0.044.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that
