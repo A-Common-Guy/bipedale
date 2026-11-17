@@ -219,6 +219,9 @@ class SimOptions:
     # Coulomb friction (frictionloss).
     tyre_torsion_scale: float = 1.0
     wheel_friction_scale: float = 1.0
+    # Factor on the leg drives' armature (reflected rotor inertia); the wheel's
+    # rotor is about 22 x the MJCF value on the bench (2026-11-15).
+    leg_armature_scale: float = 1.0
     unpowered_s: float = 0.03
     settle_s: float = 3.0
     command_rate_hz: float = 20.0
@@ -234,6 +237,7 @@ class SimOptions:
                  "seed": "seed", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
                  "gear_stiffness": "gear_stiffness_nm_rad", "gear_damping": "gear_damping_nm_s_rad",
                  "tyre_torsion": "tyre_torsion_scale", "wheel_friction": "wheel_friction_scale",
+                 "leg_armature": "leg_armature_scale",
                  "rotor_inertia": "rotor_inertia_scale",
                  "differential_filter": "wheel_differential_filter_hz",
                  "yaw_chirp": "yaw_chirp_nm", "yaw_chirp_start": "yaw_chirp_start_s"}
@@ -527,6 +531,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     qadr, dadr, act = spec.joint_qpos, spec.joint_dof, spec.joint_actuator
     m.geom_friction[spec.tyre_geoms, 1] *= options.tyre_torsion_scale
     m.dof_frictionloss[dadr[spec.wheel_index]] *= options.wheel_friction_scale
+    m.dof_armature[dadr[spec.leg_index]] *= options.leg_armature_scale
     gears = {}
     if options.wheel_backlash_rad > 0.0:
         for i, name in enumerate(JOINTS):
