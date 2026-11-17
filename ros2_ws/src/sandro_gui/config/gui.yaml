@@ -44,7 +44,7 @@ robot:
   # the drives are armed again (their read error deactivates them).
   broadcasters: [joint_state_broadcaster, imu_broadcaster, health_broadcaster]
   # Controllers the Run page offers, in this order.
-  controllers: [whole_body_controller, rl_agile_terrain, rl_flat_level, rl_flat_level_fast,
+  controllers: [whole_body_controller, rl_agile_terrain_v3, rl_agile_terrain, rl_flat_level, rl_flat_level_fast,
                 rl_stand_up, lqr_balancer, driving_balancer]
 
 # Topics watched for rate and freshness. expect_hz is what a healthy running

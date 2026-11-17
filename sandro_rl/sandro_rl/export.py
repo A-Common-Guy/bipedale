@@ -145,6 +145,7 @@ def export(policy_dir: Path) -> Path:
                    "legs": {"q_ref": "stand_q + scale_rad * a", "scale_rad": i.leg_scale,
                             "kp": i.leg_kp, "kd": i.leg_kd, "range_rad": [i.q_lo, i.q_hi]},
                    "wheels": a["wheels"], "stand_q": [float(v) for v in i.stand_q],
+                   "wheel_differential_filter_hz": i.differential_filter_hz,
                    "torque_limits_nm": [float(v) for v in i.torque_limit]},
         "command_shaping": {"forward_accel_m_s2": i.accel_limit, "yaw_time_constant_s": i.yaw_tau,
                             "height_rate_m_s": i.h_rate,

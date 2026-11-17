@@ -110,6 +110,7 @@ class PolicyInterface:
         # "ros": the drives' envelope peak (spec.envelope), folding back with heat.
         self.envelope = spec.envelope
         self.thermal = bool(a.get("torque_envelope", True))
+        self.differential_filter_hz = float(a.get("wheel_differential_filter_hz", 0.0))
         peak = spec.envelope.peak_nm
         self.torque_limit = np.array([float(_ros(tl.get("wheels", "ros"), peak))
                                       if j in sources.WHEEL_JOINTS else float(_ros(tl.get("legs", "ros"), peak))

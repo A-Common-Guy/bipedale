@@ -164,6 +164,7 @@ class SandroEnv:
         # the robot); a number caps it further.
         self.envelope = s.envelope
         self.thermal = bool(a.get("torque_envelope", True))
+        self.differential_filter_hz = float(a.get("wheel_differential_filter_hz", 0.0))
         tl = a.get("torque_limit_nm", {})
         self.leg_torque_nm = float(_ros(tl.get("legs", "ros"), self.envelope.peak_nm))
         self.wheel_torque_nm = float(_ros(tl.get("wheels", "ros"), self.envelope.peak_nm))
@@ -801,6 +802,7 @@ class SandroEnv:
             "command_timer": duration, "push_timer": wait, "push_duration": push_duration,
             "push_force_sample": push_force, "push_force": jp.zeros(self.push_dim),
             "last_action": jp.zeros(N_JOINTS), "last_action2": jp.zeros(N_JOINTS),
+            "wheel_differential": jp.float32(0.0),
             "frame": zero_frame, "drive_tau": jp.zeros(N_JOINTS), "axle_prev": self._axle_mid(data),
             "rotor": rotor,
             # As if the robot had been working: up to half the heat budget.
@@ -876,7 +878,19 @@ class SandroEnv:
             info["jump_height"] = jp.where(start, height, info["jump_height"])
             info["jump_wait"] = jp.where(start, wait + self.jump["window_s"], info["jump_wait"])
         action = jp.clip(action, -self.cfg["action"]["clip"], self.cfg["action"]["clip"])
-        new_frame = self._frames(action, params)
+        applied = action
+        if self.differential_filter_hz > 0.0:
+            # RlPolicyCore's action.wheel_differential_filter_hz: a first-order
+            # low-pass on the opposed half of the wheel actions; the
+            # observation keeps the policy's own action.
+            r, l = self.wheel_idx
+            blend = 1.0 - math.exp(-2.0 * math.pi * self.differential_filter_hz * self.dt)
+            info["wheel_differential"] = info["wheel_differential"] + blend * (
+                0.5 * (action[r] - action[l]) - info["wheel_differential"])
+            common = 0.5 * (action[r] + action[l])
+            applied = action.at[r].set(common + info["wheel_differential"]).at[l].set(
+                common - info["wheel_differential"])
+        new_frame = self._frames(applied, params)
         old_frame = info["frame"]
         delay = params["command_delay"]
 

@@ -1,0 +1,44 @@
+# agile_terrain with what the robot has shown since it was trained
+# (DESIGN.md, 2026-11). On the robot rl_agile_terrain with the 3 Hz
+# differential wheel filter is quick and buzzes least of the policies; it
+# never trained with the filter, which here sits in the training loop as
+# RlPolicyController applies it. Also:
+# - joint state from the MIT replies (the robot's default since 2026-11-09)
+#   in half the episodes;
+# - the identified wheel drive train (a rotor of 15-35 x the armature behind
+#   8-60 Nm/rad, play and damping) in half the episodes, the first-order lag
+#   in the others: flat_level_sysid trained on it in 90 % and came out slow
+#   on the robot;
+# - the tyres' torsional friction and the wheels' frictionloss down to what
+#   the yaw chirp shows (x 0.005 and x 0.02), up to the MJCF's;
+# - the leg drives' rotors at 5-35 x the armature (the wheel rotor's bench
+#   value is about 22 x).
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v2.yaml --resume policies/agile_terrain
+inherit: agile_terrain.yaml
+
+env:
+  action:
+    wheel_differential_filter_hz: 3.0
+  randomization:
+    latency:
+      mit_joints_probability: 0.5
+    drives:
+      gear:
+        probability: 0.5
+        stiffness_nm_rad: [8.0, 60.0]
+        play_rad: [0.0, 0.03]
+        damping_nm_s_rad: [0.05, 0.3]
+        rotor_inertia_scale: [15.0, 35.0]
+        substeps: 8
+    model:
+      tyre_torsional_scale: [0.005, 2.0]
+      wheel_frictionloss_scale: [0.02, 2.0]
+      leg_armature_scale: [5.0, 35.0]
+
+train:
+  num_envs: 6144              # obstacle terrain at 8192 runs out of GPU memory beside the desktop
+  iterations: 1000
+  learning_rate: 1.0e-4
+  curriculum_offset: 900      # agile_terrain's full terrain and pushes from the start
+  resume_log_std: -2.8        # agile_terrain's action noise is 0.06

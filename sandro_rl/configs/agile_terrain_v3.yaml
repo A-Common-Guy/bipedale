@@ -1,0 +1,14 @@
+# agile_terrain_v2 without the differential wheel filter in the loop. v2
+# (filter at 3 Hz in training) tracks yaw better but crossed the obstacle
+# course at 0.5 m/s in 10 of 18 seeded runs against agile_terrain's 18, and
+# with heavy leg rotors in 0 of 9 against 8; agile_terrain with the 3 Hz
+# filter added at deployment drops to 15 of 18. Everything else of v2 stays
+# (MIT joint state, the identified drive train in half the episodes, low tyre
+# torsion and wheel friction, heavy leg rotors).
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v3.yaml --resume policies/agile_terrain
+inherit: agile_terrain_v2.yaml
+
+env:
+  action:
+    wheel_differential_filter_hz: 0.0

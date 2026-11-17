@@ -84,6 +84,10 @@ rl_agile_terrain:
       # against each other through the gear play); at 3 Hz it stays quick
       # and quiet (2026-11-12 and 16, sandro_rl/docs/DESIGN.md).
       wheel_differential_filter_hz: 3.0
+rl_agile_terrain_v3:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 rl_stand_up:
   ros__parameters:
     observation:

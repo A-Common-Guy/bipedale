@@ -510,7 +510,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     # A stand-up policy is engaged lying down: no fall cut-off.
     fall_angle = math.inf if config["env"]["init"].get("fallen") else lim.fall_angle_rad
     controller = PolicyController(iface, OnnxPolicy(policy_dir / "policy.onnx"), fall_angle)
-    controller.differential_filter_hz = options.wheel_differential_filter_hz
+    # The policy's trained filter unless the simulation options set one.
+    controller.differential_filter_hz = options.wheel_differential_filter_hz or iface.differential_filter_hz
 
     from . import terrain
     leg_boxes = bool((config["env"].get("collision") or {}).get("leg_boxes", False))

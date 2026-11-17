@@ -73,6 +73,10 @@ def randomize(env, mjx_model: mjx.Model, rng: jax.Array, num_envs: int, enabled:
         damping = mjx_model.dof_damping.at[robot_dofs].multiply(_log_uniform(k[7], cfg["damping_scale"]))
         armature_scale = _log_uniform(k[8], cfg["armature_scale"])
         armature = mjx_model.dof_armature.at[robot_dofs].multiply(armature_scale)
+        # The leg drives' rotors on top (the wheel rotor is about 22 x the MJCF
+        # armature on the bench); not a critic input.
+        armature = armature.at[leg_dofs].multiply(
+            _log_uniform(jax.random.fold_in(k[8], 1), cfg.get("leg_armature_scale", [1.0, 1.0])))
         fields = {"body_mass": body_mass, "body_inertia": body_inertia, "body_pos": body_pos,
                   "geom_friction": friction, "dof_frictionloss": frictionloss,
                   "dof_damping": damping, "dof_armature": armature}

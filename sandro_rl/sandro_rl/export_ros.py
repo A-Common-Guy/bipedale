@@ -214,8 +214,9 @@ def parameter_block(name: str, policy: str, contract: dict, actor: dict, safety:
       wheel_kd_nm_s_rad: {_f(wheels["kd_nm_s_rad"])}
       wheel_scale_nm: {_f(wheels["scale_nm"])}
       # Low-pass (Hz) on the opposed half of the wheel commands, the yaw; 0
-      # off. Not trained with; the robot overrides set it per policy.
-      wheel_differential_filter_hz: 0.0
+      # off. The value the policy trained with; the robot overrides may set
+      # one for a policy that did not.
+      wheel_differential_filter_hz: {_f(action.get("wheel_differential_filter_hz", 0.0))}
       stand_q: {_list(action["stand_q"])}
 """ + ("    safety:\n" + "".join(f"      {k}: {_value(v)}\n" for k, v in safety.items()) if safety else "")
 

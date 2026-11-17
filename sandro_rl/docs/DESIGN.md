@@ -1506,6 +1506,48 @@ are off the gamepad switch and the panel's Run page, their controllers
 still defined. Untried: `agile_terrain` fine-tuned with the filter in the
 training loop.
 
+**`agile_terrain` with the 2026-11 findings (2026-11-17).** Two fine-tunes
+from `agile_terrain`, 1000 iterations at 6144 worlds (25 min each), with
+joint state from the MIT replies in half the episodes, the identified drive
+train (rotor 15–35 ×, 8–60 Nm/rad, play to 30 mrad, 0.05–0.3 Nm s/rad) in
+half, tyre torsion × 0.005–2 and wheel `frictionloss` × 0.02–2, and leg
+rotors at 5–35 × the armature (`randomize.leg_armature_scale`, new):
+
+- `agile_terrain_v2` also trains with the 3 Hz differential wheel filter in
+  the loop (`action.wheel_differential_filter_hz`, now an environment
+  option, exported in `policy.json` and shipped by `export_ros.py`). It
+  tracks yaw better but crossed the planks-and-hill course at 0.5 m/s
+  (`--scenario course_slow --course`, 2 plants × 3 latency profiles × 3
+  seeds) in 10 of 18 runs, and with heavy leg rotors in 0 of 9, against
+  `agile_terrain`'s 18 and 8. `agile_terrain` with the filter added at
+  deployment also drops (15 of 18): the filter slows the heading
+  corrections planks need. Not deployed; its intermediate checkpoints were
+  no better.
+- `agile_terrain_v3` is v2 without the filter: 27 of 27 course runs
+  (mjcf, fitted plant, heavy legs), against `agile_terrain`'s 26.
+
+`agile_terrain_v3` against `agile_terrain` with the 3 Hz filter as deployed
+(`recordings/sysid_2026-11-12/compare_agile.py`, means over phases; the
+fitted plant with leg rotors at 22 ×):
+
+| | agile_terrain + 3 Hz | agile_terrain_v3 |
+| --- | --- | --- |
+| Yaw error, hardware/default sequences, fitted plant | 0.059–0.082 rad/s | 0.024–0.028 |
+| Yaw error, agile manoeuvres (3 rad/s), fitted plant | 0.30–0.32 | 0.105–0.117 |
+| Speed error, hardware/default, fitted plant | 0.105–0.124 m/s | 0.075–0.093 |
+| Pitch RMS, hardware/default | 0.007–0.023 rad | 0.016–0.023 |
+| 5–15 Hz yaw standing, fitted plant (with 30 mrad of play) | 0.016–0.018 (0.175) rad/s | 0.003–0.004 (0.036) |
+| Course at 0.5 m/s | 15 of 18 | 27 of 27 |
+
+Under the slow-SPI profile on the MJCF as trained both chatter (worst phase
+wheel torque 8.6–10.2 Nm for the baseline, 6.5–7.6 for v3; on the fitted
+plant 0.3–1.4). `agile_terrain` without the filter chatters there too,
+which it did not at the 6 Nm wheel limit it trained with (2026-11-10): the
+9 Nm envelope gives a marginal wheel loop more authority. Deployed as
+`rl_agile_terrain_v3` (gamepad switch, yellow; first on the panel's Run
+page) next to `rl_agile_terrain`; the 3 Hz filter can be added through the
+overrides if it buzzes.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that
