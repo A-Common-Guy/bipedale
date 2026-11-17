@@ -10,11 +10,13 @@ Everything is recorded (ros2 bag, zstd) into DIR with plan.json, the time of
 each phase. Nothing is commanded: the operator drives with the gamepad.
 
 The analysis splits each phase into the yaw mode (the wheels against each
-other, the gyro's yaw rate) and the pitch mode (the wheels together, the
-gyro's pitch rate) and gives their RMS and strongest frequency in 5-15 Hz,
-the band of the 9 Hz yaw buzz, and in 15-45 Hz, above the band the yaw
-response was first measured in. The verdict names the loudest of them while
-standing: which loop to measure or constrain next.
+other, the gyro's yaw rate), the pitch mode (the wheels together, the gyro's
+pitch rate) and the roll mode (the legs' heights against each other, the
+gyro's roll rate; the legs together beside it) and gives their RMS and
+strongest frequency in 5-15 Hz, the band of the 9 Hz yaw buzz, and in
+15-45 Hz, above the band the yaw response was first measured in. The verdict
+names the loudest of them while standing: which loop to measure or constrain
+next.
 """
 
 import argparse
@@ -28,6 +30,10 @@ from pathlib import Path
 
 TOPICS = ["/joint_states", "/imu_broadcaster/imu", "/health_broadcaster/dynamic_joint_states", "/cmd_vel"]
 WHEELS = ("right_wheel", "left_wheel")
+# The motor names are mirrored between the sides (right inner is the rear motor,
+# left inner the front one) and the angles open away from the leg centre on both
+# (sandro_rl robot.py MIRROR_JOINT): a leg's height moves with front + rear.
+LEGS = ("right_motor_inner", "right_motor_outer", "left_motor_inner", "left_motor_outer")
 FS = 300.0
 RADIUS, TRACK = 0.0672, 0.304          # as sysid_yaw.py
 BANDS = ((5.0, 15.0), (15.0, 45.0))
@@ -97,15 +103,15 @@ def record(args):
 # Analysis -----------------------------------------------------------------------
 
 def read_bag(path):
-    """(t, right wheel velocity, left wheel velocity) and (t, gyro x, y, z), by header stamp."""
+    """(t, wheel velocities (WHEELS), leg velocities (LEGS)) and (t, gyro x, y, z), by header stamp."""
     import numpy as np
-    wheels, gyro = [], []
+    joints, gyro = [], []
 
     def take(topic, msg, received_ns):
         s = msg.header.stamp
         t = s.sec + s.nanosec * 1e-9 if (s.sec or s.nanosec) else received_ns * 1e-9
         if topic == "/joint_states":
-            wheels.append([t] + [msg.velocity[msg.name.index(n)] for n in WHEELS])
+            joints.append([t] + [msg.velocity[msg.name.index(n)] for n in WHEELS + LEGS])
         else:
             g = msg.angular_velocity
             gyro.append((t, g.x, g.y, g.z))
@@ -127,7 +133,7 @@ def read_bag(path):
         for file in sorted(Path(path).glob("*.mcap")):
             for m in read_ros2_messages(str(file), topics=sorted(wanted)):
                 take(m.channel.topic, m.ros_msg, m.log_time_ns)
-    return np.array(wheels), np.array(gyro)
+    return np.array(joints), np.array(gyro)
 
 
 def band_content(x, lo, hi):
@@ -145,8 +151,9 @@ def band_content(x, lo, hi):
     return rms, float(f[keep][int(power.argmax())])
 
 
-def modes(t, right, left, gyro_t, gyro, t0, t1):
-    """Per band, the yaw and pitch modes of one phase: {band: {signal: (rms, hz)}}."""
+def modes(t, right, left, gyro_t, gyro, t0, t1, legs=None):
+    """Per band, the yaw, pitch and roll modes of one phase: {band: {signal: (rms, hz)}}.
+    legs: the LEGS velocities (n, 4) at the times t, for the legs' height modes."""
     import numpy as np
     grid = np.arange(t0, t1, 1 / FS)
     wr, wl = np.interp(grid, t, right), np.interp(grid, t, left)
@@ -157,6 +164,13 @@ def modes(t, right, left, gyro_t, gyro, t0, t1):
         "wheels together": 0.5 * (wr + wl),
         "gyro roll": np.interp(grid, gyro_t, gyro[:, 0]),
     }
+    if legs is not None:
+        ri, ro, li, lo = (np.interp(grid, t, legs[:, k]) for k in range(4))
+        # Motor rad/s per joint: the right leg's height against the left's (the
+        # roll the legs make, as recordings/yaw_loop_margin.py's roll_gain) and
+        # both legs together.
+        signals["legs opposed (per joint)"] = ((ri + ro) - (li + lo)) / 4
+        signals["legs together (per joint)"] = (ri + ro + li + lo) / 4
     return {f"{lo:g}-{hi:g} Hz": {name: band_content(x, lo, hi) for name, x in signals.items()}
             for lo, hi in BANDS}
 
@@ -182,7 +196,10 @@ def verdict(standing):
     elif axis == "pitch":
         where = "the pitch loop (the wheels together): it has no measured response yet"
     else:
-        where = "roll, the legs: no measured response yet"
+        legs = standing[band].get("legs opposed (per joint)")
+        pumping = (f" (the legs opposed {legs[0]:.2f} rad/s per joint at {legs[1]:.1f} Hz)"
+                   if legs and legs[0] == legs[0] else "")
+        where = f"roll, the legs{pumping}: no measured response yet"
     return f"buzz standing: {rms:.2f} rad/s of {name} at {hz:.1f} Hz, {where}"
 
 
@@ -190,17 +207,18 @@ def analyse(directory):
     import numpy as np
     directory = Path(directory)
     plan = json.loads((directory / "plan.json").read_text())
-    wheels, gyro = read_bag(directory / "bag")
-    if len(wheels) < FS or len(gyro) < FS:
+    joints, gyro = read_bag(directory / "bag")
+    if len(joints) < FS or len(gyro) < FS:
         raise RuntimeError("the recording holds no joint states or no IMU: was the stack running?")
     rows = []
     standing = {}
     for event in (e for e in plan["events"] if e["kind"] == "phase"):
         t0 = event["t"] + 1.0               # the operator reacting to the prompt
-        t1 = min(event["t"] + event["duration_s"], wheels[-1, 0], gyro[-1, 0])
+        t1 = min(event["t"] + event["duration_s"], joints[-1, 0], gyro[-1, 0])
         if t1 - t0 < 3.0:
             continue
-        result = modes(wheels[:, 0], wheels[:, 1], wheels[:, 2], gyro[:, 0], gyro[:, 1:], t0, t1)
+        result = modes(joints[:, 0], joints[:, 1], joints[:, 2], gyro[:, 0], gyro[:, 1:], t0, t1,
+                       legs=joints[:, 3:7])
         rows.append({"phase": event["name"], "seconds": t1 - t0, "bands": result})
         if event["name"].startswith("stand"):
             for band, values in result.items():
@@ -210,12 +228,14 @@ def analyse(directory):
                         standing[band][name] = (rms, hz)
     label = plan.get("label") or "controller"
     print(f"{label}: RMS (rad/s) and strongest frequency per phase")
-    names = ["gyro yaw", "wheels opposed (as yaw)", "gyro pitch", "wheels together", "gyro roll"]
+    lines = (["gyro yaw", "wheels opposed (as yaw)", "gyro pitch", "wheels together", "gyro roll"],
+             ["legs opposed (per joint)", "legs together (per joint)"])
     for row in rows:
         print(f"  {row['phase']} ({row['seconds']:.0f} s)")
         for band, values in row["bands"].items():
-            cells = "   ".join(f"{name} {values[name][0]:.2f} @ {values[name][1]:.1f} Hz" for name in names)
-            print(f"    {band:9s} {cells}")
+            for k, names in enumerate(lines):
+                cells = "   ".join(f"{name} {values[name][0]:.2f} @ {values[name][1]:.1f} Hz" for name in names)
+                print(f"    {band if k == 0 else '':9s} {cells}")
     line = verdict(standing)
     print(line)
     (directory / "summary.json").write_text(json.dumps(

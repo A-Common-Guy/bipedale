@@ -53,6 +53,39 @@ def test_the_yaw_and_pitch_modes_are_told_apart():
     assert buzz.verdict(modes(yaw_hz=9.0, yaw=0.03)).startswith("quiet standing")
 
 
+def leg_modes(roll_hz=14.0, roll=0.0, legs_opposed=0.0, legs_together=0.0):
+    """The wheels still, the gyro rolling, and the legs (LEGS order) moving in height:
+    opposed is the right leg up while the left goes down, per joint."""
+    t = np.arange(0, 12, 1 / buzz.FS)
+    wave = np.sin(2 * np.pi * roll_hz * t)
+    gyro = np.stack([roll * wave, np.zeros_like(t), np.zeros_like(t)], 1)
+    right, left = (legs_together + legs_opposed) * wave, (legs_together - legs_opposed) * wave
+    legs = np.stack([right, right, left, left], 1)   # right inner, outer, left inner, outer
+    return buzz.modes(t, np.zeros_like(t), np.zeros_like(t), t, gyro, 0.5, 11.5, legs=legs)
+
+
+def test_the_legs_roll_mode_is_told_apart_from_their_height_mode():
+    low = leg_modes(roll=0.3, legs_opposed=0.4)["5-15 Hz"]
+    assert low["legs opposed (per joint)"][0] == pytest.approx(0.4 / math.sqrt(2), rel=0.03)
+    assert low["legs opposed (per joint)"][1] == pytest.approx(14.0, abs=0.15)
+    assert low["legs together (per joint)"][0] < 0.01
+    low = leg_modes(legs_together=0.4)["5-15 Hz"]
+    assert low["legs together (per joint)"][0] == pytest.approx(0.4 / math.sqrt(2), rel=0.03)
+    assert low["legs opposed (per joint)"][0] < 0.01
+    # Without the legs, the modes are the gyro's and the wheels' only.
+    assert not any(name.startswith("legs") for name in modes(yaw_hz=9.0, yaw=0.6)["5-15 Hz"])
+
+
+def test_a_roll_buzz_names_the_legs():
+    line = buzz.verdict(leg_modes(roll=0.3, legs_opposed=0.4))
+    assert line.startswith("buzz standing") and "gyro roll at 14.0 Hz" in line
+    assert "legs opposed 0.28 rad/s per joint at 14.0 Hz" in line
+    # A roll buzz analysed without the legs still gets its verdict.
+    gyro_only = {band: {k: v for k, v in values.items() if not k.startswith("legs")}
+                 for band, values in leg_modes(roll=0.3).items()}
+    assert "roll, the legs: no measured response yet" in buzz.verdict(gyro_only)
+
+
 def test_the_plant_band_stays_clear_of_the_sweep_ends():
     sysid = tool("sysid_yaw")
     chirp = lambda f0, f1: {"kind": "chirp", "f0_hz": f0, "f1_hz": f1}
