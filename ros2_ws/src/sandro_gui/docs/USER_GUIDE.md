@@ -132,7 +132,7 @@ started from an older build.
 
 ## Measurements (Sysid page)
 
-Two runs, each one button. A greyed Start says next to it what is missing.
+Three runs, each one button. A greyed Start says next to it what is missing.
 
 **Yaw response to 45 Hz** (about 75 s): what the RL training holds a policy's
 yaw loop against.
@@ -146,6 +146,24 @@ yaw loop against.
    machine and set `train.loop_margin.plant` to its name.
 5. Optional, each its own run: crouch to the lowest height with the pad and
    repeat, then the highest.
+
+**Roll and yaw response, wheels and legs** (about 3 min 20 s): the plant
+behind both buzzes, the 9 Hz yaw one through the wheels and the 14 Hz roll one
+through the legs. It needs the software with the leg sweeps on the robot
+(Software page: deploy, then start the stack again).
+
+1. Run page: start the stack with `whole_body_controller`, Arm and start.
+2. Flat floor, a metre of room, the default standing height, hands off the
+   sticks.
+3. Sysid page: Start, tick the box. Six sweeps follow, named in the large
+   line: the wheels twitch (twice), the body rocks side to side by up to
+   about 2 degrees (twice), the legs scissor fore-aft (twice).
+4. Results should read *good* with how far each of yaw, roll and fore-aft
+   answered cleanly. Download **Recording** (the `.tar` holds the bag,
+   `response.json` and `yaw_plant.json`) and untar it under `recordings/`.
+
+If Start answers that this whole_body_controller cannot sweep the legs, the
+running stack is older than the page: stop it, deploy, start it again.
 
 **Record a controller's buzz** (about 95 s): where a buzz is.
 

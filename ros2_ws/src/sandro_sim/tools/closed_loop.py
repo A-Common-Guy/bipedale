@@ -68,6 +68,9 @@ SCENARIOS = {
                 "3,0,0,-0.05", "2,0,0", "3,0,0,0.05", "3,0,0"],
     # Standing only, for noise floor and limit cycles.
     "stand": ["10,0,0"],
+    # Standing through one sysid run: --set sysid.mode=2 --set sysid.axis=1 ...
+    # (it starts with the phase).
+    "sysid": ["32,0,0"],
     # Standing with forward and backward shoves on the torso (pushes below).
     "push": ["10,0,0"],
     # Standing with shoves growing from 15 to 25 N, where the leg torque

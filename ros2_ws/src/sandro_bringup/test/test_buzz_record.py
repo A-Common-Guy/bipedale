@@ -60,3 +60,43 @@ def test_the_plant_band_stays_clear_of_the_sweep_ends():
     assert sysid.plant_band({"events": [{"kind": "kp"}, chirp(2.0, 45.0), chirp(2.0, 45.0)]}) == (3.0, 42.0)
     with pytest.raises(ValueError):
         sysid.plant_band({"events": [{"kind": "pulses"}]})
+
+
+def test_opposed_signals_pair_rear_with_rear_and_the_chirp_is_the_controllers():
+    sysid = tool("sysid_yaw")
+    t = np.arange(0, 6, 1 / sysid.FS)
+    event = {"t": 1.0, "f0_hz": 2.0, "f1_hz": 20.0, "duration_s": 4.0}
+    chirp = sysid.chirp_reference(event, t)
+    assert abs(chirp[t < 1.0]).max() == 0.0 and abs(chirp[t > 5.0]).max() == 0.0
+    assert abs(chirp).max() == pytest.approx(1.0, abs=0.01)
+    # A roll sweep: the left leg longer, the right shorter, i.e. both motors of
+    # a side the same way, the two sides against each other.
+    joints = np.zeros((len(t), 19))
+    joints[:, 0] = t
+    column = lambda name, block: 1 + 6 * block + sysid.JOINTS.index(name)
+    for name, sign in (("right_motor_inner", 1), ("right_motor_outer", 1),
+                       ("left_motor_inner", -1), ("left_motor_outer", -1)):
+        joints[:, column(name, 2)] = sign * 0.3 * chirp
+    gyro = np.stack([t, 0 * t, 0.2 * chirp, 0 * t], 1)          # t, z, x, y
+    _, measured = sysid.opposed_signals(joints, gyro, 1.0, 5.0)
+    grid = np.arange(1.0, 5.0, 1 / sysid.FS)
+    reference = sysid.chirp_reference(event, grid)
+    np.testing.assert_allclose(measured["rear_torque"], 0.3 * reference, atol=1e-6)
+    np.testing.assert_allclose(measured["front_torque"], 0.3 * reference, atol=1e-6)
+    np.testing.assert_allclose(measured["roll_rate"], 0.2 * reference, atol=1e-6)
+    assert abs(measured["wheel_torque"]).max() == 0.0 and abs(measured["yaw_rate"]).max() == 0.0
+    # Fore-aft against each other is the right rear and the left FRONT motor the
+    # same way: with rear paired to rear it shows as rear against front.
+    joints[:] = 0.0
+    joints[:, 0] = t
+    for name, sign in (("right_motor_inner", 1), ("right_motor_outer", -1),
+                       ("left_motor_inner", 1), ("left_motor_outer", -1)):
+        joints[:, column(name, 2)] = sign * 0.3 * chirp
+    _, measured = sysid.opposed_signals(joints, gyro, 1.0, 5.0)
+    np.testing.assert_allclose(measured["rear_torque"], 0.3 * reference, atol=1e-6)
+    np.testing.assert_allclose(measured["front_torque"], -0.3 * reference, atol=1e-6)
+    # Runs from before the axes are yaw runs.
+    plan = {"events": [{"kind": "chirp", "f0_hz": 2.0, "f1_hz": 25.0},
+                       {"kind": "chirp", "axis": "roll", "f0_hz": 2.0, "f1_hz": 25.0}]}
+    assert len(sysid.chirps_of(plan, "yaw")) == 1 and len(sysid.chirps_of(plan, "roll")) == 1
+    assert len(sysid.chirps_of(plan)) == 2

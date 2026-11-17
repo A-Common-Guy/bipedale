@@ -30,6 +30,13 @@ def test_the_commands_are_fixed_and_the_tools_exist():
     # 2-45 Hz at 0.2 and 0.4 Nm per wheel, the stock leg stiffness, no prompt.
     assert yaw[3:] == ["--kp", "12", "--pulses", "0", "--chirp-nm", "0.2", "0.4", "--f0", "2",
                        "--f1", "45", "--chirp-s", "30", "--settle", "3", "--yes", "--out", "/x/yaw_1"]
+    # The whole opposed plant: the wheels, then the legs' heights, then the axles fore-aft.
+    full = sysid.command("full", Path("/x/full_1"), tools, python="python3")
+    assert full[2] == str(tools / "sysid_yaw.py")
+    assert full[full.index("--axis") + 1:full.index("--chirp-nm")] == ["yaw", "roll", "fore_aft"]
+    assert full[full.index("--chirp-m") + 1:full.index("--f0")] == ["0.002", "0.004"]
+    assert max(float(v) for v in full[full.index("--chirp-m") + 1:full.index("--f0")]) <= 0.005
+    assert sysid.MEASUREMENTS["full"]["needs"] == "wbc"
     buzz = sysid.command("buzz", Path("/x/b"), tools, "rl_flat_level_sysid", python="python3")
     assert Path(buzz[2]).is_file() and buzz[3:5] == ["--label", "rl_flat_level_sysid"]
     assert "--yes" in buzz
@@ -133,3 +140,19 @@ def test_a_yaw_result_reports_its_band_and_coherence(tmp_path):
     assert result["usable_hz"] == 30.0 and result["weak"] is False
     assert "0.4 Nm: mode 12.7 Hz" in result["text"]
     assert runs["sysid_20261112-225514"]["result"] == {}
+    # A run of all three axes: how far each answered, and whether one is missing.
+    full = tmp_path / "experiments" / "full_20261117-130000"
+    full.mkdir()
+    (full / "summary.json").write_text(json.dumps([{"kp": 12.0, "chirp_nm": 0.4, "chirp_hz": 12.6,
+                                                    "coherence": 0.98}]))
+    sweeps = [{"axis": "yaw", "amplitude": 0.4, "clean_hz": 31.0},
+              {"axis": "roll", "amplitude": 0.002, "clean_hz": 18.0},
+              {"axis": "roll", "amplitude": 0.004, "clean_hz": 33.0},
+              {"axis": "fore_aft", "amplitude": 0.004, "clean_hz": 26.0}]
+    (full / "response_summary.json").write_text(json.dumps(sweeps))
+    result = {r["name"]: r for r in jobs.runs()}["full_20261117-130000"]["result"]
+    assert result["response"] and result["clean_hz"] == {"yaw": 31.0, "roll": 33.0, "fore_aft": 26.0}
+    assert result["missing"] == [] and result["weak"] is False
+    (full / "response_summary.json").write_text(json.dumps(sweeps[:3]))
+    result = {r["name"]: r for r in jobs.runs()}["full_20261117-130000"]["result"]
+    assert result["missing"] == ["fore_aft"] and result["weak"] is True

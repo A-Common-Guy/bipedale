@@ -7,6 +7,11 @@ checked that the robot is in the state the measurement needs:
   yaw   sysid_yaw.py: the WBC sweeps the opposed wheel torque to 45 Hz while
         it balances; the result is yaw_plant.json, the measured yaw response
         sandro_rl's train.loop_margin closes a policy's yaw loop on.
+  full  sysid_yaw.py --axis yaw roll fore_aft: the same sweep on the wheels,
+        then the leg heights against each other (roll), then the axles
+        fore-aft against each other; the result is response.json, every
+        left-against-right signal against each sweep: the plant behind the
+        9 Hz yaw buzz and the 14 Hz roll buzz together.
   buzz  buzz_record.py: records the running controller through stand, drive,
         stand, and says which loop its buzz is in.
 
@@ -53,6 +58,24 @@ MEASUREMENTS = {
                   "other for about a minute, faster and faster. Hand on the E-stop."],
         "result": "yaw_plant.json",
     },
+    "full": {
+        "title": "Roll and yaw response, wheels and legs",
+        "tool": "sysid_yaw.py",
+        "needs": "wbc",
+        "seconds": 200,
+        "purpose": "Six sweeps in one recording, 2 to 40 Hz: the wheel torques against each other "
+                   "(0.2 and 0.4 Nm), the leg heights against each other (2 and 4 mm per leg: the "
+                   "body rolls up to about 2 degrees), the axles fore-aft against each other (2 and "
+                   "4 mm). Together they give the plant behind both buzzes, the 9 Hz yaw one and "
+                   "the 14 Hz roll one through the legs.",
+        "steps": ["Start the stack with whole_body_controller, arm and start it (Run page). The "
+                  "robot must run the software with this page's leg sweeps: after an update, "
+                  "restart the stack.",
+                  "Flat floor, a metre of room, the default standing height, hands off the sticks.",
+                  "Press Start. About three and a half minutes: the wheels twitch, then the body "
+                  "rocks side to side, then the legs scissor. Hand on the E-stop."],
+        "result": "response.json",
+    },
     "buzz": {
         "title": "Record a controller's buzz",
         "tool": "buzz_record.py",
@@ -76,6 +99,10 @@ def command(kind: str, out: Path, tools: Path, label: str = "", python: str = sy
     if kind == "yaw":
         return [python, "-u", tool, "--kp", "12", "--pulses", "0", "--chirp-nm", "0.2", "0.4",
                 "--f0", "2", "--f1", "45", "--chirp-s", "30", "--settle", "3", "--yes", "--out", str(out)]
+    if kind == "full":
+        return [python, "-u", tool, "--kp", "12", "--pulses", "0", "--axis", "yaw", "roll", "fore_aft",
+                "--chirp-nm", "0.2", "0.4", "--chirp-m", "0.002", "0.004", "--f0", "2", "--f1", "40",
+                "--chirp-s", "30", "--settle", "3", "--yes", "--out", str(out)]
     return [python, "-u", tool, "--label", label, "--stand", "30", "--drive", "30", "--yes",
             "--out", str(out)]
 
@@ -178,7 +205,7 @@ class Sysid:
                 raise ValueError(reason)
             label = controller_under_test(ros)
             stamp = time.strftime("%Y%m%d-%H%M%S")
-            name = f"{kind}_{stamp}" if kind == "yaw" else f"{kind}_{label}_{stamp}"
+            name = f"{kind}_{label}_{stamp}" if kind == "buzz" else f"{kind}_{stamp}"
             out = self.dir / name
             out.mkdir(parents=True, exist_ok=True)
             argv = self.runner(kind, out, label)
@@ -256,6 +283,18 @@ class Sysid:
             result.update(plant=True, f_hz=[f[0], f[-1]], usable_hz=top, weak=top < USABLE_HZ)
         except (OSError, ValueError, KeyError, IndexError):
             pass
+        try:
+            # The leg sweeps: how far each axis answered cleanly (its larger amplitude).
+            sweeps = json.loads((path / "response_summary.json").read_text())
+            clean = {}
+            for sweep in sweeps:
+                clean[sweep["axis"]] = max(clean.get(sweep["axis"], 0.0), sweep["clean_hz"])
+            if len(clean) > 1:
+                missing = [a for a in ("yaw", "roll", "fore_aft") if a not in clean]
+                result.update(response=True, clean_hz=clean, missing=missing,
+                              weak=bool(missing) or min(clean.values()) < USABLE_HZ)
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
         return result
 
     def runs(self, limit: int = 30) -> list[dict]:
@@ -323,5 +362,9 @@ def demo_runner(kind: str, out: Path, label: str) -> list[str]:
         "    json.dump([{'kp': 12, 'chirp_nm': 0.2, 'chirp_hz': 12.4, 'coherence': 0.97}], open(out + '/summary.json', 'w'))\n"
         "    json.dump({'f_hz': [3.2, 30.0, 42.0], 'to_gyro': [[0, -2], [0, -0.2], [0, -0.1]],\n"
         "               'to_wheel': [[1, -1]] * 3, 'coherence': [0.95, 0.9, 0.5]}, open(out + '/yaw_plant.json', 'w'))\n"
+        "if kind == 'full':\n"
+        "    json.dump([{'axis': a, 'amplitude': 0.004, 'clean_hz': hz} for a, hz in\n"
+        "               (('yaw', 31.0), ('roll', 34.0), ('fore_aft', 27.0))], open(out + '/response_summary.json', 'w'))\n"
+        "    open(out + '/response.json', 'w').write('{}')\n"
         "print('NOW: done (demo data, not a measurement)', flush=True)\n")
     return [sys.executable, "-u", "-c", script, kind, str(out)]

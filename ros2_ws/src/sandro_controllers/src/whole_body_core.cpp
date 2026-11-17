@@ -59,6 +59,7 @@ bool finite_all(const WholeBodyParameters &p) {
       p.yaw_torque_limit_nm,
       p.yaw_torque_rate_nm_s,     p.yaw_torque_sign,
       p.sysid_mode,               p.sysid_amplitude_nm,
+      p.sysid_axis,               p.sysid_amplitude_m,
       p.sysid_f0_hz,              p.sysid_f1_hz,
       p.sysid_duration_s,         p.sysid_pulse_s,
       p.sysid_period_s,           p.sysid_trigger,
@@ -254,11 +255,13 @@ bool valid_whole_body_parameters(const WholeBodyParameters &p,
     return fail(reason, "yaw scrub feed-forward must stay within the yaw torque limit");
   }
   if ((p.sysid_mode != 0.0 && p.sysid_mode != 1.0 && p.sysid_mode != 2.0) ||
+      (p.sysid_axis != 0.0 && p.sysid_axis != 1.0 && p.sysid_axis != 2.0) ||
       p.sysid_amplitude_nm < 0.0 || p.sysid_amplitude_nm > 1.0 ||
+      p.sysid_amplitude_m < 0.0 || p.sysid_amplitude_m > 0.008 ||
       !(p.sysid_f0_hz > 0.0 && p.sysid_f0_hz < p.sysid_f1_hz && p.sysid_f1_hz <= 60.0) ||
       !(p.sysid_duration_s > 0.0 && p.sysid_duration_s <= 120.0) ||
       !(p.sysid_pulse_s > 0.0 && p.sysid_pulse_s < p.sysid_period_s)) {
-    return fail(reason, "sysid: mode 0, 1 or 2, amplitude 0..1 Nm, 0 < f0 < f1 <= 60 Hz, duration 0..120 s, 0 < pulse < period");
+    return fail(reason, "sysid: mode and axis 0, 1 or 2, amplitude 0..1 Nm and 0..0.008 m, 0 < f0 < f1 <= 60 Hz, duration 0..120 s, 0 < pulse < period");
   }
   if (p.leg_torque_limit_nm <= 0.0 || p.wheel_torque_limit_nm <= 0.0) {
     return fail(reason, "torque limits must be > 0");
@@ -358,7 +361,7 @@ bool build_whole_body_settings(const WholeBodyParameters &p,
   return true;
 }
 
-double sysid_excitation_nm(const WholeBodyParameters &p, const double t) {
+double sysid_waveform(const WholeBodyParameters &p, const double t) {
   if (t < 0.0 || t > p.sysid_duration_s) {
     return 0.0;
   }
@@ -367,16 +370,20 @@ double sysid_excitation_nm(const WholeBodyParameters &p, const double t) {
     if (t - n * p.sysid_period_s >= p.sysid_pulse_s) {
       return 0.0;
     }
-    return std::fmod(n, 2.0) == 0.0 ? p.sysid_amplitude_nm : -p.sysid_amplitude_nm;
+    return std::fmod(n, 2.0) == 0.0 ? 1.0 : -1.0;
   }
   if (p.sysid_mode == 2.0) {
     constexpr double kTaperS = 0.5;
     const double rate = (p.sysid_f1_hz - p.sysid_f0_hz) / p.sysid_duration_s;
     const double phase = 2.0 * kPi * (p.sysid_f0_hz * t + 0.5 * rate * t * t);
     const double edge = std::clamp(std::min(t, p.sysid_duration_s - t) / kTaperS, 0.0, 1.0);
-    return p.sysid_amplitude_nm * 0.5 * (1.0 - std::cos(kPi * edge)) * std::sin(phase);
+    return 0.5 * (1.0 - std::cos(kPi * edge)) * std::sin(phase);
   }
   return 0.0;
+}
+
+double sysid_excitation_nm(const WholeBodyParameters &p, const double t) {
+  return p.sysid_amplitude_nm * sysid_waveform(p, t);
 }
 
 void WholeBodyCore::reset(const WholeBodyState &state,
@@ -684,6 +691,25 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
                  p.height_min_m, p.height_max_m);
   out.height_reference_m = height_reference_m_;
 
+  // ---- system identification: the excitation of this cycle ---------------
+  // A run starts on a trigger change, only while balancing, and ends by
+  // itself or the moment the robot no longer balances.
+  if (p.sysid_trigger != sysid_trigger_) {
+    sysid_trigger_ = p.sysid_trigger;
+    sysid_time_s_ = p.sysid_mode != 0.0 ? 0.0 : -1.0;
+  }
+  double sysid_wave = 0.0;
+  if (sysid_time_s_ >= 0.0) {
+    if (!balance_active || !engaged_ || sysid_time_s_ > p.sysid_duration_s) {
+      sysid_time_s_ = -1.0;
+    } else {
+      sysid_wave = sysid_waveform(p, sysid_time_s_);
+      sysid_time_s_ += dt;
+    }
+  }
+  const double excitation = p.sysid_axis == 0.0 ? p.sysid_amplitude_nm * sysid_wave : 0.0;
+  const double leg_excitation_m = p.sysid_axis != 0.0 ? p.sysid_amplitude_m * sysid_wave : 0.0;
+
   // ---- roll: lean into turns, level on uneven ground ----------------------
   // Lateral acceleration v * yaw_rate must be balanced by the body leaning
   // toward the inside of the turn. With the wheels on the ground the body
@@ -708,7 +734,10 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
   if (clamped_differential != raw_differential) {
     out.status |= WBC_ROLL_LIMIT;
   }
-  height_differential_m_ = ramp * clamped_differential;
+  // Axis 1 of the identification moves the legs against each other on top
+  // of the task: the left leg longer and the right shorter by the offset.
+  height_differential_m_ = ramp * clamped_differential +
+                           (p.sysid_axis == 1.0 ? 2.0 * leg_excitation_m : 0.0);
   out.height_differential_m = height_differential_m_;
   const std::array<double, 2> height_reference{
       std::clamp(height_reference_m_ - 0.5 * height_differential_m_,
@@ -860,20 +889,8 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
   // Balance keeps priority over yaw inside the per-wheel budget.
   const double available =
       std::max(0.0, p.wheel_torque_limit_nm - 0.5 * std::abs(balance_torque_nm_));
-  if (p.sysid_trigger != sysid_trigger_) {
-    sysid_trigger_ = p.sysid_trigger;
-    sysid_time_s_ = p.sysid_mode != 0.0 ? 0.0 : -1.0;
-  }
-  double excitation = 0.0;
-  if (sysid_time_s_ >= 0.0) {
-    if (!balance_active || !engaged_ || sysid_time_s_ > p.sysid_duration_s) {
-      sysid_time_s_ = -1.0;
-    } else {
-      excitation = sysid_excitation_nm(p, sysid_time_s_);
-      sysid_time_s_ += dt;
-    }
-  }
   out.sysid_torque_nm = excitation;
+  out.sysid_offset_m = leg_excitation_m;
   out.sysid_active = sysid_time_s_ >= 0.0;
   const double requested = yaw_torque_nm_ + 2.0 * excitation;
   const double differential =
@@ -940,8 +957,11 @@ WholeBodyOutput WholeBodyCore::update(const WholeBodyState &state,
     out.position_command_rad[outer] = state.position[outer];
     const double neutral =
         p.fore_aft_neutral_m + forward_sign[side] * p.fore_aft_neutral_offset_m;
+    // Axis 2 of the identification: the right axle forward and the left back.
+    const double opposed_m =
+        p.sysid_axis == 2.0 ? (side == 0 ? leg_excitation_m : -leg_excitation_m) : 0.0;
     const double x_reference =
-        std::clamp(neutral - forward_sign[side] * leg_offset_command_m_,
+        std::clamp(neutral - forward_sign[side] * (leg_offset_command_m_ - opposed_m),
                    neutral - p.leg_offset_limit_m, neutral + p.leg_offset_limit_m);
     out.leg_reference_m[side] = Point2{x_reference, height_reference[side]};
     const LegState &leg = legs[side];

@@ -1599,10 +1599,32 @@ roll-off bound of 1.0.
   quietened the wheels' yaw loop raised the legs' roll gain 1.6-2.4 times.
 - **Next.** The roll loop has no measured plant: only the one point the
   self-oscillation gives (the loop gain is 1 at 14.4 Hz with that policy).
-  It needs an opposed leg-height chirp under the WBC (a `sysid.*` mode that
-  does not exist yet), then the same loss term on the roll channel.
   `recordings/yaw_loop_margin.py` prints the roll-rate gain meanwhile: keep
   it near `flat_level_real`'s 0.044.
+
+**The sweeps for the whole left-against-right plant (2026-11-17, built, not
+yet run on the robot).** A policy's actions that change sign under the
+robot's mirror are three: the wheel torques against each other, and the rear
+and the front leg motors against each other (the motor names are mirrored:
+the right inner and the left outer are the rear ones). The yaw and roll
+buzzes live in those and in the gyro's yaw and roll rates, the opposed leg
+angles and the opposed wheel velocity. The WBC's `sysid.axis` now sweeps
+three independent directions while it balances: 0 the wheel torques (as
+before), 1 the leg heights against each other (roll), 2 the axles fore-aft
+against each other. `sysid_yaw.py --axis yaw roll fore_aft` (the panel's
+"Roll and yaw response, wheels and legs") runs them in one recording and
+writes `response.json`: every opposed signal against each sweep's chirp.
+Per frequency the three sweeps give three columns of (torques, outputs), so
+outputs = plant x torques solves for the 3-input plant whatever loops the
+WBC closed meanwhile; the leg drives' own PD closes analytically, as the
+wheel kd does now. In `closed_loop.py` (`--scenario sysid`, the real
+controller core in MuJoCo with the latency emulation) all three sweeps
+complete at 3 and 4 mm per leg: the body rolls 1.9 deg at most, the leg
+torques stay under 1.5 Nm, and the driven torques are coherent with the
+chirp (0.9 or more from 5 Hz) to
+37 Hz. Then: the loss on the whole opposed loop (the largest eigenvalue of
+the 3 x 3 loop in place of the scalar L), which covers roll and the yaw
+through the legs with the same code.
 
 ## 9. Deployment sketch (not executed; the owner's decision)
 

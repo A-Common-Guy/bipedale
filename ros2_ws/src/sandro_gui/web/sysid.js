@@ -104,6 +104,14 @@ function link(run, file, label, title) {
 // What a result says about itself, and what to do with it.
 function verdict(run) {
   const r = run.result || {};
+  if (run.kind === "full") {
+    if (!r.response) return [badge("no response table", "warn"), " ", r.text || "the run did not finish"];
+    const axes = Object.entries(r.clean_hz).map(([axis, hz]) => `${axis.replace("_", "-")} to ${hz.toFixed(0)} Hz`).join(", ");
+    return [r.weak ? badge("weak", "warn") : badge("good", "ok"), " ", `clean response: ${axes}`,
+      r.missing.length ? `; missing ${r.missing.join(", ")}: the run ended early` : "",
+      r.weak && !r.missing.length ? ": too little for the training, repeat the run" : "",
+      h("div", { class: "muted small" }, r.text)];
+  }
   if (run.kind === "yaw") {
     if (!r.plant) return [badge("no plant table", "warn"), " ", r.text || "the run did not finish"];
     return [r.weak ? badge("weak", "warn") : badge("good", "ok"), " ",
@@ -132,6 +140,7 @@ function renderRuns() {
         h("td", {}, run.name === active ? badge("running", "info") : verdict(run)),
         h("td", { class: "actions" },
           run.name === active ? null : [
+            run.result?.response ? link(run, "response.json", "Response table", "every left-against-right signal against each sweep: send it with the recording") : null,
             run.result?.plant ? link(run, "yaw_plant.json", "Plant table", "yaw_plant_<run>.json for sandro_rl/data/") : null,
             run.files.includes("summary.json") ? link(run, "summary.json", "Summary", "the analysis as JSON") : null,
             link(run, null, `Recording (${bytes(run.bytes)})`, "the whole run as a .tar: bag, plan, log, results"),
@@ -146,8 +155,8 @@ async function start(m) {
     title: `${m.title}?`,
     body: h("div", {},
       h("ol", {}, m.steps.map((step) => h("li", {}, step))),
-      h("p", { class: "hint" }, m.id === "yaw"
-        ? "The whole-body controller adds a small opposed wheel torque while it balances. Stop measurement, the E-stop, or the robot no longer balancing end it at once."
+      h("p", { class: "hint" }, m.id !== "buzz"
+        ? "The whole-body controller adds the small sweep to its own commands while it balances. Stop measurement, the E-stop, or the robot no longer balancing end it at once."
         : "Recording only: the controller is not touched.")),
     ok: "Start",
     check: "I am watching the robot and the E-stop is in reach",

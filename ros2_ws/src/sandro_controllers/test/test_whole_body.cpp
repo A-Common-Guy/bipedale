@@ -1245,6 +1245,65 @@ TEST(WholeBodySysid, RunsOnATriggerWhileBalancingAndEndsByItself) {
   EXPECT_DOUBLE_EQ(out.sysid_torque_nm, 0.0);
 }
 
+TEST(WholeBodySysid, TheLegAxesMoveTheLegsAgainstEachOtherAndLeaveTheWheelsAlone) {
+  WholeBodyParameters p = test_parameters();
+  WholeBodySettings settings = test_settings(p);
+  PlanarPlant plant;
+  WholeBodyCore core;
+  core.reset(plant.observe(settings.parameters, kPeriod), settings);
+  auto out = run(plant, core, settings, 2.0, still);
+  ASSERT_TRUE(out.engaged);
+  const auto rest = out;
+
+  // Axis 1, the roll: the left leg longer and the right shorter by the offset.
+  p.sysid_mode = 1.0;
+  p.sysid_axis = 1.0;
+  p.sysid_amplitude_m = 0.003;
+  p.sysid_amplitude_nm = 0.4;  // not this axis: must not reach the wheels
+  p.sysid_pulse_s = 0.05;
+  p.sysid_period_s = 0.5;
+  p.sysid_duration_s = 1.0;
+  p.sysid_trigger = 1.0;
+  settings = test_settings(p);
+  out = core.update(plant.observe(settings.parameters, kPeriod), WholeBodyCommand{}, settings,
+                    kPeriod);
+  EXPECT_TRUE(out.sysid_active);
+  EXPECT_DOUBLE_EQ(out.sysid_offset_m, 0.003);
+  EXPECT_DOUBLE_EQ(out.sysid_torque_nm, 0.0);
+  EXPECT_NEAR(out.leg_reference_m[0].y - rest.leg_reference_m[0].y, -0.003, 2e-4);
+  EXPECT_NEAR(out.leg_reference_m[1].y - rest.leg_reference_m[1].y, 0.003, 2e-4);
+  EXPECT_NEAR(out.leg_reference_m[0].x, rest.leg_reference_m[0].x, 2e-4);
+  EXPECT_NEAR((out.effort_nm[2] - out.effort_nm[5]) - (rest.effort_nm[2] - rest.effort_nm[5]),
+              0.0, 0.1);
+  out = run(plant, core, settings, 1.2, still);
+  EXPECT_FALSE(out.sysid_active);
+  EXPECT_DOUBLE_EQ(out.sysid_offset_m, 0.0);
+  EXPECT_FALSE(out.fallen);
+  EXPECT_NEAR(out.leg_reference_m[0].y, out.leg_reference_m[1].y, 2e-4);
+
+  // Axis 2: the right axle forward and the left back, the heights untouched.
+  // Planar +x is body-forward on the right leg and body-backward on the left.
+  const auto before = out;
+  p.sysid_axis = 2.0;
+  p.sysid_trigger = 2.0;
+  settings = test_settings(p);
+  out = core.update(plant.observe(settings.parameters, kPeriod), WholeBodyCommand{}, settings,
+                    kPeriod);
+  EXPECT_TRUE(out.sysid_active);
+  EXPECT_NEAR(out.leg_reference_m[0].x - before.leg_reference_m[0].x, 0.003, 2e-4);
+  EXPECT_NEAR(out.leg_reference_m[1].x - before.leg_reference_m[1].x, 0.003, 2e-4);
+  EXPECT_NEAR(out.leg_reference_m[0].y, before.leg_reference_m[0].y, 2e-4);
+  EXPECT_NEAR(out.leg_reference_m[1].y, before.leg_reference_m[1].y, 2e-4);
+  out = run(plant, core, settings, 1.2, still);
+  EXPECT_FALSE(out.fallen);
+
+  p.sysid_amplitude_m = 0.02;
+  EXPECT_FALSE(valid_whole_body_parameters(p));
+  p.sysid_amplitude_m = 0.003;
+  p.sysid_axis = 3.0;
+  EXPECT_FALSE(valid_whole_body_parameters(p));
+}
+
 TEST(WholeBodyCore, GravitySupportIsFedForwardThroughTheJacobian) {
   const WholeBodySettings settings = test_settings();
   const auto &p = settings.parameters;
