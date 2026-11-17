@@ -1,0 +1,50 @@
+[
+ {
+  "axis": "yaw",
+  "amplitude": 0.2,
+  "unit": "Nm",
+  "output": "yaw_rate",
+  "clean_hz": 36.9140625,
+  "drive_coherence": 0.893
+ },
+ {
+  "axis": "yaw",
+  "amplitude": 0.4,
+  "unit": "Nm",
+  "output": "yaw_rate",
+  "clean_hz": 36.9140625,
+  "drive_coherence": 0.956
+ },
+ {
+  "axis": "roll",
+  "amplitude": 0.002,
+  "unit": "m",
+  "output": "roll_rate",
+  "clean_hz": 36.9140625,
+  "drive_coherence": 0.777
+ },
+ {
+  "axis": "roll",
+  "amplitude": 0.004,
+  "unit": "m",
+  "output": "roll_rate",
+  "clean_hz": 36.9140625,
+  "drive_coherence": 0.898
+ },
+ {
+  "axis": "fore_aft",
+  "amplitude": 0.002,
+  "unit": "m",
+  "output": "yaw_rate",
+  "clean_hz": 3.0,
+  "drive_coherence": 0.547
+ },
+ {
+  "axis": "fore_aft",
+  "amplitude": 0.004,
+  "unit": "m",
+  "output": "yaw_rate",
+  "clean_hz": 36.9140625,
+  "drive_coherence": 0.822
+ }
+]

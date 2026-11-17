@@ -1,0 +1,107 @@
+{
+ "args": {
+  "kp": [
+   12.0
+  ],
+  "pulses": 0,
+  "pulse_nm": 0.25,
+  "pulse_s": 0.03,
+  "period": 1.5,
+  "chirp_s": 30.0,
+  "chirp_nm": [
+   0.2,
+   0.4
+  ],
+  "axis": [
+   "yaw",
+   "roll",
+   "fore_aft"
+  ],
+  "chirp_m": [
+   0.002,
+   0.004
+  ],
+  "f0": 2.0,
+  "f1": 40.0,
+  "settle": 3.0,
+  "out": "/workspaces/sandro/experiments/full_20261117-002455",
+  "yes": true,
+  "analyse": null
+ },
+ "events": [
+  {
+   "kp": 12.0,
+   "kind": "start",
+   "t": 1794875100.2687557
+  },
+  {
+   "kp": 12.0,
+   "kind": "kp",
+   "t": 1794875100.282457
+  },
+  {
+   "kp": 12.0,
+   "axis": "yaw",
+   "f0_hz": 2.0,
+   "f1_hz": 40.0,
+   "duration_s": 30.0,
+   "amplitude_nm": 0.2,
+   "kind": "chirp",
+   "t": 1794875103.3624184
+  },
+  {
+   "kp": 12.0,
+   "axis": "yaw",
+   "f0_hz": 2.0,
+   "f1_hz": 40.0,
+   "duration_s": 30.0,
+   "amplitude_nm": 0.4,
+   "kind": "chirp",
+   "t": 1794875134.4492757
+  },
+  {
+   "kp": 12.0,
+   "axis": "roll",
+   "f0_hz": 2.0,
+   "f1_hz": 40.0,
+   "duration_s": 30.0,
+   "amplitude_m": 0.002,
+   "kind": "chirp",
+   "t": 1794875165.540603
+  },
+  {
+   "kp": 12.0,
+   "axis": "roll",
+   "f0_hz": 2.0,
+   "f1_hz": 40.0,
+   "duration_s": 30.0,
+   "amplitude_m": 0.004,
+   "kind": "chirp",
+   "t": 1794875196.6796079
+  },
+  {
+   "kp": 12.0,
+   "axis": "fore_aft",
+   "f0_hz": 2.0,
+   "f1_hz": 40.0,
+   "duration_s": 30.0,
+   "amplitude_m": 0.002,
+   "kind": "chirp",
+   "t": 1794875227.7788475
+  },
+  {
+   "kp": 12.0,
+   "axis": "fore_aft",
+   "f0_hz": 2.0,
+   "f1_hz": 40.0,
+   "duration_s": 30.0,
+   "amplitude_m": 0.004,
+   "kind": "chirp",
+   "t": 1794875258.921069
+  },
+  {
+   "kind": "done",
+   "t": 1794875289.944919
+  }
+ ]
+}
