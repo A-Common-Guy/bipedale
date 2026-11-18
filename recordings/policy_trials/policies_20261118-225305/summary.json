@@ -1,0 +1,349 @@
+{
+ "verdict": "rl_stand_up_v2 9 s, buzz standing 0.10 rad/s of gyro pitch at 12.0 Hz, drove 2 s to 0.1 m/s; rl_stand_up_v2 4 s, never stood still, drove 2 s to 0.1 m/s; rl_stand_up_v2 9 s, buzz standing 0.09 rad/s of gyro pitch at 12.0 Hz, lying 2 s; rl_stand_up_v2 4 s, never stood still, lying 2 s",
+ "version": {
+  "commit": "bb14ded861a6b963f44a6da25fd546a35f511761",
+  "short": "bb14ded",
+  "describe": "bb14ded",
+  "subject": "feat: record a policy trial, with the controller that ran at every moment",
+  "date": "2026-11-18T23:47:45+01:00",
+  "author": "giuseppe.festa",
+  "dirty": false,
+  "changes": [],
+  "via": "panel",
+  "at": "2026-11-18T22:48:13+0000",
+  "built_at": "2026-11-18T22:48:21+0000",
+  "packages": [
+   "sandro_bringup"
+  ]
+ },
+ "stretches": [
+  {
+   "controller": "rl_stand_up_v2",
+   "from_s": 6.568641185760498,
+   "seconds": 8.607492446899414,
+   "policy_file": "package://sandro_controllers/policies/stand_up_v2.bin",
+   "policy_fingerprint": "9263467ffba2617373993b5f3547e4c6b73962396a7ac1a6ce2568097a4c274e",
+   "standing": {
+    "seconds": 4.0,
+    "bands": {
+     "5-15 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.042697549675740874,
+        12.0
+       ],
+       "worst": [
+        0.042697549675740874,
+        12.0
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.09578549443330094,
+        12.0
+       ],
+       "worst": [
+        0.09578549443330094,
+        12.0
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.03901165370857086,
+        12.0
+       ],
+       "worst": [
+        0.03901165370857086,
+        12.0
+       ]
+      }
+     },
+     "15-45 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.01563777819257531,
+        24.0
+       ],
+       "worst": [
+        0.01563777819257531,
+        24.0
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.015993756937883682,
+        15.0
+       ],
+       "worst": [
+        0.015993756937883682,
+        15.0
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.006886166925825323,
+        15.0
+       ],
+       "worst": [
+        0.006886166925825323,
+        15.0
+       ]
+      }
+     }
+    }
+   },
+   "driving": {
+    "seconds": 2.0,
+    "bands": {
+     "5-15 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.054653000953029766,
+        11.0
+       ],
+       "worst": [
+        0.054653000953029766,
+        11.0
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.13565959062993088,
+        11.0
+       ],
+       "worst": [
+        0.13565959062993088,
+        11.0
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.04328056210304244,
+        11.0
+       ],
+       "worst": [
+        0.04328056210304244,
+        11.0
+       ]
+      }
+     },
+     "15-45 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.015276118086287857,
+        22.5
+       ],
+       "worst": [
+        0.015276118086287857,
+        22.5
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.019218953875174256,
+        15.0
+       ],
+       "worst": [
+        0.019218953875174256,
+        15.0
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.008406189083340789,
+        33.5
+       ],
+       "worst": [
+        0.008406189083340789,
+        33.5
+       ]
+      }
+     }
+    },
+    "top_speed_m_s": 0.06550740682009706
+   },
+   "down_s": 0.0
+  },
+  {
+   "controller": "rl_stand_up_v2",
+   "from_s": 20.917739868164062,
+   "seconds": 3.743384838104248,
+   "policy_file": "package://sandro_controllers/policies/stand_up_v2.bin",
+   "policy_fingerprint": "9263467ffba2617373993b5f3547e4c6b73962396a7ac1a6ce2568097a4c274e",
+   "standing": {
+    "seconds": 0.0,
+    "bands": {}
+   },
+   "driving": {
+    "seconds": 2.0,
+    "bands": {
+     "5-15 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.020147359628688407,
+        5.5
+       ],
+       "worst": [
+        0.020147359628688407,
+        5.5
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.031869003993888985,
+        13.0
+       ],
+       "worst": [
+        0.031869003993888985,
+        13.0
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.011857871043874672,
+        12.5
+       ],
+       "worst": [
+        0.011857871043874672,
+        12.5
+       ]
+      }
+     },
+     "15-45 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.007646163652116154,
+        26.0
+       ],
+       "worst": [
+        0.007646163652116154,
+        26.0
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.010112417301726882,
+        17.0
+       ],
+       "worst": [
+        0.010112417301726882,
+        17.0
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.0046470138832761946,
+        15.0
+       ],
+       "worst": [
+        0.0046470138832761946,
+        15.0
+       ]
+      }
+     }
+    },
+    "top_speed_m_s": 0.057899753097120955
+   },
+   "down_s": 0.0
+  },
+  {
+   "controller": "rl_stand_up_v2",
+   "from_s": 30.01488733291626,
+   "seconds": 9.476716756820679,
+   "policy_file": "package://sandro_controllers/policies/stand_up_v2.bin",
+   "policy_fingerprint": "9263467ffba2617373993b5f3547e4c6b73962396a7ac1a6ce2568097a4c274e",
+   "standing": {
+    "seconds": 6.0,
+    "bands": {
+     "5-15 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.036163619822502595,
+        12.0
+       ],
+       "worst": [
+        0.03904594913241732,
+        11.0
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.09014938825039212,
+        12.0
+       ],
+       "worst": [
+        0.1155554364732127,
+        11.0
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.028322661237852473,
+        13.0
+       ],
+       "worst": [
+        0.04077742857988876,
+        12.0
+       ]
+      }
+     },
+     "15-45 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.013888926852181106,
+        23.5
+       ],
+       "worst": [
+        0.017100145467952813,
+        21.5
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.01220087838547652,
+        36.5
+       ],
+       "worst": [
+        0.017924588028495378,
+        18.5
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.005144233129840541,
+        16.5
+       ],
+       "worst": [
+        0.005252580964285964,
+        17.0
+       ]
+      }
+     }
+    }
+   },
+   "driving": {
+    "seconds": 0.0,
+    "bands": {},
+    "top_speed_m_s": 0.0
+   },
+   "down_s": 2.0
+  },
+  {
+   "controller": "rl_stand_up_v2",
+   "from_s": 43.58810591697693,
+   "seconds": 3.6997387409210205,
+   "policy_file": "package://sandro_controllers/policies/stand_up_v2.bin",
+   "policy_fingerprint": "9263467ffba2617373993b5f3547e4c6b73962396a7ac1a6ce2568097a4c274e",
+   "standing": {
+    "seconds": 0.0,
+    "bands": {}
+   },
+   "driving": {
+    "seconds": 0.0,
+    "bands": {},
+    "top_speed_m_s": 0.0
+   },
+   "down_s": 2.0
+  }
+ ]
+}

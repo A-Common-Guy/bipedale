@@ -1,0 +1,172 @@
+{
+ "args": {
+  "max": 900.0,
+  "out": "/workspaces/sandro/experiments/policies_20261118-225305",
+  "version_file": "/workspaces/sandro/version/build.json",
+  "analyse": null
+ },
+ "version": {
+  "commit": "bb14ded861a6b963f44a6da25fd546a35f511761",
+  "short": "bb14ded",
+  "describe": "bb14ded",
+  "subject": "feat: record a policy trial, with the controller that ran at every moment",
+  "date": "2026-11-18T23:47:45+01:00",
+  "author": "giuseppe.festa",
+  "dirty": false,
+  "changes": [],
+  "via": "panel",
+  "at": "2026-11-18T22:48:13+0000",
+  "built_at": "2026-11-18T22:48:21+0000",
+  "packages": [
+   "sandro_bringup"
+  ]
+ },
+ "events": [
+  {
+   "kind": "start",
+   "t": 1795042390.052768
+  },
+  {
+   "kind": "controller",
+   "name": null,
+   "t": 1795042390.0672016
+  },
+  {
+   "kind": "controller",
+   "name": "rl_stand_up_v2",
+   "t": 1795042396.6214092
+  },
+  {
+   "kind": "controller",
+   "name": null,
+   "t": 1795042405.2289016
+  },
+  {
+   "kind": "controller",
+   "name": "rl_stand_up_v2",
+   "t": 1795042410.9705079
+  },
+  {
+   "kind": "controller",
+   "name": null,
+   "t": 1795042414.7138927
+  },
+  {
+   "kind": "controller",
+   "name": "rl_stand_up_v2",
+   "t": 1795042420.0676553
+  },
+  {
+   "kind": "controller",
+   "name": null,
+   "t": 1795042429.544372
+  },
+  {
+   "kind": "controller",
+   "name": "rl_stand_up_v2",
+   "t": 1795042433.640874
+  },
+  {
+   "kind": "controller",
+   "name": null,
+   "t": 1795042437.3406126
+  },
+  {
+   "kind": "end",
+   "t": 1795042444.0669687
+  }
+ ],
+ "controllers": {
+  "rl_stand_up_v2": {
+   "action.joint_max_rad": 2.0943951,
+   "action.joint_min_rad": -2.0943951,
+   "action.leg_kd_nm_s_rad": 0.6,
+   "action.leg_kp_nm_rad": 20.0,
+   "action.leg_scale_rad": 0.8,
+   "action.stand_q": [
+    0.41872984,
+    0.22624421,
+    -0.716328,
+    0.22433391,
+    0.42027311,
+    2.14299
+   ],
+   "action.wheel_differential_filter_hz": 0.0,
+   "action.wheel_filter_hz": 0.0,
+   "action.wheel_kd_nm_s_rad": 0.4,
+   "action.wheel_mode": "velocity",
+   "action.wheel_scale_nm": 3.0,
+   "action.wheel_scale_rad_s": 20.0,
+   "command_topic": "/cmd_vel",
+   "commands.forward_m_s": 0.5,
+   "commands.height_max_m": 0.185,
+   "commands.height_min_m": 0.14,
+   "commands.initial_height_m": 0.17,
+   "commands.jump_height_max_m": 0.08,
+   "commands.jump_window_s": 0.8,
+   "commands.roll_rad": 0.0,
+   "commands.yaw_rad_s": 1.5,
+   "diagnostics.publish_rate_hz": 50.0,
+   "imu_name": "imu",
+   "is_async": false,
+   "joints": [
+    "right_motor_inner",
+    "right_motor_outer",
+    "right_wheel",
+    "left_motor_inner",
+    "left_motor_outer",
+    "left_wheel"
+   ],
+   "legs.base_m": 0.09,
+   "legs.lower_m": 0.13,
+   "legs.upper_m": 0.08,
+   "observation.command_size": 3,
+   "observation.gyro_scale": 0.25,
+   "observation.history": 4,
+   "observation.history_stride": 1,
+   "observation.imu_offset_rad": 0.016,
+   "observation.jump_size": 0,
+   "observation.leg_velocity_scale": 0.1,
+   "observation.profile_clip_m": [
+    -0.15,
+    0.25
+   ],
+   "observation.profile_height_scale": 10.0,
+   "observation.profile_size": 0,
+   "observation.profile_timeout_s": 0.5,
+   "observation.wheel_velocity_scale": 0.05,
+   "policy_file": "package://sandro_controllers/policies/stand_up_v2.bin",
+   "policy_fingerprint": "9263467ffba2617373993b5f3547e4c6b73962396a7ac1a6ce2568097a4c274e",
+   "policy_rate_hz": 100.0,
+   "profile_topic": "/terrain_profile",
+   "safety.command_timeout_s": 0.3,
+   "safety.engage_hold_s": 0.2,
+   "safety.engage_joint_velocity_rad_s": 0.3,
+   "safety.engage_rate_rad_s": 1.0,
+   "safety.engage_tilt_rad": 0.08,
+   "safety.fall_angle_rad": 1.0,
+   "safety.fallen_kd_nm_s_rad": 0.5,
+   "safety.hand_over_tilt_rad": 0.15,
+   "safety.imu_timeout_s": 0.15,
+   "safety.oscillation_arm_delay_s": 3.0,
+   "safety.oscillation_leg_rad_s": 1.2,
+   "safety.oscillation_wheel_rad_s": 5.0,
+   "safety.oscillation_window_s": 0.3,
+   "safety.stand_s": 1.5,
+   "safety.stand_tolerance_rad": 0.15,
+   "safety.start_lying": true,
+   "safety.upright_tilt_rad": 0.25,
+   "shaping.forward_accel_m_s2": 1.0,
+   "shaping.height_rate_m_s": 0.05,
+   "shaping.leg_height_max_m": 0.185,
+   "shaping.leg_height_min_m": 0.14,
+   "shaping.roll_rate_rad_s": 0.5,
+   "shaping.track_width_m": 0.304,
+   "shaping.yaw_time_constant_s": 0.15,
+   "start_type_description_service": true,
+   "thread_priority": 50,
+   "update_rate": 300,
+   "use_sim_time": false
+  }
+ }
+}

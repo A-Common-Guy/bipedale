@@ -37,7 +37,7 @@ import buzz_record as buzz  # noqa: E402
 TOPICS = buzz.TOPICS + ["/terrain_profile", "/joy", "/controller_manager/activity"]
 WINDOW_S = 2.0
 # A window is driving above this forward speed or turn rate, lying down above this tilt.
-DRIVING_M_S, TURNING_RAD_S, DOWN_RAD = 0.05, 0.2, 0.9
+DRIVING_M_S, TURNING_RAD_S, DOWN_RAD = 0.05, 0.2, 0.5
 AXES = ("gyro yaw", "gyro pitch", "gyro roll")
 VERSION_FILE = "/workspaces/sandro/version/build.json"
 

@@ -1,0 +1,14 @@
+$ /usr/bin/python3 -u /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/tools/policy_record.py --max 900 --out /workspaces/sandro/experiments/policies_20261118-224844
+recording the controllers that run, for at most 900 s, into /workspaces/sandro/experiments/policies_20261118-224844
+NOW: recording no controller (since 0 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording rl_stand_up_v2 (since 11 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording rl_agile_terrain_v6 (since 39 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording rl_agile_terrain_v5 (since 80 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording rl_agile_step (since 103 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: closing the recording
+recorded: /workspaces/sandro/experiments/policies_20261118-224844
+     11 s  rl_stand_up_v2 28 s, quiet standing (0.03 rad/s), drove 6 s to 0.2 m/s
+     39 s  rl_agile_terrain_v6 41 s, quiet standing (0.03 rad/s), drove 18 s to 0.3 m/s
+     80 s  rl_agile_terrain_v5 22 s, quiet standing (0.03 rad/s), drove 14 s to 0.4 m/s
+    103 s  rl_agile_step 39 s, buzz standing 0.12 rad/s of gyro pitch at 11.5 Hz, drove 20 s to 0.2 m/s
+4 stretches of 4 controllers

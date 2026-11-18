@@ -1,0 +1,18 @@
+$ /usr/bin/python3 -u /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/tools/policy_record.py --max 900 --out /workspaces/sandro/experiments/policies_20261118-225305
+recording the controllers that run, for at most 900 s, into /workspaces/sandro/experiments/policies_20261118-225305
+NOW: recording no controller (since 0 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording rl_stand_up_v2 (since 7 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording no controller (since 15 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording rl_stand_up_v2 (since 21 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording no controller (since 25 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording rl_stand_up_v2 (since 30 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording no controller (since 39 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording rl_stand_up_v2 (since 44 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording no controller (since 47 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: closing the recording
+recorded: /workspaces/sandro/experiments/policies_20261118-225305
+      7 s  rl_stand_up_v2 9 s, buzz standing 0.10 rad/s of gyro pitch at 12.0 Hz, drove 2 s to 0.1 m/s
+     21 s  rl_stand_up_v2 4 s, never stood still, drove 2 s to 0.1 m/s
+     30 s  rl_stand_up_v2 9 s, buzz standing 0.09 rad/s of gyro pitch at 12.0 Hz, drove 2 s to 0.1 m/s
+     44 s  rl_stand_up_v2 4 s, never stood still, drove 2 s to 0.1 m/s
+4 stretches of 1 controllers

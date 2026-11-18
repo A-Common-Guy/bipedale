@@ -1,0 +1,28 @@
+[WARN] [ros2bag]: Positional "topics" argument deprecated. Please use optional "--topics" argument instead.
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1795042387.843225161] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1795042387.843230457] [rosbag2_recorder]: Event publisher thread: Started
+[INFO] [1795042387.874690389] [rosbag2_recorder]: Starting recording to '/workspaces/sandro/experiments/policies_20261118-225305/bag'
+[INFO] [1795042387.898450930] [rosbag2_recorder]: Subscribed to topic '/rl_stand_up_v2/diagnostics'
+[INFO] [1795042387.908597292] [rosbag2_recorder]: Subscribed to topic '/joy'
+[INFO] [1795042387.912157461] [rosbag2_recorder]: Subscribed to topic '/joint_states'
+[INFO] [1795042387.917746973] [rosbag2_recorder]: Subscribed to topic '/imu_broadcaster/imu'
+[INFO] [1795042387.933468051] [rosbag2_recorder]: Subscribed to topic '/health_broadcaster/dynamic_joint_states'
+[INFO] [1795042387.936600499] [rosbag2_recorder]: Subscribed to topic '/diagnostics'
+[INFO] [1795042387.946835250] [rosbag2_recorder]: Subscribed to topic '/controller_manager/activity'
+[INFO] [1795042387.950140679] [rosbag2_recorder]: Subscribed to topic '/whole_body_controller/diagnostics'
+[INFO] [1795042387.956201930] [rosbag2_recorder]: Subscribed to topic '/cmd_vel'
+[INFO] [1795042387.957179518] [rosbag2_recorder]: Listening for topics...
+[INFO] [1795042387.957337591] [rosbag2_recorder]: Recording...
+[INFO] [1795042387.957576664] [rosbag2_recorder]: Topics discovery started.
+[INFO] [1795042387.974438903] [rosbag2_recorder]: Subscribed to topic '/rl_flat_level/diagnostics'
+[INFO] [1795042387.978633514] [rosbag2_recorder]: Subscribed to topic '/rl_agile_terrain/diagnostics'
+[INFO] [1795042387.982977291] [rosbag2_recorder]: Subscribed to topic '/rl_agile_step/diagnostics'
+[INFO] [1795042387.985619094] [rosbag2_recorder]: Subscribed to topic '/rl_agile_terrain_v6/diagnostics'
+[INFO] [1795042387.991549696] [rosbag2_recorder]: Subscribed to topic '/rl_agile_terrain_v5/diagnostics'
+[INFO] [1795042387.998380332] [rosbag2_recorder]: Subscribed to topic '/rl_agile_terrain_v3/diagnostics'
+[INFO] [1795042388.005871576] [rosbag2_recorder]: Subscribed to topic '/rl_flat_level_fast/diagnostics'
+[INFO] [1795042444.068593043] [rosbag2_recorder]: Topics discovery stopped.
+[INFO] [1795042444.068911245] [rosbag2_recorder]: Pausing recording.
+[INFO] [1795042444.069031596] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[INFO] [1795042444.135010057] [rosbag2_recorder]: Recording stopped
+[INFO] [1795042444.139382929] [rosbag2_recorder]: Event publisher thread: Exited
