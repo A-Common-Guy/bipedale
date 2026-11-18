@@ -63,6 +63,8 @@ topics:
      expect_hz: 10}
   - {name: /joy, type: sensor_msgs/msg/Joy, expect_hz: 20}
   - {name: /cmd_vel, type: geometry_msgs/msg/TwistStamped, expect_hz: 50, while: deadman}
+  # The terrain ahead of the wheels from the depth camera (sandro_perception).
+  - {name: /terrain_profile, type: std_msgs/msg/Float32MultiArray, expect_hz: 25, while: camera}
 # Also read, not listed in Streams: the 300 Hz health topic of stacks from
 # before health_broadcaster. The fresher of the two is used.
 legacy_topics:

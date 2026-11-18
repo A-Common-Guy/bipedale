@@ -243,7 +243,8 @@ def test_real_robot_overrides_only_touch_known_parameters():
     overrides = yaml.safe_load((ROOT / "config" / "sandro_real_overrides.yaml").read_text())
     assert set(overrides) == {"whole_body_controller", "rl_flat_level", "rl_agile_terrain",
                               "rl_stand_up", "rl_flat_level_fast", "rl_flat_level_sysid",
-                              "rl_flat_level_fast_sysid", "rl_agile_terrain_v3", "rl_agile_terrain_v5"}
+                              "rl_flat_level_fast_sysid", "rl_agile_terrain_v3", "rl_agile_terrain_v5",
+                              "height_profile"}
     base = shipped["whole_body_controller"]["ros__parameters"]
 
     def check(subset, reference, path=""):
@@ -265,6 +266,12 @@ def test_real_robot_overrides_only_touch_known_parameters():
         # One physical IMU mounting for every controller.
         assert (overrides[name]["ros__parameters"]["observation"]["imu_offset_rad"]
                 == tasks["roll"]["imu_offset_rad"])
+    # The terrain profile (sandro_perception) levels its floor with the same mounting.
+    perception = yaml.safe_load((ROOT.parent / "sandro_perception" / "config" / "perception.yaml").read_text())
+    check(overrides["height_profile"]["ros__parameters"], perception["height_profile"]["ros__parameters"],
+          "height_profile.")
+    assert (overrides["height_profile"]["ros__parameters"]["imu"]["roll_offset_rad"]
+            == tasks["roll"]["imu_offset_rad"])
 
 
 def test_rl_policies_are_complete():

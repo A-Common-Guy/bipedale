@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-jazzy-diagnostic-updater \
       ros-jazzy-joy \
       ros-jazzy-joint-state-broadcaster \
+      ros-jazzy-realsense2-camera \
       ros-jazzy-rmw-cyclonedds-cpp \
       ros-jazzy-robot-state-publisher \
       ros-jazzy-ros2-control \

@@ -71,10 +71,12 @@ function streams(slow) {
     const r = rates[topic.name] || {};
     const fresh = r.age_s !== null && r.age_s !== undefined && r.age_s < 1;
     const gated = topic.while === "deadman";
+    const camera = topic.while === "camera";      // published only when the camera was started
     let level = "off";
     if (fresh) level = !topic.expect_hz || r.hz >= 0.8 * topic.expect_hz ? "ok" : "warn";
-    else if (running && slow.ros?.manager && !(gated && !deadman) && topic.name !== "/joy") level = "error";
-    const note = gated ? `only while ${ctx.state.info.guide.labels[ctx.state.info.guide.deadman]} is held` : "";
+    else if (running && slow.ros?.manager && !(gated && !deadman) && !camera && topic.name !== "/joy") level = "error";
+    const note = gated ? `only while ${ctx.state.info.guide.labels[ctx.state.info.guide.deadman]} is held`
+      : camera ? "only with the camera started (camera:=true)" : "";
     return h("tr", {},
       h("td", {}, dot(level), " ", h("span", { class: "mono" }, topic.name)),
       h("td", { class: "muted" }, topic.type.split("/").pop()),

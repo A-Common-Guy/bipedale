@@ -267,6 +267,22 @@ def _setup(context):
         else:
             actions.append(LogInfo(msg="joy unavailable; teleop skipped."))
 
+    # The depth camera and the terrain profile (sandro_perception): beside the
+    # control path, which neither reads it yet nor waits for it.
+    if _truth(LaunchConfiguration("camera").perform(context)):
+        perception = _package("sandro_perception")
+        if perception and hardware == "real":
+            params = [os.path.join(perception, "config", "perception.yaml")]
+            if extra_params:
+                params.append(extra_params)
+            actions.append(Node(package="sandro_perception", executable="height_profile",
+                                name="height_profile", parameters=params, output="screen"))
+            actions.append(Node(package="realsense2_camera", executable="realsense2_camera_node",
+                                namespace="camera", name="camera", parameters=params, output="screen"))
+        else:
+            actions.append(LogInfo(msg="camera:=true needs hardware:=real and sandro_perception; "
+                                       "no camera is started."))
+
     if rviz and not headless:
         if _package("rviz2"):
             # rviz2 routinely ignores SIGINT for the default 5 + 10 s, which
@@ -308,6 +324,11 @@ def generate_launch_description():
             "encoder_period_ms", default_value="auto",
             description="real only: period of the drives' encoder broadcast; auto is 20, or 5 with "
                         "state_source:=encoder",
+        ),
+        DeclareLaunchArgument(
+            "camera", default_value="false",
+            description="real only: start the D435 (depth 424x240 at 15 Hz) and the terrain "
+                        "profile ahead of the wheels, /terrain_profile (sandro_perception)",
         ),
         DeclareLaunchArgument("teleop", default_value="true"),
         DeclareLaunchArgument("rviz", default_value="true"),

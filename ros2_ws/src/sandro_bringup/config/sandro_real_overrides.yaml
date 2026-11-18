@@ -98,3 +98,10 @@ rl_stand_up:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+
+# The terrain profile (sandro_perception) takes the same physical IMU mounting
+# as the controllers above.
+height_profile:
+  ros__parameters:
+    imu:
+      roll_offset_rad: 0.016
