@@ -23,6 +23,7 @@ function onFast(fast) {
   const { kind, joints } = jointSource(fast);
   const imu = fast.ros?.imu && fast.ros.imu_age_s !== null && fast.ros.imu_age_s < 0.5 ? fast.ros.imu : null;
   view.update(joints, imu ? imu.q : null);
+  view.setTerrain(fast.ros?.terrain || null, PROFILE_M);
   if (kind !== source) {
     source = kind;
     $("#viewer-note").textContent = kind ? `joints from ${kind}` : "no joint data: drawn in the stand pose";
@@ -62,34 +63,12 @@ function onSlow(slow) {
 }
 
 // The terrain profile as the policies get it (sandro_perception): per wheel, the
-// floor height at each distance ahead, or unknown. What the camera sees, in the
-// terms a policy reacts to.
+// floor height at each distance ahead, or unknown. The 3D view draws it; this
+// panel has the numbers and the camera's state.
 const PROFILE_M = [0.10, 0.20, 0.30, 0.45, 0.60, 0.80, 1.05, 1.35];
 
-function track(label, heights, known) {
-  const X0 = 46, PX_M = 370, FLOOR = 74, PX_H = 220;     // 22 px per 10 cm of height
-  const x = (m) => X0 + PX_M * m;
-  const y = (m) => FLOOR - PX_H * Math.max(-0.15, Math.min(0.25, m));
-  const marks = heights.map((height, i) => {
-    const at = x(PROFILE_M[i] ?? (0.1 + 0.18 * i));
-    if (!known[i]) {
-      return `<circle cx="${at}" cy="${FLOOR}" r="4" class="cam-unknown"/><text x="${at}" y="${FLOOR + 18}" class="cam-text muted">?</text>`;
-    }
-    const flat = Math.abs(height) < 0.015;
-    return `<line x1="${at}" y1="${FLOOR}" x2="${at}" y2="${y(height)}" class="${flat ? "cam-flat" : "cam-step"}"/>`
-      + `<circle cx="${at}" cy="${y(height)}" r="4.5" class="${flat ? "cam-flat" : "cam-step"}"/>`
-      + `<text x="${at}" y="${height >= 0 ? y(height) - 9 : y(height) + 18}" class="cam-text">${(100 * height).toFixed(1)}</text>`;
-  }).join("");
-  const ticks = PROFILE_M.slice(0, heights.length).map((m) =>
-    `<text x="${x(m)}" y="${FLOOR + 34}" class="cam-text muted">${m.toFixed(2)}</text>`).join("");
-  return `<svg viewBox="0 0 580 116" class="cam-track"><text x="4" y="14" class="cam-label">${label}</text>`
-    + `<line x1="${X0 - 30}" y1="${FLOOR}" x2="570" y2="${FLOOR}" class="cam-floor"/>`
-    + `<circle cx="${X0}" cy="${FLOOR - 25}" r="25" class="cam-wheel"/>${marks}${ticks}`
-    + `<text x="4" y="${FLOOR + 34}" class="cam-text muted" style="text-anchor:start">m ahead</text></svg>`;
-}
-
 function camera(slow) {
-  const terrain = slow.ros?.terrain;
+  const terrain = ctx.state.fast?.ros?.terrain;
   const diag = slow.ros?.diagnostics?.height_profile;
   const values = diag?.values || {};
   const running = ["running", "external"].includes(slow.launch?.state);
@@ -100,7 +79,7 @@ function camera(slow) {
     note.textContent = running
       ? "This stack runs without the camera: policies that read the terrain (rl_agile_step) drive blind. Stop the stack and start it with Depth camera ticked on the Run page."
       : "Tick Depth camera on the Run page before starting the stack.";
-    $("#camera-profile").innerHTML = "";
+    replace($("#camera-profile"));
     replace($("#camera-values"));
     return;
   }
@@ -108,9 +87,13 @@ function camera(slow) {
   replace(state, !depth ? badge("no depth images", "error") : terrain ? badge("running", "ok") : badge("no profile", "warn"));
   note.textContent = !depth ? "The profile node runs but the D435 sends no depth images: check its USB cable and the launch log."
     : !terrain ? "Depth images arrive but no profile is published: it needs the joint states and the IMU."
-      : "Floor height in cm ahead of each wheel, relative to the floor under that wheel, as the policy reads it. A grey ? is a point the camera has not seen: the policy takes it as flat. Put a book 0.8 m ahead of a wheel: its height must appear there and stay as you roll up to it.";
-  $("#camera-profile").innerHTML = terrain
-    ? track("left wheel", terrain.heights[1], terrain.known[1]) + track("right wheel", terrain.heights[0], terrain.known[0]) : "";
+      : "Drawn in the 3D view above: a ribbon ahead of each wheel through the floor heights the policy reads, relative to the floor under that wheel. Green is flat, amber to red a step, blue a drop; a grey ring is a point the camera has not seen, which the policy takes as flat. The heights in cm are below.";
+  const row = (label, k) => terrain ? h("tr", {}, h("th", {}, label),
+    terrain.heights[k].map((height, i) => h("td", { class: terrain.known[k][i] ? (Math.abs(height) < 0.015 ? "" : "warn-text") : "muted" },
+      terrain.known[k][i] ? num(100 * height, 1) : "?"))) : null;
+  replace($("#camera-profile"), terrain ? h("table", { class: "table camera-table mono small" },
+    h("tr", {}, h("th", {}, "m ahead"), PROFILE_M.slice(0, terrain.heights[0].length).map((m) => h("th", {}, m.toFixed(2)))),
+    row("left cm", 1), row("right cm", 0)) : null);
   const cell = (label, value, title) => h("span", { title }, h("span", { class: "muted" }, `${label} `), value);
   const has = (key) => values[key] !== undefined;
   replace($("#camera-values"),
@@ -225,7 +208,7 @@ export function init(context) {
     return h("label", { class: "check small" }, input, label);
   };
   replace(tools,
-    toggle("IMU attitude", "attitude", true), toggle("Frames", "frames", true), toggle("Links", "skeleton", false),
+    toggle("IMU attitude", "attitude", true), toggle("Frames", "frames", true), toggle("Links", "skeleton", false), toggle("Terrain", "terrain", true),
     h("button", { class: "small", onclick: () => view?.resetView() }, "Reset view"));
   try {
     view = new RobotView($("#viewer"));

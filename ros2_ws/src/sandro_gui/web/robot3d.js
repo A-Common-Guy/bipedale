@@ -97,7 +97,7 @@ export class RobotView {
     fill.position.set(-0.7, 0.8, 0.5);
     scene.add(fill);
 
-    const grid = new THREE.GridHelper(2, 20, 0x3a4048, 0x262a30);
+    const grid = new THREE.GridHelper(4, 40, 0x3a4048, 0x262a30);
     grid.rotation.x = Math.PI / 2;
     scene.add(grid);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.ShadowMaterial({ opacity: 0.35 }));
@@ -128,6 +128,10 @@ export class RobotView {
     this.frames.add(this.baseFrame);
     this.label("base_link", this.baseFrame, new THREE.Vector3(0.066, 0, -0.004), "dim");
 
+    this.terrainGroup = new THREE.Group();
+    scene.add(this.terrainGroup);
+    this.buildTerrain();
+
     this.skeleton = new THREE.Group();
     this.body.add(this.skeleton);
     this.buildSkeleton();
@@ -151,8 +155,14 @@ export class RobotView {
   }
 
   resetView() {
-    this.camera.position.set(0.62, -0.72, 0.38);
-    this.controls.target.set(0.02, 0, 0.14);
+    if (this.terrain && this.options.terrain !== false) {
+      // From the side and above: the robot and the 1.35 m of floor ahead of it.
+      this.camera.position.set(1.1, -1.6, 0.8);
+      this.controls.target.set(0.42, 0, 0.08);
+    } else {
+      this.camera.position.set(0.62, -0.72, 0.38);
+      this.controls.target.set(0.02, 0, 0.14);
+    }
     this.controls.update();
     this.dirty = true;
   }
@@ -178,6 +188,7 @@ export class RobotView {
     Object.assign(this.options, options);
     this.skeleton.visible = this.options.skeleton;
     this.frames.visible = this.options.frames;
+    this.terrainGroup.visible = this.options.terrain !== false && !!this.terrain;
     for (const label of this.labels) label.hidden = !this.options.frames;
     this.applyPose();
   }
@@ -299,6 +310,122 @@ export class RobotView {
     return meta;
   }
 
+  // The terrain the depth camera gives the policies (sandro_perception's
+  // /terrain_profile), drawn where it is: a ribbon ahead of each wheel, as wide
+  // as the tyre, through the profile's heights above the floor that wheel
+  // stands on, and a fainter sheet between the two where both are known.
+  // Between two samples the height is interpolated; a point the camera has not
+  // seen is a grey ring on the floor and breaks the ribbon.
+  buildTerrain() {
+    const mesh = (opacity) => {
+      const geometry = new THREE.BufferGeometry();
+      const m = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+        vertexColors: true, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }));
+      m.frustumCulled = false;
+      this.terrainGroup.add(m);
+      return m;
+    };
+    this.terrainRibbons = mesh(0.8);
+    this.terrainSheet = mesh(0.28);
+    this.terrainEdges = new THREE.LineSegments(new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ vertexColors: true }));
+    this.terrainEdges.frustumCulled = false;
+    this.terrainUnknown = new THREE.Group();
+    this.terrainGroup.add(this.terrainEdges, this.terrainUnknown);
+    this.terrainRing = new THREE.RingGeometry(0.014, 0.019, 20);
+    this.terrainRingMaterial = new THREE.MeshBasicMaterial({ color: 0x8b939c, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.8 });
+    this.terrainGroup.visible = false;
+  }
+
+  // terrain: {heights: [right[], left[]], known: [right[], left[]]} or null;
+  // distances: m ahead of the axle of each sample.
+  setTerrain(terrain, distances) {
+    const had = !!this.terrain;
+    this.terrain = terrain && terrain.heights ? terrain : null;
+    this.terrainDistances = distances;
+    this.terrainGroup.visible = this.options.terrain !== false && !!this.terrain;
+    if (had !== !!this.terrain) this.resetView();     // the camera started or stopped: frame what there is
+    this.placeTerrain();
+  }
+
+  placeTerrain() {
+    if (!this.terrain || !this.wheelGround) return;
+    const STEPS = 6, HALF = 0.03;
+    const colour = (height) => {
+      // Flat green, a step amber to red at 8 cm, a drop blue.
+      const c = new THREE.Color(0x46b17b);
+      if (height > 0.01) c.lerp(new THREE.Color(height > 0.045 ? 0xe5534b : 0xd9a23a), Math.min(1, height / 0.045));
+      else if (height < -0.01) c.lerp(new THREE.Color(0x539bf5), Math.min(1, -height / 0.04));
+      return c;
+    };
+    // Per track: the dense, interpolated line of [x ahead, height] and where it is known.
+    const tracks = ["right", "left"].map((side, k) => {
+      const ground = this.wheelGround[side];
+      if (!ground) return null;
+      // The wheel's own contact is the profile's zero.
+      const d = [0, ...this.terrainDistances.slice(0, this.terrain.heights[k].length)];
+      const z = [0, ...this.terrain.heights[k]];
+      const known = [true, ...this.terrain.known[k]];
+      const rows = [];
+      for (let i = 0; i + 1 < d.length; i++) {
+        for (let step = 0; step <= STEPS; step++) {
+          if (step === STEPS && i + 2 < d.length) continue;      // the next span starts there
+          const t = step / STEPS;
+          const smooth = t * t * (3 - 2 * t);                    // no kinks at the samples
+          rows.push({ x: d[i] + t * (d[i + 1] - d[i]), h: z[i] + smooth * (z[i + 1] - z[i]),
+            known: known[i] && known[i + 1] });
+        }
+      }
+      return { ground, rows, d, known };
+    });
+    const ribbons = { position: [], color: [] }, sheet = { position: [], color: [] }, edges = { position: [], color: [] };
+    const quad = (target, a, b, c, d2, ca, cb) => {
+      for (const [p, col] of [[a, ca], [b, ca], [c, cb], [b, ca], [d2, cb], [c, cb]]) {
+        target.position.push(p.x, p.y, p.z);
+        target.color.push(col.r, col.g, col.b);
+      }
+    };
+    const at = (track, row, dy) => new THREE.Vector3(track.ground.x + row.x, track.ground.y + dy, track.ground.z + row.h + 0.002);
+    for (const track of tracks.filter(Boolean)) {
+      for (let i = 0; i + 1 < track.rows.length; i++) {
+        const a = track.rows[i], b = track.rows[i + 1];
+        if (!a.known) continue;
+        const ca = colour(a.h), cb = colour(b.h);
+        quad(ribbons, at(track, a, -HALF), at(track, a, HALF), at(track, b, -HALF), at(track, b, HALF), ca, cb);
+        for (const dy of [-HALF, HALF]) {
+          const p = at(track, a, dy), q = at(track, b, dy);
+          edges.position.push(p.x, p.y, p.z, q.x, q.y, q.z);
+          edges.color.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b);
+        }
+      }
+    }
+    const [right, left] = tracks;
+    if (right && left) {
+      for (let i = 0; i + 1 < Math.min(right.rows.length, left.rows.length); i++) {
+        if (!right.rows[i].known || !left.rows[i].known) continue;
+        const ca = colour(0.5 * (right.rows[i].h + left.rows[i].h));
+        const cb = colour(0.5 * (right.rows[i + 1].h + left.rows[i + 1].h));
+        quad(sheet, at(right, right.rows[i], HALF), at(left, left.rows[i], -HALF),
+          at(right, right.rows[i + 1], HALF), at(left, left.rows[i + 1], -HALF), ca, cb);
+      }
+    }
+    for (const [object, data] of [[this.terrainRibbons, ribbons], [this.terrainSheet, sheet], [this.terrainEdges, edges]]) {
+      object.geometry.setAttribute("position", new THREE.Float32BufferAttribute(data.position, 3));
+      object.geometry.setAttribute("color", new THREE.Float32BufferAttribute(data.color, 3));
+    }
+    this.terrainUnknown.clear();
+    for (const track of tracks.filter(Boolean)) {
+      track.d.forEach((x, i) => {
+        if (track.known[i]) return;
+        const ring = new THREE.Mesh(this.terrainRing, this.terrainRingMaterial);
+        ring.position.set(track.ground.x + x, track.ground.y, track.ground.z + 0.002);
+        this.terrainUnknown.add(ring);
+      });
+    }
+    this.dirty = true;
+  }
+
   // joints: {name: radians}; quaternion: [x, y, z, w] body in world, or null.
   update(joints, quaternion) {
     this.pose = { ...STAND, ...joints };
@@ -386,6 +513,14 @@ export class RobotView {
     for (const corner of this.torsoCorners || []) lows.push(corner.clone().applyQuaternion(attitude).z);
     if (axles.length) centre.multiplyScalar(1 / axles.length);
     this.robot.position.set(-centre.x, -centre.y, lows.length ? -Math.min(...lows) : 0.27);
+    // Where each wheel meets its floor, in the scene: the origin of its terrain ribbon.
+    this.wheelGround = {};
+    ["right", "left"].forEach((side, i) => {
+      if (axles.length !== 2) return;
+      const p = axles[i].clone().applyQuaternion(attitude).add(this.robot.position);
+      this.wheelGround[side] = new THREE.Vector3(p.x, p.y, p.z - this.wheelRadius);
+    });
+    this.placeTerrain();
     this.dirty = true;
   }
 

@@ -456,6 +456,7 @@ class RosBridge:
                 "imu": imu, "imu_age_s": imu_age if imu else None,
                 "imu_sensor_age_s": dynamic.get("imu", {}).get("age") if imu else None,
                 "joy": joy, "joy_age_s": joy_age if joy else None, "rates": rates,
+                "terrain": self.terrain(),
                 "cmd_vel": command}
 
     def slow(self) -> dict:
@@ -482,7 +483,7 @@ class RosBridge:
                                      "message": status.message, "values": values,
                                      "age_s": now - stamp}
         manager = self.cm["list"].service_is_ready()
-        return {"terrain": self.terrain(), "manager": manager, "controllers": self.polled_controllers if manager else [],
+        return {"manager": manager, "controllers": self.polled_controllers if manager else [],
                 "hardware": self.polled_hardware if manager else [], "dynamic": dynamic,
                 "dynamic_topic": health,
                 "dynamic_age_s": None if health is None else now - self.streams[health].last,

@@ -400,14 +400,7 @@ dialog label.check { margin-top: 10px; color: var(--muted); }
 }
 
 /* Overview: the terrain profile from the depth camera */
-.camera-profile { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px 20px; }
-.cam-track { width: 100%; max-width: 620px; height: auto; }
-.cam-floor { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; }
-.cam-wheel { fill: none; stroke: var(--muted); stroke-width: 1.5; }
-.cam-flat { stroke: var(--ok); fill: var(--ok); stroke-width: 2; }
-.cam-step { stroke: var(--warn); fill: var(--warn); stroke-width: 2; }
-.cam-unknown { fill: none; stroke: var(--muted); stroke-width: 1.5; }
-.cam-text { font-size: 10px; text-anchor: middle; fill: currentColor; font-family: ui-monospace, monospace; }
-.cam-text.muted, .cam-label { fill: var(--muted); }
-.cam-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
-.camera-values { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 6px; }
+.camera-table { width: auto; margin-top: 4px; }
+.camera-table th, .camera-table td { padding: 3px 12px 3px 0; text-align: right; }
+.camera-table th:first-child { text-align: left; color: var(--muted); font-weight: normal; }
+.camera-values { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; }

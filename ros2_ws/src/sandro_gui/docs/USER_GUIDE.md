@@ -132,13 +132,15 @@ The D435 and the terrain profile start with the stack only when **Depth
 camera** is ticked on the Run page (`camera:=true`). Without it
 `rl_agile_step` drives blind: it neither hops onto steps nor stops at blocks.
 
-Overview, **Camera**, shows what the policy gets: per wheel, the floor height
-in cm at eight distances ahead, relative to the floor under that wheel. Green
-is flat, amber a step, a grey `?` a point the camera has not seen (the policy
-takes it as flat). To check it, put a book 0.8 m ahead of one wheel: its
-height appears there, and stays as you roll up to it. On a flat floor the
-line below (floor pitch, roll, offset) is the mount's error and should be
-near zero.
+The Overview's 3D view draws what the policy gets: a ribbon ahead of each
+wheel through the floor heights of the terrain profile, relative to the floor
+under that wheel, interpolated between its eight distances. Green is flat,
+amber to red a step, blue a drop; a grey ring is a point the camera has not
+seen (the policy takes it as flat). **Terrain** above the view hides it. The
+**Camera** panel below has the same heights in cm and the camera's readings.
+To check it, put a book 0.8 m ahead of one wheel: it appears there in the
+ribbon, and stays as you roll up to it. On a flat floor the readings' floor
+pitch, roll and offset are the mount's error and should be near zero.
 
 ## Updating the robot
 

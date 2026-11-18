@@ -240,6 +240,15 @@ class DemoRos:
 
     # Read side ----------------------------------------------------------
 
+    @staticmethod
+    def _terrain(now: float) -> dict:
+        distances = (0.10, 0.20, 0.30, 0.45, 0.60, 0.80, 1.05, 1.35)
+        plank = 0.95 - 0.12 * (now % 6.0)
+        right = [0.03 if plank <= d <= plank + 0.2 else 0.12 if d > 1.2 else 0.0 for d in distances]
+        left = [0.12 if d > 1.2 else 0.0 for d in distances]
+        return {"age_s": 0.04, "heights": [right, left],
+                "known": [[d > 0.25 for d in distances], [d > 0.4 for d in distances]]}
+
     def fast(self) -> dict:
         if not self.robot.running:
             return {"joints": {}, "joints_age_s": None, "imu": None, "imu_age_s": None,
@@ -254,7 +263,10 @@ class DemoRos:
                  "/cmd_vel": {"hz": 0.0, "age_s": None, "count": 0}}
         return {"joints": joints, "joints_age_s": 0.003, "imu": self.robot.imu(),
                 "imu_age_s": 0.003, "imu_sensor_age_s": 0.002 + 0.004 * random.random(),
-                "joy": None, "joy_age_s": None, "rates": rates, "cmd_vel": None}
+                "joy": None, "joy_age_s": None, "rates": rates, "cmd_vel": None,
+                # The camera of the demo: a 3 cm plank coming closer to the right wheel,
+                # a 12 cm block ahead of both, the nearest points still unseen.
+                "terrain": self._terrain(time.time())}
 
     def _diagnostics(self, name: str) -> dict:
         kind = self.types[name].split("/")[-1]
@@ -299,10 +311,6 @@ class DemoRos:
         diagnostics["height_profile"] = {"level": 0, "message": "running", "age_s": 0.2, "values": {
             "depth_hz": 14.5, "image_age_ms": 15.0, "process_ms": 8.2, "points_known": 11.0,
             "points": 16.0, "floor_pitch_deg": -0.4, "floor_roll_deg": 0.3, "floor_offset_mm": 4.0}}
-        terrain = {"age_s": 0.04,
-                   "heights": [[0, 0, 0, 0.031, 0.03, 0.002, -0.001, 0.003], [0, 0, 0, 0.001, 0, 0.002, 0, -0.002]],
-                   "known": [[False, False, True, True, True, True, True, True],
-                             [False, False, False, True, True, True, True, False]]}
         components = {SYSTEM: ("system", "sandro_hardware/GIM6010System", 30),
                       IMU: ("sensor", "sandro_hardware/BNO085Sensor", 0)}
         hardware = [{"name": name, "type": components[name][0], "plugin": components[name][1],
@@ -310,7 +318,7 @@ class DemoRos:
                      "command_interfaces": components[name][2],
                      "claimed": components[name][2] if active and name == SYSTEM else 0}
                     for name, state in hardware_states.items()]
-        return {"terrain": terrain, "manager": True, "controllers": controllers, "hardware": hardware,
+        return {"manager": True, "controllers": controllers, "hardware": hardware,
                 "dynamic": dynamic, "dynamic_topic": "/health_broadcaster/dynamic_joint_states",
                 "dynamic_age_s": 0.05, "diagnostics": diagnostics,
                 "nodes": ["/controller_manager", "/gim6010_estop", "/joy_estop", "/joy_node",
