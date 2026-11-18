@@ -47,3 +47,10 @@ train:
     coef: 0.5
     margin: 0.5
     plant: [opposed_plant_2026-11-17.json, yaw_plant_2026-11-16.json, yaw_plant_2026-11-12.json]
+
+# The oscillation watchdog of stand_up.yaml, not re-measured for this policy.
+deploy:
+  safety:
+    oscillation_arm_delay_s: 3.0
+    oscillation_leg_rad_s: 1.2
+    oscillation_wheel_rad_s: 5.0

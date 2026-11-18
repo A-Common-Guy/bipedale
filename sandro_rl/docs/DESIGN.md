@@ -1158,6 +1158,35 @@ settling after it the legs swing at up to 1.9 rad/s in the 5-15 Hz band,
 0.8 rad/s afterwards. Getting up takes the 10 Nm the drives allow
 (`mit_torque_limit_nm`), with leg kp 20 and kd 0.6.
 
+#### `stand_up_v2` (2026-11-18): slippery floors and the measured loops
+
+`scripts/stand_up_runs.py --hard` adds to the standard grid (10 lying
+pitches, three plants, two wheel angles, three seeds: 180 runs) a floor of
+friction 0.4, one of 1.2, drives at 80 % torque, the body rolled 0.5 rad and
+all three at once (300 runs). `stand_up`, on the body with the camera: 180
+of 180, and 285 of 300, every failure but one on the slippery floor (46 of
+60), lying nose up. Its loop gate is 0.81 on the whole left-against-right
+loop (0.61 on the yaw table), where policies ring on the robot.
+
+It had never met a slippery floor: a MuJoCo contact takes the larger friction
+of its two geoms and the floor's is 1.0 (section 15).
+`configs/stand_up_v2.yaml` resumes it with `friction_everywhere` and tyre
+friction 0.3–1.2, the gear and leg-inertia randomisation of the agile
+policies and the loop-margin loss on the three measured plants (coef 0.5,
+margin 0.5).
+
+| | standard | hard | slippery | up in (median, worst) | gate, whole loop | gate, yaw table |
+|---|---|---|---|---|---|---|
+| `stand_up` | 180 of 180 | 285 of 300 | 46 of 60 | 0.56 s, 2.18 s | 0.81 | 0.61 |
+| `stand_up_v2` (iteration 500) | 180 of 180 | 300 of 300 | 60 of 60 | 0.60 s, 2.36 s | no crossing | 0.36 |
+
+The run went on to 1000 iterations and lost it: 103 of 180 at iteration 800
+and 104 at 1000 on the standard grid, at every pitch. Iteration 500 is kept
+(`meta.json` says so); a longer run is not a better one here, and the cause
+is not known. Deployed as `rl_stand_up_v2` next to `rl_stand_up`, with
+`stand_up.yaml`'s oscillation watchdog thresholds, which were measured on the
+old policy and not again. Not yet run on the robot.
+
 ### Wheel drive-train lag: the 7.5 Hz ringing on the robot
 
 On the robot, `flat_level` rang at 7.4–7.5 Hz: both wheels in phase, actions
