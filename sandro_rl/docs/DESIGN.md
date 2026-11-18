@@ -1777,6 +1777,40 @@ and the same with leg rotors at 35 ×, three latency profiles, three seeds):
   loop is the 4 mm and 0.4 Nm plants'; at 26–32 Hz the legs come to
   0.48–0.62, where the buzz bags have some content.
 
+**On the robot, and `agile_terrain_v6` (2026-11-18).** `rl_agile_terrain_v5`
+is far quieter than the policies before it, not silent; it was run with the
+3 Hz differential wheel filter (no recording). Behind that filter v5's only
+crossing left on the measured plants is the legs' at 26–27 Hz (0.48 standing,
+0.62 standing high), which no wheel filter touches. `agile_terrain_v6`
+(`configs/agile_terrain_v6.yaml`, from v5, 800 iterations): margin 0.35 in
+place of 0.5, three times the weight, and smaller steps (learning rate
+5e-5, `desired_kl` 0.005).
+
+| | v5 | v6 (iteration 500) |
+| --- | --- | --- |
+| Yaw loop, worst standing, 11-16 / 11-12 tables | 0.37 / 0.41 | 0.22 / 0.25 |
+| The same behind the 3 Hz filter | 0.17 / 0.20 | 0.20 |
+| Whole loop, worst standing crossing | 0.42 (0.60 with the filter) | none (0.36 with the filter) |
+| Legs alone at 26–27 Hz | 0.48–0.62 | 0.38, standing high only |
+| Yaw-rate gain at 9 Hz, Nm per rad/s | 0.92 | 0.61 |
+| Yaw error, hardware/default, fitted plant | 0.035–0.043 rad/s | 0.031–0.039 |
+| Yaw error, 3 rad/s manoeuvres, fitted plant | 0.14–0.15 | 0.13–0.14 |
+| Course at 0.5 m/s, without / with the filter | 27 / 26 of 27 | 27 / 27 |
+
+Speed error, pitch RMS, the roll and height commands and the lag sweep are
+as v5's; all 12 standard runs complete. The slow-SPI chatter on the MJCF as
+trained is still there (10–11 Nm RMS in the worst phase).
+
+The smaller steps did not steady the course: 16, 15, 11, 24, 27, 10, 19 and
+9 of 27 for checkpoints 100–800, the margin held throughout (0.22–0.24 and
+0–0.34). The falls are again forward at the 25 mm plank and the hill on the
+fitted plant (9 of 9 to 0 of 9 there from one checkpoint to another), with
+the same fall rate in training. `agile_terrain_v6` is the iteration-500
+checkpoint. The course at this height is beyond what these blind policies
+do reliably; seeing the plank is what `agile_perceptive` (section 14) is for.
+Deployed as `rl_agile_terrain_v6` (gamepad switch, cyan; first policy on the
+Run page), without the filter in the overrides; it can be run with it.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that

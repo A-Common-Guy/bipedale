@@ -1,0 +1,21 @@
+# agile_terrain_v5 with a tighter margin, trained slowly. On the robot
+# (2026-11-18) rl_agile_terrain_v5 is far quieter than the policies before it
+# and is run with the 3 Hz differential wheel filter; some buzz is left. On the
+# measured plants v5 keeps a crossing through the legs at 26-27 Hz of 0.48-0.62
+# standing and standing high (the buzz recordings have 28-32 Hz content), which
+# no wheel filter touches. Here the margin is 0.35 with three times the weight,
+# and the steps are smaller (v4 and v5 moved the obstacle course between 7 and
+# 27 of 27 runs from one checkpoint to the next at the same margin).
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v6.yaml --resume policies/agile_terrain_v5
+#     uv run python ../recordings/yaw_loop_margin.py policies/agile_terrain_v6 [--filter 3]
+inherit: agile_terrain_v5.yaml
+
+train:
+  iterations: 800
+  learning_rate: 5.0e-5
+  desired_kl: 0.005
+  resume_log_std: -2.5          # v5's action noise is 0.08
+  loop_margin:
+    coef: 1.0
+    margin: 0.35

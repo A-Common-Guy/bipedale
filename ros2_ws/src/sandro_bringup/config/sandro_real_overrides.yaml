@@ -94,6 +94,12 @@ rl_agile_terrain_v5:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# v5 with a margin of 0.35 (2026-11-18): no crossing left on the measured
+# plants, with or without action.wheel_differential_filter_hz.
+rl_agile_terrain_v6:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 rl_stand_up:
   ros__parameters:
     observation:
