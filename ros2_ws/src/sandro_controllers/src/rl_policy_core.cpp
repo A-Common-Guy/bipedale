@@ -150,7 +150,7 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
       !(s.wheel_kd_nm_s_rad > 0.0) || !(s.stand_s > 0.0) || !(s.wheel_filter_hz >= 0.0) ||
       !(s.wheel_differential_filter_hz >= 0.0) ||
       !(s.oscillation_leg_rad_s >= 0.0) || !(s.oscillation_wheel_rad_s >= 0.0) ||
-      !(s.oscillation_window_s > 0.0) || !(s.hand_over_tilt_rad > 0.0) ||
+      !(s.oscillation_window_s > 0.0) || !(s.oscillation_hold_s >= 0.0) || !(s.hand_over_tilt_rad > 0.0) ||
       !(s.upright_tilt_rad > 0.0)) {
     *error = "inconsistent policy settings";
     return false;
@@ -376,6 +376,7 @@ void RlPolicyCore::reset_oscillation(const RlPolicyState &state) {
     stage.fill(0.0);
   }
   oscillation_mean_square_.fill(0.0);
+  oscillation_over_s_ = 0.0;
 }
 
 std::array<double, 2> RlPolicyCore::watch_oscillation(const RlPolicyState &state,
@@ -482,8 +483,13 @@ RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCo
     const auto &osc = out.oscillation_rad_s;
     if ((s.oscillation_leg_rad_s > 0.0 && osc[0] > s.oscillation_leg_rad_s) ||
         (s.oscillation_wheel_rad_s > 0.0 && osc[1] > s.oscillation_wheel_rad_s)) {
-      oscillation_tripped_ = true;
-      phase_ = RlPhase::kFallen;
+      oscillation_over_s_ += period_s;
+      if (oscillation_over_s_ > s.oscillation_hold_s) {
+        oscillation_tripped_ = true;
+        phase_ = RlPhase::kFallen;
+      }
+    } else {
+      oscillation_over_s_ = 0.0;
     }
   }
 

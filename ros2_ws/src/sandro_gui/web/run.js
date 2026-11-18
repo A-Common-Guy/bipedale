@@ -5,7 +5,7 @@ import { $, h, replace, dot, badge, num, duration, clock, bytes } from "./util.j
 let ctx;
 const STORE = "sandro.run.form";
 const form = Object.assign({
-  hardware: null, mode: "stack", controller: "whole_body_controller", teleop: true, overrides: true,
+  hardware: null, mode: "stack", controller: "whole_body_controller", teleop: true, overrides: true, camera: false,
   state_source: "mit", encoder_period_ms: "", extra: "",
 }, JSON.parse(localStorage.getItem(STORE) || "{}"));
 if (!["stack", "imu"].includes(form.mode)) form.mode = "stack";
@@ -175,7 +175,8 @@ function renderForm() {
     h("div", { class: "field" }, h("span", { class: "field-label" }, sim ? "Controller" : "Preload"), select),
     h("div", { class: "field checks-row" },
       check("teleop", "Gamepad teleop", "joy_node, joy_teleop and joy_estop", imu),
-      sim ? null : check("overrides", "Robot overrides", info.overrides || "")),
+      sim ? null : check("overrides", "Robot overrides", info.overrides || ""),
+      sim || imu ? null : check("camera", "Depth camera", "the D435 and the terrain profile ahead of the wheels (camera:=true): rl_agile_step drives blind without it")),
     h("details", { class: "advanced", open: imu }, h("summary", {}, "Advanced"),
       sim ? null : h("div", { class: "field" }, h("span", { class: "field-label" }, "Launch"),
         segmented([["stack", "Robot stack", "The whole stack, drives not armed"],

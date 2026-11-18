@@ -99,6 +99,9 @@ def build_command(request: dict, settings: LaunchSettings) -> list[str]:
     command += [f"controller:={controller}", f"teleop:={'true' if teleop else 'false'}"]
     if request.get("overrides", True) and settings.overrides_path:
         command.append(f"extra_params:={settings.overrides_path}")
+    # The depth camera and the terrain profile (sandro_perception): the real robot only.
+    if hardware == "real" and request.get("camera"):
+        command.append("camera:=true")
     return command + extra
 
 

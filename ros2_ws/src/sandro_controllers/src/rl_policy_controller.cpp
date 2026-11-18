@@ -105,6 +105,8 @@ const std::vector<DoubleParameter> &double_parameters() {
        "5-15 Hz wheel velocity RMS beyond which the drives go limp; 0 disables it."},
       {"safety.oscillation_window_s", &RlPolicySettings::oscillation_window_s,
        "Averaging time of the oscillation watchdog's RMS."},
+      {"safety.oscillation_hold_s", &RlPolicySettings::oscillation_hold_s,
+       "The RMS stays beyond a limit this long before the drives go limp (a hop is shorter)."},
       {"safety.upright_tilt_rad", &RlPolicySettings::upright_tilt_rad,
        "start_lying: the fall cut-off arms below this tilt."},
       {"safety.oscillation_arm_delay_s", &RlPolicySettings::oscillation_arm_delay_s,

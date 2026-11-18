@@ -551,6 +551,12 @@ rl_agile_step:
       # one for a policy that did not.
       wheel_differential_filter_hz: 0.0
       stand_q: [0.41872984, 0.22624421, -0.716328, 0.22433391, 0.42027311, 2.14299]
+    safety:
+      # A hop swings the legs through the oscillation watchdog's band: 2.2-2.4
+      # rad/s RMS, beyond the 1.0 limit for 0.7-0.8 s in simulation; on the
+      # robot (2026-11-18) every hop tripped it. The limit has to be exceeded
+      # this long before the drives go limp.
+      oscillation_hold_s: 1.2
 
 rl_stand_up_v2:
   ros__parameters:

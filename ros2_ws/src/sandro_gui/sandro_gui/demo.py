@@ -295,6 +295,14 @@ class DemoRos:
         dynamic["imu"] = {"age": 0.004, "online": 1.0}
         active = [c["name"] for c in controllers if c["owns_commands"]]
         diagnostics = {name: self._diagnostics(name) for name in active}
+        # The camera of the demo: a 3 cm plank 0.45-0.6 m ahead of the right wheel.
+        diagnostics["height_profile"] = {"level": 0, "message": "running", "age_s": 0.2, "values": {
+            "depth_hz": 14.5, "image_age_ms": 15.0, "process_ms": 8.2, "points_known": 11.0,
+            "points": 16.0, "floor_pitch_deg": -0.4, "floor_roll_deg": 0.3, "floor_offset_mm": 4.0}}
+        terrain = {"age_s": 0.04,
+                   "heights": [[0, 0, 0, 0.031, 0.03, 0.002, -0.001, 0.003], [0, 0, 0, 0.001, 0, 0.002, 0, -0.002]],
+                   "known": [[False, False, True, True, True, True, True, True],
+                             [False, False, False, True, True, True, True, False]]}
         components = {SYSTEM: ("system", "sandro_hardware/GIM6010System", 30),
                       IMU: ("sensor", "sandro_hardware/BNO085Sensor", 0)}
         hardware = [{"name": name, "type": components[name][0], "plugin": components[name][1],
@@ -302,7 +310,7 @@ class DemoRos:
                      "command_interfaces": components[name][2],
                      "claimed": components[name][2] if active and name == SYSTEM else 0}
                     for name, state in hardware_states.items()]
-        return {"manager": True, "controllers": controllers, "hardware": hardware,
+        return {"terrain": terrain, "manager": True, "controllers": controllers, "hardware": hardware,
                 "dynamic": dynamic, "dynamic_topic": "/health_broadcaster/dynamic_joint_states",
                 "dynamic_age_s": 0.05, "diagnostics": diagnostics,
                 "nodes": ["/controller_manager", "/gim6010_estop", "/joy_estop", "/joy_node",

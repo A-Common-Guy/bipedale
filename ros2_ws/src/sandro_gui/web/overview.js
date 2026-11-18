@@ -56,8 +56,71 @@ function onSlow(slow) {
         h("div", { class: "check-line" }, h("span", { class: "check-label" }, check.label), h("span", { class: "check-value" }, check.value)),
         check.detail ? h("div", { class: "check-detail" }, check.detail) : null))));
   drives(slow);
+  camera(slow);
   streams(slow);
   problems(slow.problems || []);
+}
+
+// The terrain profile as the policies get it (sandro_perception): per wheel, the
+// floor height at each distance ahead, or unknown. What the camera sees, in the
+// terms a policy reacts to.
+const PROFILE_M = [0.10, 0.20, 0.30, 0.45, 0.60, 0.80, 1.05, 1.35];
+
+function track(label, heights, known) {
+  const X0 = 46, PX_M = 370, FLOOR = 74, PX_H = 220;     // 22 px per 10 cm of height
+  const x = (m) => X0 + PX_M * m;
+  const y = (m) => FLOOR - PX_H * Math.max(-0.15, Math.min(0.25, m));
+  const marks = heights.map((height, i) => {
+    const at = x(PROFILE_M[i] ?? (0.1 + 0.18 * i));
+    if (!known[i]) {
+      return `<circle cx="${at}" cy="${FLOOR}" r="4" class="cam-unknown"/><text x="${at}" y="${FLOOR + 18}" class="cam-text muted">?</text>`;
+    }
+    const flat = Math.abs(height) < 0.015;
+    return `<line x1="${at}" y1="${FLOOR}" x2="${at}" y2="${y(height)}" class="${flat ? "cam-flat" : "cam-step"}"/>`
+      + `<circle cx="${at}" cy="${y(height)}" r="4.5" class="${flat ? "cam-flat" : "cam-step"}"/>`
+      + `<text x="${at}" y="${height >= 0 ? y(height) - 9 : y(height) + 18}" class="cam-text">${(100 * height).toFixed(1)}</text>`;
+  }).join("");
+  const ticks = PROFILE_M.slice(0, heights.length).map((m) =>
+    `<text x="${x(m)}" y="${FLOOR + 34}" class="cam-text muted">${m.toFixed(2)}</text>`).join("");
+  return `<svg viewBox="0 0 580 116" class="cam-track"><text x="4" y="14" class="cam-label">${label}</text>`
+    + `<line x1="${X0 - 30}" y1="${FLOOR}" x2="570" y2="${FLOOR}" class="cam-floor"/>`
+    + `<circle cx="${X0}" cy="${FLOOR - 25}" r="25" class="cam-wheel"/>${marks}${ticks}`
+    + `<text x="4" y="${FLOOR + 34}" class="cam-text muted" style="text-anchor:start">m ahead</text></svg>`;
+}
+
+function camera(slow) {
+  const terrain = slow.ros?.terrain;
+  const diag = slow.ros?.diagnostics?.height_profile;
+  const values = diag?.values || {};
+  const running = ["running", "external"].includes(slow.launch?.state);
+  const state = $("#camera-state");
+  const note = $("#camera-note");
+  if (!diag && !terrain) {
+    replace(state, badge("not started", "off"));
+    note.textContent = running
+      ? "This stack runs without the camera: policies that read the terrain (rl_agile_step) drive blind. Stop the stack and start it with Depth camera ticked on the Run page."
+      : "Tick Depth camera on the Run page before starting the stack.";
+    $("#camera-profile").innerHTML = "";
+    replace($("#camera-values"));
+    return;
+  }
+  const depth = values.depth_hz > 5;
+  replace(state, !depth ? badge("no depth images", "error") : terrain ? badge("running", "ok") : badge("no profile", "warn"));
+  note.textContent = !depth ? "The profile node runs but the D435 sends no depth images: check its USB cable and the launch log."
+    : !terrain ? "Depth images arrive but no profile is published: it needs the joint states and the IMU."
+      : "Floor height in cm ahead of each wheel, relative to the floor under that wheel, as the policy reads it. A grey ? is a point the camera has not seen: the policy takes it as flat. Put a book 0.8 m ahead of a wheel: its height must appear there and stay as you roll up to it.";
+  $("#camera-profile").innerHTML = terrain
+    ? track("left wheel", terrain.heights[1], terrain.known[1]) + track("right wheel", terrain.heights[0], terrain.known[0]) : "";
+  const cell = (label, value, title) => h("span", { title }, h("span", { class: "muted" }, `${label} `), value);
+  const has = (key) => values[key] !== undefined;
+  replace($("#camera-values"),
+    cell("depth", has("depth_hz") ? `${num(values.depth_hz, 1)} Hz` : "—", "Depth images per second (15 expected)"),
+    cell("image age", has("image_age_ms") ? `${num(values.image_age_ms, 0)} ms` : "—", "How old an image is when it is used"),
+    cell("per image", has("process_ms") ? `${num(values.process_ms, 1)} ms` : "—", "Processing time of one image"),
+    cell("known", has("points_known") ? `${num(values.points_known, 0)} of ${num(values.points, 0)}` : "—", "Profile points the camera or its memory knows"),
+    cell("floor pitch", has("floor_pitch_deg") ? `${num(values.floor_pitch_deg, 1)}°` : "—", "The floor plane the camera sees against the one the robot stands on: on a flat floor, the mount's pitch error"),
+    cell("roll", has("floor_roll_deg") ? `${num(values.floor_roll_deg, 1)}°` : "—", "On a flat floor, the mount's roll error"),
+    cell("offset", has("floor_offset_mm") ? `${num(values.floor_offset_mm, 0)} mm` : "—", "On a flat floor, the mount's height error"));
 }
 
 function streams(slow) {

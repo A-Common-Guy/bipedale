@@ -35,7 +35,7 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.serialization import deserialize_message
 from rosidl_runtime_py.utilities import get_message
 from sensor_msgs.msg import Imu, JointState, Joy
-from std_msgs.msg import String
+from std_msgs.msg import Float32MultiArray, String
 from std_srvs.srv import Trigger
 
 from . import gamepad
@@ -239,6 +239,10 @@ class RosBridge:
             qos = LATCHED_QOS if topic.get("latched") else SENSOR_QOS
             sub(kind, name, lambda raw, stream=stream: self._on_raw(stream, raw), qos,
                 callback_group=self.group, raw=True)
+        # The terrain profile node's diagnostics (sandro_perception), when the camera runs.
+        sub(DiagnosticArray, "/height_profile/diagnostics",
+            lambda raw: self._on_diag("height_profile", raw), SENSOR_QOS,
+            callback_group=self.group, raw=True)
         sub(String, "/teleop/active_controller",
             lambda m: setattr(self, "active_controller", m.data or None), LATCHED_QOS,
             callback_group=self.group)
@@ -296,6 +300,19 @@ class RosBridge:
             return deserialize_message(stream.raw, kind), age
         except Exception:  # noqa: BLE001 - a malformed message is no data
             return None, age
+
+    def terrain(self) -> dict | None:
+        """/terrain_profile as the policies get it: per track (right, left) the floor
+        heights ahead of the wheel (m) and which of them the camera knows."""
+        message, age = self._latest("/terrain_profile", Float32MultiArray, 1.0)
+        if message is None or len(message.data) < 2 or len(message.data) % 4:
+            return None
+        values = [float(v) for v in message.data]
+        half, track = len(values) // 2, len(values) // 4
+        return {"age_s": age,
+                "heights": [values[:track], values[track:half]],
+                "known": [[v > 0.5 for v in values[half:half + track]],
+                          [v > 0.5 for v in values[half + track:]]]}
 
     def _health_stream(self) -> str | None:
         """The health topic that has the freshest message (the new broadcaster, or the old one)."""
@@ -465,7 +482,7 @@ class RosBridge:
                                      "message": status.message, "values": values,
                                      "age_s": now - stamp}
         manager = self.cm["list"].service_is_ready()
-        return {"manager": manager, "controllers": self.polled_controllers if manager else [],
+        return {"terrain": self.terrain(), "manager": manager, "controllers": self.polled_controllers if manager else [],
                 "hardware": self.polled_hardware if manager else [], "dynamic": dynamic,
                 "dynamic_topic": health,
                 "dynamic_age_s": None if health is None else now - self.streams[health].last,

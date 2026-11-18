@@ -126,6 +126,20 @@ Every launch's output is kept on the Pi in `~/sandro/gui_runs/run-*.log`
 (Run → Log → Past runs), the last 30 runs and at most 200 MB, so a run can be
 read after the fact. Its first lines name the commit it ran.
 
+## Camera
+
+The D435 and the terrain profile start with the stack only when **Depth
+camera** is ticked on the Run page (`camera:=true`). Without it
+`rl_agile_step` drives blind: it neither hops onto steps nor stops at blocks.
+
+Overview, **Camera**, shows what the policy gets: per wheel, the floor height
+in cm at eight distances ahead, relative to the floor under that wheel. Green
+is flat, amber a step, a grey `?` a point the camera has not seen (the policy
+takes it as flat). To check it, put a book 0.8 m ahead of one wheel: its
+height appears there, and stays as you roll up to it. On a flat floor the
+line below (floor pitch, roll, offset) is the mount's error and should be
+near zero.
+
 ## Updating the robot
 
 Software page, with the stack stopped: pick the branch (pushed from the laptop

@@ -555,6 +555,48 @@ TEST(RlPolicy, OscillationWatchdogTripsOnLegRingingNotOnDriving) {
   }
 }
 
+TEST(RlPolicy, OscillationWatchdogLetsAHopThroughAndStillTripsOnRinging) {
+  std::string error;
+  auto s = flat_settings();
+  s.oscillation_hold_s = 1.2;
+  sc::RlPolicyCore core;
+  ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+  core.reset(standing(s));
+  ASSERT_TRUE(core.hand_over(standing(s)));
+  // legs(amplitude, cycles): every leg motor at 7.5 Hz for that long.
+  sc::RlPolicyOutput out;
+  double largest = 0.0;
+  const auto legs = [&](const double amplitude, const int cycles) {
+    int i = 0;
+    for (; i < cycles && out.phase != sc::RlPhase::kFallen; ++i) {
+      auto state = standing(s);
+      for (const int j : {0, 1, 3, 4}) {
+        state.velocity[j] = amplitude * std::sin(2.0 * M_PI * 7.5 * i / 300.0);
+      }
+      out = core.update(state, sc::RlPolicyCommand{}, 1.0 / 300.0);
+      largest = std::max(largest, out.oscillation_rad_s[0]);
+    }
+    return i;
+  };
+  // A hop: the legs swing hard for 0.4 s, the RMS stays beyond the limit for
+  // well under the hold, then the robot stands again. Twice in a row.
+  for (int hop = 0; hop < 2; ++hop) {
+    legs(6.0, 120);
+    legs(0.0, 450);
+    EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
+  }
+  EXPECT_GT(largest, 1.5 * s.oscillation_leg_rad_s);
+  // Ringing that does not stop: limp after the hold, not at once.
+  const int cycles = legs(4.0, 900);
+  EXPECT_EQ(out.phase, sc::RlPhase::kFallen);
+  EXPECT_TRUE(out.status & sc::RL_OSCILLATION);
+  EXPECT_GT(cycles, 360);
+  EXPECT_LT(cycles, 480);
+  // No hold is not accepted negative.
+  s.oscillation_hold_s = -1.0;
+  EXPECT_FALSE(sc::RlPolicyCore().configure(s, 300, &error));
+}
+
 TEST(RlPolicy, StandUpPolicyEngagesLyingDownAndArmsOnceUpright) {
   sc::RlPolicyCore core;
   std::string error;

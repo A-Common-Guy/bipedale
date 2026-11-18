@@ -105,6 +105,9 @@ def test_stack_command_preloads_the_controller_and_never_arms():
     assert build_command({}, settings()) == build_command({"mode": "stack"}, settings())
     quiet = build_command({"controller": "rl_flat_level", "teleop": False}, settings())
     assert "controller:=rl_flat_level" in quiet and "teleop:=false" in quiet
+    # The depth camera is asked for, never on by itself.
+    assert not any(a.startswith("camera:=") for a in command)
+    assert "camera:=true" in build_command({"camera": True}, settings())
 
 
 def test_state_source_leaves_the_joint_timing_to_the_launch():
