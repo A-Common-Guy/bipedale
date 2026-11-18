@@ -27,6 +27,8 @@ joy_teleop:
     switch_button: 3           # L1 + triangle: next policy
     announce_button: 1         # circle: rumble the running policy's number (pads with rumble)
     recentre_button: 8         # L1 + R3: height back to the policy's initial
+    jump_button: 0             # L1 + cross: one hop (policies with a jump input)
+    jump_height_m: 0.05        # its wheel clearance
     estop_axes: [4, 5]         # the E-stop chord aborts a switch in progress
     estop_pressed_below: -0.5
     # Policies the switch cycles through, in rumble order (1 pulse, 2 ...).

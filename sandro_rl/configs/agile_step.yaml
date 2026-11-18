@@ -1,0 +1,98 @@
+# Three answers to what the camera sees ahead of the wheels (docs/DESIGN.md 14):
+# - floor up to 2 cm higher: drive over it;
+# - an edge of 2-5.5 cm: hop onto it. A jump window opens when the ground
+#   0.1-0.4 m ahead rises that much, as in step_climb_hop.yaml, but the policy
+#   is not told (at_edges.hidden): it has to see the edge in the terrain
+#   profile;
+# - terrain taller than 7 cm: stop 0.22 m before it (rewards.guard).
+# The requested jumps of jump.yaml stay, shown to the policy: the hop an
+# operator triggers from the gamepad, standing or driving. A window closes at
+# the first touchdown after a lift-off (single_hop), so a jump is one hop.
+#
+# Legs at kp 20 and 0.8 rad per action as jump.yaml (a hop needs the reach),
+# the drives' 9 Nm envelope, the legs held together (leg_split), step-ups with
+# long tops and planks deep enough to land on. Randomisation and the loop
+# margin as agile_terrain_v6.
+#
+#     uv run python -m sandro_rl.train configs/agile_step.yaml --resume policies/jump
+#     uv run python scripts/guard_runs.py policies/agile_step policies/agile_step:camera=0
+inherit: step_climb_v2.yaml
+
+env:
+  observation:
+    profile:                          # as configs/agile_perceptive.yaml
+      distances_m: [0.10, 0.20, 0.30, 0.45, 0.60, 0.80, 1.05, 1.35]
+      rate_hz: [10.0, 25.0]
+      near_m: [0.25, 0.55]
+      far_m: [1.2, 1.7]
+      camera_ahead_m: 0.1
+      noise_m: 0.003
+      slope_rad: 0.02
+      bias_m: 0.006
+      position_error_m: 0.03
+      position_noise_m: 0.02
+      dropout: 0.04
+      blind_probability: 0.15
+      seen_probability: 0.5
+      forget_m_per_rad: 0.4
+      forget_m_per_s: 0.08
+      travel_max_m: 2.0
+
+  terrain:
+    planks: {count: 10, height_m: [0.01, 0.055], depth_m: [0.15, 0.5], width_m: [0.4, 1.2], radius_m: [0.5, 4.0]}
+    hills: {count: 6, height_m: [0.02, 0.055], slope_deg: [70.0, 85.0], plateau_m: [0.6, 2.0],
+            width_m: [0.8, 1.6], radius_m: [0.3, 4.0]}
+    pillars: {count: 6, height_m: [0.10, 0.5], depth_m: [0.08, 0.6], width_m: [0.5, 1.4], radius_m: [0.9, 4.0]}
+
+  commands:
+    jump:
+      interval_s: [3.0, 8.0]
+      single_hop: true
+      at_edges: {lookahead_m: [0.1, 0.4], min_rise_m: 0.02, max_rise_m: 0.06, margin_m: 0.02, hidden: true}
+
+  rewards:
+    guard: {block_m: 0.07, stop_m: 0.22, slow_m: 0.5}
+
+  termination:
+    obstacle_m: -10.0                 # touching a block does not end the episode
+
+  randomization:                      # as configs/agile_terrain_v2.yaml
+    latency:
+      mit_joints_probability: 0.5
+    drives:
+      gear:
+        probability: 0.5
+        stiffness_nm_rad: [8.0, 60.0]
+        play_rad: [0.0, 0.03]
+        damping_nm_s_rad: [0.05, 0.3]
+        rotor_inertia_scale: [15.0, 35.0]
+        substeps: 8
+    model:
+      tyre_torsional_scale: [0.005, 2.0]
+      wheel_frictionloss_scale: [0.02, 2.0]
+      leg_armature_scale: [5.0, 35.0]
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.terrain.planks.height_m: [0.005, 0.035]
+        env.terrain.hills.height_m: [0.01, 0.035]
+    - iteration: 600
+      set:
+        env.terrain.planks.height_m: [0.01, 0.045]
+        env.terrain.hills.height_m: [0.01, 0.045]
+    - iteration: 1300
+      set:
+        env.terrain.planks.height_m: [0.01, 0.055]
+        env.terrain.hills.height_m: [0.02, 0.055]
+
+train:
+  num_envs: 6144
+  iterations: 2500
+  learning_rate: 2.0e-4
+  resume_log_std: -1.6
+  loop_margin:
+    coef: 1.0
+    margin: 0.35
+    plant: [opposed_plant_2026-11-17.json, yaw_plant_2026-11-16.json, yaw_plant_2026-11-12.json]

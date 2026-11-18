@@ -188,3 +188,30 @@ def test_a_level_camera_sees_the_floor_only_from_further():
     distances = np.array(settings.layout.distances_m)
     assert not known[:, distances < 0.5].any() and known[:, distances > 0.75].all()
     assert np.abs(heights).max() < 0.005
+
+
+def test_a_block_reads_as_an_obstacle_and_not_as_a_hole():
+    """A 15 cm block and a wall taller than the camera, 0.9 m ahead: the camera sees the block's
+    top and the wall's face only, and the floor behind neither. The samples from the face on
+    read the obstacle's height, known; without the shadow fill those behind it are unknown,
+    which a policy cannot tell from a gap in the map. A 3 cm plank casts no such shadow."""
+    from dataclasses import replace
+    for height, deep in ((0.15, 0.1), (0.6, 0.1), (0.6, 1.0)):
+        robot = Robot(boxes=[(0.9, 0.9 + deep, -1.0, 1.0, height)])
+        profile = HeightProfile()
+        drive(robot, profile, 1.0)
+        heights, known = profile.profile()
+        distances = np.asarray(profile.s.layout.distances_m)
+        behind = distances > 0.9 + 0.04
+        assert known[:, behind].all(), (height, deep, known)
+        assert (heights[:, behind] > 0.1).all(), (height, deep, heights)
+        ahead = (distances > 0.45) & (distances < 0.9 - 0.06)
+        assert known[:, ahead].all() and np.abs(heights[:, ahead]).max() < 0.01
+        plain = HeightProfile(replace(profile.s, shadow_m=0.0))
+        drive(Robot(boxes=robot.boxes), plain, 1.0)
+        assert not plain.profile()[1][:, distances > 0.9 + 0.1].all()
+    robot = Robot(boxes=[(0.9, 1.0, -1.0, 1.0, 0.03)])
+    profile = HeightProfile()
+    drive(robot, profile, 1.0)
+    heights, known = profile.profile()
+    assert np.abs(heights).max() < 0.045

@@ -32,7 +32,7 @@ from mujoco import mjx
 
 from . import kinematics, latency, terrain, torque_envelope
 from .interface import (PROFILE_SCALE, goal_observation, profile_known, profile_observation, profile_occluded,
-                        profile_travel, ray_angles, ray_observation)
+                        profile_shadow, profile_travel, ray_angles, ray_observation)
 from .robot import RobotSpec, rotation_x
 from .sources import JOINTS
 
@@ -214,6 +214,11 @@ class SandroEnv:
         self.n_profile = 4 * int(self.profile_distances.shape[0])
         # Where the terrain along a track is sampled for what hides the floor from the camera.
         self.profile_line = jp.linspace(0.14, 1.34, 25)
+        # Optional guard (rewards.guard): the forward speed the reward asks for falls to zero
+        # in front of terrain taller than block_m, whatever the command says. Only a policy
+        # that sees the terrain (the profile) can follow it.
+        self.guard = cfg["rewards"].get("guard") or {}
+        self.guard_line = jp.linspace(-0.02, 1.38, 29)    # from under the tyre's front on
         # The robot's footprint for pillar clearances, a box around the axle midpoint.
         self.hull_half = jp.asarray((cfg.get("avoidance") or {}).get("hull_half_m", [0.125, 0.17]),
                                     dtype=jp.float32)
@@ -343,12 +348,13 @@ class SandroEnv:
         return self._layout(comps)
 
     def blind_indices(self):
-        """(actor, critic) observation indices of everything but the terrain profile: where a
-        policy trained without it has its inputs (train.py --resume)."""
+        """(actor, critic) observation indices of everything but the terrain profile (and the
+        critic's clearance to blocks, which comes with the guard task): where a policy trained
+        without them has its inputs (train.py --resume)."""
         def keep(layout, repeat):
             offsets = np.concatenate([[0], np.cumsum(layout.sizes)])
             frame = np.concatenate([np.arange(offsets[i], offsets[i + 1]) for i, name in enumerate(layout.names)
-                                    if name not in ("profile", "true_profile")])
+                                    if name not in ("profile", "true_profile", "clearance")])
             return np.concatenate([frame + k * layout.size for k in range(repeat)])
         return keep(self.actor_layout, self.history), keep(self.critic_layout, 1)
 
@@ -614,6 +620,7 @@ class SandroEnv:
         return {"profile_near": u(k[1], c.get("near_m", [0.3, 0.8])), "profile_far": u(k[2], c.get("far_m", [1.2, 2.5])),
                 "profile_slope": sym(k[3], c.get("slope_rad", 0.015)), "profile_bias": sym(k[4], c.get("bias_m", 0.005), (2,)),
                 "profile_shift": sym(k[5], c.get("position_error_m", 0.03)),
+                "profile_face": u(jax.random.fold_in(k[5], 1), c.get("face_m", [0.2, 0.3])),
                 "profile_blind": (jax.random.uniform(k[6]) < c.get("blind_probability", 0.15)).astype(jp.float32),
                 "profile_period": period, "profile_timer": jax.random.uniform(k[8]) * period,
                 "profile_travel": jp.where(seen, jp.float32(c.get("travel_max_m", 2.0)), 0.0)}
@@ -637,6 +644,10 @@ class SandroEnv:
         camera = data.site_xpos[self.spec.imu_site][2] - floor
         hidden = jax.vmap(lambda h, l, c: profile_occluded(self.profile_distances, h, self.profile_line, l, c,
                                                            c_ahead, jp))(heights, line, camera)
+        # The node's shadow fill: an obstacle reads as one, capped at what a face averages.
+        heights, filled = jax.vmap(lambda h, hid, l: profile_shadow(
+            self.profile_distances, h, hid, self.profile_line, l, info["profile_face"], xp=jp))(heights, hidden, line)
+        hidden = hidden * (1.0 - filled)
         heights = (heights + info["profile_slope"] * self.profile_distances[None]
                    + info["profile_bias"][:, None] + c.get("noise_m", 0.005) * jax.random.normal(k[1], (2, n)))
         known = profile_known(self.profile_distances, info["profile_travel"], info["profile_near"],
@@ -780,7 +791,8 @@ class SandroEnv:
                  "leg_vel": v[self.leg_idx] * sc["leg_vel"], "wheel_vel": v[self.wheel_idx] * sc["wheel_vel"],
                  "last_action": info["last_action"], "command": command}
         if self.has_jump:
-            parts["jump"] = self.jump_observation(info["jump_timer"], info["jump_height"])
+            parts["jump"] = (self.jump_observation(info["jump_timer"], info["jump_height"])
+                             * info.get("jump_shown", 1.0))
         if self.has_goal:
             parts["goal"] = info["goal_obs"]
         if self.n_rays:
@@ -818,6 +830,17 @@ class SandroEnv:
             extra["obstacle_clearance"] = self.terrain.clearance(mid[:2], heading[:2], self.hull_half, data)
         if self.n_profile:
             extra["profile"] = self._profile_heights(data)
+        if self.guard:
+            # The nearest floor ahead of either wheel that is too tall to drive over.
+            line = self._profile_heights(data, 0.0, self.guard_line).reshape(2, -1)
+            if self.guard.get("face_run_m", 0.0) > 0.0:
+                # A face, not a ramp: the floor rising by more than block_m within face_run_m.
+                n = max(1, round(self.guard["face_run_m"] / 0.05))     # guard_line's step
+                rise = line[:, n:] - line[:, :-n]
+                blocked = jp.concatenate([jp.zeros(n, bool), jp.any(rise > self.guard["block_m"], axis=0)])
+            else:
+                blocked = jp.any(line > self.guard["block_m"], axis=0)
+            extra["block_distance"] = jp.min(jp.where(blocked, self.guard_line, 10.0))
         return extra | {
             "r_body": r_body, "gravity": r_body.T @ jp.array([0.0, 0.0, -1.0]),
             "gyro": self.body_from_imu.T @ gyro_true,
@@ -917,7 +940,9 @@ class SandroEnv:
         }
         if self.has_jump:
             jump_wait, jump_height = self._sample_jump(jax.random.fold_in(k[9], 1))
-            info.update({"jump_wait": jump_wait, "jump_timer": jp.float32(-10.0), "jump_height": jump_height})
+            info.update({"jump_wait": jump_wait, "jump_timer": jp.float32(-10.0), "jump_height": jump_height,
+                         "jump_shown": jp.float32(1.0), "jump_air": jp.float32(0.0), "jump_done": jp.float32(0.0),
+                         "jump_clearance": jp.float32(0.0)})
         if self.has_goal:
             start = jp.asarray(self.stand_axle[:2], dtype=jp.float32)
             info.update({"goal": goal, "goal_timer": self._goal_time(start, goal, command[0]),
@@ -980,9 +1005,23 @@ class SandroEnv:
                 points = jp.concatenate([mid[None], mid[None] + ahead[:, None] * fwd[None]])
                 ground = self.terrain.ground_height(points, state.data)
                 rise = jp.max(ground[1:]) - ground[0]
-                edge = (rise > edges["min_rise_m"]) & (info["jump_timer"] <= -self.jump.get("landing_s", 0.3))
+                # Above max_rise_m there is nothing to hop onto (rewards.guard stops there).
+                edge = ((rise > edges["min_rise_m"]) & (rise <= edges.get("max_rise_m", 1.0))
+                        & (info["jump_timer"] <= -self.jump.get("landing_s", 0.3)))
                 start = start | edge
                 height = jp.where(edge, jp.clip(rise + edges["margin_m"], *self.jump["height_m"]), height)
+                # hidden: the window pays as a requested jump does, but the policy is not told;
+                # it has to see the edge in the terrain profile.
+                if edges.get("hidden", False):
+                    info["jump_shown"] = jp.where(start, 1.0 - edge.astype(jp.float32), info["jump_shown"])
+            if self.jump.get("single_hop", False):
+                # The window stops paying at the first touchdown after a lift-off: one jump,
+                # not as many hops as fit in it. The countdown the policy sees runs on, as the
+                # controller's does, which cannot tell a landing.
+                lifted = state.info["jump_clearance"] > self.jump.get("liftoff_m", 0.01)
+                info["jump_air"] = jp.where(start, 0.0, jp.maximum(info["jump_air"], lifted.astype(jp.float32)))
+                landed = (info["jump_air"] > 0.0) & (state.info["jump_clearance"] < 0.003)
+                info["jump_done"] = jp.where(start, 0.0, jp.maximum(info["jump_done"], landed.astype(jp.float32)))
             info["jump_timer"] = jp.where(start, self.jump["window_s"], info["jump_timer"])
             info["jump_height"] = jp.where(start, height, info["jump_height"])
             info["jump_wait"] = jp.where(start, wait + self.jump["window_s"], info["jump_wait"])
@@ -1095,6 +1134,8 @@ class SandroEnv:
 
         truth = self._truth(data, info)
         info["axle_prev"] = truth["axle"]
+        if self.has_jump:
+            info["jump_clearance"] = jp.min(truth["clearance"])
         if self.has_goal:
             # Held within reach_m for hold_s, or out of time: the next goal is
             # sampled from where the robot stands. The rewards of this step
@@ -1246,6 +1287,16 @@ class SandroEnv:
         # p_max is per 10 ms; a faster policy terminates as often per second.
         return 1.0 - (1.0 - c["p_max"] * jp.max(v)) ** (self.dt / 0.01)
 
+    def _guarded_speed(self, forward, truth):
+        """The forward reference with the guard: full speed slow_m before the stopping
+        point, zero stop_m (axle to face) before terrain too tall to cross. Backing away is
+        never limited."""
+        if not self.guard:
+            return forward
+        allowed = self.v_max * jp.clip((truth["block_distance"] - self.guard["stop_m"]) / self.guard["slow_m"],
+                                       0.0, 1.0)
+        return jp.minimum(forward, allowed)
+
     def _reward(self, truth, info, action, prev_action, prev_action2, taus, terminated):
         r = self.cfg["rewards"]
         w, sig = r["weights"], r["sigma"]
@@ -1260,7 +1311,8 @@ class SandroEnv:
         legs, wheels = self.leg_idx, self.wheel_idx
         terms = {
             "alive": jp.float32(1.0),
-            "track_forward": jp.exp(-((truth["forward_speed"] - ref[0]) / sig["forward"]) ** 2),
+            "track_forward": jp.exp(-((truth["forward_speed"] - self._guarded_speed(ref[0], truth))
+                                      / sig["forward"]) ** 2),
             "track_yaw": jp.exp(-((truth["yaw_rate"] - ref[1]) / sig["yaw"]) ** 2),
             "track_height": jp.exp(-((jp.mean(truth["heights"]) - ref[2]) / sig["height"]) ** 2),
             "roll": (truth["roll"] - roll_target) ** 2,
@@ -1295,7 +1347,7 @@ class SandroEnv:
             # In a jump window: reward both wheels' clearance up to the target,
             # and drop the terms that hold the body at a steady height.
             jumping = self._jumping(info)
-            in_window = (info["jump_timer"] > 0.0).astype(jp.float32)
+            in_window = (info["jump_timer"] > 0.0).astype(jp.float32) * (1.0 - info["jump_done"])
             lift = jp.clip(jp.min(truth["clearance"]), 0.0, info["jump_height"]) / info["jump_height"]
             terms["jump_clearance"] = in_window * lift
             terms["jump_vz"] = in_window * jp.clip(truth["base_vz"], 0.0, 1.5)

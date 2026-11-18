@@ -40,6 +40,7 @@ def randomize(env, mjx_model: mjx.Model, rng: jax.Array, num_envs: int, enabled:
     wheel_dofs = jp.array([m.jnt_dofadr[m.joint(j).id] for j in WHEEL_JOINTS])
     robot_dofs = jp.concatenate([leg_dofs, wheel_dofs])
     tyres = jp.asarray(spec.tyre_geoms)
+    nominal_sliding = float(m.geom_friction[spec.tyre_geoms[0], 0])
     # Payload offsets are given in the IMU frame, the frame of sim_identified.yaml.
     imu_in_torso = np.zeros(9)
     mujoco.mju_quat2Mat(imu_in_torso, m.site_quat[spec.imu_site])
@@ -64,7 +65,13 @@ def randomize(env, mjx_model: mjx.Model, rng: jax.Array, num_envs: int, enabled:
             body_pos = body_pos.at[payload].add(imu_in_torso @ offset)
         sliding = _uniform(k[3], cfg["tyre_sliding_friction"])
         torsional = _log_uniform(k[4], cfg["tyre_torsional_scale"])
-        friction = mjx_model.geom_friction.at[tyres, 0].set(sliding)
+        friction = mjx_model.geom_friction
+        if cfg.get("friction_everywhere", False):
+            # A contact takes the larger of its two geoms' friction, and the floor's is 1.0:
+            # the tyres' value alone never makes the floor slippery (docs/DESIGN.md 8,
+            # stand_up). Every other geom moves with the tyres, about their nominal value.
+            friction = friction.at[:, 0].multiply(sliding / nominal_sliding)
+        friction = friction.at[tyres, 0].set(sliding)
         friction = friction.at[tyres, 1].multiply(torsional)
         leg_fl = _log_uniform(k[5], cfg["leg_frictionloss_scale"])
         wheel_fl = _log_uniform(k[6], cfg["wheel_frictionloss_scale"])

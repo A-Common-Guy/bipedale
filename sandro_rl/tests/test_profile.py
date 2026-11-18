@@ -160,3 +160,20 @@ def test_floor_behind_an_obstacle_is_hidden():
     assert not profile_occluded(d, np.zeros(8), line, np.zeros(25), 0.33, 0.1).any()
     assert np.asarray(profile_occluded(jp.asarray(d), jp.asarray(box(d)), jp.asarray(line), jp.asarray(box(line)),
                                        0.33, 0.1, jp)).tolist() == hidden.tolist()
+
+
+def test_an_obstacles_shadow_reads_as_the_obstacle():
+    """sandro_perception fills the hidden floor behind a tall face with the face's height: a
+    0.6 m wall from 0.5 m on reads 0.25 (the face's average), known, at every sample from its
+    face to 0.6 m behind it; the shadow of a 3 cm plank stays unknown."""
+    from sandro_rl.interface import profile_occluded, profile_shadow
+    d = np.array([0.10, 0.20, 0.30, 0.45, 0.60, 0.80, 1.05, 1.35])
+    line = np.linspace(0.14, 1.34, 25)
+    wall = lambda x: np.where((x >= 0.5) & (x <= 0.7), 0.6, 0.0)
+    hidden = profile_occluded(d, wall(d), line, wall(line), 0.33, 0.1)
+    heights, filled = profile_shadow(d, wall(d), hidden, line, wall(line), 0.25)
+    np.testing.assert_allclose(heights, [0, 0, 0, 0, 0.25, 0.25, 0.25, 0.0])
+    np.testing.assert_array_equal(hidden * (1 - filled), [0, 0, 0, 0, 0, 0, 0, 1])
+    plank = lambda x: np.where((x >= 0.5) & (x <= 0.65), 0.03, 0.0)
+    hidden = profile_occluded(d, plank(d), line, plank(line), 0.33, 0.1)
+    assert not profile_shadow(d, plank(d), hidden, line, plank(line), 0.25)[1].any()

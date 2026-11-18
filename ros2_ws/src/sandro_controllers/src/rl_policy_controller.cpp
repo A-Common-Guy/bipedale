@@ -174,6 +174,13 @@ void RlPolicyController::declare_parameters() {
                           read_only("Policy steps between stacked frames."));
   node->declare_parameter("observation.command_size", 3,
                           read_only("Command terms: 3, or 4 with a roll command."));
+  node->declare_parameter("observation.jump_size", 0,
+                          read_only("Hop inputs: 0, or 2 for a policy trained with jump events. "
+                                    "/cmd_vel linear.y is then the requested wheel clearance, m."));
+  node->declare_parameter("commands.jump_height_max_m", 0.08,
+                          read_only("Hop target that reads 1 in the observation, m."));
+  node->declare_parameter("commands.jump_window_s", 0.8,
+                          read_only("Length of a hop window, s."));
   node->declare_parameter("observation.profile_size", 0,
                           read_only("Terrain profile terms: 0 (blind), or 32 for a policy trained "
                                     "on sandro_perception's /terrain_profile."));
@@ -210,6 +217,9 @@ bool RlPolicyController::read_settings(RlPolicySettings &s, std::string *error) 
   s.history_stride =
       static_cast<int>(node->get_parameter("observation.history_stride").as_int());
   s.command_size = static_cast<int>(node->get_parameter("observation.command_size").as_int());
+  s.jump_size = static_cast<int>(node->get_parameter("observation.jump_size").as_int());
+  s.jump_height_max_m = node->get_parameter("commands.jump_height_max_m").as_double();
+  s.jump_window_s = node->get_parameter("commands.jump_window_s").as_double();
   s.profile_size = static_cast<int>(node->get_parameter("observation.profile_size").as_int());
   s.profile_height_scale = node->get_parameter("observation.profile_height_scale").as_double();
   s.profile_timeout_s = node->get_parameter("observation.profile_timeout_s").as_double();
@@ -320,7 +330,8 @@ RlPolicyController::on_configure(const rclcpp_lifecycle::State &) {
       [this](const geometry_msgs::msg::TwistStamped::SharedPtr message) {
         command_.writeFromNonRT(StampedCommand{message->twist.linear.x, message->twist.angular.z,
                                                message->twist.linear.z, message->twist.angular.x,
-                                               get_node()->now().seconds()});
+                                               get_node()->now().seconds(),
+                                               message->twist.linear.y});
       });
   profile_.writeFromNonRT(StampedProfile{});
   if (settings.profile_size > 0) {
@@ -437,6 +448,7 @@ controller_interface::return_type RlPolicyController::update(const rclcpp::Time 
                           received.receipt_time_s < 0.0
                               ? std::numeric_limits<double>::infinity()
                               : std::max(0.0, time.seconds() - received.receipt_time_s)};
+  command.jump_m = received.jump_m;
   const RlPolicyOutput output = core_.update(state, command, period.seconds());
   if (output.inferred) {
     inference_last_s_ = output.inference_s;

@@ -141,6 +141,8 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
   const auto &s = settings;
   if (s.history < 1 || s.history_stride < 1 || (s.command_size != 3 && s.command_size != 4) ||
       (s.profile_size != 0 && s.profile_size != kProfileSize) ||
+      (s.jump_size != 0 && s.jump_size != 2) || !(s.jump_window_s > 0.0) ||
+      !(s.jump_height_max_m > 0.0) ||
       !(s.profile_clip_max_m > s.profile_clip_min_m) || !(s.profile_timeout_s > 0.0) ||
       !(s.policy_rate_hz > 0.0) || update_rate_hz <= 0 || !(s.forward_m_s > 0.0) ||
       !(s.yaw_rad_s > 0.0) || !(s.height_max_m > s.height_min_m) ||
@@ -163,7 +165,7 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
   if (!policy_.load(s.policy_file, error)) {
     return false;
   }
-  frame_size_ = kFrameWithoutCommand + s.command_size + s.profile_size;
+  frame_size_ = kFrameWithoutCommand + s.command_size + s.jump_size + s.profile_size;
   if (policy_.input_size() != static_cast<std::size_t>(frame_size_ * s.history) ||
       policy_.output_size() != 6U) {
     *error = "the policy takes " + std::to_string(policy_.input_size()) + " inputs and " +
@@ -249,6 +251,11 @@ void RlPolicyCore::build_frame(const RlPolicyState &state,
                                   (0.5 * (s.height_max_m - s.height_min_m)));
   if (s.command_size == 4) {
     frame[k++] = static_cast<float>(reference_[3] / s.roll_rad);
+  }
+  if (s.jump_size == 2) {
+    const bool active = jump_timer_s_ > 0.0;
+    frame[k++] = active ? static_cast<float>(jump_height_m_ / s.jump_height_max_m) : 0.0F;
+    frame[k++] = active ? static_cast<float>(jump_timer_s_ / s.jump_window_s) : 0.0F;
   }
   if (s.profile_size > 0) {
     // Heights clipped and scaled, zero where unknown; then the known flags.
@@ -342,6 +349,9 @@ void RlPolicyCore::engage(const RlPolicyState &state) {
   const double height = std::clamp(0.5 * (heights[0] + heights[1]), settings_.height_min_m,
                                    settings_.height_max_m);
   reference_ = {0.0, 0.0, height, 0.0};
+  jump_timer_s_ = -10.0;
+  jump_height_m_ = 0.0;
+  jump_request_m_ = 0.0;
   height_command_m_ = std::clamp(settings_.initial_height_m, settings_.height_min_m,
                                  settings_.height_max_m);
   last_action_.fill(0.0F);
@@ -541,6 +551,17 @@ RlPolicyOutput RlPolicyCore::update(const RlPolicyState &state, const RlPolicyCo
 
   if (phase_ == RlPhase::kPolicy && fresh && cycle_ % cycles_per_action_ == 0) {
     shape(command);
+    if (s.jump_size == 2) {
+      // As sandro_rl's evaluator: a rising edge of the request opens a window
+      // unless one is running.
+      jump_timer_s_ -= 1.0 / s.policy_rate_hz;
+      if (command.jump_m > 0.0 && !(jump_request_m_ > 0.0) && jump_timer_s_ <= 0.0 &&
+          std::isfinite(command.jump_m)) {
+        jump_timer_s_ = s.jump_window_s;
+        jump_height_m_ = std::clamp(command.jump_m, s.jump_height_min_m, s.jump_height_max_m);
+      }
+      jump_request_m_ = command.jump_m;
+    }
     build_frame(state, frame_);
     push_frame();
     const auto start = std::chrono::steady_clock::now();

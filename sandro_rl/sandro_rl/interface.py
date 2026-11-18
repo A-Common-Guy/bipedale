@@ -83,6 +83,19 @@ def profile_occluded(distances, heights, line_distances, line_heights, camera_he
     return xp.any(between & (heights[:, None] < sight - 0.005), axis=1) * 1.0
 
 
+def profile_shadow(distances, heights, hidden, line_distances, line_heights, face_m, obstacle_m=0.07,
+                   shadow_m=0.6, xp=np):
+    """(heights, filled): sandro_perception's answer to an obstacle's shadow. A hidden sample
+    up to shadow_m behind terrain more than obstacle_m above the wheel's floor reads that
+    terrain's height, known. Nothing reads higher than face_m: of an obstacle taller than the
+    camera only the face is seen, and its cell averages 0.2-0.3 m."""
+    before = ((line_distances[None, :] < distances[:, None])
+              & (line_distances[None, :] >= distances[:, None] - shadow_m))
+    cast = xp.max(xp.where(before, line_heights[None, :], -1.0), axis=1)
+    filled = (hidden > 0.5) & (cast > obstacle_m)
+    return xp.minimum(xp.where(filled, cast, heights), face_m), filled * 1.0
+
+
 def profile_travel(travel, forward_speed, yaw_rate, dt, cfg, xp=np):
     """The distance driven since the map was empty, one policy step on. Turning brings
     floor ahead of the wheels that the camera never saw, and the node forgets floor it has

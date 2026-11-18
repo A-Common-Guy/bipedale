@@ -206,6 +206,8 @@ class JoyTeleop(Node):
         p("switch_button", 3)
         p("announce_button", 1)
         p("recentre_button", 8)
+        p("jump_button", 0)
+        p("jump_height_m", 0.05)
         p("estop_axes", [4, 5])
         p("estop_pressed_below", -0.5)
         p("policies", ["rl_flat_level", "rl_agile_terrain"])
@@ -228,6 +230,8 @@ class JoyTeleop(Node):
         self.switch_button = int(g("switch_button"))
         self.announce_button = int(g("announce_button"))
         self.recentre_button = int(g("recentre_button"))
+        self.jump_button = int(g("jump_button"))
+        self.jump_height = float(g("jump_height_m"))
         self.estop_axes = [int(v) for v in g("estop_axes")]
         self.estop_below = float(g("estop_pressed_below"))
         self.fraction = float(g("speed_fraction"))
@@ -580,10 +584,13 @@ class JoyTeleop(Node):
                 else:
                     height_rate = height_rate_towards(
                         reference, limits.initial_height_m, limits.height_rate_m_s, self.gain)
-        self.publish(forward, yaw, height_rate, roll)
+        # Deadman + jump button: a hop of jump_height_m, standing or driving, for policies
+        # with a jump input (twist.linear.y; the others ignore it). One hop per press.
+        jump = self.jump_height if pressed(self.joy.buttons, self.jump_button) else 0.0
+        self.publish(forward, yaw, height_rate, roll, jump)
         self.publishing = True
 
-    def publish(self, forward: float, yaw: float, height_rate: float, roll: float) -> None:
+    def publish(self, forward: float, yaw: float, height_rate: float, roll: float, jump: float = 0.0) -> None:
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = self.frame
@@ -591,6 +598,7 @@ class JoyTeleop(Node):
         msg.twist.angular.z = yaw
         msg.twist.linear.z = height_rate
         msg.twist.angular.x = roll
+        msg.twist.linear.y = jump
         self.command_pub.publish(msg)
 
     # Feedback -----------------------------------------------------------

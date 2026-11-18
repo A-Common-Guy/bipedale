@@ -49,6 +49,7 @@ private:
     double height_rate_m_s{};
     double roll_rad{};
     double receipt_time_s{-1.0};
+    double jump_m{};
   };
 
   // /terrain_profile as it arrived (sandro_perception); a message of another

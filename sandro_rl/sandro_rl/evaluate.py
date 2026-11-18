@@ -228,6 +228,9 @@ class SimOptions:
     diagnostics_rate_hz: float = 50.0
     seed: int = 1
     camera: float = 1.0          # 0: the terrain profile stays unknown (camera off)
+    floor_friction_scale: float = 1.0   # every geom's sliding friction (the floor, tyres, body shell, leg boxes)
+    torque_scale: float = 1.0           # every drive's torque limit (a low battery, a hot drive)
+    fallen_roll_rad: float = 0.0        # with --fallen: tipped about the heading too
 
     @classmethod
     def from_closed_loop(cls, sim: dict[str, str], latency: sources.Latency) -> "SimOptions":
@@ -235,7 +238,8 @@ class SimOptions:
                 latency.joint_stagger, latency.command_delay_s)
         names = {"imu_delay": "imu_delay_s", "imu_rate": "imu_rate_hz", "joint_delay": "joint_delay_s",
                  "joint_rate": "joint_rate_hz", "command_delay": "command_delay_s", "settle": "settle_s",
-                 "seed": "seed", "camera": "camera", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
+                 "seed": "seed", "camera": "camera", "floor_friction": "floor_friction_scale",
+                 "torque_scale": "torque_scale", "fallen_roll": "fallen_roll_rad", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
                  "gear_stiffness": "gear_stiffness_nm_rad", "gear_damping": "gear_damping_nm_s_rad",
                  "tyre_torsion": "tyre_torsion_scale", "wheel_friction": "wheel_friction_scale",
                  "leg_armature": "leg_armature_scale",
@@ -263,6 +267,8 @@ EXTRA_SCENARIOS = {
     "course": ["2,0,0", "3,0.5,0", "6,0.8,0", "2,0,0", "2,0,2.5", "4,0.6,0", "2,0,0"],
     # The course at the hardware's 0.5 m/s drive limit (controllers.yaml).
     "course_slow": ["2,0,0", "3,0.5,0", "8,0.5,0", "2,0,0", "2,0,2.5", "4,0.5,0", "2,0,0"],
+    # For `--course guard`: 0.5 m/s at the plank and the block for 8 s (4 m), then back.
+    "guard": ["2,0,0", "8,0.5,0", "2,0,0", "3,-0.4,0", "2,0,0"],
     # For `--course steps`: straight over the four planks and onto the curb.
     "steps": ["2,0,0", "14,0.5,0", "3,0,0"],
     # Fields: duration, forward, yaw, height rate, roll. Roll is feasible up
@@ -296,6 +302,10 @@ COURSES = {
     "planks": (COURSE, COURSE_HILL),
     "steps": ([(1.0, 0.030), (2.0, 0.040), (3.0, 0.050), (4.0, 0.060)],
               {"distance_m": 5.4, "height_m": 0.06, "slope_deg": 45.0, "plateau_m": 0.8, "width_m": 1.6}),
+    # For the camera: a 2 cm plank to cross, then a 15 cm block to stop in front of
+    # (scenario guard). The hill is out of reach.
+    "guard": ([(1.0, 0.020), (2.4, 0.150)],
+              {"distance_m": 30.0, "height_m": 0.02, "slope_deg": 10.0, "plateau_m": 0.6, "width_m": 1.6}),
     # The same curb alone, close enough that heading drift does not miss it.
     "curb": ([], {"distance_m": 1.5, "height_m": 0.06, "slope_deg": 45.0, "plateau_m": 0.8, "width_m": 1.6}),
 }
@@ -530,9 +540,10 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     mujoco.mj_resetDataKeyframe(m, d, mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, "stand"))
     if fallen_pitch is not None:
         from . import fallen
-        d.qpos[:] = fallen.tipped_qpos(spec, m, fallen_pitch)
+        d.qpos[:] = fallen.tipped_qpos(spec, m, fallen_pitch, options.fallen_roll_rad)
         options.unpowered_s = 3.0
     qadr, dadr, act = spec.joint_qpos, spec.joint_dof, spec.joint_actuator
+    m.geom_friction[:, 0] *= options.floor_friction_scale
     m.geom_friction[spec.tyre_geoms, 1] *= options.tyre_torsion_scale
     m.dof_frictionloss[dadr[spec.wheel_index]] *= options.wheel_friction_scale
     m.dof_armature[dadr[spec.leg_index]] *= options.leg_armature_scale
@@ -566,7 +577,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     fallback_lines = [[DelayLine(options.command_delay_s, 0.0) for _ in range(5)] for _ in range(len(JOINTS))]
     bus = DriveBus(len(JOINTS), options.command_delay_s)
     staged = np.zeros(m.nu)
-    limits = iface.torque_limit
+    limits = iface.torque_limit * options.torque_scale
     heat = np.zeros(len(JOINTS))  # the drives' thermal envelope, from cold
 
     phases = [[float(x) for x in p.split(",")] + [0.0] * (6 - len(p.split(","))) for p in SCENARIOS[scenario]]
@@ -684,10 +695,14 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         shift = profile_cfg.get("position_noise_m", 0.02) * rng.normal()
         heights = np.array([[ground(a + (x + shift) * heading) - ground(a) for x in dists] for a in anchors])
         line_d = np.linspace(0.14, 1.34, 25)
+        lines = np.array([[ground(a + (x + shift) * heading) - ground(a) for x in line_d] for a in anchors])
         hidden = np.array([interface.profile_occluded(
-            dists, heights[w], line_d, np.array([ground(a + (x + shift) * heading) - ground(a) for x in line_d]),
-            d.site_xpos[imu_site][2] - ground(a), profile_cfg.get("camera_ahead_m", 0.1))
-            for w, a in enumerate(anchors)])
+            dists, heights[w], line_d, lines[w], d.site_xpos[imu_site][2] - ground(a),
+            profile_cfg.get("camera_ahead_m", 0.1)) for w, a in enumerate(anchors)])
+        face = float(np.mean(profile_cfg.get("face_m", [0.2, 0.3])))
+        for w in range(2):
+            heights[w], filled = interface.profile_shadow(dists, heights[w], hidden[w], line_d, lines[w], face)
+            hidden[w] = hidden[w] * (1.0 - filled)
         heights += profile_cfg.get("noise_m", 0.005) * rng.normal(size=heights.shape)
         known = interface.profile_known(dists, terrain_map["travel"], float(np.mean(profile_cfg.get("near_m", [0.3, 0.8]))),
                                         float(np.mean(profile_cfg.get("far_m", [1.2, 2.5]))))

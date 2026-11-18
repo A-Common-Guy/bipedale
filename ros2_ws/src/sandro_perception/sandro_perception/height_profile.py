@@ -98,6 +98,12 @@ class Settings:
     band_m: tuple = (-0.30, 0.45)       # heights kept, about the floor under the wheels
     floor_rate_m_s: float = 0.5         # how fast the floor under a wheel may move
     history_s: float = 1.0              # poses kept for late images
+    # The camera cannot see the floor behind an obstacle, nor the top of one taller than
+    # itself: only the face. A sample that is unknown up to shadow_m behind a known cell
+    # more than obstacle_m above the wheel's floor takes that cell's height, known: an
+    # obstacle then reads as one, not as a hole in the map.
+    obstacle_m: float = 0.07
+    shadow_m: float = 0.6
 
 
 def leg_forward_kinematics(theta_inner, theta_outer, body: Body):
@@ -329,4 +335,17 @@ class HeightProfile:
         height, known = self._lookup(points.reshape(-1, 2), t)
         height = height.reshape(2, -1) - self.floor[:, None]
         known = known.reshape(2, -1)
+        if self.s.shadow_m > 0.0 and not known.all():
+            # Every cell along each track up to the last sample, for the obstacle's shadow.
+            steps = np.arange(self.s.cell_m, distances[-1] + self.s.cell_m, self.s.cell_m)
+            line = wheels[:, None, :] + steps[None, :, None] * heading[None, None, :]
+            line_h, line_known = self._lookup(line.reshape(-1, 2), t)
+            line_h = line_h.reshape(2, -1) - self.floor[:, None]
+            line_known = line_known.reshape(2, -1)
+            for w in range(2):
+                for k in np.flatnonzero(~known[w]):
+                    before = np.flatnonzero(line_known[w] & (steps < distances[k])
+                                            & (steps >= distances[k] - self.s.shadow_m))
+                    if len(before) and line_h[w, before[-1]] > self.s.obstacle_m:
+                        height[w, k], known[w, k] = line_h[w, before[-1]], True
         return np.where(known, np.clip(height, *layout.clip_m), 0.0), known

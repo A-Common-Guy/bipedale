@@ -1,0 +1,49 @@
+# stand_up for the floors and the robot it has not seen (docs/DESIGN.md 8,
+# stand_up, 2026-11-18):
+# - Slippery and grippy floors. A contact takes the larger of its two geoms'
+#   friction and the floor's is 1.0, so the tyres' 0.5-1.2 never made the
+#   floor slippery: on the evaluator's fitted plant at half the friction
+#   policies/stand_up gets up from 46 of 60 falls, the failures all nose up.
+#   friction_everywhere moves every geom with the tyres: 0.37-1.5 here.
+# - The body with the camera and its bracket (a collider now): the bank of
+#   rest poses is regenerated on it (python -m sandro_rl.fallen).
+# - What the agile policies train on since 2026-11: joint state from the MIT
+#   replies, the identified wheel drive train in half the episodes, heavy leg
+#   rotors, low tyre torsion and wheel friction.
+# - The loop margin on the measured plants: once up it stands at 0.61 (yaw)
+#   and 0.81 (the whole loop), where rl_flat_level_sysid rings.
+#
+#     uv run python -m sandro_rl.train configs/stand_up_v2.yaml --resume policies/stand_up
+#     uv run python scripts/stand_up_runs.py [--hard] policies/stand_up policies/stand_up_v2
+inherit: stand_up.yaml
+
+env:
+  randomization:
+    latency:
+      mit_joints_probability: 0.5
+    drives:
+      gear:
+        probability: 0.5
+        stiffness_nm_rad: [8.0, 60.0]
+        play_rad: [0.0, 0.03]
+        damping_nm_s_rad: [0.05, 0.3]
+        rotor_inertia_scale: [15.0, 35.0]
+        substeps: 8
+    model:
+      friction_everywhere: true
+      tyre_sliding_friction: [0.3, 1.2]
+      tyre_torsional_scale: [0.005, 2.0]
+      wheel_frictionloss_scale: [0.02, 2.0]
+      leg_armature_scale: [5.0, 35.0]
+
+train:
+  iterations: 1000
+  num_envs: 3072                # beside a desktop session
+  steps_per_env: 64
+  curriculum_offset: 1200       # no lift assist
+  learning_rate: 2.0e-4
+  resume_log_std: -1.4
+  loop_margin:
+    coef: 0.5
+    margin: 0.5
+    plant: [opposed_plant_2026-11-17.json, yaw_plant_2026-11-16.json, yaw_plant_2026-11-12.json]

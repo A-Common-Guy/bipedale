@@ -1,0 +1,37 @@
+# The camera taking effect: agile_perceptive that crosses what it can and stops
+# in front of what it cannot. Blocks 10-50 cm tall stand among agile_terrain's
+# planks (to 3 cm) and hills; the reward's forward reference falls to zero
+# 0.3 m (axle to face) before a face taller than 6 cm ahead of either wheel
+# (rewards.guard), whatever the stick says, and backing away is free. A blind
+# policy cannot tell a block from a plank before it hits it; one that reads
+# the terrain profile can. Running into a block is not an episode's end by
+# itself: falling over it is.
+#
+#     uv run python -m sandro_rl.train configs/agile_guard.yaml --resume policies/agile_terrain_v6
+#     uv run python -m sandro_rl.evaluate policies/agile_guard --scenario guard --course guard [--sim camera=0]
+inherit: agile_perceptive.yaml
+
+env:
+  terrain:
+    planks: {height_m: [0.005, 0.03]}
+    # Blocks and tall steps, wide enough to stand in a wheel track when they are in the way.
+    pillars: {count: 8, height_m: [0.10, 0.5], depth_m: [0.08, 0.6], width_m: [0.5, 1.4], radius_m: [0.9, 4.0]}
+
+  rewards:
+    # A face: more than 6 cm of rise within 10 cm. agile_terrain's hills (to 10 cm, ramps
+    # of 5-15 degrees) are to be driven over; with the height alone as the rule the first
+    # run stopped in front of them.
+    guard: {block_m: 0.06, face_run_m: 0.1, stop_m: 0.3, slow_m: 0.5}
+
+  termination:
+    obstacle_m: -10.0                 # touching a block does not end the episode
+
+curriculum:
+  stages: []
+
+train:
+  iterations: 1500
+  curriculum_offset: 0
+  learning_rate: 2.0e-4
+  desired_kl: 0.01
+  resume_log_std: -1.8

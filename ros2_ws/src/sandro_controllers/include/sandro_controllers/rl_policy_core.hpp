@@ -45,6 +45,14 @@ struct RlPolicySettings {
   int history{4};
   int history_stride{1};  // policy steps between the stacked frames
   int command_size{3};
+  // Hop requests (policies trained with jump events, sandro_rl jump.yaml):
+  // 0, or 2 for the two inputs [target / jump_height_max_m, time left /
+  // jump_window_s] after the command, zero outside a window. A window opens
+  // on the rising edge of RlPolicyCommand::jump_m.
+  int jump_size{0};
+  double jump_height_min_m{0.02};
+  double jump_height_max_m{0.08};
+  double jump_window_s{0.8};
   // Terrain profile of sandro_perception (/terrain_profile) appended to the
   // frame: 0 for a blind policy, kProfileSize for one trained on it
   // (sandro_rl interface.profile_observation).
@@ -165,6 +173,9 @@ struct RlPolicyCommand {
   double height_rate_m_s{};
   double roll_rad{};
   double age_s{};
+  // linear.y: the wheel clearance of a requested hop, m; 0 for none. Its
+  // rising edge starts a hop (policies with jump_size 2).
+  double jump_m{};
 };
 
 // One MIT frame per joint: the drive applies
@@ -261,6 +272,10 @@ private:
   std::array<double, 4> reference_{};
   double height_command_m_{};
   std::array<float, 6> last_action_{};
+  // The hop window: time left, its target and the last request (for the edge).
+  double jump_timer_s_{-10.0};
+  double jump_height_m_{};
+  double jump_request_m_{};
   std::array<float, 6> applied_action_{};
   float applied_differential_{};  // the filtered opposed half of the wheel actions
   std::array<std::array<double, 6>, 2> oscillation_high_pass_{};  // the high-passes' low-pass states

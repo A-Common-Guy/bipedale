@@ -165,7 +165,19 @@ def parameter_block(name: str, policy: str, contract: dict, actor: dict, safety:
     obs = contract["observation"]
     frame = dict((k, n) for k, n in obs["frame"])
     unsupported = set(frame) - {"gravity", "gyro", "leg_pos", "leg_vel", "wheel_vel", "last_action", "command",
-                                "profile"}
+                                "profile", "jump"}
+    jump, jump_command = "", ""
+    if "jump" in frame:
+        if frame["jump"] != 2 or list(frame)[list(frame).index("command") + 1] != "jump":
+            raise ValueError(f"{policy}: RlPolicyController takes the two jump inputs right after the command")
+        spec = obs["command_normalisation"]["jump"]
+        jump = """
+      # A hop on /cmd_vel linear.y (the wheel clearance asked for, m; the
+      # gamepad's L1 + cross): its rising edge opens one window.
+      jump_size: 2"""
+        jump_command = f"""
+      jump_height_max_m: {_f(spec["height_max_m"])}
+      jump_window_s: {_f(spec["window_s"])}"""
     profile = ""
     if "profile" in frame:
         if frame["profile"] != 32 or list(frame)[-1] != "profile":
@@ -201,7 +213,7 @@ def parameter_block(name: str, policy: str, contract: dict, actor: dict, safety:
     observation:
       history: {obs["history"]}
       history_stride: {obs.get("history_stride", 1)}
-      command_size: {frame["command"]}{profile}
+      command_size: {frame["command"]}{jump}{profile}
       gyro_scale: {_f(obs["scales"]["gyro"])}
       leg_velocity_scale: {_f(obs["scales"]["leg_vel"])}
       wheel_velocity_scale: {_f(obs["scales"]["wheel_vel"])}
@@ -213,7 +225,7 @@ def parameter_block(name: str, policy: str, contract: dict, actor: dict, safety:
       yaw_rad_s: {_f(norm["yaw_rad_s"])}
       height_min_m: {_f(height[0])}
       height_max_m: {_f(height[1])}
-      roll_rad: {_f(norm.get("roll_rad", 0.0))}
+      roll_rad: {_f(norm.get("roll_rad", 0.0))}{jump_command}
       # Height command on engaging (the WBC's tasks.height.target_m); the
       # reference starts at the measured height and moves there.
       initial_height_m: {_f(initial_height_m())}
