@@ -269,6 +269,8 @@ EXTRA_SCENARIOS = {
     "course_slow": ["2,0,0", "3,0.5,0", "8,0.5,0", "2,0,0", "2,0,2.5", "4,0.5,0", "2,0,0"],
     # For `--course guard`: 0.5 m/s at the plank and the block for 8 s (4 m), then back.
     "guard": ["2,0,0", "8,0.5,0", "2,0,0", "3,-0.4,0", "2,0,0"],
+    # For `--course three`: 0.5 m/s for 10 s (5 m), then back off.
+    "three": ["2,0,0", "10,0.5,0", "2,0,0", "3,-0.4,0", "2,0,0"],
     # For `--course steps`: straight over the four planks and onto the curb.
     "steps": ["2,0,0", "14,0.5,0", "3,0,0"],
     # Fields: duration, forward, yaw, height rate, roll. Roll is feasible up
@@ -306,6 +308,10 @@ COURSES = {
     # (scenario guard). The hill is out of reach.
     "guard": ([(1.0, 0.020), (2.4, 0.150)],
               {"distance_m": 30.0, "height_m": 0.02, "slope_deg": 10.0, "plateau_m": 0.6, "width_m": 1.6}),
+    # Three answers (scenario three): a 1.5 cm plank at 0.9 m to drive over, a 5 cm step
+    # with a 1 m top from 1.9 m to hop onto and drop off, a 15 cm block at 4.3 m to stop at.
+    "three": ([(0.9, 0.015), (4.3, 0.150)],
+              {"distance_m": 2.4, "height_m": 0.05, "slope_deg": 80.0, "plateau_m": 1.0, "width_m": 1.6}),
     # The same curb alone, close enough that heading drift does not miss it.
     "curb": ([], {"distance_m": 1.5, "height_m": 0.06, "slope_deg": 45.0, "plateau_m": 0.8, "width_m": 1.6}),
 }
@@ -914,8 +920,12 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                 "truth_forward_m_s": truth_forward, "truth_yaw_rate_rad_s": truth_yaw,
                 "truth_height_m": float(np.mean(true_heights)),
                 "truth_roll_rad": math.atan2(rb[2, 1], rb[2, 2]),
-                # Lower wheel above z = 0, so only meaningful on flat ground.
-                "truth_wheel_clearance_m": nan if course else float(np.min(d.xanchor[wheel_joints][:, 2]) - radius),
+                # The lower wheel above the ground under its axle (the course's, through mj_ray).
+                "truth_wheel_clearance_m": float(min(
+                    p[2] - radius - (max(0.0, 0.5 - mujoco.mj_ray(m, d, np.array([p[0], p[1], 0.5]),
+                                                                    np.array([0.0, 0.0, -1.0]), GROUND_GROUPS, 1, -1,
+                                                                    np.zeros(1, dtype=np.int32))) if course else 0.0)
+                    for p in d.xanchor[wheel_joints])),
                 "truth_axle_x_m": float(axle[0]), "truth_axle_y_m": float(axle[1]),
                 "truth_tilt_rad": math.acos(float(np.clip(rb[2, 2], -1.0, 1.0))),
                 "truth_imu_height_m": float(d.site_xpos[imu_site][2]),

@@ -2340,3 +2340,83 @@ camera while balancing (neither process is kept off the control loop's core),
 the depth stamps' accuracy (20 ms is 2 cm at 1.35 m when the body rocks), the
 odometry's scale, and the 1.35 m point's coverage.
 
+
+## 15. Three answers to the terrain ahead: `configs/agile_step.yaml` (2026-11-18)
+
+`agile_perceptive` showed that seeing the terrain earns nothing while every
+obstacle can be driven over. `agile_step` gives the camera three things to
+decide, on the legs' two degrees of freedom:
+
+1. edges below 2 cm: drive over them;
+2. steps of 2 to 6 cm: one hop onto them. As in `step_climb_hop` a jump window
+   opens when the ground 0.1–0.4 m ahead of the wheels rises that much, but
+   the policy is not told (`commands.jump.at_edges.hidden`): the jump
+   observation stays zero and the edge has to be read in the terrain profile.
+   `single_hop` pays for one flight per window;
+3. anything taller than 7 cm: stop 0.22 m before it (`rewards.guard`: the
+   forward command the tracking reward compares against falls to zero between
+   `slow_m` and `stop_m` of the nearest such face in the wheels' paths).
+
+The requested hops of `jump.yaml` stay, shown to the policy, and reach the
+robot as `/cmd_vel` `linear.y` (the gamepad's L1 + cross, `jump_height_m`
+0.05): a rising edge opens one window (`RlPolicyCore`, as the evaluator).
+
+Two things had to change before a stop could be learnt at all:
+
+- **A block hides its own top.** From 0.16 m up and 20 degrees down the
+  camera sees the near face of anything taller than a few centimetres and not
+  what is behind it, so a block read as "unknown", like a hole. The node
+  (`height_profile.py`, `obstacle_m` 0.07, `shadow_m` 0.6) and the simulated
+  camera (`interface.profile_shadow`) now fill the shadow behind a face taller
+  than `obstacle_m` with the face's height, known. Before it the guard reward
+  taught nothing; after it the policy slows from 0.43 to 0.14 m/s at a block
+  with the camera on.
+- **The floor was never slippery.** MuJoCo takes the larger friction of the
+  two geoms in contact and the floor's is 1.0, so the tyre range of 0.5–1.2
+  only ever raised it. `randomization.friction_everywhere` scales every geom.
+  Only `stand_up_v2` trains with it so far; every other policy, this one
+  included, has met a floor of 1.0 or more, and edges are easier to climb in
+  the simulation than on a smooth floor.
+
+### Results
+
+Resumed from `policies/jump` (2500 iterations, 369 M steps, 78 min).
+`scripts/three_runs.py`: a 1.5 cm plank, a step with a 1 m top, a 15 cm
+block; 0.5 m/s, two plants, three latency profiles, three seeds (18 runs).
+
+| step | policy | over the plank | onto the step | off it | stopped before the block | speed at the block | falls |
+|---|---|---|---|---|---|---|---|
+| 3 cm | `agile_step` | 18 | 18 | 18 | 18 | 0 | 0 |
+| 3 cm | `agile_terrain_v6` (blind) | 18 | 18 | 18 | – | 0.71 m/s | 1 |
+| 4 cm | `agile_step` | 18 | 14 | 14 | 11 | 0 | 2 |
+| 4 cm | `agile_terrain_v6` | 18 | 14 | 13 | – | 0.57 m/s | 1 |
+| 5 cm | `agile_step` | 18 | 11 | 9 | 8 | 0 | 2 |
+| 5 cm | `agile_step`, camera off | 18 | 0 | 0 | 0 | – | 0 |
+| 5 cm | `agile_terrain_v6` | 18 | 7 | 6 | – | 0.57 m/s | 5 |
+| 5 cm | `jump` (hops on request only) | 18 | 0 | 0 | – | – | 4 |
+
+- The camera decides: with it off the policy climbs nothing and waits in
+  front of the step. With it on it never touched the block in any run; the
+  blind policy drives into it at 0.6–0.7 m/s.
+- The hop is at its limit at 5 cm: the wheels clear 4–5 cm before the step.
+  A run that does not make it mostly stays in front of the step, upright.
+  At 4 cm it climbs no more often than v6 drives over, at 5 cm more often
+  and with fewer falls.
+- The ability moves between checkpoints as on the obstacle courses before
+  (onto the 5 cm step: 0, 7, 1, 10, 0, 0, 11 of 18 at iterations 1000, 1500,
+  2000, 2200, 2300, 2400, 2500); the last one is kept.
+- Requested hops (`--scenario jump` and at 0.5 and 1.0 m/s forward, 0.5
+  reverse, two plants, three latency profiles): 96 of 96, 6–8 cm of wheel
+  clearance whatever height is asked, no fall, tilt below 0.31 rad.
+- The gate: 0.34 on the whole loop, 0.23 on the yaw table (legs alone 0.50
+  at 14 Hz, standing).
+- It is not a general terrain policy: `rewards.guard` here has no face rule,
+  so the 8 cm ramp of the standard course counts as a block and it stops
+  there (16 of 27 on `course_runs.py`, v6 27). Top speed 1.0 m/s.
+
+Deployed as `rl_agile_step` next to the others (the switch's seventh, pink),
+never run on the robot. It needs `camera:=true`; without `/terrain_profile`
+it drives blind and climbs nothing. The controller's ROS part (the profile
+subscription and the hop on `linear.y`) and `joy_teleop`'s button are not
+compiled or run here; the core is (`test_rl_policy.cpp`: the frame with the
+hop and the profile, and the hop window).

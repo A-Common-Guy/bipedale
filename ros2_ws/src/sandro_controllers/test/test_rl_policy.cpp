@@ -45,6 +45,16 @@ sc::RlPolicySettings perceptive_settings() {
   return s;
 }
 
+// agile_step: the same with the hop input (/cmd_vel linear.y).
+sc::RlPolicySettings step_settings() {
+  sc::RlPolicySettings s = perceptive_settings();
+  s.policy_file = kSource + "/policies/agile_step.bin";
+  s.jump_size = 2;
+  s.jump_height_max_m = 0.08;
+  s.jump_window_s = 0.8;
+  return s;
+}
+
 sc::RlPolicyState standing(const sc::RlPolicySettings &s) {
   sc::RlPolicyState state;
   state.position = s.stand_q;
@@ -55,7 +65,7 @@ sc::RlPolicyState standing(const sc::RlPolicySettings &s) {
 
 // The C++ actor reproduces onnxruntime on the exported policy.onnx.
 TEST(RlPolicy, ActorMatchesOnnxReference) {
-  for (const std::string name : {"flat_level", "agile_terrain", "stand_up", "flat_level_fast", "flat_level_sysid", "flat_level_fast_sysid", "agile_terrain_v3", "agile_terrain_v5", "agile_terrain_v6", "agile_perceptive"}) {
+  for (const std::string name : {"flat_level", "agile_terrain", "stand_up", "flat_level_fast", "flat_level_sysid", "flat_level_fast_sysid", "agile_terrain_v3", "agile_terrain_v5", "agile_terrain_v6", "agile_perceptive", "agile_step"}) {
     sc::MlpPolicy policy;
     std::string error;
     ASSERT_TRUE(policy.load(kSource + "/policies/" + name + ".bin", &error)) << error;
@@ -118,11 +128,12 @@ TEST(RlPolicy, FrameLayout) {
 // build_frame reproduces interface.PolicyInterface.frame on random signals
 // (zero last action and command reference, as before the first policy step).
 TEST(RlPolicy, FrameMatchesThePythonInterface) {
-  for (const std::string name : {"flat_level", "agile_terrain", "agile_perceptive"}) {
+  for (const std::string name : {"flat_level", "agile_terrain", "agile_perceptive", "agile_step"}) {
     std::ifstream in(kSource + "/test/data/" + name + "_frames.txt");
     ASSERT_TRUE(in) << name;
     auto s = name == "flat_level" ? flat_settings()
-                                  : name == "agile_terrain" ? agile_settings() : perceptive_settings();
+                                  : name == "agile_terrain" ? agile_settings()
+                                  : name == "agile_perceptive" ? perceptive_settings() : step_settings();
     std::size_t count{};
     in >> count >> s.imu_offset_rad;
     for (auto &q : s.stand_q) {
@@ -321,6 +332,45 @@ TEST(RlPolicy, HandOverEngagesAtOnceFromTheMeasuredPoseOnlyWhenUpright) {
   const auto out = core.update(crouched, sc::RlPolicyCommand{}, 1.0 / 300.0);
   EXPECT_EQ(out.phase, sc::RlPhase::kPolicy);
   EXPECT_TRUE(out.inferred);
+}
+
+// A hop request (/cmd_vel linear.y) opens one window on its rising edge: the
+// height asked for and the window's remaining fraction, zero once it has run
+// out, however long the button is held.
+TEST(RlPolicy, AHopRequestOpensOneWindowOnItsRisingEdge) {
+  sc::RlPolicyCore core;
+  std::string error;
+  const auto s = step_settings();
+  ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+  const auto state = standing(s);
+  core.reset(state);
+  ASSERT_TRUE(core.hand_over(state));
+  Eigen::VectorXf frame(core.frame_size());
+  const Eigen::Index jump = core.frame_size() - sc::kProfileSize - 2;
+  const auto step = [&](double request) {
+    sc::RlPolicyCommand command;
+    command.jump_m = request;
+    for (int cycle = 0; cycle < 3; ++cycle) {
+      core.update(state, command, 1.0 / 300.0);
+    }
+    core.build_frame(state, frame);
+  };
+  step(0.0);
+  EXPECT_EQ(frame[jump], 0.0F);
+  EXPECT_EQ(frame[jump + 1], 0.0F);
+  step(0.05);
+  EXPECT_NEAR(frame[jump], 0.05F / 0.08F, 1e-6F);
+  EXPECT_NEAR(frame[jump + 1], 1.0F, 1e-6F);
+  step(0.05);
+  EXPECT_NEAR(frame[jump + 1], 0.79F / 0.8F, 1e-5F);
+  for (int n = 0; n < 100; ++n) {
+    step(0.05);   // held past the window: no second hop
+  }
+  EXPECT_EQ(frame[jump], 0.0F);
+  EXPECT_EQ(frame[jump + 1], 0.0F);
+  step(0.0);
+  step(0.2);      // released and pressed again: a hop, no higher than the policy's range
+  EXPECT_NEAR(frame[jump], 1.0F, 1e-6F);
 }
 
 // A 300 Hz policy with stride 3 infers every cycle on frames 10 ms apart.

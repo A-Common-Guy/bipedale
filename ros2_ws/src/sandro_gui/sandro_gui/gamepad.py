@@ -187,6 +187,10 @@ def guide(teleop: dict) -> dict:
                  "command (rl_agile_terrain) use it."},
         {"group": "Drive", "keys": [dead, _button(t["recentre_button"])],
          "text": "Height back to the running policy's initial height."},
+        *([{"group": "Drive", "keys": [dead, _button(t["jump_button"])],
+           "text": f"One hop, about {100 * t.get('jump_height_m', 0.05):g} cm of wheel clearance, standing or "
+                   "driving. Only policies with a hop input (rl_agile_step) use it."}]
+          if t.get("jump_button", -1) >= 0 else []),
         {"group": "Policies", "keys": [dead, _button(t["switch_button"])],
          "text": "Switch to the next policy (" + " → ".join(policies) + "). The robot first "
                  f"settles at {t.get('handover_height_m', 0.17):g} m with zero speed and roll, "

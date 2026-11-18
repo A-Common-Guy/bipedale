@@ -101,6 +101,14 @@ rl_agile_terrain_v6:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# The three answers to the terrain ahead (2026-11-18, sandro_rl/docs/DESIGN.md
+# section 15): drive over low edges, hop onto steps of up to about 5 cm, stop
+# before anything taller. Needs camera:=true; without /terrain_profile it
+# drives blind and climbs nothing. L1 + cross hops on request.
+rl_agile_step:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 rl_stand_up:
   ros__parameters:
     observation:
