@@ -13,8 +13,9 @@
 whole_body_controller:
   ros__parameters:
     model:
-      # Weighed 2026-10-21: 4.825 kg minus two 170 g wheels, no battery.
-      body_mass_kg: 4.485
+      # Weighed 2026-10-21: 4.825 kg minus two 170 g wheels, no battery, plus
+      # the D435 and its bracket (0.099, not weighed) since 2026-11-18.
+      body_mass_kg: 4.584
     balance:
       # Second recording (real2_2026-09-20): 0.43 Nm of average wheel torque
       # produced almost no acceleration, about 0.2 Nm of Coulomb friction per

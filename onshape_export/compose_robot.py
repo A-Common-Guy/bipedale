@@ -13,7 +13,9 @@ rigid sub-assembly instances with their articulated exports:
      parts carry no material in Onshape, so the weighed hub masses
      (sim_identified.yaml) are spread over their volumes (set_hub_inertials);
      only the outer shell keeps collision geoms (TORSO_COLLIDERS); the IMU
-     frame comes from the BNO085 board part (imu_mount.py)
+     frame comes from the BNO085 board part (imu_mount.py), the D435 frames
+     from the camera part (camera_mount.py). Parts not fastened in the
+     Onshape assembly come out as free bodies and are dropped
   4. mjSpec.attach() each sub-assembly model at its base-link frame (joints,
      actuators, sites, equalities are prefixed automatically with the
      Onshape instance name) and store the recovered assembly joint angles
@@ -43,6 +45,7 @@ from onshape_to_robot.config import Config
 from onshape_to_robot.onshape_api.client import Client
 
 import stand_pose
+from camera_mount import D435_KG, add_camera, camera_from_part, find_d435
 from imu_mount import IMU_BOARD_PATTERN, imu_from_board
 
 HERE = Path(__file__).parent
@@ -61,10 +64,13 @@ TORSO_COLLIDERS = r"^(body_lower|robot_roof|handle|rpi_holder|pcb__rpi4modelb__c
 # (sim_identified.yaml masses) are spread uniformly over the volume of their
 # parts: the Raspberry Pi and its holder in a jointless child body, the
 # central body (shell, roof, handle, power box, IMU) and the cables on the
-# torso itself.
+# torso itself. The D435 and its bracket are the jointless camera body, the
+# camera at its datasheet mass and the bracket at the rest of camera_kg.
 IDENTIFIED_YAML = HERE.parent / "ros2_ws" / "src" / "sandro_description" / "config" / "sim_identified.yaml"
 RPI_BODY = "raspberry_pi"
 RPI_PARTS = r"rpi4modelb|^rpi_holder$"
+CAMERA_BODY = "camera"
+CAMERA_BRACKET_PARTS = r"^realsense_holder$"
 
 # ---------------------------------------------------------------------------
 # Hardware constants -- verify against the datasheets before trusting results.
@@ -182,12 +188,12 @@ def inertia_about_origin(mass, com, I_com):
 
 
 def load_hub_masses():
-    """(torso kg, Raspberry Pi kg) from sim_identified.yaml masses."""
+    """(torso kg, Raspberry Pi kg, camera kg) from sim_identified.yaml masses."""
     import yaml
 
     masses = (yaml.safe_load(IDENTIFIED_YAML.read_text()) or {}).get("masses") or {}
     rpi = float(masses["raspberry_pi_kg"])
-    return float(masses["central_hub_kg"]) - rpi, rpi
+    return float(masses["central_hub_kg"]) - rpi, rpi, float(masses.get("camera_kg", 0.0))
 
 
 def solid_properties(verts, faces):
@@ -204,13 +210,22 @@ def solid_properties(verts, faces):
     return volume, centroid, np.trace(covariance) * np.eye(3) - covariance
 
 
-def set_hub_inertials(spec: mujoco.MjSpec, masses):
-    """Torso and Raspberry Pi inertials from their parts' volumes (uniform density each)."""
-    torso_kg, rpi_kg = masses
+def set_hub_inertials(spec: mujoco.MjSpec, masses, d435_mesh=None):
+    """Torso, Raspberry Pi and camera inertials from their parts' volumes.
+
+    The torso and the Raspberry Pi have a uniform density each; the camera
+    body puts D435_KG in the D435 part and the rest of its mass in the bracket.
+    """
+    torso_kg, rpi_kg, camera_kg = masses
+    if d435_mesh is None:
+        camera_kg = 0.0
+    elif camera_kg <= D435_KG:
+        raise SystemExit(f"masses.camera_kg {camera_kg} does not cover the D435's {D435_KG} kg")
     torso = spec.bodies[1]
     model = spec.compile()
     tid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, torso.name)
     totals = {}
+    camera_parts = {}
     for g in range(model.ngeom):
         if (model.geom_bodyid[g] != tid or model.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH
                 or model.geom_group[g] != 2):
@@ -225,12 +240,20 @@ def set_hub_inertials(spec: mujoco.MjSpec, masses):
         faces = model.mesh_face[model.mesh_faceadr[mid]:model.mesh_faceadr[mid]
                                 + model.mesh_facenum[mid]]
         vol, com, inertia = solid_properties(verts.astype(float), faces)
+        if camera_kg > 0.0 and (name == d435_mesh or re.search(CAMERA_BRACKET_PARTS, name)):
+            V, S, I = camera_parts.get(name == d435_mesh, (0.0, np.zeros(3), np.zeros((3, 3))))
+            camera_parts[name == d435_mesh] = (V + vol, S + vol * com,
+                                               I + inertia_about_origin(vol, com, inertia))
+            continue
         group = RPI_BODY if re.search(RPI_PARTS, name) else torso.name
         V, S, I = totals.get(group, (0.0, np.zeros(3), np.zeros((3, 3))))
         totals[group] = (V + vol, S + vol * com,
                          I + inertia_about_origin(vol, com, inertia))
     if set(totals) != {torso.name, RPI_BODY}:
         raise SystemExit(f"hub parts not found on the torso: {sorted(totals)}")
+    if camera_kg > 0.0 and set(camera_parts) != {True, False}:
+        raise SystemExit(f"camera body needs the D435 and a part matching "
+                         f"{CAMERA_BRACKET_PARTS!r} on the torso")
 
     def inertial(group, kg):
         V, S, I = totals[group]
@@ -238,19 +261,32 @@ def set_hub_inertials(spec: mujoco.MjSpec, masses):
         I_com = (I - inertia_about_origin(V, com, np.zeros((3, 3)))) * kg / V
         return com, I_com
 
+    def add_child(name, kg, com, I):
+        body = torso.add_body(name=name, pos=com)
+        body.explicitinertial = True
+        body.mass, body.ipos, body.iquat = kg, [0, 0, 0], [1, 0, 0, 0]
+        body.fullinertia = [I[0, 0], I[1, 1], I[2, 2], I[0, 1], I[0, 2], I[1, 2]]
+
     com, I = inertial(torso.name, torso_kg)
     torso.explicitinertial = True
     torso.mass, torso.ipos, torso.iquat = torso_kg, com, [1, 0, 0, 0]
     torso.fullinertia = [I[0, 0], I[1, 1], I[2, 2], I[0, 1], I[0, 2], I[1, 2]]
     com_rpi, I_rpi = inertial(RPI_BODY, rpi_kg)
-    rpi = torso.add_body(name=RPI_BODY, pos=com_rpi)
-    rpi.explicitinertial = True
-    rpi.mass, rpi.ipos, rpi.iquat = rpi_kg, [0, 0, 0], [1, 0, 0, 0]
-    rpi.fullinertia = [I_rpi[0, 0], I_rpi[1, 1], I_rpi[2, 2],
-                       I_rpi[0, 1], I_rpi[0, 2], I_rpi[1, 2]]
+    add_child(RPI_BODY, rpi_kg, com_rpi, I_rpi)
     print(f"hub: torso {torso_kg:.3f} kg at {np.round(com, 4)} "
           f"({totals[torso.name][0] * 1e6:.0f} cm3), {RPI_BODY} {rpi_kg:.3f} kg at "
           f"{np.round(com_rpi, 4)} ({totals[RPI_BODY][0] * 1e6:.0f} cm3)")
+    if camera_kg > 0.0:
+        # parts at their own densities: mass-weighted sums about the torso origin
+        S, I = np.zeros(3), np.zeros((3, 3))
+        for is_d435, (V, Sv, Iv) in camera_parts.items():
+            density = (D435_KG if is_d435 else camera_kg - D435_KG) / V
+            S, I = S + density * Sv, I + density * Iv
+        com_cam = S / camera_kg
+        I_cam = I - inertia_about_origin(camera_kg, com_cam, np.zeros((3, 3)))
+        add_child(CAMERA_BODY, camera_kg, com_cam, I_cam)
+        print(f"{CAMERA_BODY}: {camera_kg:.3f} kg at {np.round(com_cam, 4)} "
+              f"(D435 {D435_KG} kg, bracket {camera_kg - D435_KG:.3f} kg)")
 
 
 def strip_side_suffix(spec: mujoco.MjSpec):
@@ -549,6 +585,23 @@ def main():
     spec.option.integrator = mujoco.mjtIntegrator.mjINT_IMPLICITFAST
     torso = spec.bodies[1]
     torso.name = "torso"
+    for body in list(spec.worldbody.bodies):
+        if body is not torso:
+            print(f"WARNING: part '{body.name}' is not fastened to the robot in the Onshape "
+                  f"assembly (a free body); dropped")
+            meshes = {g.meshname for g in body.geoms}
+            materials = {g.material for g in body.geoms}
+            spec.delete(body)
+            used = {g.meshname for g in spec.geoms}
+            for mesh in [m for m in spec.meshes if m.name in meshes - used]:
+                spec.delete(mesh)
+            used = {g.material for g in spec.geoms}
+            for material in [m for m in spec.materials if m.name in materials - used]:
+                spec.delete(material)
+    d435 = find_d435(spec, spec.compile())
+    d435_mesh = d435[0] if d435 else None
+    if d435_mesh is None:
+        print("WARNING: no D435-sized box on the torso; no camera frames")
 
     # drop the rigid copies of the attached parts; the torso body frame is
     # identity so spec-level pos are world coordinates
@@ -562,7 +615,7 @@ def main():
     kept = set()
     for g in list(torso.geoms):
         if g.classname.name == "collision":
-            if re.search(TORSO_COLLIDERS, g.meshname):
+            if re.search(TORSO_COLLIDERS, g.meshname) or g.meshname == d435_mesh:
                 kept.add(g.meshname)
             else:
                 spec.delete(g)
@@ -601,7 +654,7 @@ def main():
     # polygonal mesh tires make the rolling contact hop facet to facet;
     # swap them for analytic cylinders of the same radius/width
     stand_pose.replace_tire_collision(spec)
-    set_hub_inertials(spec, load_hub_masses())
+    set_hub_inertials(spec, load_hub_masses(), d435_mesh)
 
     add_actuators(spec, sides, args.kp, args.kv, args.wheel_kv)
 
@@ -627,6 +680,11 @@ def main():
         imu_pos, imu_quat = IMU_MOUNT_POS, IMU_MOUNT_QUAT
         print(f"WARNING: no torso mesh matches {args.imu_board!r}; IMU at the old roof mount")
     add_imu(spec, torso, imu_pos, imu_quat, chip_quat)
+    camera = camera_from_part(spec, model, imu_pos, imu_quat)
+    if camera is not None:
+        _, camera_pos, camera_quat, report = camera
+        print(report)
+        add_camera(spec, torso, camera_pos, camera_quat)
     add_encoders(spec, sides)
 
     model = spec.compile()

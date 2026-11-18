@@ -52,9 +52,10 @@ class HeightProfileNode(Node):
     def __init__(self) -> None:
         super().__init__("height_profile")
         p = lambda name, default: self.declare_parameter(name, default).value
-        mount = Mount(x_m=p("mount.x_m", 0.115), y_m=p("mount.y_m", 0.0175), z_m=p("mount.z_m", 0.003),
-                      pitch_rad=p("mount.pitch_rad", 0.0), roll_rad=p("mount.roll_rad", 0.0),
-                      yaw_rad=p("mount.yaw_rad", 0.0))
+        cad = Mount()
+        mount = Mount(x_m=p("mount.x_m", cad.x_m), y_m=p("mount.y_m", cad.y_m), z_m=p("mount.z_m", cad.z_m),
+                      pitch_rad=p("mount.pitch_rad", cad.pitch_rad), roll_rad=p("mount.roll_rad", cad.roll_rad),
+                      yaw_rad=p("mount.yaw_rad", cad.yaw_rad))
         layout = Layout(distances_m=tuple(p("layout.distances_m", list(Layout().distances_m))),
                         half_track_m=p("layout.half_track_m", Layout().half_track_m))
         defaults = Settings()

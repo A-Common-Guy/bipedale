@@ -217,7 +217,9 @@ whole_body_controller:
       # (sandro_description/config/sim_identified.yaml masses, 2026-10-21,
       # hub split 2026-11-06) evaluated in the MJCF of the 2026-11 body at
       # the stand keyframe; CoM and pitch inertia fitted over 0.16-0.20 m.
-      body_mass_kg: 4.485             # weighed 4.825 kg minus two 170 g wheels
+      # The D435 and its bracket (camera_kg, 0.099) raised the CoM 2.5 mm and
+      # the pitch inertia 5 %, the yaw inertia 0.6 % at the stand keyframe.
+      body_mass_kg: 4.584             # weighed 4.825 kg plus the camera, minus two 170 g wheels
       wheel_mass_kg: 0.170
       wheel_inertia_kgm2: 0.00064     # hub, tyre and rotor plus armature
       # Loaded radius: the airless tyres squash about 7 mm from the CAD's
@@ -227,7 +229,7 @@ whole_body_controller:
       track_width_m: 0.304
       # Whole robot about the vertical through its CoM, wheels' spin inertia
       # reflected through the track included (identified MJCF, stand pose).
-      yaw_inertia_kgm2: 0.093
+      yaw_inertia_kgm2: 0.094
       # Time constant with which the measured axle follows its commanded
       # fore-aft offset: 60 to 85 ms on the robot (fourth run, controller-side
       # impedance; compare_runs.py leg_lag_ms), 55 to 65 ms in MuJoCo with the
@@ -235,9 +237,9 @@ whole_body_controller:
       # for a 72 ms mode and hunted at 1.9 Hz. Re-identify after changing the
       # leg gains (the overdamped leg responds in about kd / kp).
       leg_lag_s: 0.07
-      com_height_per_leg_height: 0.790  # CoM above axle = 0.790 * leg height
+      com_height_per_leg_height: 0.805  # CoM above axle = 0.805 * leg height
       com_height_offset_m: 0.0
-      pitch_inertia_kgm2: 0.042       # about the CoM at 0.1855 m leg height
+      pitch_inertia_kgm2: 0.044       # about the CoM at 0.1855 m leg height
       pitch_inertia_reference_height_m: 0.1855
       pitch_inertia_per_m: 0.18
       gravity_m_s2: 9.81

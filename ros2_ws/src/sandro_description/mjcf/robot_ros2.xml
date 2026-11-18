@@ -41,7 +41,9 @@
   <asset>
     <material name="handle_holder_1_material" rgba="0.647059 0.647059 0.647059 1" />
     <material name="handle_holder_2_material" rgba="0.615686 0.811765 0.929412 1" />
+    <material name="part_7_material" />
     <material name="body_lower_material" rgba="0.615686 0.811765 0.929412 1" />
+    <material name="realsense_holder_material" rgba="0.615686 0.811765 0.929412 1" />
     <material name="handle_material" rgba="0.231373 0.380392 0.705882 1" />
     <material name="power_box_lid_material" rgba="0.647059 0.647059 0.647059 1" />
     <material name="imu_holder_material" rgba="0.231373 0.380392 0.705882 1" />
@@ -292,259 +294,261 @@
     <material name="left_wheel_tire_holder_material" rgba="0.615686 0.811765 0.929412 1" />
     <material name="left_tire_material" rgba="0.647059 0.647059 0.647059 1" />
     <material name="left_manovella1_material" rgba="0.615686 0.811765 0.929412 1" />
-    <mesh name="handle_holder_2" file="handle_holder_2.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body14" file="bno085_9axis_imu_v1_1__body14.stl" />
-    <mesh name="via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp" file="via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body30" file="bno085_9axis_imu_v1_1__body30.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported14" file="camera_connector__rpi4modelb__imported14.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported7" file="sd_card_slot__rpi4modelb__imported7.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported4" file="sd_card_slot__rpi4modelb__imported4.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported7" file="camera_connector__rpi4modelb__imported7.stl" />
-    <mesh name="printed_circuit_board_1__body1" file="printed_circuit_board_1__body1.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8.stl" />
-    <mesh name="bss138ps_v2_1__body5" file="bss138ps_v2_1__body5.stl" />
-    <mesh name="display_connector__rpi4modelb__imported4" file="display_connector__rpi4modelb__imported4.stl" />
-    <mesh name="pernobiella" file="pernobiella.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body8" file="bno085_9axis_imu_v1_1__body8.stl" />
-    <mesh name="display_connector__rpi4modelb__imported17" file="display_connector__rpi4modelb__imported17.stl" />
-    <mesh name="capc_0603_t0_9_bn_v1_1__body1" file="capc_0603_t0_9_bn_v1_1__body1.stl" />
-    <mesh name="wheelmotorhub" file="wheelmotorhub.stl" />
-    <mesh name="power_box_lid" file="power_box_lid.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body2" file="bno085_9axis_imu_v1_1__body2.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26.stl" />
     <mesh name="bno085_9axis_imu_v1_1__body28" file="bno085_9axis_imu_v1_1__body28.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31.stl" />
-    <mesh name="display_connector__rpi4modelb__imported14" file="display_connector__rpi4modelb__imported14.stl" />
-    <mesh name="imu_holder" file="imu_holder.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body16" file="bno055_9axis_imu_v2_1__body16.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15.stl" />
-    <mesh name="crystal_xtal3215_32_768khz_v2_1__body3" file="crystal_xtal3215_32_768khz_v2_1__body3.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19.stl" />
-    <mesh name="smallplate_manovella2" file="smallplate_manovella2.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported3" file="sd_card_slot__rpi4modelb__imported3.stl" />
-    <mesh name="microphone_plug__rpi4modelb__imported5" file="microphone_plug__rpi4modelb__imported5.stl" />
-    <mesh name="qwicc_v1_1__body7" file="qwicc_v1_1__body7.stl" />
-    <mesh name="microphone_plug__rpi4modelb__imported3" file="microphone_plug__rpi4modelb__imported3.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body5" file="bno085_9axis_imu_v1_1__body5.stl" />
-    <mesh name="2x_usb3_0_ports__rpi4modelb__imported1" file="2x_usb3_0_ports__rpi4modelb__imported1.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body18" file="bno085_9axis_imu_v1_1__body18.stl" />
-    <mesh name="bss138ps_v2_1__body1" file="bss138ps_v2_1__body1.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported10" file="camera_connector__rpi4modelb__imported10.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body17" file="bno055_9axis_imu_v2_1__body17.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body29" file="bno085_9axis_imu_v1_1__body29.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body14" file="bno055_9axis_imu_v2_1__body14.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body4" file="bno055_9axis_imu_v2_1__body4.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported2" file="sd_card_slot__rpi4modelb__imported2.stl" />
-    <mesh name="female_usb_type_c_connector__rpi4modelb__imported1" file="female_usb_type_c_connector__rpi4modelb__imported1.stl" />
-    <mesh name="wheel_tire_holder" file="wheel_tire_holder.stl" />
-    <mesh name="cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp" file="cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported11" file="camera_connector__rpi4modelb__imported11.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body21" file="bno055_9axis_imu_v2_1__body21.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body23" file="bno055_9axis_imu_v2_1__body23.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported4" file="camera_connector__rpi4modelb__imported4.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body31" file="bno085_9axis_imu_v1_1__body31.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40.stl" />
-    <mesh name="wheelstickcover" file="wheelstickcover.stl" />
-    <mesh name="display_connector__rpi4modelb__imported7" file="display_connector__rpi4modelb__imported7.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported6" file="camera_connector__rpi4modelb__imported6.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body20" file="bno085_9axis_imu_v1_1__body20.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body15" file="bno055_9axis_imu_v2_1__body15.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body11" file="bno085_9axis_imu_v1_1__body11.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body22" file="bno055_9axis_imu_v2_1__body22.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body19" file="bno055_9axis_imu_v2_1__body19.stl" />
-    <mesh name="crystal_xtal3215_32_768khz_v2_1__body4" file="crystal_xtal3215_32_768khz_v2_1__body4.stl" />
-    <mesh name="bss138ps_v2_1__body3" file="bss138ps_v2_1__body3.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported10" file="sd_card_slot__rpi4modelb__imported10.stl" />
-    <mesh name="capc_0805_t0_95_bn_v1_1__body1" file="capc_0805_t0_95_bn_v1_1__body1.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported8" file="camera_connector__rpi4modelb__imported8.stl" />
-    <mesh name="crystal_xtal3215_32_768khz_v2_1__body1" file="crystal_xtal3215_32_768khz_v2_1__body1.stl" />
-    <mesh name="body_tssop_1__body1" file="body_tssop_1__body1.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported6" file="sd_card_slot__rpi4modelb__imported6.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body27" file="bno085_9axis_imu_v1_1__body27.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5.stl" />
-    <mesh name="display_connector__rpi4modelb__imported6" file="display_connector__rpi4modelb__imported6.stl" />
-    <mesh name="sot23_5_v1_1__body3" file="sot23_5_v1_1__body3.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body19" file="bno085_9axis_imu_v1_1__body19.stl" />
-    <mesh name="manovella2" file="manovella2.stl" />
-    <mesh name="motor_shaft_2" file="motor_shaft_2.stl" />
-    <mesh name="handle" file="handle.stl" />
-    <mesh name="91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional" file="91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body10" file="bno085_9axis_imu_v1_1__body10.stl" />
-    <mesh name="sot23_5_v1_1__body4" file="sot23_5_v1_1__body4.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported9" file="camera_connector__rpi4modelb__imported9.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29.stl" />
-    <mesh name="motor_2" file="motor_2.stl" />
-    <mesh name="led_0603_single_color_v1_1__body3" file="led_0603_single_color_v1_1__body3.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body20" file="bno055_9axis_imu_v2_1__body20.stl" />
-    <mesh name="display_connector__rpi4modelb__imported16" file="display_connector__rpi4modelb__imported16.stl" />
-    <mesh name="broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow" file="broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body27" file="bno055_9axis_imu_v2_1__body27.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body26" file="bno055_9axis_imu_v2_1__body26.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported1" file="sd_card_slot__rpi4modelb__imported1.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported16" file="camera_connector__rpi4modelb__imported16.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body30" file="bno055_9axis_imu_v2_1__body30.stl" />
-    <mesh name="microphone_plug__rpi4modelb__imported2" file="microphone_plug__rpi4modelb__imported2.stl" />
-    <mesh name="display_connector__rpi4modelb__imported10" file="display_connector__rpi4modelb__imported10.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body13" file="bno085_9axis_imu_v1_1__body13.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body26" file="bno085_9axis_imu_v1_1__body26.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body29" file="bno055_9axis_imu_v2_1__body29.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32.stl" />
-    <mesh name="manovella1" file="manovella1.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1.stl" />
-    <mesh name="display_connector__rpi4modelb__imported1" file="display_connector__rpi4modelb__imported1.stl" />
-    <mesh name="gigabit_ethernet_port__rpi4modelb__imported1" file="gigabit_ethernet_port__rpi4modelb__imported1.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body25" file="bno085_9axis_imu_v1_1__body25.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body9" file="bno085_9axis_imu_v1_1__body9.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34.stl" />
-    <mesh name="sot23_5_v1_1__body6" file="sot23_5_v1_1__body6.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body12" file="bno085_9axis_imu_v1_1__body12.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body15" file="bno085_9axis_imu_v1_1__body15.stl" />
-    <mesh name="biella" file="biella.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported15" file="camera_connector__rpi4modelb__imported15.stl" />
-    <mesh name="display_connector__rpi4modelb__imported5" file="display_connector__rpi4modelb__imported5.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body23" file="bno085_9axis_imu_v1_1__body23.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body24" file="bno085_9axis_imu_v1_1__body24.stl" />
-    <mesh name="sot23_5_v1_1__body5" file="sot23_5_v1_1__body5.stl" />
-    <mesh name="body_lower" file="body_lower.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported17" file="camera_connector__rpi4modelb__imported17.stl" />
-    <mesh name="bodymotorholder" file="bodymotorholder.stl" />
-    <mesh name="display_connector__rpi4modelb__imported9" file="display_connector__rpi4modelb__imported9.stl" />
-    <mesh name="led_0603_single_color_v1_1__body4" file="led_0603_single_color_v1_1__body4.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25.stl" />
-    <mesh name="broadcom_bcm2711b0_cpu__rpi4modelb__top" file="broadcom_bcm2711b0_cpu__rpi4modelb__top.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported12" file="camera_connector__rpi4modelb__imported12.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported2" file="camera_connector__rpi4modelb__imported2.stl" />
-    <mesh name="mxl7704_universal_pmic__rpi4modelb__partnoextended" file="mxl7704_universal_pmic__rpi4modelb__partnoextended.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body1" file="bno055_9axis_imu_v2_1__body1.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body7" file="bno055_9axis_imu_v2_1__body7.stl" />
-    <mesh name="bss138ps_v2_1__body6" file="bss138ps_v2_1__body6.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body16" file="bno085_9axis_imu_v1_1__body16.stl" />
-    <mesh name="microphone_plug__rpi4modelb__imported4" file="microphone_plug__rpi4modelb__imported4.stl" />
-    <mesh name="handle_holder_1" file="handle_holder_1.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported9" file="sd_card_slot__rpi4modelb__imported9.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4.stl" />
-    <mesh name="tire" file="tire.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body21" file="bno085_9axis_imu_v1_1__body21.stl" />
     <mesh name="power_dist_box" file="power_dist_box.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body6" file="bno085_9axis_imu_v1_1__body6.stl" />
+    <mesh name="capc_0603_t0_9_bn_v1_1__body1" file="capc_0603_t0_9_bn_v1_1__body1.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported1" file="sd_card_slot__rpi4modelb__imported1.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4.stl" />
+    <mesh name="handle_holder_2" file="handle_holder_2.stl" />
+    <mesh name="sot23_5_v1_1__body6" file="sot23_5_v1_1__body6.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported41.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported12.stl" />
+    <mesh name="bodymotorholder" file="bodymotorholder.stl" />
+    <mesh name="qwicc_v1_1__body2" file="qwicc_v1_1__body2.stl" />
+    <mesh name="smallplate_manovella2" file="smallplate_manovella2.stl" />
+    <mesh name="realsense_holder" file="realsense_holder.stl" />
+    <mesh name="sot23_5_v1_1__body2" file="sot23_5_v1_1__body2.stl" />
+    <mesh name="bss138ps_v2_1__body2" file="bss138ps_v2_1__body2.stl" />
+    <mesh name="yc164_respack_v1_1__body1" file="yc164_respack_v1_1__body1.stl" />
+    <mesh name="sot23_5_v1_1__body1" file="sot23_5_v1_1__body1.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body31" file="bno085_9axis_imu_v1_1__body31.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body24" file="bno055_9axis_imu_v2_1__body24.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported1.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body30" file="bno055_9axis_imu_v2_1__body30.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported21.stl" />
+    <mesh name="body_lower" file="body_lower.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported10" file="sd_card_slot__rpi4modelb__imported10.stl" />
+    <mesh name="display_connector__rpi4modelb__imported7" file="display_connector__rpi4modelb__imported7.stl" />
+    <mesh name="wheel_tire_holder" file="wheel_tire_holder.stl" />
+    <mesh name="bss138ps_v2_1__body5" file="bss138ps_v2_1__body5.stl" />
+    <mesh name="motor_shaft_2" file="motor_shaft_2.stl" />
+    <mesh name="manovella2" file="manovella2.stl" />
+    <mesh name="crystal_xtal3215_32_768khz_v2_1__body1" file="crystal_xtal3215_32_768khz_v2_1__body1.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body7" file="bno085_9axis_imu_v1_1__body7.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported15" file="camera_connector__rpi4modelb__imported15.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported13" file="camera_connector__rpi4modelb__imported13.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body18" file="bno085_9axis_imu_v1_1__body18.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body11" file="bno055_9axis_imu_v2_1__body11.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported31.stl" />
+    <mesh name="display_connector__rpi4modelb__imported3" file="display_connector__rpi4modelb__imported3.stl" />
+    <mesh name="display_connector__rpi4modelb__imported13" file="display_connector__rpi4modelb__imported13.stl" />
+    <mesh name="mxl7704_universal_pmic__rpi4modelb__partnoextended" file="mxl7704_universal_pmic__rpi4modelb__partnoextended.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body9" file="bno055_9axis_imu_v2_1__body9.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported7" file="camera_connector__rpi4modelb__imported7.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported38.stl" />
+    <mesh name="display_connector__rpi4modelb__imported12" file="display_connector__rpi4modelb__imported12.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body15" file="bno085_9axis_imu_v1_1__body15.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported14.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body19" file="bno085_9axis_imu_v1_1__body19.stl" />
+    <mesh name="female_usb_type_c_connector__rpi4modelb__imported1" file="female_usb_type_c_connector__rpi4modelb__imported1.stl" />
+    <mesh name="display_connector__rpi4modelb__imported8" file="display_connector__rpi4modelb__imported8.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported12" file="camera_connector__rpi4modelb__imported12.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body5" file="bno055_9axis_imu_v2_1__body5.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body16" file="bno085_9axis_imu_v1_1__body16.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body22" file="bno055_9axis_imu_v2_1__body22.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported9" file="camera_connector__rpi4modelb__imported9.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body4" file="bno055_9axis_imu_v2_1__body4.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported1.stl" />
+    <mesh name="via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp" file="via_vl805_pcie_usb_3_0_controller__rpi4modelb__sc_cp.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported35.stl" />
+    <mesh name="microphone_plug__rpi4modelb__imported4" file="microphone_plug__rpi4modelb__imported4.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported4" file="sd_card_slot__rpi4modelb__imported4.stl" />
+    <mesh name="bss138ps_v2_1__body7" file="bss138ps_v2_1__body7.stl" />
+    <mesh name="display_connector__rpi4modelb__imported5" file="display_connector__rpi4modelb__imported5.stl" />
+    <mesh name="part_7" file="part_7.stl" />
+    <mesh name="capc_0805_t0_95_bn_v1_1__body1" file="capc_0805_t0_95_bn_v1_1__body1.stl" />
+    <mesh name="pernobiella" file="pernobiella.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body26" file="bno055_9axis_imu_v2_1__body26.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39.stl" />
+    <mesh name="bss138ps_v2_1__body6" file="bss138ps_v2_1__body6.stl" />
+    <mesh name="motor_2" file="motor_2.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body11" file="bno085_9axis_imu_v1_1__body11.stl" />
+    <mesh name="qwicc_v1_1__body7" file="qwicc_v1_1__body7.stl" />
+    <mesh name="cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp" file="cypress_cyw43455_wireless_module_cover__rpi4modelb__ventlp.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body23" file="bno085_9axis_imu_v1_1__body23.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported8" file="camera_connector__rpi4modelb__imported8.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported23.stl" />
+    <mesh name="handle_holder_1" file="handle_holder_1.stl" />
+    <mesh name="imu_holder" file="imu_holder.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported22.stl" />
+    <mesh name="display_connector__rpi4modelb__imported9" file="display_connector__rpi4modelb__imported9.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body14" file="bno085_9axis_imu_v1_1__body14.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported1" file="camera_connector__rpi4modelb__imported1.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported3" file="camera_connector__rpi4modelb__imported3.stl" />
+    <mesh name="bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported17.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body5" file="bno085_9axis_imu_v1_1__body5.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body18" file="bno055_9axis_imu_v2_1__body18.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body27" file="bno055_9axis_imu_v2_1__body27.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported19.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body14" file="bno055_9axis_imu_v2_1__body14.stl" />
+    <mesh name="display_connector__rpi4modelb__imported1" file="display_connector__rpi4modelb__imported1.stl" />
+    <mesh name="sot23_5_v1_1__body5" file="sot23_5_v1_1__body5.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body29" file="bno055_9axis_imu_v2_1__body29.stl" />
+    <mesh name="microphone_plug__rpi4modelb__imported2" file="microphone_plug__rpi4modelb__imported2.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported29.stl" />
+    <mesh name="display_connector__rpi4modelb__imported14" file="display_connector__rpi4modelb__imported14.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body19" file="bno055_9axis_imu_v2_1__body19.stl" />
+    <mesh name="sot23_5_v1_1__body4" file="sot23_5_v1_1__body4.stl" />
+    <mesh name="microphone_plug__rpi4modelb__imported5" file="microphone_plug__rpi4modelb__imported5.stl" />
+    <mesh name="display_connector__rpi4modelb__imported15" file="display_connector__rpi4modelb__imported15.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported10" file="camera_connector__rpi4modelb__imported10.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported28.stl" />
+    <mesh name="wheelmotorhub" file="wheelmotorhub.stl" />
+    <mesh name="female_micro_hdmi_connector__rpi4modelb__imported1" file="female_micro_hdmi_connector__rpi4modelb__imported1.stl" />
+    <mesh name="led_0603_single_color_v1_1__body2" file="led_0603_single_color_v1_1__body2.stl" />
+    <mesh name="crystal_xtal3215_32_768khz_v2_1__body3" file="crystal_xtal3215_32_768khz_v2_1__body3.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body20" file="bno085_9axis_imu_v1_1__body20.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported25.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported2.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body29" file="bno085_9axis_imu_v1_1__body29.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported5" file="sd_card_slot__rpi4modelb__imported5.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body30" file="bno085_9axis_imu_v1_1__body30.stl" />
+    <mesh name="broadcom_bcm2711b0_cpu__rpi4modelb__top" file="broadcom_bcm2711b0_cpu__rpi4modelb__top.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body16" file="bno055_9axis_imu_v2_1__body16.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body20" file="bno055_9axis_imu_v2_1__body20.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported16" file="camera_connector__rpi4modelb__imported16.stl" />
     <mesh name="bno055_9axis_imu_v2_1__body13" file="bno055_9axis_imu_v2_1__body13.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported5" file="camera_connector__rpi4modelb__imported5.stl" />
+    <mesh name="broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow" file="broadcom_bcm2711b0_cpu__rpi4modelb__locatingarrow.stl" />
+    <mesh name="robot_roof" file="robot_roof.stl" />
+    <mesh name="crystal_xtal3215_32_768khz_v2_1__body4" file="crystal_xtal3215_32_768khz_v2_1__body4.stl" />
+    <mesh name="91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional" file="91d77_d9whv_778k__4_gb_lpddr4_sdram__rpi4modelb__partnoadditional.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body26" file="bno085_9axis_imu_v1_1__body26.stl" />
+    <mesh name="display_connector__rpi4modelb__imported2" file="display_connector__rpi4modelb__imported2.stl" />
+    <mesh name="power_box_lid" file="power_box_lid.stl" />
+    <mesh name="tire" file="tire.stl" />
+    <mesh name="sot23_5_v1_1__body3" file="sot23_5_v1_1__body3.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body24" file="bno085_9axis_imu_v1_1__body24.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported4" file="camera_connector__rpi4modelb__imported4.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported15.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body12" file="bno085_9axis_imu_v1_1__body12.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body17" file="bno055_9axis_imu_v2_1__body17.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body15" file="bno055_9axis_imu_v2_1__body15.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body23" file="bno055_9axis_imu_v2_1__body23.stl" />
+    <mesh name="display_connector__rpi4modelb__imported6" file="display_connector__rpi4modelb__imported6.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported3.stl" />
+    <mesh name="qwicc_v1_1__body5" file="qwicc_v1_1__body5.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported40.stl" />
+    <mesh name="crystal_xtal3215_32_768khz_v2_1__body2" file="crystal_xtal3215_32_768khz_v2_1__body2.stl" />
+    <mesh name="gigabit_ethernet_port__rpi4modelb__imported1" file="gigabit_ethernet_port__rpi4modelb__imported1.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body21" file="bno055_9axis_imu_v2_1__body21.stl" />
+    <mesh name="display_connector__rpi4modelb__imported16" file="display_connector__rpi4modelb__imported16.stl" />
+    <mesh name="led_0603_single_color_v1_1__body1" file="led_0603_single_color_v1_1__body1.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body17" file="bno085_9axis_imu_v1_1__body17.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported36.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body13" file="bno085_9axis_imu_v1_1__body13.stl" />
+    <mesh name="display_connector__rpi4modelb__imported17" file="display_connector__rpi4modelb__imported17.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported6" file="camera_connector__rpi4modelb__imported6.stl" />
     <mesh name="led_0603_single_color_v1_1__body5" file="led_0603_single_color_v1_1__body5.stl" />
     <mesh name="bno085_9axis_imu_v1_1__body1" file="bno085_9axis_imu_v1_1__body1.stl" />
-    <mesh name="qwicc_v1_1__body1" file="qwicc_v1_1__body1.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported5.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported5" file="sd_card_slot__rpi4modelb__imported5.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body2" file="bno085_9axis_imu_v1_1__body2.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27.stl" />
-    <mesh name="crystal_xtal3215_32_768khz_v2_1__body2" file="crystal_xtal3215_32_768khz_v2_1__body2.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported3" file="camera_connector__rpi4modelb__imported3.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported4.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body25" file="bno055_9axis_imu_v2_1__body25.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body28" file="bno055_9axis_imu_v2_1__body28.stl" />
-    <mesh name="sot23_5_v1_1__body2" file="sot23_5_v1_1__body2.stl" />
-    <mesh name="microphone_plug__rpi4modelb__imported1" file="microphone_plug__rpi4modelb__imported1.stl" />
-    <mesh name="qwicc_v1_1__body2" file="qwicc_v1_1__body2.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body22" file="bno085_9axis_imu_v1_1__body22.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body3" file="bno085_9axis_imu_v1_1__body3.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body2" file="bno055_9axis_imu_v2_1__body2.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body4" file="bno085_9axis_imu_v1_1__body4.stl" />
-    <mesh name="display_connector__rpi4modelb__imported13" file="display_connector__rpi4modelb__imported13.stl" />
-    <mesh name="qwicc_v1_1__body4" file="qwicc_v1_1__body4.stl" />
+    <mesh name="handle" file="handle.stl" />
+    <mesh name="2x_usb3_0_ports__rpi4modelb__imported1" file="2x_usb3_0_ports__rpi4modelb__imported1.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body6" file="bno085_9axis_imu_v1_1__body6.stl" />
     <mesh name="bss138ps_v2_1__body4" file="bss138ps_v2_1__body4.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body8" file="bno055_9axis_imu_v2_1__body8.stl" />
-    <mesh name="bss138ps_v2_1__body2" file="bss138ps_v2_1__body2.stl" />
-    <mesh name="sd_card_slot__rpi4modelb__imported8" file="sd_card_slot__rpi4modelb__imported8.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported33.stl" />
-    <mesh name="bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body18" file="bno055_9axis_imu_v2_1__body18.stl" />
-    <mesh name="broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3" file="broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3.stl" />
-    <mesh name="sot23_5_v1_1__body1" file="sot23_5_v1_1__body1.stl" />
-    <mesh name="pcb__rpi4modelb__cornerradius" file="pcb__rpi4modelb__cornerradius.stl" />
     <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported18" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported18.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported30.stl" />
-    <mesh name="display_connector__rpi4modelb__imported2" file="display_connector__rpi4modelb__imported2.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported26.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10.stl" />
-    <mesh name="display_connector__rpi4modelb__imported8" file="display_connector__rpi4modelb__imported8.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body31" file="bno055_9axis_imu_v2_1__body31.stl" />
-    <mesh name="robot_roof" file="robot_roof.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported11.stl" />
-    <mesh name="lead_tssop_1__body1" file="lead_tssop_1__body1.stl" />
-    <mesh name="yc164_respack_v1_1__body1" file="yc164_respack_v1_1__body1.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body6" file="bno055_9axis_imu_v2_1__body6.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body17" file="bno085_9axis_imu_v1_1__body17.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported13" file="camera_connector__rpi4modelb__imported13.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported7.stl" />
-    <mesh name="display_connector__rpi4modelb__imported11" file="display_connector__rpi4modelb__imported11.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported3.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported5" file="camera_connector__rpi4modelb__imported5.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16.stl" />
+    <mesh name="qwicc_v1_1__body4" file="qwicc_v1_1__body4.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported14" file="camera_connector__rpi4modelb__imported14.stl" />
+    <mesh name="bss138ps_v2_1__body3" file="bss138ps_v2_1__body3.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported32.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body22" file="bno085_9axis_imu_v1_1__body22.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body25" file="bno085_9axis_imu_v1_1__body25.stl" />
+    <mesh name="manovella1" file="manovella1.stl" />
     <mesh name="qwicc_v1_1__body3" file="qwicc_v1_1__body3.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body5" file="bno055_9axis_imu_v2_1__body5.stl" />
-    <mesh name="led_0603_single_color_v1_1__body1" file="led_0603_single_color_v1_1__body1.stl" />
-    <mesh name="qwicc_v1_1__body5" file="qwicc_v1_1__body5.stl" />
-    <mesh name="display_connector__rpi4modelb__imported15" file="display_connector__rpi4modelb__imported15.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body9" file="bno085_9axis_imu_v1_1__body9.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported6" file="sd_card_slot__rpi4modelb__imported6.stl" />
+    <mesh name="led_0603_single_color_v1_1__body4" file="led_0603_single_color_v1_1__body4.stl" />
+    <mesh name="qwicc_v1_1__body1" file="qwicc_v1_1__body1.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body28" file="bno055_9axis_imu_v2_1__body28.stl" />
+    <mesh name="bss138ps_v2_1__body1" file="bss138ps_v2_1__body1.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported11" file="camera_connector__rpi4modelb__imported11.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body1" file="bno055_9axis_imu_v2_1__body1.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported9.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported27.stl" />
+    <mesh name="microphone_plug__rpi4modelb__imported1" file="microphone_plug__rpi4modelb__imported1.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported2" file="sd_card_slot__rpi4modelb__imported2.stl" />
+    <mesh name="display_connector__rpi4modelb__imported4" file="display_connector__rpi4modelb__imported4.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported9" file="sd_card_slot__rpi4modelb__imported9.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported24.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported8.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported17" file="camera_connector__rpi4modelb__imported17.stl" />
+    <mesh name="biella" file="biella.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported37.stl" />
+    <mesh name="pcb__rpi4modelb__cornerradius" file="pcb__rpi4modelb__cornerradius.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4" file="2_54_mm_dupont_male_pin_header__poe__2x2__rpi4modelb__imported4.stl" />
+    <mesh name="led_0603_single_color_v1_1__body3" file="led_0603_single_color_v1_1__body3.stl" />
+    <mesh name="body_tssop_1__body1" file="body_tssop_1__body1.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported3" file="sd_card_slot__rpi4modelb__imported3.stl" />
+    <mesh name="display_connector__rpi4modelb__imported10" file="display_connector__rpi4modelb__imported10.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body27" file="bno085_9axis_imu_v1_1__body27.stl" />
+    <mesh name="printed_circuit_board_1__body1" file="printed_circuit_board_1__body1.stl" />
+    <mesh name="wheelstickcover" file="wheelstickcover.stl" />
+    <mesh name="broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3" file="broadcom_bcm54213pe_gigabit_ethernet_transceiver__rpi4modelb__partnoe3.stl" />
     <mesh name="bno055_9axis_imu_v2_1__body10" file="bno055_9axis_imu_v2_1__body10.stl" />
-    <mesh name="qwicc_v1_1__body6" file="qwicc_v1_1__body6.stl" />
-    <mesh name="camera_connector__rpi4modelb__imported1" file="camera_connector__rpi4modelb__imported1.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported39.stl" />
-    <mesh name="bss138ps_v2_1__body7" file="bss138ps_v2_1__body7.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body9" file="bno055_9axis_imu_v2_1__body9.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body4" file="bno085_9axis_imu_v1_1__body4.stl" />
+    <mesh name="microphone_plug__rpi4modelb__imported3" file="microphone_plug__rpi4modelb__imported3.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body25" file="bno055_9axis_imu_v2_1__body25.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body8" file="bno055_9axis_imu_v2_1__body8.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body7" file="bno055_9axis_imu_v2_1__body7.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported10.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body3" file="bno085_9axis_imu_v1_1__body3.stl" />
     <mesh name="bno055_9axis_imu_v2_1__body12" file="bno055_9axis_imu_v2_1__body12.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body24" file="bno055_9axis_imu_v2_1__body24.stl" />
-    <mesh name="female_micro_hdmi_connector__rpi4modelb__imported1" file="female_micro_hdmi_connector__rpi4modelb__imported1.stl" />
+    <mesh name="camera_connector__rpi4modelb__imported2" file="camera_connector__rpi4modelb__imported2.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported5.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body8" file="bno085_9axis_imu_v1_1__body8.stl" />
+    <mesh name="display_connector__rpi4modelb__imported11" file="display_connector__rpi4modelb__imported11.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported7" file="sd_card_slot__rpi4modelb__imported7.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body21" file="bno085_9axis_imu_v1_1__body21.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body31" file="bno055_9axis_imu_v2_1__body31.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported16.stl" />
     <mesh name="bno055_9axis_imu_v2_1__body3" file="bno055_9axis_imu_v2_1__body3.stl" />
-    <mesh name="bno055_9axis_imu_v2_1__body11" file="bno055_9axis_imu_v2_1__body11.stl" />
-    <mesh name="display_connector__rpi4modelb__imported12" file="display_connector__rpi4modelb__imported12.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported20.stl" />
+    <mesh name="qwicc_v1_1__body6" file="qwicc_v1_1__body6.stl" />
     <mesh name="rpi_holder" file="rpi_holder.stl" />
-    <mesh name="bno085_9axis_imu_v1_1__body7" file="bno085_9axis_imu_v1_1__body7.stl" />
-    <mesh name="display_connector__rpi4modelb__imported3" file="display_connector__rpi4modelb__imported3.stl" />
-    <mesh name="led_0603_single_color_v1_1__body2" file="led_0603_single_color_v1_1__body2.stl" />
-    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported2.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body2" file="bno055_9axis_imu_v2_1__body2.stl" />
+    <mesh name="bno055_9axis_imu_v2_1__body6" file="bno055_9axis_imu_v2_1__body6.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported6.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported13.stl" />
     <mesh name="2x_usb2_0_ports__rpi4modelb__imported1" file="2x_usb2_0_ports__rpi4modelb__imported1.stl" />
-    <mesh name="right_biella" file="biella.stl" />
+    <mesh name="bno085_9axis_imu_v1_1__body10" file="bno085_9axis_imu_v1_1__body10.stl" />
+    <mesh name="sd_card_slot__rpi4modelb__imported8" file="sd_card_slot__rpi4modelb__imported8.stl" />
+    <mesh name="lead_tssop_1__body1" file="lead_tssop_1__body1.stl" />
+    <mesh name="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34" file="2_54_mm_dupont_male_pin_header__io__2x20__rpi4modelb__imported34.stl" />
     <mesh name="right_pernobiella" file="pernobiella.stl" />
     <mesh name="right_wheelmotorhub" file="wheelmotorhub.stl" />
-    <mesh name="right_motor_2" file="motor_2.stl" />
-    <mesh name="right_manovella2" file="manovella2.stl" />
     <mesh name="right_bodymotorholder" file="bodymotorholder.stl" />
-    <mesh name="right_smallplate_manovella2" file="smallplate_manovella2.stl" />
+    <mesh name="right_wheel_tire_holder" file="wheel_tire_holder.stl" />
     <mesh name="right_motor_shaft_2" file="motor_shaft_2.stl" />
+    <mesh name="right_manovella2" file="manovella2.stl" />
+    <mesh name="right_biella" file="biella.stl" />
     <mesh name="right_manovella1" file="manovella1.stl" />
     <mesh name="right_tire" file="tire.stl" />
     <mesh name="right_bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl" />
-    <mesh name="right_wheel_tire_holder" file="wheel_tire_holder.stl" />
     <mesh name="right_wheelstickcover" file="wheelstickcover.stl" />
-    <mesh name="left_wheelstickcover" file="wheelstickcover.stl" />
-    <mesh name="left_pernobiella" file="pernobiella.stl" />
-    <mesh name="left_bodymotorholder" file="bodymotorholder.stl" />
+    <mesh name="right_motor_2" file="motor_2.stl" />
+    <mesh name="right_smallplate_manovella2" file="smallplate_manovella2.stl" />
     <mesh name="left_wheelmotorhub" file="wheelmotorhub.stl" />
-    <mesh name="left_biella" file="biella.stl" />
-    <mesh name="left_bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl" />
     <mesh name="left_tire" file="tire.stl" />
-    <mesh name="left_motor_2" file="motor_2.stl" />
+    <mesh name="left_biella" file="biella.stl" />
     <mesh name="left_wheel_tire_holder" file="wheel_tire_holder.stl" />
+    <mesh name="left_bearing_5_2_4_0_7" file="bearing_5_2_4_0_7.stl" />
+    <mesh name="left_pernobiella" file="pernobiella.stl" />
     <mesh name="left_manovella1" file="manovella1.stl" />
-    <mesh name="left_manovella2" file="manovella2.stl" />
+    <mesh name="left_motor_2" file="motor_2.stl" />
     <mesh name="left_motor_shaft_2" file="motor_shaft_2.stl" />
+    <mesh name="left_wheelstickcover" file="wheelstickcover.stl" />
+    <mesh name="left_bodymotorholder" file="bodymotorholder.stl" />
     <mesh name="left_smallplate_manovella2" file="smallplate_manovella2.stl" />
+    <mesh name="left_manovella2" file="manovella2.stl" />
   </asset>
   <worldbody>
     <body name="torso" childclass="robot">
@@ -552,8 +556,11 @@
       <joint class="main" type="free" />
       <geom class="visual" pos="0.0261725 0.384364 -0.351331" quat="0.548841 -0.548841 -0.445841 0.445841" material="handle_holder_1_material" mesh="handle_holder_1" />
       <geom class="visual" pos="0.0261725 0.384364 -0.351331" quat="0.548841 -0.548841 -0.445841 0.445841" material="handle_holder_2_material" mesh="handle_holder_2" />
+      <geom class="visual" pos="0.0327148 0.470904 -0.351331" quat="0.617922 -0.343762 0.617922 0.343762" material="part_7_material" mesh="part_7" />
+      <geom class="collision" pos="0.0327148 0.470904 -0.351331" quat="0.617922 -0.343762 0.617922 0.343762" type="mesh" material="part_7_material" mesh="part_7" />
       <geom class="visual" pos="0.0914954 0.370689 -0.411331" quat="0.630514 0 0 -0.776178" material="body_lower_material" mesh="body_lower" />
       <geom class="collision" pos="0.0914954 0.370689 -0.411331" quat="0.630514 0 0 -0.776178" type="mesh" material="body_lower_material" mesh="body_lower" />
+      <geom class="visual" pos="0.0379545 0.440644 -0.351331" quat="0.445841 0.445841 -0.548841 -0.548841" material="realsense_holder_material" mesh="realsense_holder" />
       <geom class="visual" pos="0.0261725 0.384364 -0.351331" quat="0.445841 0.445841 -0.548841 -0.548841" material="handle_material" mesh="handle" />
       <geom class="collision" pos="0.0261725 0.384364 -0.351331" quat="0.445841 0.445841 -0.548841 -0.548841" type="mesh" material="handle_material" mesh="handle" />
       <geom class="visual" pos="0.0914954 0.370689 -0.351331" quat="0.548841 -0.548841 -0.445841 0.445841" material="power_box_lid_material" mesh="power_box_lid" />
@@ -954,6 +961,9 @@
       <body name="raspberry_pi" pos="0.010242 0.314045 -0.352678">
         <inertial pos="0 0 0" quat="0.818308 0.0583643 -0.0495217 0.56966" mass="0.095" diaginertia="7.24653e-05 6.14623e-05 2.8303e-05" />
       </body>
+      <body name="camera" pos="0.0253331 0.454079 -0.352144">
+        <inertial pos="0 0 0" quat="0.999526 0.00323778 0.00229686 -0.0305284" mass="0.099" diaginertia="6.24236e-05 5.50349e-05 1.89858e-05" />
+      </body>
       <frame name="imu_mount" pos="0.00761387 0.355449 -0.351366" quat="0.53523103 -0.56212155 -0.45662921 0.43478519">
         <site name="imu" group="2" rgba="1 0.85 0.1 1" />
         <site name="imu_chip" size="0.003" quat="0.707107 0 0 0.707107" group="3" />
@@ -967,6 +977,12 @@
           <inertial pos="0 0 0" mass="0.4" diaginertia="0.0006 0.00033333333 0.00069333333" />
           <geom name="identified_payload" type="box" group="3" contype="0" conaffinity="0" size="0.04 0.06 0.03" rgba="0.9 0.3 0.3 0.4" />
         </body>
+      </frame>
+      <frame name="camera_mount" pos="0.0304473 0.46725 -0.368869" quat="0.617922 -0.617922 -0.343762 0.343762">
+        <site name="camera_link" size="0.004" group="2" rgba="0.2 0.8 0.9 1" />
+        <site name="camera_depth_optical" size="0.003" quat="0.5 -0.5 0.5 -0.5" group="3" />
+        <site name="camera_view" size="0.0015 0.03" pos="0.03 0 0" quat="0.707107 0 -0.707107 0" type="cylinder" group="2" rgba="0.2 0.8 0.9 1" />
+        <camera name="d435_depth" quat="0.5 0.5 -0.5 -0.5" resolution="424 240" fovy="58" />
       </frame>
     </body>
   </worldbody>
@@ -1002,6 +1018,6 @@
     <jointvel joint="left_wheel" name="left_wheel_vel" />
   </sensor>
   <keyframe>
-    <key name="stand" qpos="-0.378823 -0.351681 0.264795 0.55811 0.55811 0.434181 -0.434181 0.41133484 0.123066 0.21714621 0.424165 -1.48937 0.21522591 -1.10099 2.14299 0.41287811 1.0894" ctrl="0 0 0 0 0 0" />
+    <key name="stand" qpos="-0.380817 -0.351681 0.260378 0.560282 0.560282 0.431374 -0.431374 0.41872984 0.110193 0.22624421 0.409085 -0.716328 0.22433391 -1.08589 2.14299 0.42027311 1.07654" ctrl="0 0 0 0 0 0" />
   </keyframe>
 </mujoco>

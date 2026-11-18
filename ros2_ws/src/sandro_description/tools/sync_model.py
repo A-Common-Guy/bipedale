@@ -378,8 +378,18 @@ def apply_masses(worldbody: ET.Element, masses: dict, payload_kg: float) -> None
         set_mass(links, float(masses["lower_links_per_side_kg"]))
         set_mass([joint_body[f"{side}_wheel"]], float(masses["wheel_kg"]))
 
-    total = payload_kg + sum(float(b.find("inertial").attrib["mass"])
-                             for b in worldbody.iter("body") if b.find("inertial") is not None)
+    camera_kg = float(masses.get("camera_kg", 0.0))
+    camera = torso.find("./body[@name='camera']")
+    if camera_kg > 0.0:
+        if camera is None or camera.find("joint") is not None:
+            raise ValueError("camera_kg needs a jointless camera child of the torso")
+        set_mass([camera], camera_kg)
+    elif camera is not None:
+        raise ValueError("the model has a camera body but masses has no camera_kg")
+
+    total = payload_kg - camera_kg + sum(
+        float(b.find("inertial").attrib["mass"])
+        for b in worldbody.iter("body") if b.find("inertial") is not None)
     if abs(total - float(masses["total_kg"])) > 0.001:
         raise ValueError(f"measured components add up to {total:.4f} kg, "
                          f"not the weighed {masses['total_kg']} kg")

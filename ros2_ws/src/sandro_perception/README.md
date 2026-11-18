@@ -1,7 +1,8 @@
 # sandro_perception
 
-Sandro's eyes. A RealSense D435 sits on the front bracket (81 mm ahead of the
-IMU, looking 20 degrees down since 2026-11-18; `config/perception.yaml`) and, for now, on the Raspberry Pi's USB 3
+Sandro's eyes. A RealSense D435 sits on the front bracket (its depth origin
+114 mm ahead of the IMU, looking 20 degrees down since 2026-11-18: the CAD
+camera, `config/perception.yaml`) and, for now, on the Raspberry Pi's USB 3
 port. This package turns its depth images into the one thing the balance
 policies will read: the **terrain profile**, the floor height at eight points
 ahead of each wheel.
@@ -79,8 +80,11 @@ this once after every change to the bracket.
   (`configs/agile_perceptive.yaml`, sandro_rl/docs/DESIGN.md 14) and
   `RlPolicyController` takes it for policies exported with it, but the first
   policies gain nothing from the camera.
-- The camera is not in the simulation model or the URDF, and the mount's x
-  and z are the level bracket's.
+- The camera is in the simulation model (`d435_depth`, a MuJoCo camera with
+  the depth stream's field of view, which nothing renders yet) and in the URDF
+  (`camera_link`, `camera_depth_optical_frame`, the frames realsense2_camera
+  stamps), but this node takes its mount from `mount.*`, not from TF.
+  `sandro_description`'s tests keep the three the same.
 - Obstacles are only "high floor": nothing tells a person from a wall, and a
   wall reads high only in the cell of its visible face, unknown behind
   (not +0.25 as said above for everything beyond it).

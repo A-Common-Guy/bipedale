@@ -1,0 +1,13 @@
+{
+    "configuration": "default",
+    "documentId": "e5cda129f952f5ca0f29e636",
+    "documentMicroversion": "c17453294a55dfa1524cc137",
+    "elementId": "0ba810e164b3b60f261dd493",
+    "fullConfiguration": "default",
+    "id": "MNNtHrxTYgbNE5taN",
+    "isStandardContent": false,
+    "name": "realsense_holder <2>",
+    "partId": "JID",
+    "suppressed": false,
+    "type": "Part"
+}

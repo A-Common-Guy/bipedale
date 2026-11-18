@@ -103,8 +103,10 @@ def test_a_flat_floor_reads_zero_and_the_near_floor_is_unknown_until_driven_over
     t = drive(robot, profile, 1.0)
     heights, known = profile.profile()
     distances = np.array(profile.s.layout.distances_m)
-    # Level at 0.34 m a D435 sees the floor from about 0.6 m: nearer is not known yet.
-    assert not known[:, distances < 0.5].any() and known[:, distances > 0.75].all()
+    # Tilted 20 degrees down a D435 sees the floor from about 0.4 m: nearer is not known yet.
+    # Standing perfectly still the 1.35 m sample is hit or missed by whole pixel rows (two
+    # rows there are 6 cm of floor), so it waits for the drive below.
+    assert not known[:, distances <= 0.3].any() and known[:, (distances >= 0.45) & (distances < 1.2)].all()
     assert np.abs(heights).max() < 0.005
     pitch, roll, offset, count = profile.last_fit
     assert abs(pitch) < 2e-3 and abs(roll) < 2e-3 and abs(offset) < 2e-3 and count > 200
@@ -176,13 +178,13 @@ def test_the_floor_fit_shows_a_mount_that_looks_further_down_than_configured():
     assert pitch == pytest.approx(math.radians(2.0), abs=math.radians(0.3)) and abs(roll) < 5e-3
 
 
-def test_a_camera_tilted_down_20_degrees_sees_the_floor_from_nearer():
-    """Level, the floor is in view from about 0.7 m ahead of the wheels; tilted 20 degrees
-    down, from about 0.4 m."""
-    settings = Settings(mount=Mount(pitch_rad=math.radians(20.0)))
+def test_a_level_camera_sees_the_floor_only_from_further():
+    """Tilted 20 degrees down, the floor is in view from about 0.4 m ahead of the wheels;
+    level, from about 0.6 m."""
+    settings = Settings(mount=Mount(pitch_rad=0.0))
     robot, profile = Robot(), HeightProfile(settings)
     drive(robot, profile, 1.0)
     heights, known = profile.profile()
     distances = np.array(settings.layout.distances_m)
-    assert known[:, distances >= 0.45].all() and not known[:, distances <= 0.3].any()
+    assert not known[:, distances < 0.5].any() and known[:, distances > 0.75].all()
     assert np.abs(heights).max() < 0.005

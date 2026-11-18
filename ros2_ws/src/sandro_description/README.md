@@ -72,6 +72,15 @@ weighed hub masses of `config/sim_identified.yaml` (they carry no material in
 Onshape) with the Raspberry Pi as the jointless `raspberry_pi` body, keeps
 collision only on the outer shell, takes the `imu` frame from the BNO085
 board part (`onshape_export/imu_mount.py`) and writes the stand keyframe.
+The RealSense D435 is found by its 90 x 25 x 25 mm box: with its bracket it is
+the jointless `camera` body (`masses.camera_kg`, on top of the weighed total),
+its box collides, and `onshape_export/camera_mount.py` turns it into the
+`camera_mount` frame (`camera_link` at the depth origin, the
+`camera_depth_optical` site, the `d435_depth` camera). The URDF's
+`camera_mount` joint and `sandro_perception`'s mount must match that frame in
+the `imu` frame, which `test/test_description.py` checks. Parts not fastened
+in the Onshape assembly come out as free bodies and are dropped with a
+warning.
 The board's own axes are the `imu_chip` site; the real driver's
 `imu_mount_yaw_rad` (`urdf/sandro.urdf.xacro`) must match its yaw, which
 `test/test_description.py` checks. Then run:

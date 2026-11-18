@@ -77,9 +77,16 @@ actuators:
 #                            two coupling shafts to the upper cranks; split
 #                            between the two in the CAD proportion
 #   wheel_kg                 each wheel joint body: hub, tyre, motor rotor
-# total_kg is the whole robot on the scale; sync fails if the components do
-# not add up to it within 1 g. Weighed without a battery (bench supply):
-# weigh again, and redo the tilt weighing, once one is fitted.
+#   camera_kg                the RealSense D435 and its front bracket: the
+#                            jointless camera body. Not on the scale on
+#                            2026-10-21, so it comes on top of total_kg. Not
+#                            weighed either: 0.072 for the D435 (datasheet)
+#                            and 0.027 for the bracket (its CAD volume,
+#                            21.8 cm3, as solid PLA)
+# total_kg is the whole robot on the scale, without the camera; sync fails if
+# the other components do not add up to it within 1 g. Weighed without a
+# battery (bench supply): weigh again, with the camera, and redo the tilt
+# weighing, once one is fitted.
 masses:
   total_kg: 4.825
   central_hub_kg: 1.145
@@ -88,6 +95,7 @@ masses:
   upper_crank_kg: 0.112
   lower_links_per_side_kg: 0.670
   wheel_kg: 0.170
+  camera_kg: 0.099
 
 # Part of the central hub's mass, in the IMU frame (x forward, y left, z up),
 # placed where the tilt weighing puts the CoM (tools/com_from_weighing.py

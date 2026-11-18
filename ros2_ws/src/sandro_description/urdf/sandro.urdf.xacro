@@ -56,6 +56,39 @@
   </joint>
 
   <!--
+    RealSense D435 on the front bracket, as realsense2_camera names its frames
+    (camera_name "camera", publish_tf false: these replace its static TF).
+    camera_link is the depth origin, the left imager, x along the optical axis,
+    y left, z up. The pose is the mjcf camera_mount frame in the imu frame,
+    which onshape_export/camera_mount.py takes from the CAD camera; the
+    sandro_perception mount (config/perception.yaml) must be the same, which
+    test/test_description.py checks.
+  -->
+  <link name="camera_link">
+    <visual>
+      <origin xyz="-0.0082 -0.0175 0"/>
+      <geometry><box size="0.025 0.090 0.025"/></geometry>
+      <material name="wheel_dark"/>
+    </visual>
+  </link>
+  <joint name="camera_mount" type="fixed">
+    <parent link="imu_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.11411 0.0175 0.00056" rpy="0 0.349066 0"/>
+  </joint>
+  <link name="camera_depth_frame"/>
+  <joint name="camera_depth_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_depth_frame"/>
+  </joint>
+  <link name="camera_depth_optical_frame"/>
+  <joint name="camera_depth_optical_joint" type="fixed">
+    <parent link="camera_depth_frame"/>
+    <child link="camera_depth_optical_frame"/>
+    <origin rpy="${-pi/2} 0 ${-pi/2}"/>
+  </joint>
+
+  <!--
     dir is the body-x direction from the inner to the outer pivot: +1 on the
     right, -1 on the left. The inner/outer motor names are mirrored between
     the sides (right inner is the rear motor, left inner the front one), and

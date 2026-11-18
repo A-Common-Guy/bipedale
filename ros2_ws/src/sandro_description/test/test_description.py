@@ -91,6 +91,61 @@ def test_raspberry_pi_carries_its_weighed_mass():
     assert abs(float(body.find("./inertial").attrib["mass"]) - masses["raspberry_pi_kg"]) < 1e-9
 
 
+def test_camera_carries_its_mass():
+    masses = sync_model.load_identified()["masses"]
+    root = ET.parse(PACKAGE / "mjcf" / "robot_ros2.xml").getroot()
+    body = root.find("./worldbody/body[@name='torso']/body[@name='camera']")
+    assert body is not None
+    assert body.find("./joint") is None
+    assert abs(float(body.find("./inertial").attrib["mass"]) - masses["camera_kg"]) < 1e-9
+
+
+def _quat_matrix(w, x, y, z):
+    return [
+        [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+        [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+        [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
+    ]
+
+
+def _frame_pose(frame):
+    pos = [float(v) for v in frame.attrib.get("pos", "0 0 0").split()]
+    quat = [float(v) for v in frame.attrib.get("quat", "1 0 0 0").split()]
+    return pos, _quat_matrix(*quat)
+
+
+def test_camera_frames_agree_with_the_cad_and_the_perception_mount():
+    """camera_link in the imu frame: the MJCF (from the CAD), the URDF and sandro_perception."""
+    import yaml
+
+    root = ET.parse(PACKAGE / "mjcf" / "robot_full_floating.xml").getroot()
+    torso = root.find("./worldbody/body[@name='torso']")
+    imu_pos, imu_R = _frame_pose(torso.find("./frame[@name='imu_mount']"))
+    camera = torso.find("./frame[@name='camera_mount']")
+    cam_pos, cam_R = _frame_pose(camera)
+    assert "quat" not in camera.find("./site[@name='camera_link']").attrib
+    assert camera.find("./camera[@name='d435_depth']") is not None
+    offset = [sum(imu_R[r][c] * (cam_pos[r] - imu_pos[r]) for r in range(3)) for c in range(3)]
+    R = [[sum(imu_R[k][r] * cam_R[k][c] for k in range(3)) for c in range(3)] for r in range(3)]
+    pitch = math.asin(-R[2][0])
+    assert abs(R[1][0]) < 1e-4 and abs(R[2][1]) < 1e-4  # no yaw, no roll
+
+    description = ET.parse(PACKAGE / "urdf" / "sandro.urdf.xacro").getroot()
+    joint = description.find("./joint[@name='camera_mount']")
+    assert joint.find("parent").get("link") == "imu_link"
+    xyz = [float(v) for v in joint.find("origin").get("xyz").split()]
+    rpy = [float(v) for v in joint.find("origin").get("rpy").split()]
+    assert all(abs(a - b) < 1e-4 for a, b in zip(xyz, offset)), (xyz, offset)
+    assert abs(rpy[0]) < 1e-6 and abs(rpy[1] - pitch) < 1e-4 and abs(rpy[2]) < 1e-6
+
+    perception = PACKAGE.parent / "sandro_perception" / "config" / "perception.yaml"
+    mount = yaml.safe_load(perception.read_text())["height_profile"]["ros__parameters"]["mount"]
+    measured = [mount["x_m"], mount["y_m"], mount["z_m"]]
+    assert all(abs(a - b) < 1e-4 for a, b in zip(measured, offset)), (measured, offset)
+    assert abs(mount["pitch_rad"] - pitch) < 1e-4
+    assert mount["roll_rad"] == 0.0 and mount["yaw_rad"] == 0.0
+
+
 def test_real_imu_mount_yaw_matches_the_cad_chip():
     """The driver turns the chip's axes into the imu site frame the sim reports.
 

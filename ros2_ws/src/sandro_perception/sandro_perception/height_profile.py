@@ -70,13 +70,13 @@ class Body:
 
 @dataclass
 class Mount:
-    """The camera's depth origin in the body frame. From the Onshape bracket: 81 mm ahead of
-    the IMU, level, looking straight ahead; the D435's depth origin is its left imager."""
+    """The camera's depth origin in the body frame. From the CAD camera on the 20-degree
+    bracket (camera_link in the URDF); the D435's depth origin is its left imager."""
 
-    x_m: float = 0.115
+    x_m: float = 0.11411
     y_m: float = 0.0175
-    z_m: float = 0.003
-    pitch_rad: float = 0.0              # positive looks down
+    z_m: float = 0.00056
+    pitch_rad: float = 0.349066         # positive looks down
     roll_rad: float = 0.0
     yaw_rad: float = 0.0
 
