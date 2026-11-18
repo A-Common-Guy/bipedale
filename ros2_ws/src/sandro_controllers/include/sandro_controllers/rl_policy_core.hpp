@@ -45,6 +45,14 @@ struct RlPolicySettings {
   int history{4};
   int history_stride{1};  // policy steps between the stacked frames
   int command_size{3};
+  // Terrain profile of sandro_perception (/terrain_profile) appended to the
+  // frame: 0 for a blind policy, kProfileSize for one trained on it
+  // (sandro_rl interface.profile_observation).
+  int profile_size{0};
+  double profile_height_scale{10.0};
+  double profile_clip_min_m{-0.15};
+  double profile_clip_max_m{0.25};
+  double profile_timeout_s{0.5};  // older than this, the profile reads unknown
   double gyro_scale{0.25};
   double leg_velocity_scale{0.1};
   double wheel_velocity_scale{0.05};
@@ -134,7 +142,14 @@ struct RlPolicySettings {
   double oscillation_arm_delay_s{0.0};
 };
 
+// /terrain_profile: 8 floor heights (m) ahead of the right wheel, 8 ahead of
+// the left, then a known flag for each.
+inline constexpr int kProfileSize = 32;
+
 struct RlPolicyState {
+  // The last /terrain_profile and its age; unknown until one arrives.
+  std::array<float, kProfileSize> profile{};
+  double profile_age_s{1e9};
   std::array<double, 6> position{};
   std::array<double, 6> velocity{};
   // ROS order x, y, z, w; non-finite when the IMU is stale.

@@ -20,13 +20,18 @@ height_profile:
     publish_hz: 25.0
     mount:
       # The depth origin (the D435's left imager) in the body frame, whose
-      # origin is the IMU: from the Onshape bracket (81 mm ahead of the IMU,
-      # 3 mm above, centred, facing straight ahead) plus the camera's own
-      # depth. Check pitch on a flat floor: ~/diagnostics floor_pitch_deg.
+      # origin is the IMU. The bracket looks 20 degrees down since 2026-11-18.
+      # x and z are still the level bracket's (81 mm ahead of the IMU, 3 mm
+      # above, plus the camera's own depth): tilting moves the origin by about
+      # a third of its distance from the pivot, around 1 cm. Take them from
+      # the Onshape bracket or measure them, then check on a flat floor:
+      # ~/diagnostics floor_pitch_deg trims pitch_rad, floor_offset_mm z_m.
+      # With the wrong pitch a flat floor reads up to +0.25 m, all known, and
+      # the diagnostics give no floor fit.
       x_m: 0.115
       y_m: 0.0175
       z_m: 0.003
-      pitch_rad: 0.0            # positive looks down; 0.349 once the bracket is tilted 20 degrees
+      pitch_rad: 0.349          # positive looks down; 0.0 was the level bracket
       roll_rad: 0.0
       yaw_rad: 0.0
     imu:

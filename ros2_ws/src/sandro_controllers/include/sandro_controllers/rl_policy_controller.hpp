@@ -8,6 +8,7 @@
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "rclcpp/subscription.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "realtime_tools/realtime_buffer.hpp"
 #include "realtime_tools/realtime_publisher.hpp"
@@ -50,6 +51,13 @@ private:
     double receipt_time_s{-1.0};
   };
 
+  // /terrain_profile as it arrived (sandro_perception); a message of another
+  // size is dropped.
+  struct StampedProfile {
+    std::array<float, kProfileSize> values{};
+    double receipt_time_s{-1.0};
+  };
+
   void declare_parameters();
   bool read_settings(RlPolicySettings &settings, std::string *error) const;
   bool read_state(RlPolicyState &state) const;
@@ -67,6 +75,8 @@ private:
   std::uint32_t last_reported_status_{};
   realtime_tools::RealtimeBuffer<StampedCommand> command_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr command_subscription_;
+  realtime_tools::RealtimeBuffer<StampedProfile> profile_;
+  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr profile_subscription_;
   // ~/arm_handover: the next activation within kHandoverWindowS takes over
   // from the running balancer without the stand phase (the gamepad switch).
   static constexpr double kHandoverWindowS = 1.0;

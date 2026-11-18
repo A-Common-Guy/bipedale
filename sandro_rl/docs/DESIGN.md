@@ -2236,3 +2236,107 @@ except under pushes, and completes the wheel-lag sweep (5–15 Hz share
 0.17–0.31 at 50–80 ms). `RlPolicyController` cannot run it yet (the
 multi-step flow, section 11 item 11). `avoid` against `avoid_fpo` is not
 trained.
+
+## 14. The depth camera's terrain profile: `configs/agile_perceptive.yaml`
+
+`sandro_perception` (2026-11-18) turns the D435's depth into
+`/terrain_profile`: the floor height at 0.10, 0.20, 0.30, 0.45, 0.60, 0.80,
+1.05 and 1.35 m ahead of each wheel, relative to the floor that wheel stands
+on, and a known flag per point. This section is the training side and the
+controller's input. **The first policies trained on it do not use the camera
+to any measurable effect; nothing is deployed.**
+
+### The observation and the simulated camera
+
+`observation.profile` adds 32 values to the actor frame (`profile`: 16
+heights, clipped to -0.15..0.25 m, x 10, zero where unknown; 16 flags; right
+track first, as the message), stacked like the rest, and the true heights to
+the critic. `interface.profile_observation` is the definition for the
+environment, the evaluator and `RlPolicyController`.
+
+The environment samples the terrain's true height at those points
+(`terrain.ground_height`) and degrades it as the node's map would
+(`env._measure_profile`), following a review of the package with the bracket
+20 degrees down:
+
+| Effect on the robot | In training |
+| --- | --- |
+| The camera sees the floor from 0.28–0.44 m ahead of the wheels (stance, ±5 deg of pitch); nearer floor is known only from the map | unknown closer than `near_m` (0.25–0.55 per episode) minus the distance driven since the map was empty (`interface.profile_travel`) |
+| A turn on the spot brings unseen floor ahead; floor not seen for 8 s is forgotten | the distance driven falls by 0.4 m per rad turned and 0.08 m/s |
+| Floor behind an obstacle is never seen | hidden where the sight line from the camera passes under nearer terrain (`interface.profile_occluded`, the terrain along the track at 5 cm steps) |
+| The 1.35 m point is marginal (coverage gaps from 1.28 m) | `far_m` 1.2–1.7 per episode |
+| Mount or IMU pitch error: 11–12 mm at 1.35 m per 0.5 deg | a slope of ±0.02 rad per episode |
+| Camera height, tyre squash, the reference floor under the wheel | ±6 mm per track and episode |
+| Odometry scale, mount x, 4 cm cells, pose staleness | the sample points shifted ±3 cm per episode and 2 cm (1 sigma) per image |
+| Depth at 15 Hz, 30–60 ms late, published at 25 Hz | sample and hold at 10–25 Hz, one period late |
+| Holes, lost frames | 4 % of the points per image; noise 3 mm |
+| No camera, or a stale profile | 15 % of the episodes all unknown |
+
+Not modelled: tall obstacles (only the visible face cell is high, the rest
+unknown), drops deeper than 0.30 m (unknown, not -0.15), the reference
+floor's 0.5 m/s rate limit, glossy or sunlit floors. The camera's mass (about
+72 g and its bracket, 0.1 m ahead of the IMU) is not in the MJCF.
+
+A blind checkpoint resumes into it (`train.widen_for_profile`): zero weights
+on the new inputs, so the policy starts as the blind one, and a fixed
+normalisation for them (heights 2 cm, flags a half; the resumed normaliser has
+counted too many samples to learn it, which left the first run's heights
+scaled five times too small). `evaluate.py` computes the same profile through
+`mj_ray` with the mean values; `--sim camera=0` leaves it unknown.
+
+### Results (2026-11-18)
+
+Both from `agile_terrain_v6`, with its margin loss, 6144 worlds. Course at
+0.5 m/s (`course_runs.py`, planks to 25 mm and the hill), camera on / off:
+
+| Run | final | earlier checkpoints |
+| --- | --- | --- |
+| agile_terrain's terrain (planks to 3 cm), 1000 iterations, the weak normalisation | 23 / 21 of 27 | 13 / 14, 4 / 7, 12 / 10, 27 / 25 |
+| planks to 5 cm (curriculum), 1500 iterations, the normalisation fixed | 15 / 15 | 15 / 13, 15 / 18, 20 / 23 |
+| `agile_terrain_v6`, blind | 27 | |
+
+- The camera makes no difference outside the course's own scatter between
+  checkpoints, in either run, and the second run is worse on the course than
+  the blind policy it started from (fall rate in training 0.20 per 1000 steps
+  on 5 cm planks against 0.13–0.15 on 3 cm).
+- The policy does read the profile: a 4 cm plank 0.1–0.45 m ahead moves the
+  leg actions by 0.05–0.1 (25–50 mrad) and the wheel actions by 0.1; beyond
+  0.6 m nothing. The first-layer weights on the heights are a fifth of those
+  on the proprioception.
+- `policies/agile_perceptive` is the second run's last checkpoint: kept as
+  the reference for the controller's tests, not deployed.
+
+What this leaves open, in the order to try:
+
+1. A task where seeing is needed. Planks to 5 cm at up to 1 m/s are mostly a
+   matter of torque and pitch on this robot, and the reward has nothing a
+   look-ahead would earn: no term for slowing before an obstacle, lifting the
+   legs over it or choosing a height. `step_climb` (6.5 cm steps, a hop on a
+   request that today comes from the true terrain) is the natural candidate:
+   the profile would replace the request.
+2. Whether the simulated camera is too poor near the wheels to time anything:
+   ±3–5 cm of misplacement and 40–200 ms of delay against a wheel of 67 mm
+   radius. A run with a perfect profile would say.
+3. From scratch rather than from zero weights on a converged policy, or a
+   teacher with the true terrain distilled into the camera policy.
+
+### On the robot
+
+`RlPolicyController` takes the profile for policies exported with it
+(`observation.profile_size: 32`, written by `export_ros.py`; 0 for every
+other policy, whose frames are unchanged): it subscribes to `profile_topic`
+(`/terrain_profile`), and a profile older than `observation.profile_timeout_s`
+(0.5 s) reads all unknown, so the policy drives blind. `build_frame` matches
+`interface.PolicyInterface.frame` on random profile messages
+(`test_rl_policy.cpp`). The controller's ROS part (the subscription) has not
+been compiled: this machine has no ROS.
+
+`sandro_perception/config/perception.yaml` now has the bracket's 20 degrees
+(`mount.pitch_rad: 0.349`); with the level value a flat floor read up to
++0.25 m, all known. The depth origin's x and z are still the level bracket's
+(about 1 cm off) and want the Onshape bracket or a measurement, then the
+flat-floor check of the package's README. Open on the robot: the cost of the
+camera while balancing (neither process is kept off the control loop's core),
+the depth stamps' accuracy (20 ms is 2 cm at 1.35 m when the body rocks), the
+odometry's scale, and the 1.35 m point's coverage.
+

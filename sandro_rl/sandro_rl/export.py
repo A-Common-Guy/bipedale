@@ -17,7 +17,7 @@ import numpy as np
 import onnx
 from onnx import TensorProto, helper, numpy_helper
 
-from . import checkpoint, sources
+from . import checkpoint, interface as interface_mod, sources
 from .interface import PolicyInterface, ray_angles
 from .robot import RobotSpec
 from .sources import JOINTS
@@ -111,6 +111,7 @@ def export(policy_dir: Path) -> Path:
     frame = [("gravity", 3), ("gyro", 3)] + ([("accel", 3)] if i.accelerometer else []) + [
         ("leg_pos", 4), ("leg_vel", 4), ("wheel_vel", 2), ("last_action", 6), ("command", 4 if i.has_roll else 3)] + ([("jump", 2)] if i.has_jump else [])
     frame += ([("goal", 3)] if i.has_goal else []) + ([("rays", i.n_rays)] if i.n_rays else [])
+    frame += [("profile", i.n_profile)] if i.n_profile else []
     if sum(n for _, n in frame) * i.history != payload["actor_norm"]["mean"].size:
         raise RuntimeError("interface.PolicyInterface no longer matches the trained observation size")
     a = cfg["env"]["action"]
@@ -138,7 +139,15 @@ def export(policy_dir: Path) -> Path:
                             i.rays.get("fov_deg", 360.0)))],
                                      "observation": "interface.ray_observation: range / max_range_m, 1 for no return; "
                                                     "rays in the body's x-y plane from the IMU site + offset_m"}}
-                           if i.n_rays else {})},
+                           if i.n_rays else {}),
+                        **({"profile": {"distances_m": [float(x) for x in i.profile_distances],
+                                        "height_scale": interface_mod.PROFILE_SCALE,
+                                        "clip_m": list(interface_mod.PROFILE_CLIP_M),
+                                        "observation": "interface.profile_observation of sandro_perception's "
+                                                       "/terrain_profile: 16 heights (right track, left track; "
+                                                       "clipped, x height_scale, 0 where unknown) then its 16 "
+                                                       "known flags; all zero without a profile"}}
+                           if i.n_profile else {})},
         "policy": ({"type": "flow", "integration": "Euler from x = 0 (zero-sampling), unrolled in the ONNX graph",
                     "deploy_steps": int(fpo.settings(cfg["train"])["deploy_steps"])} if flow else {"type": "mlp"}),
         "action": {"joints": list(JOINTS),

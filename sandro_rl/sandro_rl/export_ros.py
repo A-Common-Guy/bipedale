@@ -91,7 +91,8 @@ def write_reference(onnx_path: Path, actor: dict, path: Path, count: int = 16) -
 
 def write_frames(policy_dir: Path, path: Path, count: int = 32) -> None:
     """Random measured signals and interface.PolicyInterface's observation
-    frame for each, with zero last action and command reference."""
+    frame for each, with zero last action and command reference. A policy with
+    the terrain profile gets a random /terrain_profile message after the signals."""
     from .interface import PolicyInterface
     from .robot import RobotSpec
 
@@ -108,8 +109,16 @@ def write_frames(policy_dir: Path, path: Path, count: int = 32) -> None:
             q = iface.stand_q + rng.normal(size=6) * 0.3
             v = rng.normal(size=6) * 5.0
             ref = np.zeros(4 if iface.has_roll else 3)
-            frame = iface.frame(np.roll(quat_xyzw, 1), gyro, np.zeros(3), q, v, np.zeros(6), ref)
-            f.write(" ".join(f"{x:.9g}" for x in [*quat_xyzw, *gyro, *q, *v]) + "\n")
+            message = []
+            if iface.n_profile:
+                # A /terrain_profile message: heights in m (some beyond the clip), then flags.
+                from .interface import profile_observation
+                n = iface.n_profile // 2
+                message = [*rng.normal(size=n) * 0.12, *(rng.uniform(size=n) > 0.3).astype(float)]
+                profile = profile_observation(np.array(message[:n]), np.array(message[n:]))
+            frame = iface.frame(np.roll(quat_xyzw, 1), gyro, np.zeros(3), q, v, np.zeros(6), ref,
+                                **({"profile": profile} if iface.n_profile else {}))
+            f.write(" ".join(f"{x:.9g}" for x in [*quat_xyzw, *gyro, *q, *v, *message]) + "\n")
             f.write(" ".join(f"{x:.9g}" for x in frame) + "\n")
 
 
@@ -155,7 +164,20 @@ def _value(value) -> str:
 def parameter_block(name: str, policy: str, contract: dict, actor: dict, safety: dict | None = None) -> str:
     obs = contract["observation"]
     frame = dict((k, n) for k, n in obs["frame"])
-    unsupported = set(frame) - {"gravity", "gyro", "leg_pos", "leg_vel", "wheel_vel", "last_action", "command"}
+    unsupported = set(frame) - {"gravity", "gyro", "leg_pos", "leg_vel", "wheel_vel", "last_action", "command",
+                                "profile"}
+    profile = ""
+    if "profile" in frame:
+        if frame["profile"] != 32 or list(frame)[-1] != "profile":
+            raise ValueError(f"{policy}: RlPolicyController takes a profile of 32 values at the end of the frame")
+        spec = obs["profile"]
+        profile = f"""
+      # sandro_perception's /terrain_profile at {_list(spec["distances_m"])} m
+      # ahead of each wheel: start the stack with camera:=true. Without a
+      # profile the policy drives blind.
+      profile_size: 32
+      profile_height_scale: {_f(spec["height_scale"])}
+      profile_clip_m: {_list(spec["clip_m"])}"""
     if unsupported:
         raise ValueError(f"{policy}: observation terms {unsupported} are not implemented by RlPolicyController")
     if obs["order"] != "newest frame first":
@@ -179,7 +201,7 @@ def parameter_block(name: str, policy: str, contract: dict, actor: dict, safety:
     observation:
       history: {obs["history"]}
       history_stride: {obs.get("history_stride", 1)}
-      command_size: {frame["command"]}
+      command_size: {frame["command"]}{profile}
       gyro_scale: {_f(obs["scales"]["gyro"])}
       leg_velocity_scale: {_f(obs["scales"]["leg_vel"])}
       wheel_velocity_scale: {_f(obs["scales"]["wheel_vel"])}

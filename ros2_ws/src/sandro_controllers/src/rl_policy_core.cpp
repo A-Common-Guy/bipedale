@@ -140,6 +140,8 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
                              std::string *error) {
   const auto &s = settings;
   if (s.history < 1 || s.history_stride < 1 || (s.command_size != 3 && s.command_size != 4) ||
+      (s.profile_size != 0 && s.profile_size != kProfileSize) ||
+      !(s.profile_clip_max_m > s.profile_clip_min_m) || !(s.profile_timeout_s > 0.0) ||
       !(s.policy_rate_hz > 0.0) || update_rate_hz <= 0 || !(s.forward_m_s > 0.0) ||
       !(s.yaw_rad_s > 0.0) || !(s.height_max_m > s.height_min_m) ||
       (s.command_size == 4 && !(s.roll_rad > 0.0)) || !(s.leg_kp_nm_rad > 0.0) ||
@@ -161,7 +163,7 @@ bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_
   if (!policy_.load(s.policy_file, error)) {
     return false;
   }
-  frame_size_ = kFrameWithoutCommand + s.command_size;
+  frame_size_ = kFrameWithoutCommand + s.command_size + s.profile_size;
   if (policy_.input_size() != static_cast<std::size_t>(frame_size_ * s.history) ||
       policy_.output_size() != 6U) {
     *error = "the policy takes " + std::to_string(policy_.input_size()) + " inputs and " +
@@ -247,6 +249,22 @@ void RlPolicyCore::build_frame(const RlPolicyState &state,
                                   (0.5 * (s.height_max_m - s.height_min_m)));
   if (s.command_size == 4) {
     frame[k++] = static_cast<float>(reference_[3] / s.roll_rad);
+  }
+  if (s.profile_size > 0) {
+    // Heights clipped and scaled, zero where unknown; then the known flags.
+    // A stale or missing profile is all unknown: the policy then drives blind.
+    const int n = kProfileSize / 2;
+    const bool fresh = state.profile_age_s <= s.profile_timeout_s;
+    for (int i = 0; i < n; ++i) {
+      const float height = state.profile[static_cast<std::size_t>(i)];
+      const bool known =
+          fresh && state.profile[static_cast<std::size_t>(n + i)] > 0.5F && std::isfinite(height);
+      const double clipped =
+          std::min(std::max(static_cast<double>(height), s.profile_clip_min_m), s.profile_clip_max_m);
+      frame[k + i] = known ? static_cast<float>(clipped * s.profile_height_scale) : 0.0F;
+      frame[k + n + i] = known ? 1.0F : 0.0F;
+    }
+    k += kProfileSize;
   }
 }
 

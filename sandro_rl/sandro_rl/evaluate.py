@@ -227,6 +227,7 @@ class SimOptions:
     command_rate_hz: float = 20.0
     diagnostics_rate_hz: float = 50.0
     seed: int = 1
+    camera: float = 1.0          # 0: the terrain profile stays unknown (camera off)
 
     @classmethod
     def from_closed_loop(cls, sim: dict[str, str], latency: sources.Latency) -> "SimOptions":
@@ -234,7 +235,7 @@ class SimOptions:
                 latency.joint_stagger, latency.command_delay_s)
         names = {"imu_delay": "imu_delay_s", "imu_rate": "imu_rate_hz", "joint_delay": "joint_delay_s",
                  "joint_rate": "joint_rate_hz", "command_delay": "command_delay_s", "settle": "settle_s",
-                 "seed": "seed", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
+                 "seed": "seed", "camera": "camera", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
                  "gear_stiffness": "gear_stiffness_nm_rad", "gear_damping": "gear_damping_nm_s_rad",
                  "tyre_torsion": "tyre_torsion_scale", "wheel_friction": "wheel_friction_scale",
                  "leg_armature": "leg_armature_scale",
@@ -422,6 +423,8 @@ class PolicyController:
         # Goal policies: set by the caller before each update (interface.goal_observation, ray_observation).
         self.goal_obs = interface.goal_observation(0.0, 0.0, iface.goal_range)
         self.ray_obs = np.ones(iface.n_rays)
+        # Perceptive policies: interface.profile_observation, all unknown until the caller sets it.
+        self.profile_obs = np.zeros(iface.n_profile)
 
     def reset(self, quat, gyro, accel, q, v, height_target):
         heights = self._heights(q)
@@ -429,7 +432,7 @@ class PolicyController:
                              0.0][: 4 if self.iface.has_roll else 3])
         self.height_command = height_target
         frame = self.iface.frame(quat, gyro, accel, q, v, self.last_action, self.ref,
-                                 goal=self.goal_obs, rays=self.ray_obs)
+                                 goal=self.goal_obs, rays=self.ray_obs, profile=self.profile_obs)
         self.history = np.tile(frame, (self.iface.history_frames, 1))
         self.cycle = 0
 
@@ -469,7 +472,7 @@ class PolicyController:
                 self.jump_request = request
                 jump = i.jump_observation(self.jump_timer, self.jump_height)
             frame = i.frame(quat, gyro, accel, q, v, self.last_action, self.ref, jump,
-                            goal=self.goal_obs, rays=self.ray_obs)
+                            goal=self.goal_obs, rays=self.ray_obs, profile=self.profile_obs)
             self.history = np.concatenate([frame[None], self.history[:-1]], axis=0)
             action = np.clip(self.policy(self.history[:: i.history_stride].reshape(-1)), -i.clip, i.clip)
             self.last_action = action
@@ -651,6 +654,48 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
             dist = np.where(rng.uniform(size=iface.n_rays) < rays_cfg.get("dropout", 0.0), r_max, dist)
             controller.ray_obs = interface.ray_observation(dist, r_max)
 
+    profile_cfg = iface.profile
+    terrain_map = {"travel": 0.0, "next": 0.0, "pending": np.zeros(iface.n_profile), "axle": None, "yaw": 0.0}
+
+    def terrain_profile(now):
+        """The terrain profile of one control cycle (perceptive policies): the true floor
+        heights through mj_ray, known as interface.profile_known has them, with the
+        training's noise, holes, rate and one period of delay at their mean values."""
+        rt = d.site_xmat[imu_site].reshape(3, 3) @ body_from_imu
+        heading = np.array([rt[0, 0], rt[1, 0], 0.0])
+        heading /= max(np.linalg.norm(heading), 1e-9)
+        anchors = d.xanchor[wheel_joints]
+        axle, yaw = anchors.mean(axis=0), math.atan2(heading[1], heading[0])
+        if terrain_map["axle"] is not None:
+            dt = 1.0 / lim.control_rate_hz
+            turn = (yaw - terrain_map["yaw"] + math.pi) % (2.0 * math.pi) - math.pi
+            terrain_map["travel"] = float(interface.profile_travel(
+                terrain_map["travel"], float((axle - terrain_map["axle"]) @ heading) / dt, turn / dt, dt, profile_cfg))
+        terrain_map["axle"], terrain_map["yaw"] = axle.copy(), yaw
+        if now < terrain_map["next"]:
+            return
+        terrain_map["next"] = now + 1.0 / float(np.mean(profile_cfg.get("rate_hz", [12.0, 25.0])))
+        geom, down = np.zeros(1, dtype=np.int32), np.array([0.0, 0.0, -1.0])
+
+        def ground(x):
+            dist = mujoco.mj_ray(m, d, np.array([x[0], x[1], 0.5]), down, GROUND_GROUPS, 1, -1, geom)
+            return 0.5 - dist if dist >= 0 else 0.0
+        dists = iface.profile_distances
+        shift = profile_cfg.get("position_noise_m", 0.02) * rng.normal()
+        heights = np.array([[ground(a + (x + shift) * heading) - ground(a) for x in dists] for a in anchors])
+        line_d = np.linspace(0.14, 1.34, 25)
+        hidden = np.array([interface.profile_occluded(
+            dists, heights[w], line_d, np.array([ground(a + (x + shift) * heading) - ground(a) for x in line_d]),
+            d.site_xpos[imu_site][2] - ground(a), profile_cfg.get("camera_ahead_m", 0.1))
+            for w, a in enumerate(anchors)])
+        heights += profile_cfg.get("noise_m", 0.005) * rng.normal(size=heights.shape)
+        known = interface.profile_known(dists, terrain_map["travel"], float(np.mean(profile_cfg.get("near_m", [0.3, 0.8]))),
+                                        float(np.mean(profile_cfg.get("far_m", [1.2, 2.5]))))
+        known = np.tile(known, (2, 1)) * (1.0 - hidden) * (rng.uniform(size=heights.shape) >= profile_cfg.get("dropout", 0.03))
+        known = known * (1.0 if options.camera else 0.0)
+        controller.profile_obs = terrain_map["pending"]
+        terrain_map["pending"] = interface.profile_observation(heights.reshape(-1), known.reshape(-1))
+
     def step(push_force, chirp=0.0):
         nonlocal last_frame_t
         d.ctrl[:] = staged
@@ -742,6 +787,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         if not activated:
             if iface.has_goal:
                 exteroception(now, quat, gyro, vel, period)    # the first frame fills the history
+            if iface.n_profile:
+                terrain_profile(now)
             controller.reset(quat, gyro, accel, pos, vel, lim.height_target_m)
             activated = True
             continue
@@ -776,6 +823,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                 received = published[1:6]
         if iface.has_goal:
             exteroception(now, quat, gyro, vel, period)
+        if iface.n_profile:
+            terrain_profile(now)
         frames = controller.update(quat, gyro, accel, pos, vel, received, period)
 
         # write()

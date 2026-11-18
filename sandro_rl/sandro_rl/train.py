@@ -111,6 +111,35 @@ def plot_curves(log_path: Path, out: Path) -> None:
     plt.close(fig)
 
 
+def widen_for_profile(payload, env):
+    """A checkpoint trained without the terrain profile, for an environment with it: the new
+    inputs get zero weights (the policy starts as the blind one) and the normalisation of
+    env.profile_statistics."""
+    keeps = dict(zip(("actor", "critic"), env.blind_indices()))
+    stats = dict(zip(("actor", "critic"), env.profile_statistics()))
+    sizes = {"actor": env.actor_obs_size, "critic": env.critic_obs_size}
+    payload = {**payload, "params": dict(payload["params"])}
+    for net, keep in keeps.items():
+        norm = payload[f"{net}_norm"]
+        old = np.asarray(norm["mean"]).size
+        if old == sizes[net]:
+            continue
+        if old != len(keep):
+            raise ValueError(f"{net}: the checkpoint has {old} inputs, the environment {sizes[net]} "
+                             f"({len(keep)} without the terrain profile)")
+        mean, var = (x.copy() for x in stats[net])
+        mean[keep], var[keep] = np.asarray(norm["mean"]), np.asarray(norm["var"])
+        payload[f"{net}_norm"] = {**norm, "mean": mean, "var": var}
+        layers = dict(payload["params"][net]["params"])
+        kernel = np.asarray(layers["Dense_0"]["kernel"])
+        wide = np.zeros((sizes[net], kernel.shape[1]), kernel.dtype)
+        wide[keep] = kernel
+        layers["Dense_0"] = {**layers["Dense_0"], "kernel": wide}
+        payload["params"][net] = {**payload["params"][net], "params": layers}
+        print(f"{net}: {sizes[net] - old} new inputs (terrain profile) start at zero weight")
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("config")
@@ -136,6 +165,7 @@ def main() -> int:
         payload, meta = checkpoint.load(Path(args.resume))
         checkpoint.check_model(meta)
         from .networks import Normalizer
+        payload = widen_for_profile(payload, env)
         ts = ts.replace(params=jax.tree.map(jp.asarray, payload["params"]),
                         actor_norm=Normalizer(**{k: jp.asarray(v) for k, v in payload["actor_norm"].items()}),
                         critic_norm=Normalizer(**{k: jp.asarray(v) for k, v in payload["critic_norm"].items()}))

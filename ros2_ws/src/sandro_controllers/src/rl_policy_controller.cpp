@@ -174,6 +174,17 @@ void RlPolicyController::declare_parameters() {
                           read_only("Policy steps between stacked frames."));
   node->declare_parameter("observation.command_size", 3,
                           read_only("Command terms: 3, or 4 with a roll command."));
+  node->declare_parameter("observation.profile_size", 0,
+                          read_only("Terrain profile terms: 0 (blind), or 32 for a policy trained "
+                                    "on sandro_perception's /terrain_profile."));
+  node->declare_parameter("observation.profile_height_scale", 10.0,
+                          read_only("Observation per m of profile height."));
+  node->declare_parameter("observation.profile_clip_m", std::vector<double>{-0.15, 0.25},
+                          read_only("Profile heights are clipped to this range, m."));
+  node->declare_parameter("observation.profile_timeout_s", 0.5,
+                          read_only("A profile older than this reads unknown."));
+  node->declare_parameter("profile_topic", "/terrain_profile",
+                          read_only("std_msgs/Float32MultiArray: 16 heights, 16 known flags."));
   node->declare_parameter("action.wheel_mode", "velocity", read_only("velocity or torque."));
   node->declare_parameter("safety.start_lying", false,
                           read_only("Stand-up policy: engage limp where the robot lies, arm the "
@@ -199,6 +210,16 @@ bool RlPolicyController::read_settings(RlPolicySettings &s, std::string *error) 
   s.history_stride =
       static_cast<int>(node->get_parameter("observation.history_stride").as_int());
   s.command_size = static_cast<int>(node->get_parameter("observation.command_size").as_int());
+  s.profile_size = static_cast<int>(node->get_parameter("observation.profile_size").as_int());
+  s.profile_height_scale = node->get_parameter("observation.profile_height_scale").as_double();
+  s.profile_timeout_s = node->get_parameter("observation.profile_timeout_s").as_double();
+  const auto profile_clip = node->get_parameter("observation.profile_clip_m").as_double_array();
+  if (profile_clip.size() != 2U) {
+    *error = "observation.profile_clip_m takes two values";
+    return false;
+  }
+  s.profile_clip_min_m = profile_clip[0];
+  s.profile_clip_max_m = profile_clip[1];
   const auto mode = node->get_parameter("action.wheel_mode").as_string();
   if (mode != "velocity" && mode != "torque") {
     *error = "action.wheel_mode must be velocity or torque";
@@ -301,6 +322,20 @@ RlPolicyController::on_configure(const rclcpp_lifecycle::State &) {
                                                message->twist.linear.z, message->twist.angular.x,
                                                get_node()->now().seconds()});
       });
+  profile_.writeFromNonRT(StampedProfile{});
+  if (settings.profile_size > 0) {
+    profile_subscription_ = node->create_subscription<std_msgs::msg::Float32MultiArray>(
+        node->get_parameter("profile_topic").as_string(), rclcpp::SensorDataQoS(),
+        [this](const std_msgs::msg::Float32MultiArray::SharedPtr message) {
+          if (message->data.size() != static_cast<std::size_t>(kProfileSize)) {
+            return;
+          }
+          StampedProfile profile;
+          std::copy(message->data.begin(), message->data.end(), profile.values.begin());
+          profile.receipt_time_s = get_node()->now().seconds();
+          profile_.writeFromNonRT(profile);
+        });
+  }
   handover_service_ = node->create_service<std_srvs::srv::Trigger>(
       "~/arm_handover",
       [this](const std::shared_ptr<std_srvs::srv::Trigger::Request>,
@@ -391,6 +426,11 @@ controller_interface::return_type RlPolicyController::update(const rclcpp::Time 
     zero_commands();
     return controller_interface::return_type::ERROR;
   }
+  const StampedProfile &profile = *profile_.readFromRT();
+  state.profile = profile.values;
+  state.profile_age_s = profile.receipt_time_s < 0.0
+                            ? std::numeric_limits<double>::infinity()
+                            : std::max(0.0, time.seconds() - profile.receipt_time_s);
   const StampedCommand received = *command_.readFromRT();
   RlPolicyCommand command{received.forward_m_s, received.yaw_rate_rad_s,
                           received.height_rate_m_s, received.roll_rad,

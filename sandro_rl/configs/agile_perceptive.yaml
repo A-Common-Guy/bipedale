@@ -1,0 +1,61 @@
+# agile_terrain_v6 with the depth camera's terrain profile as an observation
+# (sandro_perception, /terrain_profile): the floor height at 8 distances ahead
+# of each wheel, relative to the floor that wheel stands on, and a known flag
+# per point. The environment samples the true terrain there and degrades it
+# as the node's map would (env._measure_profile, docs/DESIGN.md 14): unknown
+# closer than the camera's view until the robot has driven up to what it saw,
+# forgotten on turns and with time, late, noisy, with the mount's pitch error
+# as a slope. In 15 % of the episodes the camera is off: the policy must then
+# drive as the blind one.
+#
+# A blind checkpoint resumes into it with zero weights on the new inputs:
+#     uv run python -m sandro_rl.train configs/agile_perceptive.yaml --resume policies/agile_terrain_v6
+inherit: agile_terrain_v6.yaml
+
+env:
+  observation:
+    profile:
+      # sandro_perception/config/perception.yaml layout.distances_m: a contract.
+      distances_m: [0.10, 0.20, 0.30, 0.45, 0.60, 0.80, 1.05, 1.35]
+      # The values below follow the 2026-11-18 review of sandro_perception with the
+      # bracket 20 degrees down (DESIGN.md 14).
+      rate_hz: [10.0, 25.0]           # depth at 15 Hz, published at 25 Hz; one period late: 40-200 ms
+      near_m: [0.25, 0.55]            # where the floor comes into view ahead of the wheels: 0.28-0.44 m over the stances and +-5 deg of pitch
+      far_m: [1.2, 1.7]               # the 1.35 m point is marginal: gaps from 1.28 m
+      camera_ahead_m: 0.1             # of the axle, for what hides the floor behind an obstacle
+      noise_m: 0.003
+      slope_rad: 0.02                 # mount and IMU pitch error: 0.5 deg is 1.2 cm at 1.35 m
+      bias_m: 0.006                   # per track, per episode: camera height, tyre squash, the reference under the wheel
+      position_error_m: 0.03          # the map's misplacement along the track, per episode: odometry scale, mount x
+      position_noise_m: 0.02          # and per image (4 cm cells, pose staleness)
+      dropout: 0.04                   # holes, per point and image
+      blind_probability: 0.15         # the camera off for the episode
+      seen_probability: 0.5           # episodes that start with the floor ahead already mapped
+      forget_m_per_rad: 0.4           # turning brings unseen floor ahead of the wheels
+      forget_m_per_s: 0.08            # the map's max_age_s
+      travel_max_m: 2.0
+
+  # Planks up to 5 cm, where seeing them matters: agile_terrain's 3 cm are
+  # passable blind (the first run, on those, came out the same with the camera
+  # on and off).
+  terrain:
+    planks: {height_m: [0.01, 0.05]}
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.terrain.planks.height_m: [0.005, 0.03]
+    - iteration: 300
+      set:
+        env.terrain.planks.height_m: [0.005, 0.04]
+    - iteration: 700
+      set:
+        env.terrain.planks.height_m: [0.01, 0.05]
+
+train:
+  iterations: 1500
+  curriculum_offset: 0
+  learning_rate: 1.0e-4
+  desired_kl: 0.008
+  resume_log_std: -2.0

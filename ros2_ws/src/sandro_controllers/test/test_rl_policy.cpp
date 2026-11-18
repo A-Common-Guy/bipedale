@@ -37,6 +37,14 @@ sc::RlPolicySettings agile_settings() {
   return s;
 }
 
+// agile_perceptive: agile_terrain's settings and the terrain profile.
+sc::RlPolicySettings perceptive_settings() {
+  sc::RlPolicySettings s = agile_settings();
+  s.policy_file = kSource + "/policies/agile_perceptive.bin";
+  s.profile_size = sc::kProfileSize;
+  return s;
+}
+
 sc::RlPolicyState standing(const sc::RlPolicySettings &s) {
   sc::RlPolicyState state;
   state.position = s.stand_q;
@@ -47,7 +55,7 @@ sc::RlPolicyState standing(const sc::RlPolicySettings &s) {
 
 // The C++ actor reproduces onnxruntime on the exported policy.onnx.
 TEST(RlPolicy, ActorMatchesOnnxReference) {
-  for (const std::string name : {"flat_level", "agile_terrain", "stand_up", "flat_level_fast", "flat_level_sysid", "flat_level_fast_sysid", "agile_terrain_v3", "agile_terrain_v5", "agile_terrain_v6"}) {
+  for (const std::string name : {"flat_level", "agile_terrain", "stand_up", "flat_level_fast", "flat_level_sysid", "flat_level_fast_sysid", "agile_terrain_v3", "agile_terrain_v5", "agile_terrain_v6", "agile_perceptive"}) {
     sc::MlpPolicy policy;
     std::string error;
     ASSERT_TRUE(policy.load(kSource + "/policies/" + name + ".bin", &error)) << error;
@@ -110,10 +118,11 @@ TEST(RlPolicy, FrameLayout) {
 // build_frame reproduces interface.PolicyInterface.frame on random signals
 // (zero last action and command reference, as before the first policy step).
 TEST(RlPolicy, FrameMatchesThePythonInterface) {
-  for (const std::string name : {"flat_level", "agile_terrain"}) {
+  for (const std::string name : {"flat_level", "agile_terrain", "agile_perceptive"}) {
     std::ifstream in(kSource + "/test/data/" + name + "_frames.txt");
     ASSERT_TRUE(in) << name;
-    auto s = name == "flat_level" ? flat_settings() : agile_settings();
+    auto s = name == "flat_level" ? flat_settings()
+                                  : name == "agile_terrain" ? agile_settings() : perceptive_settings();
     std::size_t count{};
     in >> count >> s.imu_offset_rad;
     for (auto &q : s.stand_q) {
@@ -129,6 +138,11 @@ TEST(RlPolicy, FrameMatchesThePythonInterface) {
       for (auto &v : state.angular_velocity) in >> v;
       for (auto &v : state.position) in >> v;
       for (auto &v : state.velocity) in >> v;
+      if (s.profile_size > 0) {
+        // A /terrain_profile message follows the signals; it arrived just now.
+        for (auto &v : state.profile) in >> v;
+        state.profile_age_s = 0.0;
+      }
       core.build_frame(state, frame);
       for (Eigen::Index i = 0; i < frame.size(); ++i) {
         float expected{};
@@ -137,6 +151,43 @@ TEST(RlPolicy, FrameMatchesThePythonInterface) {
       }
     }
   }
+}
+
+// A profile policy without a fresh profile reads all unknown, and a blind
+// policy's frame is unchanged by one.
+TEST(RlPolicy, AStaleOrMissingProfileReadsUnknown) {
+  const auto s = perceptive_settings();
+  sc::RlPolicyCore core;
+  std::string error;
+  ASSERT_TRUE(core.configure(s, 300, &error)) << error;
+  ASSERT_EQ(core.frame_size(), 26 + sc::kProfileSize);
+  Eigen::VectorXf frame(core.frame_size());
+  sc::RlPolicyState state = standing(s);
+  for (int i = 0; i < sc::kProfileSize / 2; ++i) {
+    state.profile[static_cast<std::size_t>(i)] = 0.03F;
+    state.profile[static_cast<std::size_t>(sc::kProfileSize / 2 + i)] = 1.0F;
+  }
+  core.build_frame(state, frame);  // never received
+  EXPECT_TRUE(frame.tail(sc::kProfileSize).isZero());
+  state.profile_age_s = 0.1;
+  state.profile[0] = 0.40F;  // above the clip
+  state.profile[sc::kProfileSize / 2 + 1] = 0.0F;  // second point unknown
+  core.build_frame(state, frame);
+  EXPECT_NEAR(frame[26], 2.5F, 1e-6F);
+  EXPECT_NEAR(frame[27], 0.0F, 1e-6F);
+  EXPECT_NEAR(frame[28], 0.3F, 1e-6F);
+  EXPECT_NEAR(frame[26 + 16], 1.0F, 1e-6F);
+  EXPECT_NEAR(frame[26 + 17], 0.0F, 1e-6F);
+  state.profile_age_s = s.profile_timeout_s + 0.01;
+  core.build_frame(state, frame);
+  EXPECT_TRUE(frame.tail(sc::kProfileSize).isZero());
+
+  sc::RlPolicyCore blind;
+  ASSERT_TRUE(blind.configure(agile_settings(), 300, &error)) << error;
+  EXPECT_EQ(blind.frame_size(), 26);
+  auto wrong = perceptive_settings();
+  wrong.profile_size = 16;
+  EXPECT_FALSE(sc::RlPolicyCore().configure(wrong, 300, &error));
 }
 
 TEST(RlPolicy, ShapingFollowsTheRateLimits) {

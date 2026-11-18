@@ -31,7 +31,8 @@ from flax import struct
 from mujoco import mjx
 
 from . import kinematics, latency, terrain, torque_envelope
-from .interface import goal_observation, ray_angles, ray_observation
+from .interface import (PROFILE_SCALE, goal_observation, profile_known, profile_observation, profile_occluded,
+                        profile_travel, ray_angles, ray_observation)
 from .robot import RobotSpec, rotation_x
 from .sources import JOINTS
 
@@ -206,6 +207,13 @@ class SandroEnv:
                                          dtype=jp.float32)
             self.ray_range = float(self.rays["max_range_m"])
             self.ray_offset = jp.asarray(self.rays.get("offset_m", [0.0, 0.0, 0.0]), dtype=jp.float32)
+        # Optional terrain profile (sandro_perception's /terrain_profile): the floor height
+        # ahead of each wheel from the depth camera's map.
+        self.profile = cfg["observation"].get("profile") or {}
+        self.profile_distances = jp.asarray(self.profile.get("distances_m", []), dtype=jp.float32)
+        self.n_profile = 4 * int(self.profile_distances.shape[0])
+        # Where the terrain along a track is sampled for what hides the floor from the camera.
+        self.profile_line = jp.linspace(0.14, 1.34, 25)
         # The robot's footprint for pillar clearances, a box around the axle midpoint.
         self.hull_half = jp.asarray((cfg.get("avoidance") or {}).get("hull_half_m", [0.125, 0.17]),
                                     dtype=jp.float32)
@@ -252,6 +260,8 @@ class SandroEnv:
         legs = list(self.leg_idx)
         leg_perm = np.array([legs.index(perm6[j]) for j in legs])
         wheel_perm = np.array([1, 0])
+        swap_tracks = lambda blocks, order: (np.arange(size).reshape(blocks, -1)[order].reshape(-1)
+                                             if size % blocks == 0 else np.arange(size))
         table = {
             "gravity": (np.arange(3), np.array([1, -1, 1])),
             "gyro": (np.arange(3), np.array([-1, 1, -1])),
@@ -277,6 +287,9 @@ class SandroEnv:
             # about the forward axis (interface.ray_angles), so they reverse.
             "goal": (np.arange(3), np.array([1, 1, -1])),
             "true_goal": (np.arange(3), np.array([1, 1, -1])),
+            # Right track, left track, and their known flags: the tracks swap.
+            "profile": (swap_tracks(4, [1, 0, 3, 2]), np.ones(size)),
+            "true_profile": (swap_tracks(2, [1, 0]), np.ones(size)),
             "rays": (np.arange(size)[::-1], np.ones(size)),
             "true_rays": (np.arange(size)[::-1], np.ones(size)),
             "clearance": (np.arange(1), np.ones(1)),
@@ -305,7 +318,8 @@ class SandroEnv:
         return self._layout(comps)
 
     def _exteroceptive_components(self):
-        return ([("goal", 3)] if self.has_goal else []) + ([("rays", self.n_rays)] if self.n_rays else [])
+        return (([("goal", 3)] if self.has_goal else []) + ([("rays", self.n_rays)] if self.n_rays else [])
+                + ([("profile", self.n_profile)] if self.n_profile else []))
 
     N_PARAMS = 8 + 8   # episode parameters + randomize.MODEL_PARAMS
 
@@ -324,7 +338,35 @@ class SandroEnv:
             comps.append(("true_rays", self.n_rays))
         if self.has_pillars:
             comps.append(("clearance", 1))
+        if self.n_profile:
+            comps.append(("true_profile", self.n_profile // 2))
         return self._layout(comps)
+
+    def blind_indices(self):
+        """(actor, critic) observation indices of everything but the terrain profile: where a
+        policy trained without it has its inputs (train.py --resume)."""
+        def keep(layout, repeat):
+            offsets = np.concatenate([[0], np.cumsum(layout.sizes)])
+            frame = np.concatenate([np.arange(offsets[i], offsets[i + 1]) for i, name in enumerate(layout.names)
+                                    if name not in ("profile", "true_profile")])
+            return np.concatenate([frame + k * layout.size for k in range(repeat)])
+        return keep(self.actor_layout, self.history), keep(self.critic_layout, 1)
+
+    def profile_statistics(self):
+        """(mean, variance) of the actor and of the critic observation where the terrain
+        profile sits (0 and 1 elsewhere): heights of a few cm, flags half set. A resumed
+        normaliser has counted too many samples to learn them."""
+        def stats(layout, repeat):
+            mean, var = np.zeros(layout.size, np.float32), np.ones(layout.size, np.float32)
+            offsets = np.concatenate([[0], np.cumsum(layout.sizes)])
+            for i, name in enumerate(layout.names):
+                if name in ("profile", "true_profile"):
+                    heights = layout.sizes[i] // 2 if name == "profile" else layout.sizes[i]
+                    var[offsets[i]:offsets[i] + heights] = (0.02 * PROFILE_SCALE) ** 2
+                    mean[offsets[i] + heights:offsets[i + 1]] = 0.5
+                    var[offsets[i] + heights:offsets[i + 1]] = 0.25
+            return np.tile(mean, repeat), np.tile(var, repeat)
+        return stats(self.actor_layout, self.history), stats(self.critic_layout, 1)
 
     def _actor_obs(self, obs_history):
         """Every history_stride-th frame of the buffer, newest first, flattened."""
@@ -547,6 +589,62 @@ class SandroEnv:
         measured = jp.where(jax.random.uniform(k[1], true.shape) < r.get("dropout", 0.0), self.ray_range, measured)
         return ray_observation(measured, self.ray_range, jp)
 
+    def _profile_heights(self, data, shift=0.0, distances=None):
+        """Floor height at the profile's distances (+ shift, m) ahead of each wheel, above the
+        floor under that wheel: [right track, left track]."""
+        distances = self.profile_distances if distances is None else distances
+        _, r_body = self._body_frame(data)
+        heading = jp.array([r_body[0, 0], r_body[1, 0], 0.0])
+        heading = heading / jp.maximum(jp.linalg.norm(heading), 1e-6)
+        anchors = data.xanchor[self.spec.wheel_joint_ids]
+        ahead = (distances + shift)[None, :, None] * heading[None, None, :]
+        points = (anchors[:, None, :] + ahead).reshape(-1, 3)
+        ground = self.terrain.ground_height(jp.concatenate([anchors, points]), data)
+        return (ground[2:].reshape(2, -1) - ground[:2, None]).reshape(-1)
+
+    def _sample_profile(self, rng):
+        """One episode's camera and map: where its view of the floor starts and ends, its
+        calibration errors, its rate, and how much floor it has already seen."""
+        c = self.profile
+        k = jax.random.split(rng, 9)
+        u = lambda key, lo_hi, shape=(): jax.random.uniform(key, shape, minval=lo_hi[0], maxval=lo_hi[1])
+        sym = lambda key, half, shape=(): half * jax.random.uniform(key, shape, minval=-1.0, maxval=1.0)
+        period = 1.0 / u(k[0], c.get("rate_hz", [12.0, 25.0]))
+        seen = jax.random.uniform(k[7]) < c.get("seen_probability", 0.5)
+        return {"profile_near": u(k[1], c.get("near_m", [0.3, 0.8])), "profile_far": u(k[2], c.get("far_m", [1.2, 2.5])),
+                "profile_slope": sym(k[3], c.get("slope_rad", 0.015)), "profile_bias": sym(k[4], c.get("bias_m", 0.005), (2,)),
+                "profile_shift": sym(k[5], c.get("position_error_m", 0.03)),
+                "profile_blind": (jax.random.uniform(k[6]) < c.get("blind_probability", 0.15)).astype(jp.float32),
+                "profile_period": period, "profile_timer": jax.random.uniform(k[8]) * period,
+                "profile_travel": jp.where(seen, jp.float32(c.get("travel_max_m", 2.0)), 0.0)}
+
+    def _measure_profile(self, data, info, rng):
+        """The profile as the node would publish it now: the map's heights with the mount's
+        pitch error (a slope), a height bias per track, the map's misplacement along the
+        track, noise and holes, and unknown where the camera has not seen the floor."""
+        c = self.profile
+        k = jax.random.split(rng, 3)
+        n = self.n_profile // 4
+        c_ahead = c.get("camera_ahead_m", 0.1)
+        jitter = c.get("position_noise_m", 0.02) * jax.random.normal(k[0])
+        shift = info["profile_shift"] + jitter
+        both = self._profile_heights(data, shift, jp.concatenate([self.profile_distances, self.profile_line]))
+        both = both.reshape(2, -1)
+        heights, line = both[:, :n], both[:, n:]
+        # The camera above the floor each wheel stands on, at the IMU's height.
+        anchors = data.xanchor[self.spec.wheel_joint_ids]
+        floor = self.terrain.ground_height(anchors, data)
+        camera = data.site_xpos[self.spec.imu_site][2] - floor
+        hidden = jax.vmap(lambda h, l, c: profile_occluded(self.profile_distances, h, self.profile_line, l, c,
+                                                           c_ahead, jp))(heights, line, camera)
+        heights = (heights + info["profile_slope"] * self.profile_distances[None]
+                   + info["profile_bias"][:, None] + c.get("noise_m", 0.005) * jax.random.normal(k[1], (2, n)))
+        known = profile_known(self.profile_distances, info["profile_travel"], info["profile_near"],
+                              info["profile_far"], jp)
+        known = jp.tile(known[None], (2, 1)) * (1.0 - info["profile_blind"]) * (1.0 - hidden)
+        known = known * (jax.random.uniform(k[2], (2, n)) >= c.get("dropout", 0.03))
+        return profile_observation(heights.reshape(-1), known.reshape(-1), jp)
+
     def _goal_vector(self, goal, axle, heading):
         """(forward, left) of a goal from the axle midpoint, heading frame."""
         rel = goal - axle[:2]
@@ -687,6 +785,8 @@ class SandroEnv:
             parts["goal"] = info["goal_obs"]
         if self.n_rays:
             parts["rays"] = info["ray_obs"]
+        if self.n_profile:
+            parts["profile"] = info["profile_obs"]
         return jp.concatenate([parts[n] for n in self.actor_layout.names]), parts
 
     def _truth(self, data, info):
@@ -716,6 +816,8 @@ class SandroEnv:
             extra["rays"] = self._scan(data, r_body)
         if self.has_pillars:
             extra["obstacle_clearance"] = self.terrain.clearance(mid[:2], heading[:2], self.hull_half, data)
+        if self.n_profile:
+            extra["profile"] = self._profile_heights(data)
         return extra | {
             "r_body": r_body, "gravity": r_body.T @ jp.array([0.0, 0.0, -1.0]),
             "gyro": self.body_from_imu.T @ gyro_true,
@@ -755,6 +857,9 @@ class SandroEnv:
             parts["true_rays"] = ray_observation(truth["rays"], self.ray_range, jp)
         if self.has_pillars:
             parts["clearance"] = jp.clip(truth["obstacle_clearance"], -0.1, 1.0)[None]
+        if self.n_profile:
+            parts["true_profile"] = profile_observation(truth["profile"], jp.ones(self.n_profile // 2),
+                                                        jp)[: self.n_profile // 2]
         return jp.concatenate([parts[n] for n in self.critic_layout.names])
 
     # ------------------------------------------------------------ API
@@ -823,6 +928,10 @@ class SandroEnv:
             period = 1.0 / jax.random.uniform(kr[0], minval=self.rays["rate_hz"][0], maxval=self.rays["rate_hz"][1])
             info.update({"ray_period": period, "ray_timer": jax.random.uniform(kr[1]) * period,
                          "ray_obs": self._measure_rays(self._scan(data, self._body_frame(data)[1]), kr[2])})
+        if self.n_profile:
+            info.update(self._sample_profile(jax.random.fold_in(k[9], 3)))
+            info["profile_obs"] = self._measure_profile(data, info, jax.random.fold_in(k[9], 4))
+            info["profile_pending"] = info["profile_obs"]
         sensed = self._read_sensors(info)
         frame, parts = self._actor_frame(sensed, info)
         obs_history = jp.tile(frame[None], (self.history_frames, 1))
@@ -1015,6 +1124,16 @@ class SandroEnv:
             fresh = self._measure_rays(truth["rays"], jax.random.fold_in(k_noise, 23))
             info["ray_obs"] = jp.where(due, fresh, info["ray_obs"])
             info["ray_timer"] = jp.where(due, info["ray_timer"] + info["ray_period"], info["ray_timer"])
+        if self.n_profile:
+            # The map's sample and hold at the camera's rate, published one period late.
+            info["profile_travel"] = profile_travel(info["profile_travel"], truth["forward_speed"],
+                                                    truth["yaw_rate"], self.dt, self.profile, jp)
+            info["profile_timer"] = info["profile_timer"] - self.dt
+            due = info["profile_timer"] <= 0.0
+            fresh = self._measure_profile(data, info, jax.random.fold_in(k_noise, 29))
+            info["profile_obs"] = jp.where(due, info["profile_pending"], info["profile_obs"])
+            info["profile_pending"] = jp.where(due, fresh, info["profile_pending"])
+            info["profile_timer"] = jp.where(due, info["profile_timer"] + info["profile_period"], info["profile_timer"])
         sensed = self._read_sensors(info)
         info["last_action2"] = info["last_action"]
         prev_action = info["last_action"]

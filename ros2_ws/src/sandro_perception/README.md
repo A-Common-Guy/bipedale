@@ -1,7 +1,7 @@
 # sandro_perception
 
 Sandro's eyes. A RealSense D435 sits on the front bracket (81 mm ahead of the
-IMU, level, looking straight ahead) and, for now, on the Raspberry Pi's USB 3
+IMU, looking 20 degrees down since 2026-11-18; `config/perception.yaml`) and, for now, on the Raspberry Pi's USB 3
 port. This package turns its depth images into the one thing the balance
 policies will read: the **terrain profile**, the floor height at eight points
 ahead of each wheel.
@@ -28,9 +28,9 @@ the policies trained on it (`config/perception.yaml`).
 
 `height_profile.py` (numpy only, no ROS) is the definition:
 
-- The camera sees the floor only from about 0.7 m ahead of the wheels (0.34 m
-  up, level, 58 degrees of vertical view; about 0.4 m with the bracket tilted
-  20 degrees down). What it saw is kept in a 4 cm grid fixed to the floor, a
+- The camera sees the floor only from 0.3-0.45 m ahead of the wheels (0.25-0.35 m
+  up, 20 degrees down, 58 degrees of vertical view; 0.55-0.75 m with the level
+  bracket), and floor behind an obstacle not at all. What it saw is kept in a 4 cm grid fixed to the floor, a
   2.5 m window that travels with the robot on wheel odometry and the IMU's
   heading, so a plank seen at 0.8 m is still known when the wheel reaches it.
 - Floor never seen (at start, after a turn on the spot) is **unknown**, as is
@@ -75,7 +75,15 @@ this once after every change to the bracket.
 
 ## Not yet
 
-- The policies do not read the profile (sandro_rl: the observation, the
-  simulated camera, training; then RlPolicyController).
-- The camera is not in the simulation model or the URDF.
-- Obstacles are only "high floor": nothing tells a person from a wall.
+- No deployed policy reads the profile. `sandro_rl` trains on a simulated one
+  (`configs/agile_perceptive.yaml`, sandro_rl/docs/DESIGN.md 14) and
+  `RlPolicyController` takes it for policies exported with it, but the first
+  policies gain nothing from the camera.
+- The camera is not in the simulation model or the URDF, and the mount's x
+  and z are the level bracket's.
+- Obstacles are only "high floor": nothing tells a person from a wall, and a
+  wall reads high only in the cell of its visible face, unknown behind
+  (not +0.25 as said above for everything beyond it).
+- From the 2026-11-18 review, unchecked on the robot: the cost while
+  balancing (pin the camera and this node off the control loop's core), the
+  depth stamps' accuracy, the odometry's scale, coverage at 1.35 m.

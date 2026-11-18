@@ -55,6 +55,50 @@ def goal_observation(forward, left, range_m, xp=np):
                      xp.where(near, 0.0, left / safe)])
 
 
+# The terrain profile of sandro_perception (/terrain_profile): the floor height at
+# `distances_m` ahead of each axle end, relative to the floor that wheel stands on, right
+# track then left, and a known flag per point. The camera sees the floor from `near` m
+# ahead of the wheels; nearer floor is known only once the robot has driven over what it
+# saw (the node's map), which the three functions below model with one number per robot:
+# the distance driven since the map was empty.
+PROFILE_SCALE = 10.0          # observation per m of height
+PROFILE_CLIP_M = (-0.15, 0.25)  # sandro_perception's clip
+
+
+def profile_known(distances, travel, near_m, far_m, xp=np):
+    """1 where the floor `distances` m ahead of a wheel is in the map: in the camera's view
+    now (near_m to far_m), or seen before the robot drove `travel` m up to it."""
+    return ((distances >= near_m - travel) & (distances <= far_m)) * 1.0
+
+
+def profile_occluded(distances, heights, line_distances, line_heights, camera_height, camera_ahead, xp=np):
+    """1 where the camera cannot see the floor at `distances` (heights above the wheel's
+    floor) over the terrain along the track (`line_heights` at `line_distances`): the floor
+    behind a plank or a hill, which the node's map then never holds. The camera is
+    `camera_height` above the wheel's floor and `camera_ahead` of the axle."""
+    run = xp.maximum(line_distances - camera_ahead, 1e-3)[None, :]
+    between = (line_distances[None, :] > camera_ahead + 0.02) & (line_distances[None, :] < distances[:, None] - 0.02)
+    # The sight line over each nearer terrain point, at the sample's distance.
+    sight = camera_height - (camera_height - line_heights[None, :]) * (distances[:, None] - camera_ahead) / run
+    return xp.any(between & (heights[:, None] < sight - 0.005), axis=1) * 1.0
+
+
+def profile_travel(travel, forward_speed, yaw_rate, dt, cfg, xp=np):
+    """The distance driven since the map was empty, one policy step on. Turning brings
+    floor ahead of the wheels that the camera never saw, and the node forgets floor it has
+    not seen for max_age_s."""
+    step = forward_speed * dt - (cfg.get("forget_m_per_rad", 0.4) * xp.abs(yaw_rate)
+                                 + cfg.get("forget_m_per_s", 0.08)) * dt
+    return xp.clip(travel + step, 0.0, cfg.get("travel_max_m", 2.0))
+
+
+def profile_observation(heights, known, xp=np):
+    """[heights (clipped, PROFILE_SCALE per m, 0 where unknown), known flags], as
+    /terrain_profile orders them: right track, left track."""
+    h = xp.clip(heights, PROFILE_CLIP_M[0], PROFILE_CLIP_M[1]) * known
+    return xp.concatenate([h * PROFILE_SCALE, known])
+
+
 class GoalOdometry:
     """Keeps a goal in the robot's heading frame from wheel odometry and the
     IMU yaw, as the deployment controller must (training adds the drift of
@@ -148,6 +192,9 @@ class PolicyInterface:
         rays = cfg["observation"].get("rays") or {}
         self.n_rays = int(rays.get("count", 0))
         self.rays = rays
+        self.profile = cfg["observation"].get("profile") or {}
+        self.profile_distances = np.asarray(self.profile.get("distances_m", []), float)
+        self.n_profile = 4 * len(self.profile_distances)
 
     # ------------------------------------------------------------ observation
     def body_rotation(self, quat_wxyz) -> np.ndarray:
@@ -162,12 +209,12 @@ class PolicyInterface:
         return np.array([height / self.jump_h_max, timer / self.jump_window])
 
     def frame(self, quat_wxyz, gyro, accel, q, v, last_action, command_ref, jump=(0.0, 0.0),
-              goal=None, rays=None) -> np.ndarray:
+              goal=None, rays=None, profile=None) -> np.ndarray:
         """One observation frame from the measured signals (JOINTS order).
 
         jump: jump_observation(...) for policies trained with jump events;
         goal: goal_observation(...) and rays: ray_observation(...) for the
-        avoid task."""
+        avoid task; profile: profile_observation(...) of /terrain_profile."""
         r_body = self.body_rotation(quat_wxyz)
         gravity = r_body.T @ np.array([0.0, 0.0, -1.0])
         q, v = np.asarray(q, float), np.asarray(v, float)
@@ -186,6 +233,8 @@ class PolicyInterface:
             parts.append(np.asarray(goal, float))
         if self.n_rays:
             parts.append(np.asarray(rays, float))
+        if self.n_profile:
+            parts.append(np.asarray(profile, float))
         return np.concatenate(parts)
 
     # ------------------------------------------------------------ action
