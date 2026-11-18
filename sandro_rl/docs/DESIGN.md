@@ -2420,3 +2420,16 @@ it drives blind and climbs nothing. The controller's ROS part (the profile
 subscription and the hop on `linear.y`) and `joy_teleop`'s button are not
 compiled or run here; the core is (`test_rl_policy.cpp`: the frame with the
 hop and the profile, and the hop window).
+
+### The stop alone: `configs/agile_guard.yaml` (not deployed)
+
+`agile_terrain_v6` with the profile and only `rewards.guard`, trained twice
+after the shadow fill. With the absolute rule (anything above 6 cm is a
+block) it slowed to 0.14 m/s at the block and stopped in 7 of 18 runs, but
+also stopped at the standard course's 8 cm ramp. With the face rule
+(`face_run_m`: a rise of 6 cm within 0.1 m) it crosses the standard course in
+19 of 27 runs at the last checkpoint and 27 at iterations 600 and 900, and
+stops before the block in 5, 1 and 0 of 18 (`scripts/guard_runs.py`), meeting
+it at up to 0.67 m/s. Neither is kept: `agile_step` stops in every run. What
+separates them is unknown; `agile_step` trains the stop together with the hop
+at steeper faces (70–85 degrees) and without the face rule.
