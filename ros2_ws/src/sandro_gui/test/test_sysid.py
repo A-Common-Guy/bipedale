@@ -40,6 +40,9 @@ def test_the_commands_are_fixed_and_the_tools_exist():
     buzz = sysid.command("buzz", Path("/x/b"), tools, "rl_flat_level_sysid", python="python3")
     assert Path(buzz[2]).is_file() and buzz[3:5] == ["--label", "rl_flat_level_sysid"]
     assert "--yes" in buzz
+    trial = sysid.command("policies", Path("/x/p"), tools, python="python3")
+    assert Path(trial[2]).name == "policy_record.py" and Path(trial[2]).is_file()
+    assert trial[3:] == ["--max", "900", "--out", "/x/p"]
     # Both stay inside what sysid_yaw.py itself refuses (0.5 Nm per wheel, kp 6-25).
     assert max(float(v) for v in yaw[yaw.index("--chirp-nm") + 1:yaw.index("--f0")]) <= 0.5
 
@@ -57,6 +60,9 @@ def test_a_measurement_starts_only_on_the_state_it_needs():
     assert sysid.blocked("yaw", ros(), RUNNING) is None
     assert sysid.blocked("buzz", ros("rl_flat_level_sysid"), RUNNING) is None
     assert sysid.blocked("buzz", ros(), {"state": "external"}) is None
+    # A policy trial records from before the first controller starts.
+    assert sysid.blocked("policies", idle, RUNNING) is None
+    assert "stack is not running" in sysid.blocked("policies", idle, {"state": "stopped"})
 
 
 def fake(seconds=0.2, code=0):
@@ -156,3 +162,19 @@ def test_a_yaw_result_reports_its_band_and_coherence(tmp_path):
     (full / "response_summary.json").write_text(json.dumps(sweeps[:3]))
     result = {r["name"]: r for r in jobs.runs()}["full_20261117-130000"]["result"]
     assert result["missing"] == ["fore_aft"] and result["weak"] is True
+
+
+def test_the_e_stop_leaves_a_policy_trial_recording_and_stop_ends_it_as_done(tmp_path):
+    script = ("import signal, sys, time\n"
+              "signal.signal(signal.SIGINT, lambda *_: sys.exit(0))\n"
+              "print('NOW: recording', flush=True)\n"
+              "time.sleep(30)\n")
+    jobs = sysid.Sysid(tmp_path, logbook.Logbook(), BRINGUP / "tools",
+                       runner=lambda kind, out, label: [sys.executable, "-u", "-c", script])
+    idle = {"manager": True, "controllers": []}
+    job = jobs.start("policies", idle, RUNNING)
+    assert job["name"].startswith("policies_2")
+    time.sleep(0.3)                                  # the handler installed
+    assert jobs.stop(emergency=True) is None and jobs.summary()["state"] == "running"
+    assert jobs.stop()["kind"] == "policies"
+    assert wait(jobs, "done")["code"] == 0

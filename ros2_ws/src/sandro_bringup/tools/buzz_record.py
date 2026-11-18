@@ -96,21 +96,9 @@ def record(args):
 
 # Analysis -----------------------------------------------------------------------
 
-def read_bag(path):
-    """(t, right wheel velocity, left wheel velocity) and (t, gyro x, y, z), by header stamp."""
-    import numpy as np
-    wheels, gyro = [], []
-
-    def take(topic, msg, received_ns):
-        s = msg.header.stamp
-        t = s.sec + s.nanosec * 1e-9 if (s.sec or s.nanosec) else received_ns * 1e-9
-        if topic == "/joint_states":
-            wheels.append([t] + [msg.velocity[msg.name.index(n)] for n in WHEELS])
-        else:
-            g = msg.angular_velocity
-            gyro.append((t, g.x, g.y, g.z))
-
-    wanted = {"/joint_states", "/imu_broadcaster/imu"}
+def messages(path, wanted):
+    """(topic, message, receive time ns) of the wanted topics of a bag, in order."""
+    wanted = set(wanted)
     try:
         from rclpy.serialization import deserialize_message
         from rosbag2_py import ConverterOptions, SequentialReader, StorageOptions
@@ -121,12 +109,30 @@ def read_bag(path):
         while reader.has_next():
             topic, data, received = reader.read_next()
             if topic in wanted:
-                take(topic, deserialize_message(data, get_message(types[topic])), received)
+                yield topic, deserialize_message(data, get_message(types[topic])), received
     except ImportError:
         from mcap_ros2.reader import read_ros2_messages
         for file in sorted(Path(path).glob("*.mcap")):
             for m in read_ros2_messages(str(file), topics=sorted(wanted)):
-                take(m.channel.topic, m.ros_msg, m.log_time_ns)
+                yield m.channel.topic, m.ros_msg, m.log_time_ns
+
+
+def stamp(msg, received_ns):
+    s = msg.header.stamp
+    return s.sec + s.nanosec * 1e-9 if (s.sec or s.nanosec) else received_ns * 1e-9
+
+
+def read_bag(path):
+    """(t, right wheel velocity, left wheel velocity) and (t, gyro x, y, z), by header stamp."""
+    import numpy as np
+    wheels, gyro = [], []
+    for topic, msg, received_ns in messages(path, {"/joint_states", "/imu_broadcaster/imu"}):
+        t = stamp(msg, received_ns)
+        if topic == "/joint_states":
+            wheels.append([t] + [msg.velocity[msg.name.index(n)] for n in WHEELS])
+        else:
+            g = msg.angular_velocity
+            gyro.append((t, g.x, g.y, g.z))
     return np.array(wheels), np.array(gyro)
 
 

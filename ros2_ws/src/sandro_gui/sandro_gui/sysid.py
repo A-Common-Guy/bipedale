@@ -14,6 +14,9 @@ checked that the robot is in the state the measurement needs:
         9 Hz yaw buzz and the 14 Hz roll buzz together.
   buzz  buzz_record.py: records the running controller through stand, drive,
         stand, and says which loop its buzz is in.
+  policies  policy_record.py: an open recording of a trial of the policies,
+        with the controller that ran at every moment and its parameters;
+        ends with Stop measurement.
 
 A run lives in <dir>/<kind>_<time>/ with the tool's output in panel.log; the
 page shows that log, the instruction of the moment (the tools' "NOW:" lines)
@@ -90,7 +93,26 @@ MEASUREMENTS = {
                   "Nothing is commanded by this run; you drive."],
         "result": "summary.json",
     },
+    "policies": {
+        "title": "Record a policy trial",
+        "tool": "policy_record.py",
+        "needs": "stack",
+        "seconds": 900,
+        "purpose": "An open recording while you try the policies: everything the robot measures, "
+                   "and which controller ran when, with its policy file and parameters. One row "
+                   "per controller in the result: how it stood, drove and whether it fell. For the "
+                   "repository, as the record the next training starts from.",
+        "steps": ["Start the stack. Press Start here first, then start the first controller: "
+                  "its start is then in the recording too.",
+                  "Try the policies as you like, from the Run page or the gamepad. For a fair "
+                  "comparison give each one 20 s standing still and some driving.",
+                  "Press Stop measurement when you are done (it closes by itself after 15 "
+                  "minutes). The E-stop does not end this recording."],
+        "result": "summary.json",
+    },
 }
+# The runs Stop is the normal end of, and the E-stop leaves running.
+OPEN_ENDED = {"policies"}
 
 
 def command(kind: str, out: Path, tools: Path, label: str = "", python: str = sys.executable) -> list[str]:
@@ -103,6 +125,8 @@ def command(kind: str, out: Path, tools: Path, label: str = "", python: str = sy
         return [python, "-u", tool, "--kp", "12", "--pulses", "0", "--axis", "yaw", "roll", "fore_aft",
                 "--chirp-nm", "0.2", "0.4", "--chirp-m", "0.002", "0.004", "--f0", "2", "--f1", "40",
                 "--chirp-s", "30", "--settle", "3", "--yes", "--out", str(out)]
+    if kind == "policies":
+        return [python, "-u", tool, "--max", "900", "--out", str(out)]
     return [python, "-u", tool, "--label", label, "--stand", "30", "--drive", "30", "--yes",
             "--out", str(out)]
 
@@ -113,6 +137,8 @@ def blocked(kind: str, ros: dict | None, launch: dict | None) -> str | None:
         return "the stack is not running: start it on the Run page"
     if not ros or not ros.get("manager"):
         return "no controller manager yet"
+    if MEASUREMENTS[kind]["needs"] == "stack":
+        return None
     running = [c for c in ros.get("controllers", []) if c.get("owns_commands")]
     if not running:
         return "no controller is running: arm and start one on the Run page"
@@ -187,6 +213,8 @@ class Sysid:
             except OSError:
                 code = None
         stopped = job.pop("stopping", False)
+        if stopped and code == 0 and job["kind"] in OPEN_ENDED:
+            stopped = False
         job.update(ended=time.time(), code=code,
                    state="stopped" if stopped else "done" if code == 0 else
                    "ended" if code is None else "failed")
@@ -221,12 +249,18 @@ class Sysid:
             self.log.note(f"sysid: {self.job['title']} started ({name})")
             return dict(self.job)
 
-    def stop(self) -> dict | None:
-        """One SIGINT to the tool, as Ctrl-C; it closes its recording and restores the WBC."""
+    def stop(self, emergency: bool = False) -> dict | None:
+        """One SIGINT to the tool, as Ctrl-C; it closes its recording and restores the WBC.
+
+        The E-stop (emergency) leaves a recording that commands nothing running:
+        what the robot did after it belongs to a policy trial.
+        """
         with self.lock:
             self._poll()
             job = self.job
             if not job or job["state"] != "running":
+                return None
+            if emergency and job["kind"] in OPEN_ENDED:
                 return None
             job["stopping"] = True
             try:
@@ -352,11 +386,11 @@ def demo_runner(kind: str, out: Path, label: str) -> list[str]:
         "import json, sys, time\n"
         "kind, out = sys.argv[1], sys.argv[2]\n"
         "steps = ['stand still, hands off the sticks (4 s)', 'drive and turn gently (4 s)',\n"
-        "         'stand still again (4 s)'] if kind == 'buzz' else ['chirp 0.2 Nm (6 s)', 'chirp 0.4 Nm (6 s)']\n"
+        "         'stand still again (4 s)'] if kind in ('buzz', 'policies') else ['chirp 0.2 Nm (6 s)', 'chirp 0.4 Nm (6 s)']\n"
         "for step in steps:\n"
         "    print('NOW: ' + step, flush=True)\n"
-        "    time.sleep(4 if kind == 'buzz' else 6)\n"
-        "if kind == 'buzz':\n"
+        "    time.sleep(4 if kind in ('buzz', 'policies') else 6)\n"
+        "if kind in ('buzz', 'policies'):\n"
         "    json.dump({'verdict': 'quiet standing: at most 0.03 rad/s (demo)'}, open(out + '/summary.json', 'w'))\n"
         "else:\n"
         "    json.dump([{'kp': 12, 'chirp_nm': 0.2, 'chirp_hz': 12.4, 'coherence': 0.97}], open(out + '/summary.json', 'w'))\n"

@@ -181,5 +181,20 @@ running stack is older than the page: stop it, deploy, start it again.
 3. Results gives the verdict (quiet, or the mode, its size and frequency);
    **Recording** downloads the whole run as a `.tar` for `recordings/`.
 
+**Record a policy trial** (open, 15 minutes at most): which policy did what.
+
+1. Start the stack. Sysid page: Start, tick the box. Then start the first
+   controller, so that its start is recorded too.
+2. Try the policies as you like, from the Run page or the gamepad. The large
+   line names the controller being recorded and changes with every switch.
+   For a fair comparison give each one 20 s standing still and some driving.
+3. **Stop measurement** ends the recording. The E-stop does not: a fall and
+   what followed belong to the trial.
+4. Results has one line per stay of a controller: how long, quiet or buzzing
+   while standing (size, axis, frequency), how far it drove, how long it lay
+   on the floor. **Recording** downloads the run as a `.tar`: untar it under
+   `recordings/policy_trials/` (its README says what is inside) and add what
+   you saw and heard to `notes.md` beside it.
+
 Stop measurement ends a run cleanly at any time; so does the E-stop. A run
 that ends early keeps what it recorded.

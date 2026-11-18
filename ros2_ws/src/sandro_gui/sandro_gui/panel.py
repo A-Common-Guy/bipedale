@@ -598,7 +598,7 @@ class Panel:
         else:
             raise RuntimeError("ROS is not available: use the power cut-off")
         self.session["estopped"] = True
-        if self.sysid is not None and self.sysid.stop():
+        if self.sysid is not None and self.sysid.stop(emergency=True):
             message += "; the running measurement stopped"
         self.log.note("E-STOP from the panel: " + message, ERROR)
         return message

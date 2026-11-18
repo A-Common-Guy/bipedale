@@ -60,7 +60,8 @@ function renderCards() {
         h("button", { class: "primary", disabled: !!reason, title: reason || "", onclick: () => start(m) },
           `Start (${duration(m.seconds)})`),
         reason ? h("span", { class: "warn-text small" }, reason)
-          : h("span", { class: "muted small" }, m.id === "buzz" ? `records ${data.controller}` : "the WBC is balancing")));
+          : h("span", { class: "muted small" }, m.id === "policies" ? "records every controller you run"
+            : m.id === "buzz" ? `records ${data.controller}` : "the WBC is balancing")));
   }));
 }
 
@@ -120,6 +121,7 @@ function verdict(run) {
       h("div", { class: "muted small" }, r.text)];
   }
   if (!r.text) return [badge("no analysis", "warn"), " the run did not finish"];
+  if (run.kind === "policies") return r.text.split("; ").map((line) => h("div", {}, line));
   return [r.text.startsWith("quiet") ? badge("quiet", "ok") : badge("buzz", "warn"), " ", r.text];
 }
 
@@ -147,7 +149,7 @@ function renderRuns() {
           ])))),
     h("p", { class: "hint sysid-next" },
       "Opposed plant (or the yaw-only Plant table): save it into sandro_rl/data/ on the training machine and set train.loop_margin.plant to its file name. ",
-      "Recording: untar it under recordings/ to keep it with the others."));
+      "Recording: untar it under recordings/ to keep it with the others (a policy trial under recordings/policy_trials/)."));
 }
 
 async function start(m) {
@@ -155,7 +157,7 @@ async function start(m) {
     title: `${m.title}?`,
     body: h("div", {},
       h("ol", {}, m.steps.map((step) => h("li", {}, step))),
-      h("p", { class: "hint" }, m.id !== "buzz"
+      h("p", { class: "hint" }, m.id !== "buzz" && m.id !== "policies"
         ? "The whole-body controller adds the small sweep to its own commands while it balances. Stop measurement, the E-stop, or the robot no longer balancing end it at once."
         : "Recording only: the controller is not touched.")),
     ok: "Start",

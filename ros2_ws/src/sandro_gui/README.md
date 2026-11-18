@@ -12,7 +12,7 @@ How to drive it, step by step and button by button: [docs/USER_GUIDE.md](docs/US
 | Tune | Any node's parameters, set live through the parameter services, changes marked against the launch values, revert, and an export of the changes as a `ros__parameters` file. |
 | IMU | Attitude, rates, acceleration, topic rate against new-sample rate, sample age, strip charts. |
 | Gamepad | Bluetooth scan, pair, connect, forget, rfkill unblock; the pad's live input as the robot sees it and the `/cmd_vel` teleop sends. |
-| Sysid | The measurements the RL training needs, one button each: the yaw response to 45 Hz under the WBC (result: `yaw_plant.json` for `sandro_rl`'s `train.loop_margin`), the same sweep on the wheels, the leg heights (roll) and the axles fore-aft in one recording (result: `response.json`, the whole left-against-right plant), and a stand-drive-stand recording of any controller that says which loop its buzz is in. Each run checks the robot's state first, shows the instruction of the moment, and keeps its recording and result to download. |
+| Sysid | The measurements the RL training needs, one button each: the yaw response to 45 Hz under the WBC (result: `yaw_plant.json` for `sandro_rl`'s `train.loop_margin`), the same sweep on the wheels, the leg heights (roll) and the axles fore-aft in one recording (result: `response.json`, the whole left-against-right plant), and a stand-drive-stand recording of any controller that says which loop its buzz is in. A fourth, open recording follows a trial of the policies and logs which controller ran when, with its policy file and parameters. Each run checks the robot's state first, shows the instruction of the moment, and keeps its recording and result to download. |
 | Guide | The start-up procedure and every gamepad combination, generated from `teleop.yaml`. |
 
 ## Running it
@@ -108,7 +108,7 @@ changed and restarts the panel; see `deploy/pi/README.md`.
   the E-stop node's service and deactivates the controllers in parallel, and
   aborts any action still in flight.
 - **Sysid** (`sysid.py`). A measurement is a `sandro_bringup/tools` script
-  (`sysid_yaw.py`, `buzz_record.py`) run as its own process with arguments
+  (`sysid_yaw.py`, `buzz_record.py`, `policy_record.py`) run as its own process with arguments
   fixed in `sysid.command`, its output in `experiments/<run>/panel.log`.
   It starts only when the snapshot shows what it needs (the WBC engaged for
   the sweep, any controller running for the recording) and after the
