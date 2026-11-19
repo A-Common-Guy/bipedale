@@ -293,6 +293,9 @@ EXTRA_SCENARIOS = {
 }
 SCENARIOS = {**closed_loop.SCENARIOS, **EXTRA_SCENARIOS}
 
+# The video's tracking camera: distance (m), elevation and azimuth (degrees).
+VIDEO_VIEW = (1.2, -15.0, 120.0)
+
 # The obstacle course of `--course`, along the start heading: planks 0.1 m
 # deep and 1.2 m wide at these distances (m) and heights (m), then a hill
 # (10 degree ramps, 0.6 m plateau, 1.6 m wide) 8 cm high centred at 5.0 m.
@@ -598,7 +601,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         camera = mujoco.MjvCamera()
         camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
         camera.trackbodyid = torso
-        camera.distance, camera.elevation, camera.azimuth = 1.2, -15.0, 120.0
+        camera.distance, camera.elevation, camera.azimuth = VIDEO_VIEW
         last_frame_t = -1.0
 
     # env.py's drive-train lag on the wheel torque (wheel_lag, s).
