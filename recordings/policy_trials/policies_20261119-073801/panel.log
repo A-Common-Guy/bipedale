@@ -1,0 +1,32 @@
+$ /usr/bin/python3 -u /workspaces/sandro/install/sandro_bringup/share/sandro_bringup/tools/policy_record.py --max 900 --out /workspaces/sandro/experiments/policies_20261119-073801
+recording the controllers that run, for at most 900 s, into /workspaces/sandro/experiments/policies_20261119-073801
+NOW: recording rl_agile_step (since 0 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: recording no controller (since 95 s). Switch and drive as you like; Stop measurement ends the recording.
+NOW: closing the recording
+recorded: /workspaces/sandro/experiments/policies_20261119-073801
+Traceback (most recent call last):
+  File "/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/tools/policy_record.py", line 306, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/tools/policy_record.py", line 299, in main
+    analyse(args.out)
+  File "/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/tools/policy_record.py", line 255, in analyse
+    wheels, imu = read_bag(directory / "bag")
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/tools/policy_record.py", line 190, in read_bag
+    for topic, msg, received_ns in buzz.messages(path, {"/joint_states", "/imu_broadcaster/imu"}):
+  File "/workspaces/sandro/ros2_ws/src/sandro_bringup/tools/buzz_record.py", line 112, in messages
+    yield topic, deserialize_message(data, get_message(types[topic])), received
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rosidl_runtime_py/utilities.py", line 28, in get_message
+    interface = import_message_from_namespaced_type(get_message_namespaced_type(identifier))
+                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rosidl_runtime_py/utilities.py", line 57, in get_message_namespaced_type
+    return _get_namespaced_type(identifier, default_namespace='msg')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rosidl_runtime_py/utilities.py", line 90, in _get_namespaced_type
+    namespace = identifier.split(sep='/')
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/sandro/install/sandro_bringup/share/sandro_bringup/tools/policy_record.py", line 126, in stop
+    raise KeyboardInterrupt
+KeyboardInterrupt

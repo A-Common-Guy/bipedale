@@ -1,0 +1,166 @@
+{
+ "verdict": "rl_agile_step 95 s, buzz standing 0.07 rad/s of gyro pitch at 12.0 Hz, drove 68 s to 0.9 m/s",
+ "version": {
+  "commit": "6f799765e1223956a4e894c22fd9cef4c20622cc",
+  "short": "6f79976",
+  "describe": "6f79976",
+  "subject": "feat(sandro_gui): the terrain profile drawn in the 3D view",
+  "date": "2026-11-19T00:49:48+01:00",
+  "author": "giuseppe.festa",
+  "dirty": false,
+  "changes": [],
+  "via": "panel",
+  "at": "2026-11-18T23:50:10+0000",
+  "built_at": "2026-11-18T23:50:10+0000",
+  "packages": "all"
+ },
+ "stretches": [
+  {
+   "controller": "rl_agile_step",
+   "from_s": 0.036261796951293945,
+   "seconds": 94.56499743461609,
+   "policy_file": "package://sandro_controllers/policies/agile_step.bin",
+   "policy_fingerprint": "107fb7830e78e44a9361c60031d8f2f982332f272bf2e3804b3578220a72ab31",
+   "standing": {
+    "seconds": 24.0,
+    "bands": {
+     "5-15 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.029008691450784437,
+        11.5
+       ],
+       "worst": [
+        0.08585918843560215,
+        11.5
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.07316761723033807,
+        12.0
+       ],
+       "worst": [
+        0.395613885432667,
+        5.5
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.06217211500260841,
+        13.0
+       ],
+       "worst": [
+        0.33122177007314146,
+        11.5
+       ]
+      }
+     },
+     "15-45 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.019059531321342606,
+        15.5
+       ],
+       "worst": [
+        0.03636317187274408,
+        17.0
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.029434936754074673,
+        15.0
+       ],
+       "worst": [
+        0.09013770157700186,
+        15.5
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.016093007543110698,
+        15.0
+       ],
+       "worst": [
+        0.07067384879465755,
+        18.0
+       ]
+      }
+     }
+    }
+   },
+   "driving": {
+    "seconds": 68.0,
+    "bands": {
+     "5-15 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.08328118024596297,
+        6.0
+       ],
+       "worst": [
+        0.2161178414587038,
+        6.0
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.25911238968911615,
+        11.0
+       ],
+       "worst": [
+        0.9039408907295247,
+        10.5
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.16744109881366112,
+        12.0
+       ],
+       "worst": [
+        0.4702829304694057,
+        12.0
+       ]
+      }
+     },
+     "15-45 Hz": {
+      "gyro yaw": {
+       "typical": [
+        0.02816840917747042,
+        16.5
+       ],
+       "worst": [
+        0.08799099047520338,
+        16.0
+       ]
+      },
+      "gyro pitch": {
+       "typical": [
+        0.06350769987239335,
+        15.0
+       ],
+       "worst": [
+        0.2724382083192975,
+        19.5
+       ]
+      },
+      "gyro roll": {
+       "typical": [
+        0.04350874105618781,
+        15.0
+       ],
+       "worst": [
+        0.24859317183252927,
+        15.0
+       ]
+      }
+     }
+    },
+    "top_speed_m_s": 0.9024004367886602
+   },
+   "down_s": 0.0
+  }
+ ]
+}
