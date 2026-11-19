@@ -1,0 +1,36 @@
+# fun_one_leg held for 8 s per request instead of 2 (it may travel and turn
+# while it holds), on the randomised drive train of the robot-ready policies:
+# a first run without it held 7 s on the MJCF and fell in 8 of 9 runs on the
+# fitted plant (heavy rotor, soft gear).
+#
+#     uv run python -m sandro_rl.train configs/fun_one_leg_long.yaml --resume policies/fun_one_leg
+inherit: fun_one_leg.yaml
+
+env:
+  commands:
+    jump:
+      interval_s: [3.0, 6.0]
+      window_s: 8.0
+  randomization:
+    latency:
+      mit_joints_probability: 0.5
+    drives:
+      gear:
+        probability: 0.5
+        stiffness_nm_rad: [8.0, 60.0]
+        play_rad: [0.0, 0.03]
+        damping_nm_s_rad: [0.05, 0.3]
+        rotor_inertia_scale: [15.0, 35.0]
+        substeps: 8
+    model:
+      tyre_torsional_scale: [0.005, 2.0]
+      wheel_frictionloss_scale: [0.02, 2.0]
+      leg_armature_scale: [5.0, 35.0]
+
+train:
+  iterations: 1500
+
+# The oscillation watchdog waits out the whole stand.
+deploy:
+  safety:
+    oscillation_hold_s: 9.5

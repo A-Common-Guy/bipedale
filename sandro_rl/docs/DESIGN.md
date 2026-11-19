@@ -2499,6 +2499,18 @@ track; whether the real tyre and floor allow what MuJoCo's do is open, and
 the floor is 1.0 or grippier here (section 15). The oscillation watchdog
 waits 3.5 s for it (`deploy.safety.oscillation_hold_s`), untested.
 
+**`fun_one_leg_long`: 8 s on one wheel** (`rl_fun_one_leg_long`).
+`fun_one_leg` with `window_s` 8, free to travel and turn. A first run from
+`fun_one_leg` held 7.0 s in 27 of 27 requests on the MJCF and fell in 8 of 9
+runs on the fitted plant (heavy rotor, soft gear), after 2 to 7 s: the jump
+lineage never trained on that drive train. 1200 more iterations with the
+gear, rotor and leg-inertia randomisation of `step_climb_v2`:
+`scripts/one_leg_runs.py --hold 8`, 54 of 54 requests, 7.0–8.0 s on one
+wheel (median 7.5; 7.5–8.0 on the fitted plant), the right wheel 12–14 cm
+up, roll within 0.58 rad, no fall in 18 runs. Gate 0.34. Watchdog hold
+9.5 s, which switches the oscillation watchdog off for the stand. Videos:
+`fun_one_leg_long.mp4` from behind, `_side.mp4`.
+
 `evaluate.py` logs the higher wheel's lift (`truth_wheel_lift_m`).
 `configs/agile_step.yaml` now carries its watchdog hold (1.2 s), which was
 only in the generated `rl_policies.yaml`.

@@ -134,6 +134,11 @@ rl_fun_one_leg:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# The same held for 8 s per request.
+rl_fun_one_leg_long:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 
 # The terrain profile (sandro_perception) takes the same physical IMU mounting
 # as the controllers above.
