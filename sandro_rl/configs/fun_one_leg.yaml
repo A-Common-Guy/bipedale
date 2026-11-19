@@ -1,0 +1,41 @@
+# For fun: on request (the hop input, L1 + cross) lift the right wheel and
+# stand on the left one for the window (commands.jump.one_leg). The robot has
+# no actuator about its roll axis on one wheel, so how long it can hold is
+# for the training to find out. From the jump policy.
+#
+#     uv run python -m sandro_rl.train configs/fun_one_leg.yaml --resume policies/jump
+inherit: jump.yaml
+
+env:
+  commands:
+    jump:
+      one_leg: true
+      interval_s: [3.0, 6.0]
+      window_s: 2.0
+      landing_s: 0.5
+      height_m: [0.03, 0.06]
+  rewards:
+    weights:
+      jump_clearance: 40.0
+      jump_vz: 0.0
+      jump_overshoot: -500.0
+  constraints:
+    tilt: {limit_rad: 0.6, slack: 0.3}
+
+train:
+  symmetry_coef: 0.0            # the task is not mirror-symmetric
+  num_envs: 6144
+  iterations: 2000
+  curriculum_offset: 900
+  learning_rate: 2.0e-4
+  resume_log_std: -1.6
+  loop_margin:
+    coef: 1.0
+    margin: 0.35
+    plant: [opposed_plant_2026-11-17.json, yaw_plant_2026-11-16.json, yaw_plant_2026-11-12.json]
+
+# Standing on one leg works the legs for the whole 2 s window: the
+# oscillation watchdog waits it out (as agile_step's waits out a hop).
+deploy:
+  safety:
+    oscillation_hold_s: 3.5

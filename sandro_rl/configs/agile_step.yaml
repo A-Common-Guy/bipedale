@@ -96,3 +96,10 @@ train:
     coef: 1.0
     margin: 0.35
     plant: [opposed_plant_2026-11-17.json, yaw_plant_2026-11-16.json, yaw_plant_2026-11-12.json]
+
+# A hop swings the legs through the oscillation watchdog's band: 2.2-2.4
+# rad/s for 0.7-0.8 s, on the robot as in simulation. The drives go limp only
+# when the limit is exceeded for this long.
+deploy:
+  safety:
+    oscillation_hold_s: 1.2

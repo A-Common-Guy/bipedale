@@ -1320,7 +1320,12 @@ class SandroEnv:
             "pitch": truth["pitch"] ** 2,
             "pitch_rate": truth["pitch_rate"] ** 2,
             "vertical_velocity": truth["vertical_speed"] ** 2,
-            "leg_symmetry": (truth["offsets"][0] - truth["offsets"][1]) ** 2,
+            "leg_symmetry": (truth["offsets"][0] - truth["offsets"][1] - r.get("split_m", 0.0)) ** 2,
+            # A split stance (rewards.split_m: the right axle that far ahead of
+            # the left one), held about the neutral offset.
+            "track_split": jp.exp(-((truth["offsets"][0] - truth["offsets"][1] - r.get("split_m", 0.0))
+                                    / sig.get("split", 0.03)) ** 2),
+            "split_centre": (truth["offsets"][0] + truth["offsets"][1]) ** 2,
             # Differences per 10 ms, so a faster policy is held to the same
             # smoothness (unchanged at 100 Hz).
             "action_rate": jp.sum(((action - prev_action) * self.difference_scale) ** 2),
@@ -1348,11 +1353,22 @@ class SandroEnv:
             # and drop the terms that hold the body at a steady height.
             jumping = self._jumping(info)
             in_window = (info["jump_timer"] > 0.0).astype(jp.float32) * (1.0 - info["jump_done"])
-            lift = jp.clip(jp.min(truth["clearance"]), 0.0, info["jump_height"]) / info["jump_height"]
+            one_leg = bool(self.jump.get("one_leg", False))
+            if one_leg:
+                # Standing on the left leg: the right wheel's clearance counts
+                # while the left tyre stays on the ground.
+                grounded = (truth["clearance"][1] < 0.005).astype(jp.float32)
+                raised = truth["clearance"][0]
+                lift = grounded * jp.clip(raised, 0.0, info["jump_height"]) / info["jump_height"]
+            else:
+                raised = jp.min(truth["clearance"])
+                lift = jp.clip(raised, 0.0, info["jump_height"]) / info["jump_height"]
             terms["jump_clearance"] = in_window * lift
             terms["jump_vz"] = in_window * jp.clip(truth["base_vz"], 0.0, 1.5)
-            terms["jump_overshoot"] = in_window * jp.maximum(jp.min(truth["clearance"]) - info["jump_height"], 0.0) ** 2
-            for name in ("track_height", "vertical_velocity"):
+            terms["jump_overshoot"] = in_window * jp.maximum(raised - info["jump_height"], 0.0) ** 2
+            free = ("track_height", "vertical_velocity") + (
+                ("roll", "track_roll", "leg_symmetry", "track_forward", "track_yaw") if one_leg else ())
+            for name in free:
                 terms[name] = terms[name] * (1.0 - jumping)
         if self.has_goal:
             # Agile But Safe (He et al. 2024) style: speed towards the goal up to

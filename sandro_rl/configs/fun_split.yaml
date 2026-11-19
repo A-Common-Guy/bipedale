@@ -1,0 +1,25 @@
+# For fun: agile_terrain_v6 driving in a split stance, the right wheel
+# 14 cm ahead of the left one (rewards.split_m), each leg about 7 cm from
+# its neutral offset. The stance is statically stable in pitch, the one the
+# jump training once found by itself (DESIGN.md 8). Same inputs as v6.
+#
+#     uv run python -m sandro_rl.train configs/fun_split.yaml --resume policies/agile_terrain_v6
+inherit: agile_terrain_v6.yaml
+
+env:
+  commands:
+    height_m: [0.10, 0.15]      # the reach fore and aft shrinks with the height
+  rewards:
+    split_m: 0.14
+    sigma: {split: 0.03}
+    weights:
+      leg_symmetry: -400.0        # about split_m: the pull from far away, where track_split is flat
+      track_split: 3.0
+      split_centre: -100.0
+
+train:
+  symmetry_coef: 0.0            # the task is not mirror-symmetric
+  iterations: 600
+  learning_rate: 2.0e-4
+  desired_kl: 0.01
+  resume_log_std: -1.8

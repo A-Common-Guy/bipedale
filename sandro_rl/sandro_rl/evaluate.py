@@ -59,7 +59,7 @@ DIAG_KEYS = [
     "yaw_torque_nm", "yaw_feedforward_nm", "truth_pitch_rad", "truth_speed_m_s"]
 TRUTH_KEYS = ["truth_forward_m_s", "truth_yaw_rate_rad_s", "truth_height_m", "truth_roll_rad",
               "truth_wheel_clearance_m", "truth_axle_x_m", "truth_axle_y_m", "truth_tilt_rad",
-              "truth_imu_height_m"]
+              "truth_imu_height_m", "truth_wheel_lift_m"]
 IMU_COLUMNS = ["imu_qx", "imu_qy", "imu_qz", "imu_qw", "imu_gx", "imu_gy", "imu_gz", "imu_ax", "imu_ay", "imu_az"]
 
 # Latency profiles of the comparison. "spi_slow" is the gate closed_loop.py
@@ -929,6 +929,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                 "truth_axle_x_m": float(axle[0]), "truth_axle_y_m": float(axle[1]),
                 "truth_tilt_rad": math.acos(float(np.clip(rb[2, 2], -1.0, 1.0))),
                 "truth_imu_height_m": float(d.site_xpos[imu_site][2]),
+                # The higher wheel above a flat floor (one-leg policies).
+                "truth_wheel_lift_m": float(max(p[2] - radius for p in d.xanchor[wheel_joints])),
             }
             rows.append({**base, "stream": "diag", **{f"diag_{k}": f"{v:.6g}" for k, v in values.items()}})
         joint_row = {**base, "stream": "joint"}

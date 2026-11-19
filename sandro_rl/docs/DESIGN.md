@@ -2462,3 +2462,43 @@ stops before the block in 5, 1 and 0 of 18 (`scripts/guard_runs.py`), meeting
 it at up to 0.67 m/s. Neither is kept: `agile_step` stops in every run. What
 separates them is unknown; `agile_step` trains the stop together with the hop
 at steeper faces (70–85 degrees) and without the face rule.
+
+## 16. Three policies for fun (2026-11-19)
+
+Asked for by friends of the owner; none has run on the robot.
+
+**`fun_split`: a split stance** (`rl_fun_split`). `agile_terrain_v6` with
+`rewards.split_m` 0.14: the right axle that far ahead of the left one.
+`leg_symmetry` is now the squared error about `split_m` (0 everywhere else),
+which pulls from far away; `track_split`, a kernel 3 cm wide, alone left the
+legs together in a first run (flat at 14 cm of error). Result: the right
+axle 4 cm ahead of its neutral, the left 7 cm behind (11 cm apart, 8–12 while
+driving; the legs reach 0.97 of their length), the standard course in 27 of
+27 runs, gate 0.33. No mirror loss.
+
+**`fun_fast`: 2 m/s** (`rl_fun_fast`). v6 with `commands.forward_m_s` 2.0,
+3 m/s² and wheel actions up to 40 rad/s, on lower obstacles. Cruises at
+1.66–1.70 m/s when asked for 2.0, 1.25 at 1.5, 0.82–0.89 at 1.0, no fall in
+18 runs, tilt below 0.26 rad, gate 0.34. The wheels reach 32 rad/s; the
+drives' default speed limit is 186 rpm at the output (19.5 rad/s, 1.3 m/s
+at the tyre, `gim6010/manual`), which the simulation does not have. Beyond
+about 1.2 m/s the robot needs that limit raised and the supply voltage for
+it; until then, lower `joy_teleop`'s `speed_fraction`.
+
+**`fun_one_leg`: standing on the left wheel** (`rl_fun_one_leg`). The hop
+input (L1 + cross) opens a 2 s window in which the right wheel's clearance
+is paid for while the left tyre stays on the floor
+(`commands.jump.one_leg`); roll, leg symmetry and the speed tracking are
+free in the window. From `jump`, 2000 iterations. `scripts/one_leg_runs.py`
+(two plants, three latency profiles, three seeds, five requests each, two
+of them at 0.5 m/s): 87 of 88 requests answered, 2.06 s on one wheel
+(median; 2.62 at most), the right wheel 13 cm up (median), the body rolled
+to about 0.5 rad, one fall in 18 runs. Gate 0.32. The robot has nothing to
+steer its roll with on one wheel but the legs' own motion and the tyre's
+track; whether the real tyre and floor allow what MuJoCo's do is open, and
+the floor is 1.0 or grippier here (section 15). The oscillation watchdog
+waits 3.5 s for it (`deploy.safety.oscillation_hold_s`), untested.
+
+`evaluate.py` logs the higher wheel's lift (`truth_wheel_lift_m`).
+`configs/agile_step.yaml` now carries its watchdog hold (1.2 s), which was
+only in the generated `rl_policies.yaml`.

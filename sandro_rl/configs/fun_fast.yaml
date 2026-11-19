@@ -1,0 +1,25 @@
+# For fun: agile_terrain_v6 up to 2 m/s (1 m/s), wheel actions up to
+# 40 rad/s (25), lower obstacles. The drives' default speed limit is
+# 186 rpm at the output, 1.3 m/s at the tyre: beyond it the robot needs
+# the limit raised and the supply voltage for it (DESIGN.md).
+#
+#     uv run python -m sandro_rl.train configs/fun_fast.yaml --resume policies/agile_terrain_v6
+inherit: agile_terrain_v6.yaml
+
+env:
+  action:
+    wheels: {scale_rad_s: 40.0}
+  commands:
+    forward_m_s: 2.0
+    forward_accel_m_s2: 3.0
+  terrain:
+    planks: {height_m: [0.003, 0.015]}
+    hills: {height_m: [0.01, 0.05]}
+  rewards:
+    sigma: {forward: 0.3}
+
+train:
+  iterations: 1200
+  learning_rate: 2.0e-4
+  desired_kl: 0.01
+  resume_log_std: -1.8
