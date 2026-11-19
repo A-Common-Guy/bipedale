@@ -7,6 +7,8 @@ profiles, three seeds. --hold S: the policy's window (commands.jump.window_s, 2 
 
 Per policy: requests answered (one wheel more than 1.5 cm up with the other on the floor for
 at least 0.5 s), the time on one wheel and the lift per request, the largest roll, and falls.
+Then what touched the floor during the windows, from the simulation's contacts: the left tyre
+alone (the stand), both tyres, nothing (a hop), or any other part of the robot (propped).
 """
 import csv
 import sys
@@ -31,14 +33,16 @@ def one(job):
     out = Path(f"/tmp/one_leg_runs/{Path(policy).name}_{plant}_{profile}_{seed}.csv")
     code, path = e.run(Path(policy), "one_leg", {**e.PROFILES[profile], **(FITTED if plant else {})}, out, seed=seed)
     rows = [r for r in csv.DictReader(open(path)) if r.get("diag_truth_wheel_lift_m") not in ("", None)]
-    t, high, low, roll, request = (np.array([float(r[k] or 0) for r in rows]) for k in (
-        "t_s", "diag_truth_wheel_lift_m", "diag_truth_wheel_clearance_m", "diag_truth_roll_rad", "cmd_jump"))
+    t, high, low, roll, request, touch = (np.array([float(r[k] or 0) for r in rows]) for k in (
+        "t_s", "diag_truth_wheel_lift_m", "diag_truth_wheel_clearance_m", "diag_truth_roll_rad", "cmd_jump",
+        "diag_truth_floor_contact"))
     dt = float(np.median(np.diff(t)))
-    stands = []
+    stands, touched = [], []
     for start in t[1:][(request[1:] > 0) & (request[:-1] <= 0)]:
         window = (t >= start) & (t < start + hold + 1.5)
         stands.append(((window & (high > 0.015) & (low < 0.005)).sum() * dt, high[window].max()))
-    return code == 3, stands, float(np.abs(roll).max())
+        touched.extend(touch[(t >= start + 0.7) & (t < start + hold - 0.3)].astype(int).tolist())
+    return code == 3, stands, float(np.abs(roll).max()), touched
 
 
 def main():
@@ -58,6 +62,11 @@ def main():
               f"{seconds[0]:.2f} .. {seconds[len(seconds) // 2]:.2f} .. {seconds[-1]:.2f} s, lift "
               f"{lifts[0]:.3f} .. {lifts[len(lifts) // 2]:.3f} .. {lifts[-1]:.3f} m, roll up to "
               f"{max(r[2] for r in results):.2f} rad, falls {sum(r[0] for r in results)} of {len(results)}")
+        touch = np.array([c for r in results for c in r[3]])
+        share = lambda mask: 100.0 * float(np.mean(mask)) if len(touch) else float("nan")
+        print(f"    floor contact in the windows: left tyre alone {share(touch == 2):.0f} %, both tyres "
+              f"{share(touch == 3):.0f} %, right tyre alone {share(touch == 1):.0f} %, nothing "
+              f"{share(touch == 0):.0f} %, another part {share(touch >= 4):.0f} %")
 
 
 if __name__ == "__main__":

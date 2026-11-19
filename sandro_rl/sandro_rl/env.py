@@ -101,6 +101,10 @@ class SandroEnv:
         s = self.spec
         lim = s.limits
         self.mj_model = s.model
+        # The leg links' collision boxes (collision.leg_boxes), for their height above the floor.
+        self.link_boxes = np.array([g for g in range(s.model.ngeom)
+                                    if (s.model.geom(g).name or "").endswith("_link_box")], dtype=int)
+        self.link_half = jp.asarray(s.model.geom_size[self.link_boxes], dtype=jp.float32)
         self.impl = cfg.get("impl", "warp")
         graph_mode = None
         if self.impl == "warp" and cfg.get("graph_mode"):
@@ -826,6 +830,11 @@ class SandroEnv:
             extra["goal_dist"] = jp.sqrt(forward ** 2 + left ** 2)
         if self.n_rays:
             extra["rays"] = self._scan(data, r_body)
+        if len(self.link_boxes):
+            # The lowest corner of any leg link above a flat floor.
+            up = data.geom_xmat[self.link_boxes].reshape(-1, 3, 3)[:, 2, :]
+            extra["link_clearance"] = jp.min(data.geom_xpos[self.link_boxes][:, 2]
+                                             - jp.sum(jp.abs(up) * self.link_half, axis=1))
         if self.has_pillars:
             extra["obstacle_clearance"] = self.terrain.clearance(mid[:2], heading[:2], self.hull_half, data)
         if self.n_profile:
@@ -1358,6 +1367,10 @@ class SandroEnv:
                 # Standing on the left leg: the right wheel's clearance counts
                 # while the left tyre stays on the ground.
                 grounded = (truth["clearance"][1] < 0.005).astype(jp.float32)
+                if "link_clearance" in truth:
+                    # On the tyre alone: no leg link within link_margin_m of the floor.
+                    grounded = grounded * (truth["link_clearance"]
+                                           > self.jump.get("link_margin_m", 0.015)).astype(jp.float32)
                 raised = truth["clearance"][0]
                 lift = grounded * jp.clip(raised, 0.0, info["jump_height"]) / info["jump_height"]
             else:
@@ -1366,8 +1379,13 @@ class SandroEnv:
             terms["jump_clearance"] = in_window * lift
             terms["jump_vz"] = in_window * jp.clip(truth["base_vz"], 0.0, 1.5)
             terms["jump_overshoot"] = in_window * jp.maximum(raised - info["jump_height"], 0.0) ** 2
-            free = ("track_height", "vertical_velocity") + (
-                ("roll", "track_roll", "leg_symmetry", "track_forward", "track_yaw") if one_leg else ())
+            free = (("track_height", "roll", "track_roll", "leg_symmetry", "track_forward", "track_yaw")
+                    if one_leg and self.jump.get("steady", False) else
+                    ("track_height", "vertical_velocity") + (
+                        ("roll", "track_roll", "leg_symmetry", "track_forward", "track_yaw") if one_leg else ()))
+            if one_leg and self.jump.get("steady", False):
+                # A stand, not a series of hops: the supporting tyre leaving the floor costs.
+                terms["jump_airborne"] = in_window * (truth["clearance"][1] > 0.005)
             for name in free:
                 terms[name] = terms[name] * (1.0 - jumping)
         if self.has_goal:

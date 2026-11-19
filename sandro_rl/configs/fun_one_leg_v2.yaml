@@ -1,0 +1,27 @@
+# fun_one_leg_long made honest. Its simulation let it cheat: the leg links
+# did not collide with the floor (a leg joint hovered 6 mm above it), the
+# raised wheel tapped down for 8 % of the stand and the robot was airborne
+# for 5 %. Here the leg links collide (collision.leg_boxes), the stand pays
+# only with every leg link 1.5 cm clear of the floor, and the supporting tyre
+# leaving the floor or the body bobbing costs (commands.jump.steady).
+#
+#     uv run python -m sandro_rl.train configs/fun_one_leg_v2.yaml --resume policies/fun_one_leg_long
+inherit: fun_one_leg_long.yaml
+
+env:
+  collision:
+    leg_boxes: true
+  commands:
+    jump:
+      steady: true
+      link_margin_m: 0.015
+  rewards:
+    weights:
+      jump_airborne: -20.0
+
+train:
+  iterations: 1500
+
+deploy:
+  safety:
+    oscillation_hold_s: 9.5

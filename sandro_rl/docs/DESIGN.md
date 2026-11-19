@@ -2511,6 +2511,26 @@ up, roll within 0.58 rad, no fall in 18 runs. Gate 0.34. Watchdog hold
 9.5 s, which switches the oscillation watchdog off for the stand. Videos:
 `fun_one_leg_long.mp4` from behind, `_side.mp4`.
 
+**Correction (same day): it is not a clean stand.** The owner saw the video
+and said so. `evaluate.py` now logs what touches the floor
+(`truth_floor_contact`, from the contacts) and `one_leg_runs.py` reports it
+over the windows; "one wheel up, the other down" from the wheel heights had
+hidden it. The simulation these policies trained in collides only the tyres
+and the torso with the floor, not the leg links.
+
+| `--hold 8`, 54 requests | left tyre alone | both tyres | right alone | nothing (a hop) | another part |
+|---|---|---|---|---|---|
+| `fun_one_leg_long` as trained (no leg collision) | 90 % | 4 % | 2 % | 5 % | 0 % |
+| the same with the leg links colliding | 83 % | 0 % | 0 % | 5 % | 11 % |
+| `fun_one_leg_v2` (not kept) | 60 % | 4 % | 18 % | 13 % | 4 % |
+
+So `fun_one_leg_long` is on its left tyre for most of the hold, hops for
+5 % of it and, once the leg links can touch, leans on one for 11 %.
+`configs/fun_one_leg_v2.yaml` (leg links colliding, the stand paid only
+with every link 1.5 cm clear of the floor, `commands.jump.steady`: the
+supporting tyre leaving the floor costs) made it worse: it rocks and hops.
+An honest, steady stand on one wheel has not been trained.
+
 `evaluate.py` logs the higher wheel's lift (`truth_wheel_lift_m`).
 `configs/agile_step.yaml` now carries its watchdog hold (1.2 s), which was
 only in the generated `rl_policies.yaml`.
