@@ -444,6 +444,18 @@ controller_interface::return_type RlPolicyController::update(const rclcpp::Time 
   state.profile_age_s = profile.receipt_time_s < 0.0
                             ? std::numeric_limits<double>::infinity()
                             : std::max(0.0, time.seconds() - profile.receipt_time_s);
+  // For the diagnostics: what the policy is shown of the terrain, so a recording
+  // tells a policy that ignores the camera from one that never got its profile.
+  profile_age_s_ = std::min(state.profile_age_s, 1e3);
+  profile_known_ = 0;
+  profile_highest_m_ = 0.0;
+  for (int i = 0; i < kProfileSize / 2; ++i) {
+    if (profile.values[static_cast<std::size_t>(kProfileSize / 2 + i)] > 0.5F) {
+      ++profile_known_;
+      profile_highest_m_ = std::max(
+          profile_highest_m_, static_cast<double>(profile.values[static_cast<std::size_t>(i)]));
+    }
+  }
   const StampedCommand received = *command_.readFromRT();
   RlPolicyCommand command{received.forward_m_s, received.yaw_rate_rad_s,
                           received.height_rate_m_s, received.roll_rad,
@@ -588,6 +600,11 @@ void RlPolicyController::publish_diagnostics(const rclcpp::Time &time,
   add("inference_us", 1e6 * inference_last_s_);
   add("inference_max_us", 1e6 * inference_max_s_);
   add("command_age_s", command_age_s);
+  // The terrain profile as received (all 0 for a blind policy): its age, how many
+  // of its 16 points are known and the highest of them.
+  add("profile_age_s", profile_age_s_);
+  add("profile_known", profile_known_);
+  add("profile_highest_m", profile_highest_m_);
   values.finish();
   diagnostics_publisher_->unlockAndPublish();
 }

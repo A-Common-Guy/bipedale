@@ -34,7 +34,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import buzz_record as buzz  # noqa: E402
 
-TOPICS = buzz.TOPICS + ["/terrain_profile", "/joy", "/controller_manager/activity"]
+TOPICS = buzz.TOPICS + ["/terrain_profile", "/height_profile/depth_preview", "/joy", "/controller_manager/activity"]
 WINDOW_S = 2.0
 # A window is driving above this forward speed or turn rate, lying down above this tilt.
 DRIVING_M_S, TURNING_RAD_S, DOWN_RAD = 0.05, 0.2, 0.5

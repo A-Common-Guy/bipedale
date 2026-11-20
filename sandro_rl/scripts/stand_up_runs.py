@@ -1,7 +1,8 @@
 """How reliably a stand-up policy gets up (docs/DESIGN.md 8, stand_up): the robot tipped by
 each pitch, limp for 3 s, then the policy; 8 s to get up, then 3 s at 0.4 m/s, 3 s turning at
 1 rad/s, 2 s still. Pitches +-0.3 .. +-1.4 rad x seeds x latency profiles x plants (the MJCF
-with 40 and 80 ms of wheel lag, and the fitted drive train; --hard: see HARD).
+with 40 and 80 ms of wheel lag, and the fitted drive train; --hard: see HARD; --held: the legs
+not limp but held where they were, six draws over their reach, on the fitted plant).
 
     cd sandro_rl && uv run python scripts/stand_up_runs.py policies/stand_up [more policies]
 
@@ -29,6 +30,11 @@ PLANTS = {"lag 40 ms": {"wheel_lag": "0.04"}, "lag 80 ms": {"wheel_lag": "0.08"}
 HARD = {"slippery": {**FITTED, "floor_friction": "0.5"}, "grippy": {**FITTED, "floor_friction": "1.5"},
         "weak drives": {**FITTED, "torque_scale": "0.8"}, "rolled": {**FITTED, "fallen_roll": "0.3"},
         "rolled, slippery, weak": {**FITTED, "fallen_roll": "-0.3", "floor_friction": "0.6", "torque_scale": "0.85"}}
+HELD = {f"legs {n}": {**FITTED, "fallen_legs": str(n)} for n in range(1, 7)}
+if "--held" in sys.argv:
+    sys.argv.remove("--held")
+    PLANTS = HELD
+    PITCHES = (-1.6, -1.4, -1.1, -0.8, -0.5, 0.5, 0.8, 1.1, 1.4, 1.6)
 if "--hard" in sys.argv:
     sys.argv.remove("--hard")
     PLANTS = HARD

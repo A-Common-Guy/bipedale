@@ -2,8 +2,13 @@
 
 Publishes `/terrain_profile` (std_msgs/Float32MultiArray: the right track's heights, the left
 track's, then the same 2 x k values as known flags, 1 or 0; height_profile.py has the
-definition) at `publish_hz`, and `~/diagnostics` twice a second. Nothing reads the profile yet
-and this node commands nothing: it can run beside any controller.
+definition) at `publish_hz`, and `~/diagnostics` twice a second. This node commands nothing:
+it can run beside any controller.
+
+`~/depth_preview` carries every few images at a quarter of the resolution (`preview.hz`,
+`preview.stride`; 16UC1 millimetres, stamped as the image was used, the intrinsics of the
+small image in frame_id), about 40 kB/s: light enough for policy_record.py's bag, and enough
+for recordings/replay_profile.py to run height_profile.py again on what the camera saw.
 
 Kept light, because on the Pi it shares the computer with the 300 Hz control loop: the two
 300 Hz topics (joint states, IMU) are not given to the executor; a 50 Hz timer takes whatever
@@ -48,6 +53,20 @@ def depth_image(msg: Image):
     return None, 0.0
 
 
+def preview_image(depth, scale: float, intrinsics, stride: int, stamp: float) -> Image:
+    """Every stride-th pixel of a depth image as 16UC1 millimetres, stamped `stamp`, with the
+    small image's intrinsics in frame_id ("fx fy cx cy")."""
+    small = np.asarray(depth)[::stride, ::stride]
+    small = np.clip(np.rint(small * (scale * 1e3)), 0, 65535).astype("<u2")
+    fx, fy, cx, cy = (v / stride for v in intrinsics)
+    msg = Image(height=small.shape[0], width=small.shape[1], encoding="16UC1", is_bigendian=0,
+                step=2 * small.shape[1], data=small.tobytes())
+    msg.header.stamp.sec = int(stamp)
+    msg.header.stamp.nanosec = int((stamp - int(stamp)) * 1e9)
+    msg.header.frame_id = f"{fx:.4f} {fy:.4f} {cx:.4f} {cy:.4f}"
+    return msg
+
+
 class HeightProfileNode(Node):
     def __init__(self) -> None:
         super().__init__("height_profile")
@@ -66,6 +85,10 @@ class HeightProfileNode(Node):
             stride=p("depth.stride", defaults.stride), max_age_s=p("map.max_age_s", defaults.max_age_s)))
         # The IMU's roll when the body is level, as tasks.roll.imu_offset_rad of the controllers.
         self.imu_roll_offset = p("imu.roll_offset_rad", 0.0)
+        preview_hz = p("preview.hz", 3.0)
+        self.preview_period = 1.0 / preview_hz if preview_hz > 0.0 else math.inf
+        self.preview_stride = max(1, int(p("preview.stride", 4)))
+        self.preview_next = 0.0
         self.intrinsics = None
         self.latest = {"joints": None, "imu": None}
         self.depth_stamps: list[float] = []
@@ -87,6 +110,7 @@ class HeightProfileNode(Node):
                                  self.on_info, qos_profile_sensor_data)
         self.publisher = self.create_publisher(Float32MultiArray, p("topics.profile", "/terrain_profile"), 5)
         self.diagnostics = self.create_publisher(DiagnosticArray, "~/diagnostics", 5)
+        self.preview = self.create_publisher(Image, "~/depth_preview", 2)
         self.publish_every = max(1, round(STATE_HZ / p("publish_hz", 25.0)))
         self.tick = 0
         self.create_timer(1.0 / STATE_HZ, self.on_timer)
@@ -158,6 +182,9 @@ class HeightProfileNode(Node):
         self.process_ms = 1e3 * (time.perf_counter() - started)
         self.image_age_ms = 1e3 * age
         self.depth_stamps = [t for t in self.depth_stamps if t > stamp - 2.0] + [stamp]
+        if stamp >= self.preview_next:
+            self.preview_next = stamp + self.preview_period
+            self.preview.publish(preview_image(depth, scale, self.intrinsics, self.preview_stride, stamp))
 
     def on_diagnostics(self) -> None:
         status = DiagnosticStatus(name="height_profile", hardware_id="d435")

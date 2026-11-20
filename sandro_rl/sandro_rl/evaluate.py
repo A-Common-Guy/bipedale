@@ -228,9 +228,16 @@ class SimOptions:
     diagnostics_rate_hz: float = 50.0
     seed: int = 1
     camera: float = 1.0          # 0: the terrain profile stays unknown (camera off)
+    # 1: the profile from sandro_perception's height_profile.py on rendered depth images
+    # (depth_camera.py) instead of the emulation; the camera's range noise (per m^2), and
+    # how far the real bracket's pitch is from the configured mount (rad).
+    depth: float = 0.0
+    depth_noise: float = 0.006
+    mount_error_rad: float = 0.0
     floor_friction_scale: float = 1.0   # every geom's sliding friction (the floor, tyres, body shell, leg boxes)
     torque_scale: float = 1.0           # every drive's torque limit (a low battery, a hot drive)
     fallen_roll_rad: float = 0.0        # with --fallen: tipped about the heading too
+    fallen_legs: int = 0                # with --fallen: the legs held where draw N of fallen.leg_targets puts them
 
     @classmethod
     def from_closed_loop(cls, sim: dict[str, str], latency: sources.Latency) -> "SimOptions":
@@ -238,8 +245,9 @@ class SimOptions:
                 latency.joint_stagger, latency.command_delay_s)
         names = {"imu_delay": "imu_delay_s", "imu_rate": "imu_rate_hz", "joint_delay": "joint_delay_s",
                  "joint_rate": "joint_rate_hz", "command_delay": "command_delay_s", "settle": "settle_s",
-                 "seed": "seed", "camera": "camera", "floor_friction": "floor_friction_scale",
-                 "torque_scale": "torque_scale", "fallen_roll": "fallen_roll_rad", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
+                 "seed": "seed", "camera": "camera", "depth": "depth", "depth_noise": "depth_noise",
+                 "mount_error": "mount_error_rad", "floor_friction": "floor_friction_scale",
+                 "torque_scale": "torque_scale", "fallen_roll": "fallen_roll_rad", "fallen_legs": "fallen_legs", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
                  "gear_stiffness": "gear_stiffness_nm_rad", "gear_damping": "gear_damping_nm_s_rad",
                  "tyre_torsion": "tyre_torsion_scale", "wheel_friction": "wheel_friction_scale",
                  "leg_armature": "leg_armature_scale",
@@ -308,6 +316,10 @@ def floor_contact(m, d, tyres) -> int:
         bits |= 1 if name == names[0] else 2 if name == names[1] else 4
     return bits
 
+
+# A list here collects (time, axle midpoint, profile observation, true heights [2, k]) per
+# control cycle of a perceptive policy's run: what the policy was shown and what was there.
+PROFILE_LOG: list | None = None
 
 # The video's tracking camera: distance (m), elevation and azimuth (degrees).
 VIDEO_VIEW = (1.2, -15.0, 120.0)
@@ -693,11 +705,37 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     profile_cfg = iface.profile
     terrain_map = {"travel": 0.0, "next": 0.0, "pending": np.zeros(iface.n_profile), "axle": None, "yaw": 0.0}
 
-    def terrain_profile(now):
+    def true_profile():
+        """The floor at the profile's distances ahead of each wheel, above the floor under it."""
+        rt = d.site_xmat[imu_site].reshape(3, 3) @ body_from_imu
+        heading = np.array([rt[0, 0], rt[1, 0], 0.0])
+        heading /= max(np.linalg.norm(heading), 1e-9)
+        geom, down = np.zeros(1, dtype=np.int32), np.array([0.0, 0.0, -1.0])
+
+        def ground(x):
+            dist = mujoco.mj_ray(m, d, np.array([x[0], x[1], 0.5]), down, GROUND_GROUPS, 1, -1, geom)
+            return 0.5 - dist if dist >= 0 else 0.0
+        return np.array([[ground(a + x * heading) - ground(a) for x in iface.profile_distances]
+                         for a in d.xanchor[wheel_joints]])
+
+    pipeline = None
+    if iface.n_profile and options.depth and options.camera:
+        from .depth_camera import DepthPipeline
+        pipeline = DepthPipeline(m, rng, noise=options.depth_noise, mount_error_rad=options.mount_error_rad)
+
+    def terrain_profile(now, quat, gyro, pos, vel):
         """The terrain profile of one control cycle (perceptive policies): the true floor
         heights through mj_ray, known as interface.profile_known has them, with the
-        training's noise, holes, rate and one period of delay at their mean values."""
+        training's noise, holes, rate and one period of delay at their mean values. With
+        `depth`, the robot's own perception on rendered images instead."""
         rt = d.site_xmat[imu_site].reshape(3, 3) @ body_from_imu
+        if pipeline is not None:
+            observation = pipeline.update(
+                now, d, d.site_xpos[imu_site], rt, pos[iface.leg_idx], vel[iface.wheel_idx],
+                iface.body_rotation(quat), float((iface.body_from_imu_correction.T @ gyro)[1]))
+            if observation is not None:
+                controller.profile_obs = observation
+            return
         heading = np.array([rt[0, 0], rt[1, 0], 0.0])
         heading /= max(np.linalg.norm(heading), 1e-9)
         anchors = d.xanchor[wheel_joints]
@@ -774,8 +812,16 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
             renderer.update_scene(d, camera)
             frames_out.append(renderer.render())
 
+    held_legs = None
+    if fallen_pitch is not None and options.fallen_legs:
+        # Not limp: the legs stay where they were (fallen.py), until the policy takes them.
+        held_legs = fallen.leg_targets(spec, np.random.default_rng(int(options.fallen_legs)))
     while d.time < options.unpowered_s - 1e-12:
+        if held_legs is not None:
+            fallen.hold(spec, d, held_legs)
+            staged[act[spec.leg_index]] = d.ctrl[act[spec.leg_index]]
         step(0.0)
+    staged[:] = 0.0
 
     period_ns = int(1e9 / lim.control_rate_hz)
     step_ns = lambda: int(d.time * 1e9)
@@ -828,7 +874,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
             if iface.has_goal:
                 exteroception(now, quat, gyro, vel, period)    # the first frame fills the history
             if iface.n_profile:
-                terrain_profile(now)
+                terrain_profile(now, quat, gyro, pos, vel)
             controller.reset(quat, gyro, accel, pos, vel, lim.height_target_m)
             activated = True
             continue
@@ -864,7 +910,10 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         if iface.has_goal:
             exteroception(now, quat, gyro, vel, period)
         if iface.n_profile:
-            terrain_profile(now)
+            terrain_profile(now, quat, gyro, pos, vel)
+            if PROFILE_LOG is not None:
+                PROFILE_LOG.append((now, d.xanchor[wheel_joints].mean(axis=0).copy(), controller.profile_obs.copy(),
+                                    true_profile()))
         frames = controller.update(quat, gyro, accel, pos, vel, received, period)
 
         # write()

@@ -20,17 +20,26 @@ How it gets there:
     frame follows from the leg kinematics and the floor under the wheels.
   - Depth. `add_depth()` deprojects an image with the camera intrinsics,
     carries the points through the mount and the body pose *at the image's
-    stamp* (the frame is 30-60 ms old when it arrives) and averages them into
+    stamp* (the frame is 30-60 ms old when it arrives) and bins them into
     a grid of `cell_m` cells fixed to the floor, a square window that travels
-    with the robot.
+    with the robot. A cell's height is the upper end of its points (mean plus
+    `spread` standard deviations, at most the highest), not their mean: a cell on an edge or on the
+    face of a block holds points from the floor to the top, and the top is what
+    a wheel meets. A cell changes by more than `confirm_m`, or becomes known,
+    only when two images in a row agree: one bad image leaves no obstacle
+    behind in the part of the map the camera cannot see again.
   - Memory. The camera looks ahead: at 0.34 m height and level, a D435 sees
     the floor only from about 0.6 m. Cells keep their height until they are
     seen again or `max_age_s` old, so a plank seen at 0.8 m is still known
     when the wheel reaches it. Cells never seen (after a turn on the spot, or
     at start) are unknown.
-  - The floor under a wheel is the map's cell there when it is known, so the
+  - The floor under a wheel is the map there when it is known, so the
     heights stay consistent while the robot climbs what it has seen; where
-    it is not, the last value is kept (flat is assumed).
+    it is not, the last value is kept (flat is assumed). It is the lowest of
+    the cells within `footprint_m` before and behind the contact point: the
+    odometry is a few cm off after a metre, and a wheel 5 cm short of a step
+    must not read as standing on it, or the step vanishes from the profile
+    just when the policy has to act on it.
 
 Frames: body is x forward, y left, z up with its origin at the IMU, the frame
 of /imu_broadcaster/imu. The optical frame of the depth image is z along the
@@ -94,6 +103,10 @@ class Settings:
     stride: int = 2                     # use every stride-th pixel each way
     min_points: int = 3                 # per cell and image
     blend: float = 0.6                  # weight of a new image on a cell seen before
+    spread: float = 1.5                 # a cell's height: its points' mean + spread x their deviation
+    confirm_m: float = 0.03             # a larger change of a cell needs two images that agree,
+    confirm_s: float = 0.4              # this close in time
+    footprint_m: float = 0.05           # the floor under a wheel: the lowest cell this far either way
     max_age_s: float = 8.0
     band_m: tuple = (-0.30, 0.45)       # heights kept, about the floor under the wheels
     floor_rate_m_s: float = 0.5         # how fast the floor under a wheel may move
@@ -161,6 +174,8 @@ class HeightProfile:
         n = s.cells
         self.height = np.zeros((n, n), dtype=np.float32)
         self.seen = np.full((n, n), -1e9)              # time of the last look
+        self.candidate = np.zeros((n, n), dtype=np.float32)   # a height one image saw, to be confirmed
+        self.candidate_seen = np.full((n, n), -1e9)
         self.key_i = np.full((n, n), np.iinfo(np.int64).min, dtype=np.int64)   # the floor cell a slot holds
         self.key_j = np.full((n, n), np.iinfo(np.int64).min, dtype=np.int64)
         self.x = self.y = 0.0                          # the axle midpoint on the floor
@@ -205,7 +220,7 @@ class HeightProfile:
         self.time, self.roll, self.pitch, self.yaw = t, roll, pitch, yaw
         self.axles = axles(joints, self.s.body)
         # The floor under each wheel: the map there when it is known, else unchanged.
-        height, known = self._lookup(self.wheel_points(), t)
+        height, known = self._floor_under(self.wheel_points(), t)
         step = self.s.floor_rate_m_s * dt
         self.floor = np.where(known, self.floor + np.clip(height - self.floor, -step, step), self.floor)
         origin, _ = self._origin()
@@ -243,6 +258,16 @@ class HeightProfile:
         known = (self.key_i[a, b] == i) & (self.key_j[a, b] == j) & (t - self.seen[a, b] <= self.s.max_age_s)
         return self.height[a, b].astype(float), known
 
+    def _floor_under(self, wheels, t):
+        """(height, known) of the floor each wheel stands on: the lowest known cell from
+        footprint_m behind the contact point to footprint_m ahead of it."""
+        heading = np.array([math.cos(self.yaw), math.sin(self.yaw)])
+        offsets = np.array([-self.s.footprint_m, 0.0, self.s.footprint_m])
+        points = wheels[:, None, :] + offsets[None, :, None] * heading[None, None, :]
+        height, known = self._lookup(points.reshape(-1, 2), t)
+        height, known = height.reshape(2, -1), known.reshape(2, -1)
+        return np.where(known, height, np.inf).min(axis=1), known.any(axis=1)
+
     def add_depth(self, t: float, depth_m: np.ndarray, fx: float, fy: float, cx: float, cy: float,
                   scale: float = 1.0) -> int:
         """One depth image taken at time t: depth along the view, 0 where there is none, in
@@ -279,24 +304,42 @@ class HeightProfile:
         i, j, a, b = self._slots(points[:, :2])
         flat = a * s.cells + b
         count = np.bincount(flat, minlength=s.cells * s.cells)
-        total = np.bincount(flat, weights=points[:, 2], minlength=s.cells * s.cells)
+        z = points[:, 2] - reference                 # about the floor, for the squares' precision
+        total = np.bincount(flat, weights=z, minlength=s.cells * s.cells)
+        squares = np.bincount(flat, weights=z * z, minlength=s.cells * s.cells)
         hit = np.flatnonzero(count >= s.min_points)
         if not len(hit):
             return 0
-        mean = (total[hit] / count[hit]).astype(np.float32)
+        mean = total[hit] / count[hit]
+        deviation = np.sqrt(np.maximum(squares[hit] / count[hit] - mean * mean, 0.0))
+        # Never above the cell's highest point: half floor and half plank would overshoot.
+        order = np.argsort(flat, kind="stable")
+        top = np.maximum.reduceat(z[order], np.searchsorted(flat[order], hit))
+        mean = (reference + np.minimum(mean + s.spread * deviation, top)).astype(np.float32)
         a_hit, b_hit = hit // s.cells, hit % s.cells
         # The floor cell each slot now stands for (the window is narrower than the slots wrap).
         first = np.zeros(s.cells * s.cells, dtype=np.int64)
         first[flat] = np.arange(len(flat))
         ci, cj = i[first[hit]], j[first[hit]]
-        same = ((self.key_i[a_hit, b_hit] == ci) & (self.key_j[a_hit, b_hit] == cj)
-                & (t - self.seen[a_hit, b_hit] <= s.max_age_s))
-        self.height[a_hit, b_hit] = np.where(same, (1 - s.blend) * self.height[a_hit, b_hit] + s.blend * mean, mean)
+        held = (self.key_i[a_hit, b_hit] == ci) & (self.key_j[a_hit, b_hit] == cj)
+        same = held & (t - self.seen[a_hit, b_hit] <= s.max_age_s)
+        # A cell that is new, or that this image moves by more than confirm_m, waits for the
+        # next image to say the same.
+        agrees = (held & (t - self.candidate_seen[a_hit, b_hit] <= s.confirm_s)
+                  & (np.abs(self.candidate[a_hit, b_hit] - mean) <= s.confirm_m))
+        small = same & (np.abs(self.height[a_hit, b_hit] - mean) <= s.confirm_m)
+        accept = small | agrees
+        self.candidate[a_hit, b_hit] = mean
+        self.candidate_seen[a_hit, b_hit] = t
+        # A slot that now stands for another floor cell forgets what it held.
+        self.seen[a_hit, b_hit] = np.where(held, self.seen[a_hit, b_hit], -1e9)
         self.key_i[a_hit, b_hit], self.key_j[a_hit, b_hit] = ci, cj
+        a_hit, b_hit, mean, same = a_hit[accept], b_hit[accept], mean[accept], same[accept]
+        self.height[a_hit, b_hit] = np.where(same, (1 - s.blend) * self.height[a_hit, b_hit] + s.blend * mean, mean)
         self.seen[a_hit, b_hit] = t
         self.images += 1
         self._fit_input, self._fit = (points, origin, r_body), False
-        return int(len(hit))
+        return int(len(a_hit))
 
     @property
     def last_fit(self):

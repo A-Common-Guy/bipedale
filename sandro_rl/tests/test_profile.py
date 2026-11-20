@@ -177,3 +177,30 @@ def test_an_obstacles_shadow_reads_as_the_obstacle():
     plank = lambda x: np.where((x >= 0.5) & (x <= 0.65), 0.03, 0.0)
     hidden = profile_occluded(d, plank(d), line, plank(line), 0.33, 0.1)
     assert not profile_shadow(d, plank(d), hidden, line, plank(line), 0.25)[1].any()
+
+
+def test_the_evaluator_runs_the_robots_perception_on_rendered_depth(tmp_path, monkeypatch):
+    """`--sim depth=1`: sandro_perception's height_profile.py in the policy's loop, on depth
+    images rendered from the camera mount (depth_camera.py). Standing 0.9 m before a 1.5 cm
+    plank and 4.3 m before a 15 cm block: the floor reads flat within 1 cm, the plank is in
+    the profile at 0.8-1.05 m and nothing reads as an obstacle."""
+    import os
+    from pathlib import Path
+
+    import numpy as np
+    import pytest
+
+    from sandro_rl import evaluate
+    policy = Path(__file__).resolve().parents[1] / "policies" / "agile_step"
+    if not (policy / "policy.onnx").exists():
+        pytest.skip("policies/agile_step is not exported")
+    monkeypatch.setitem(os.environ, "MUJOCO_GL", "egl")
+    monkeypatch.setattr(evaluate, "PROFILE_LOG", [])
+    monkeypatch.setitem(evaluate.SCENARIOS, "wait", ["1,0,0"])
+    evaluate.run(policy, "wait", {"settle": "1.0", "depth": "1"}, tmp_path / "a.csv", course="three")
+    _, _, shown, truth = evaluate.PROFILE_LOG[-1]
+    heights, known = shown[:16].reshape(2, 8) / 10.0, shown[16:].reshape(2, 8) > 0.5
+    assert known[:, 4:].all()                       # from 0.6 m on the camera sees the floor
+    assert np.abs(heights[:, :5]).max() < 0.01      # flat up to the plank
+    assert 0.008 < heights[:, 5:7].max() < 0.025    # the plank, 0.85-0.95 m ahead
+    assert heights.max() < 0.03 and np.abs(truth).max() < 0.02

@@ -7,8 +7,9 @@ port. This package turns its depth images into the one thing the balance
 policies will read: the **terrain profile**, the floor height at eight points
 ahead of each wheel.
 
-Nothing here commands the robot and nothing in the control path reads the
-profile yet. The control loop keeps its priority: depth runs at 424 x 240 and
+Nothing here commands the robot. The camera policies (`rl_agile_step` and
+its successors) read the profile; every other controller ignores it. The
+control loop keeps its priority: depth runs at 424 x 240 and
 15 Hz, an image costs about 8 ms on the Pi 4, and the 300 Hz topics are
 sampled at 50 Hz without waking an executor.
 
@@ -39,13 +40,33 @@ the policies trained on it (`config/perception.yaml`).
 - Each image is placed with the body pose at the image's own stamp, 30-60 ms
   back: a body pitching at 1 rad/s would otherwise misplace the floor at
   1.3 m by 5 cm.
-- The floor under a wheel is the map's cell there once it is known, so the
-  profile stays right while the robot climbs what it has seen.
+- The floor under a wheel is the map there once it is known, so the profile
+  stays right while the robot climbs what it has seen: the lowest cell within
+  5 cm before and behind the contact point. Taken from the one cell under the
+  axle, a wheel 5 cm short of a step read as standing on it and the step
+  vanished from the profile just before the hop (2026-11-19).
+- A cell reads the top of what is in it (its points' mean plus 1.5 standard
+  deviations, at most the highest point), not the mean: the face of a 15 cm
+  block averaged 7 cm, a 3 cm edge 2.
+- A cell becomes known, or changes by more than 3 cm, only when two images in
+  a row say so: one bad image no longer leaves an obstacle in the part of the
+  map the camera cannot see again. The robot's recording of 2026-11-19 has
+  such cells, 16 cm at 0.2-0.3 m ahead of a standing robot for up to 1.5 s.
 
 `test/test_height_profile.py` renders depth from the mount over a floor with
 a plank and drives the robot across kinematically: flat reads 0 within 5 mm,
 the plank 3 cm within 8 mm through the blind zone, with a rocking body and
-60 ms late images.
+60 ms late images. `sandro_rl`'s evaluator runs the same file in the policy's
+loop on images rendered in MuJoCo (`--sim depth=1`, `sandro_rl/depth_camera.py`).
+
+## What the camera saw, afterwards
+
+`~/depth_preview` publishes every fifth image at a quarter of the resolution
+(106 x 60, about 40 kB/s; `preview.hz`, `preview.stride`), and
+`policy_record.py` records it. `recordings/replay_profile.py <run>` runs
+`height_profile.py` on it again, beside the profile the robot published:
+why a profile read what it read, and what a change to the map would have made
+of the same images.
 
 ## Running it
 

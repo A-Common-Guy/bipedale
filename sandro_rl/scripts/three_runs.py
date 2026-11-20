@@ -7,7 +7,8 @@ step's height (0.05).
     cd sandro_rl && uv run python scripts/three_runs.py policies/agile_step policies/agile_step:camera=0
 
 Per policy: runs over the plank, onto the step (the axle 0.3 m past its face, upright), off
-its far end, stopped short of the block (the tyre 1 to 60 cm from the face), the highest wheel
+its far end, stopped short of the block (the tyre 1 to 60 cm from the face, on the course),
+runs that drifted past the block's end (off course), the highest wheel
 clearance in the 0.5 m before the step, the speed at which the tyre met the block, and falls.
 """
 import csv
@@ -40,19 +41,19 @@ def one(job):
     speed = [float(r["diag_truth_speed_m_s"]) for r in rows]
     lift = [float(r["diag_truth_wheel_clearance_m"]) for r in rows]
     tilt = [float(r["diag_truth_tilt_rad"]) for r in rows]
-    x0, y0 = xy[0]
-    first = next(((x - x0, y - y0) for x, y in xy if math.hypot(x - x0, y - y0) > 0.5), (1.0, 0.0))
-    norm = math.hypot(*first)
-    along = [((x - x0) * first[0] + (y - y0) * first[1]) / norm for x, y in xy]
+    # The course lies along the world's x from the origin, 1.2 m wide at the block.
+    along = [x for x, _ in xy]
+    beside = max(abs(y) for x, y in xy if x > FACE_M - 0.3) if along and max(along) > FACE_M - 0.3 else 0.0
     upright_at = lambda d: any(a >= d and t < 0.4 for a, t in zip(along, tilt))
     touch = FACE_M - TYRE_M
     hit = next((i for i, a in enumerate(along) if a >= touch - 0.005), None)
     approach = [c for a, c in zip(along, lift) if STEP_M - 0.5 <= a <= STEP_M + 0.1]
     fell = code == 3
     return {"fell": fell, "plank": upright_at(PLANK_M + 0.3), "on": upright_at(STEP_M + 0.3),
-            "off": upright_at(STEP_END_M + 0.3), "stopped": not fell and 0.01 < touch - max(along) < 0.6,
+            "off": upright_at(STEP_END_M + 0.3),
+            "stopped": not fell and 0.01 < touch - max(along) < 0.6 and beside < 0.4, "beside": beside >= 0.4,
             "hop": max([c for c in approach if not math.isnan(c)], default=0.0),
-            "impact": 0.0 if hit is None else abs(speed[hit])}
+            "impact": 0.0 if hit is None or beside >= 0.4 else abs(speed[hit])}
 
 
 def main():
@@ -65,13 +66,13 @@ def main():
     with Pool(14) as pool:
         results = dict(zip(jobs, pool.map(one, jobs)))
     n = len(PLANTS) * len(PROFILES) * len(SEEDS)
-    print(f"{'policy':38s} plank  on step  off step  stopped  hop before the step, m   impact, m/s  falls   (of {n})")
+    print(f"{'policy':38s} plank  on step  off step  stopped  hop before the step, m   impact, m/s  falls  off course   (of {n})")
     for spec in args:
         rs = [r for k, r in results.items() if k[0] == spec]
         hops = sorted(r["hop"] for r in rs)
         count = lambda key: sum(bool(r[key]) for r in rs)
         print(f"{spec:38s} {count('plank'):3d}    {count('on'):3d}      {count('off'):3d}       {count('stopped'):3d}     "
-              f"{hops[0]:.3f} .. {hops[len(hops) // 2]:.3f} .. {hops[-1]:.3f}     {max(r['impact'] for r in rs):.2f}        {count('fell'):3d}")
+              f"{hops[0]:.3f} .. {hops[len(hops) // 2]:.3f} .. {hops[-1]:.3f}     {max(r['impact'] for r in rs):.2f}        {count('fell'):3d}      {count('beside'):3d}")
 
 
 if __name__ == "__main__":

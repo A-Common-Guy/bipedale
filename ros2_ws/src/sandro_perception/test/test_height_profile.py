@@ -215,3 +215,69 @@ def test_a_block_reads_as_an_obstacle_and_not_as_a_hole():
     drive(robot, profile, 1.0)
     heights, known = profile.profile()
     assert np.abs(heights).max() < 0.045
+
+
+def test_a_wheel_short_of_a_step_still_stands_on_the_floor():
+    """A 5 cm step across both tracks, the tyres 1 cm from its face (the axles 7.7 cm) and an
+    odometry that has run 8 cm long, so that the map has the step under the axles. The floor
+    under the wheels stays the lower one, and the step still reads 5 cm at the nearest
+    sample, where the policy has to act on it; taken from the one cell under the axle, the
+    floor rises onto the step and hides it. On the step, the floor follows."""
+    from dataclasses import replace
+    step = (2.0, 4.0, -1.0, 1.0, 0.05)
+    k = Settings().layout.distances_m.index(0.10)
+    seen = {}
+    for footprint in (Settings().footprint_m, 0.0):
+        robot, profile = Robot([step]), HeightProfile(replace(Settings(), footprint_m=footprint))
+        t = drive(robot, profile, 0.5)
+        t = drive(robot, profile, (2.0 - 0.077 - 0.0207) / 0.5, speed=0.5, t0=t)
+        profile.x += 0.08                               # the odometry is long by two cells
+        for _ in range(10):
+            t += 0.02
+            profile.update_state(t, STAND, (0.0, 0.0), robot.quaternion(0.0), 0.0)
+        seen[footprint] = (profile.floor.copy(), profile.profile()[0][:, k])
+    floor, heights = seen[Settings().footprint_m]
+    assert np.abs(floor).max() < 0.008 and heights == pytest.approx(0.05, abs=0.01)
+    assert seen[0.0][0].min() > 0.02                    # what the footprint is for
+    robot, profile = Robot([step]), HeightProfile()
+    t = drive(robot, profile, 0.5)
+    drive(robot, profile, 2.4 / 0.5, speed=0.5, t0=t)
+    assert profile.floor == pytest.approx(0.05, abs=0.008)
+
+
+def test_one_bad_image_leaves_no_obstacle_in_the_map():
+    """An image with a 20 cm thing 0.3-0.5 m ahead that the next image does not show (a hand,
+    a cable, a burst of noise): nothing of it reaches the profile, though the camera cannot
+    see the floor there again to correct it. The same thing in two images in a row is there."""
+    robot, profile = Robot(), HeightProfile()
+    t = drive(robot, profile, 0.5)
+    t = drive(robot, profile, 1.0, speed=0.5, t0=t)     # the floor up to the wheels is in the map
+    origin, r, _ = robot.pose()
+    ghost = render(origin, r, profile.s.mount, [(robot.x + 0.3, robot.x + 0.5, -1.0, 1.0, 0.2)])
+    profile.add_depth(t - 0.02, ghost, FX, FY, CX, CY)
+    t = drive(robot, profile, 0.5, t0=t)
+    heights, known = profile.profile()
+    assert np.abs(heights).max() < 0.01, heights
+    for _ in range(2):
+        profile.add_depth(t - 0.02, ghost, FX, FY, CX, CY)
+        t += 0.07
+        profile.update_state(t, STAND, (0.0, 0.0), robot.quaternion(0.0), 0.0)
+    assert profile.profile()[0].max() > 0.1          # blended with the floor it replaces
+
+
+def test_a_cell_on_an_edge_reads_the_top_and_not_more():
+    """Cells hold floor and plank, or a block's face from the floor to its top: they read the
+    top (what a wheel meets), within a few mm, with the camera's noise. Their mean would give
+    a 15 cm block as 7, at the limit of what the policy takes for an obstacle."""
+    for height in (0.015, 0.03, 0.05, 0.15):
+        for start in (0.90, 0.91, 0.92, 0.93):          # the edge anywhere in its cell
+            robot = Robot(boxes=[(start, start + 0.3, -1.0, 1.0, height)])
+            profile = HeightProfile()
+            drive(robot, profile, 1.0, noise=0.006)
+            heights, known = profile.profile()
+            k = profile.s.layout.distances_m.index(1.05)
+            assert known[:, k].all()
+            assert heights[:, k] == pytest.approx(height, abs=0.006), (height, start, heights[:, k])
+            line, line_known = profile._lookup(
+                profile.wheel_points()[0] + np.arange(0.6, 1.3, 0.02)[:, None] * np.array([1.0, 0.0]), profile.time)
+            assert line[line_known].max() < height + 0.008, (height, start, line[line_known].max())

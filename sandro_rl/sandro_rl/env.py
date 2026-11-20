@@ -624,15 +624,18 @@ class SandroEnv:
         return {"profile_near": u(k[1], c.get("near_m", [0.3, 0.8])), "profile_far": u(k[2], c.get("far_m", [1.2, 2.5])),
                 "profile_slope": sym(k[3], c.get("slope_rad", 0.015)), "profile_bias": sym(k[4], c.get("bias_m", 0.005), (2,)),
                 "profile_shift": sym(k[5], c.get("position_error_m", 0.03)),
+                "profile_lift": jax.random.uniform(jax.random.fold_in(k[5], 2)) * c.get("airborne_gain", 0.0),
                 "profile_face": u(jax.random.fold_in(k[5], 1), c.get("face_m", [0.2, 0.3])),
                 "profile_blind": (jax.random.uniform(k[6]) < c.get("blind_probability", 0.15)).astype(jp.float32),
                 "profile_period": period, "profile_timer": jax.random.uniform(k[8]) * period,
                 "profile_travel": jp.where(seen, jp.float32(c.get("travel_max_m", 2.0)), 0.0)}
 
-    def _measure_profile(self, data, info, rng):
+    def _measure_profile(self, data, info, rng, clearance=None):
         """The profile as the node would publish it now: the map's heights with the mount's
         pitch error (a slope), a height bias per track, the map's misplacement along the
-        track, noise and holes, and unknown where the camera has not seen the floor."""
+        track, noise and holes, and unknown where the camera has not seen the floor. The
+        node takes the body's height from the legs with the wheels on the floor: off the
+        floor by `clearance` [right, left], it reads everything lower by up to that much."""
         c = self.profile
         k = jax.random.split(rng, 3)
         n = self.n_profile // 4
@@ -654,6 +657,8 @@ class SandroEnv:
         hidden = hidden * (1.0 - filled)
         heights = (heights + info["profile_slope"] * self.profile_distances[None]
                    + info["profile_bias"][:, None] + c.get("noise_m", 0.005) * jax.random.normal(k[1], (2, n)))
+        if clearance is not None:
+            heights = heights - info["profile_lift"] * jp.maximum(clearance, 0.0)[:, None]
         known = profile_known(self.profile_distances, info["profile_travel"], info["profile_near"],
                               info["profile_far"], jp)
         known = jp.tile(known[None], (2, 1)) * (1.0 - info["profile_blind"]) * (1.0 - hidden)
@@ -1180,7 +1185,15 @@ class SandroEnv:
                                                     truth["yaw_rate"], self.dt, self.profile, jp)
             info["profile_timer"] = info["profile_timer"] - self.dt
             due = info["profile_timer"] <= 0.0
-            fresh = self._measure_profile(data, info, jax.random.fold_in(k_noise, 29))
+            # The floor the node believes each wheel stands on wanders: a bias per track that
+            # walks between measurements (profile.bias_walk_m per measurement, within bias_max_m).
+            walk = self.profile.get("bias_walk_m", 0.0)
+            if walk > 0.0:
+                limit = self.profile.get("bias_max_m", 0.02)
+                moved = jp.clip(info["profile_bias"] + walk * jax.random.normal(jax.random.fold_in(k_noise, 31), (2,)),
+                                -limit, limit)
+                info["profile_bias"] = jp.where(due, moved, info["profile_bias"])
+            fresh = self._measure_profile(data, info, jax.random.fold_in(k_noise, 29), truth["clearance"])
             info["profile_obs"] = jp.where(due, info["profile_pending"], info["profile_obs"])
             info["profile_pending"] = jp.where(due, fresh, info["profile_pending"])
             info["profile_timer"] = jp.where(due, info["profile_timer"] + info["profile_period"], info["profile_timer"])

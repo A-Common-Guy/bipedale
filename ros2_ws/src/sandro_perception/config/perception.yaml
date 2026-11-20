@@ -18,6 +18,11 @@ camera:
 height_profile:
   ros__parameters:
     publish_hz: 25.0
+    preview:
+      # ~/depth_preview: every few images at 1/stride of the resolution, for the
+      # recordings (recordings/replay_profile.py). 0 Hz turns it off.
+      hz: 3.0
+      stride: 4
     mount:
       # The depth origin (the D435's left imager) in the body frame, whose
       # origin is the IMU: the CAD camera on the 20-degree bracket

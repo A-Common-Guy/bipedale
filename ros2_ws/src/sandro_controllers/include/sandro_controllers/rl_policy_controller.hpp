@@ -78,6 +78,9 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr command_subscription_;
   realtime_tools::RealtimeBuffer<StampedProfile> profile_;
   rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr profile_subscription_;
+  double profile_age_s_{1e3};
+  int profile_known_{0};
+  double profile_highest_m_{0.0};
   // ~/arm_handover: the next activation within kHandoverWindowS takes over
   // from the running balancer without the stand phase (the gamepad switch).
   static constexpr double kHandoverWindowS = 1.0;
