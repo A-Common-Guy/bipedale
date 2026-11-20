@@ -1187,6 +1187,44 @@ is not known. Deployed as `rl_stand_up_v2` next to `rl_stand_up`, with
 `stand_up.yaml`'s oscillation watchdog thresholds, which were measured on the
 old policy and not again. Not yet run on the robot.
 
+#### Lying with the legs held (2026-11-20): reproduced in part, not fixed
+
+On the robot `rl_stand_up_v2` turned the drives to no effect when the robot
+lay with the legs extended and the tyres off the floor. Every pose in the
+bank fell with the drives unpowered, so the legs always folded or hung the
+same way; the robot's geared drives keep the legs where they were.
+
+`python -m sandro_rl.fallen --held 0.5` now holds the legs, in that share of
+the drops, where a draw over their whole reach put them (`leg_targets`: the
+two legs alike in half the draws; the torso tipped up to 1.6 rad), and
+`stand_up_runs.py --held` starts from six such draws on the fitted plant
+(`--sim fallen_legs=N`), ten pitches, three latency profiles, two seeds.
+
+| | standard (limp) | legs held |
+|---|---|---|
+| `stand_up` | 180 of 180 | 330 of 360 |
+| `stand_up_v2` | 180 of 180 | 312 of 360 |
+| `stand_up_v3`, iterations 200 / 400 / 600 / 800 | 144 / 159 / 141 / 142 | 329 / 312 / 312 / 330 |
+| `stand_up_v3b`, iterations 200 / 400 | 180 / 144 | 317 / 232 |
+
+- What fails, for every policy, is the same two draws: the legs held
+  differently from each other, one of them nearly stretched (reach 0.96 and
+  0.98). The robot comes to rest on its side (roll 1.7 rad); the policy
+  freezes the legs and turns the wheels at 19 rad/s for good. With legs that
+  move only fore and aft this may be a pose there is no way out of.
+- The owner's case as described, both legs stretched alike and the tyres
+  5 cm clear, gets up in 60 of 60 in the simulation (draw 6). So what
+  happened on the robot is not reproduced, and a recording of it is needed:
+  which pose, and what the drives did.
+- `configs/stand_up_v3.yaml` resumes v2 on the bank with held legs
+  (`data/fallen_states_held.npz`, 800 iterations): a few more of the held
+  starts at some checkpoints and the limp nose-up starts lost at all of them.
+  `stand_up_v3b.yaml` takes smaller steps (`desired_kl` 0.003): unchanged from
+  v2 at iteration 200 and worse after. As with v2 itself, training on from
+  this policy loses what it had within a few hundred iterations, and the
+  cause is still not known. Neither is kept or deployed; the configs and the
+  bank stay.
+
 ### Wheel drive-train lag: the 7.5 Hz ringing on the robot
 
 On the robot, `flat_level` rang at 7.4–7.5 Hz: both wheels in phase, actions

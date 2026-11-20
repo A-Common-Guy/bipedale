@@ -1,0 +1,33 @@
+# stand_up_v3 in smaller steps (desired_kl 0.003, 400 iterations). Not kept either:
+# the same as v2 at iteration 200, worse after (DESIGN.md, "Lying with the legs held").
+#
+# stand_up_v2 for a robot that does not lie limp (docs/DESIGN.md 8, stand_up,
+# 2026-11-20). The bank of rest poses had every drive unpowered while it fell,
+# so the legs always folded or hung the same way. On the robot the geared
+# drives keep the legs where they were: lying on the torso with the legs out
+# and the tyres off the floor, rl_stand_up_v2 turned the drives to no effect.
+# In half of this bank the legs are held where a draw over their whole reach
+# put them, the two legs alike or not, the torso tipped up to 1.6 rad
+# (python -m sandro_rl.fallen --count 2048 --held 0.5 --out data/fallen_states_held.npz).
+#
+#     uv run python -m sandro_rl.train configs/stand_up_v3.yaml --resume policies/stand_up_v2
+#     uv run python scripts/stand_up_runs.py [--held|--hard] policies/stand_up_v2 policies/stand_up_v3
+inherit: stand_up_v2.yaml
+
+env:
+  init:
+    fallen: {states: data/fallen_states_held.npz}
+
+train:
+  iterations: 400
+  curriculum_offset: 1200       # no lift assist
+  resume_log_std: -1.6
+  learning_rate: 5.0e-5
+  desired_kl: 0.003             # small steps: the limp starts were lost within 200 iterations at 0.01
+
+# The oscillation watchdog of stand_up.yaml (export_ros.py reads this file alone).
+deploy:
+  safety:
+    oscillation_arm_delay_s: 3.0
+    oscillation_leg_rad_s: 1.2
+    oscillation_wheel_rad_s: 5.0
