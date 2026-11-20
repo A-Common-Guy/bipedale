@@ -1,0 +1,82 @@
+# For a demo: the right stick's left-right axis strides the legs. The roll
+# channel of the command is the legs' fore-aft split (commands.split): stick
+# right puts the right wheel ahead and the left one behind, stick left the
+# opposite, the centre brings them together; sweeping it makes the robot
+# stride while it balances, drives and turns. The body stays level.
+#
+# For RlPolicyController the channel is still a roll: roll_rad is the largest
+# split in metres (0.16: each axle 8 cm from its neutral) and roll_rate_rad_s
+# its rate in m/s. The controller clips a roll to what the leg heights allow
+# (atan(2 room / track)); with the height command inside 0.11-0.15 m and the
+# leg limits 0.07-0.195 m that clip is 0.195 or more and never binds. What the
+# legs reach at a height (0.9 of their length: 0.19 m of split at 0.13 m,
+# 0.14 m at 0.15 m) clips the split that is paid for, not the command.
+#
+# agile_terrain_v6's lineage: the loop margin, the identified drive train. The
+# leg actions reach further (1.2 rad about the stand pose, 0.5 in v6), which
+# train.py rescales the resumed actor to. Inside 0.5 rad an axle moves 3 cm
+# back and 1 cm forward at 0.15 m: a first run held 8 cm of split, fell in 9
+# runs of 18 and lost the yaw. Inside 1 rad it still moves 5 cm back and 3 cm
+# forward only at 0.12 m: a second run made the largest splits by rolling the
+# body 0.4 rad and turning at 1-1.7 rad/s, and strode by twisting the body
+# (+-1.4 rad/s of yaw) more than by rolling the wheels. Hence also the roll
+# and yaw weights below.
+#
+# policies/fun_stride is three runs (runs/fun_stride_c, _d, _g):
+#
+#     uv run python -m sandro_rl.train configs/fun_stride.yaml --resume policies/agile_terrain_v6 --out runs/c \
+#         --set env.terrain.planks.height_m=[0.003,0.015] --set env.terrain.hills.height_m=[0.01,0.05]
+#     uv run python -m sandro_rl.train configs/fun_stride.yaml --resume runs/c --out runs/d \
+#         --set train.iterations=800 --set train.learning_rate=1.0e-4 --set train.resume_log_std=-2.6
+#     uv run python -m sandro_rl.train configs/fun_stride.yaml --resume runs/d --out policies/fun_stride \
+#         --set train.iterations=300 --set train.learning_rate=5.0e-5 --set train.desired_kl=0.005 \
+#         --set train.resume_log_std=-2.8 --set train.loop_margin.margin=0.27 --set train.loop_margin.coef=1.5
+#     MUJOCO_GL=egl uv run python scripts/stride_runs.py policies/fun_stride
+#
+# The second run ended with a crossing of the whole loop of 0.39 at 32 Hz
+# (the leg actions are 2.4 times v6's); the third removes it. A margin of
+# 0.25 at twice the weight removed it too and left the robot rocking fore
+# and aft at +-0.35 m/s when standing with slow SPI.
+inherit: agile_terrain_v6.yaml
+
+env:
+  action:
+    legs: {scale_rad: 1.2}
+
+  commands:
+    height_m: [0.11, 0.15]        # the reach fore and aft shrinks with the height
+    roll_rad: 0.16                # the largest split, m
+    roll_rate_rad_s: 0.6          # m/s: a 1 Hz stride of +-9 cm keeps its shape
+    roll_zero_probability: 0.3
+    split:
+      stretch: 0.9
+      wave_probability: 0.5       # of the commands, a sinusoid about zero
+      wave_hz: [0.3, 1.5]
+      wave_min_m: 0.03
+
+  rewards:
+    sigma: {split: 0.03}
+    weights:
+      leg_symmetry: -400.0        # about the split asked for: the pull from far away
+      track_split: 3.0
+      split_centre: -100.0        # the two axles as far from neutral as each other
+      roll: -20.0                 # (-5) the split is not made by leaning
+      track_yaw: 1.5
+      yaw_error: -0.5             # the stride is the wheels rolling, not the body twisting
+
+  constraints:
+    wheel_speed: {limit_rad_s: 17.0, slack: 4.0}   # the drives stop at 19.5 rad/s
+
+train:
+  num_envs: 6144
+  iterations: 1500
+  learning_rate: 2.0e-4
+  desired_kl: 0.01
+  resume_log_std: -2.3          # in the wider leg actions, about v6's exploration
+
+# A stride swings the legs: thrown from end to end the 5-15 Hz watchdog reads
+# 0.81 rad/s of its 1.0 (scripts/stride_runs.py). It has to stay beyond the
+# limit this long before the drives go limp.
+deploy:
+  safety:
+    oscillation_hold_s: 0.5

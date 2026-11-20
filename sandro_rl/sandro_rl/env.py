@@ -197,6 +197,14 @@ class SandroEnv:
         # wheel stays under this rim speed (the drives' speed limit). The policy still sees
         # the command as it comes; it learns which part of it to follow.
         self.rim_speed = float(c.get("wheel_speed_m_s", 0.0))
+        # Optional: the roll channel commands the legs' fore-aft split instead of the body's
+        # roll (commands.split; roll_rad is then the largest split in m and roll_rate_rad_s
+        # its rate in m/s, so the deployment controller shapes it as it shapes a roll). The
+        # body is held level. Part of the commands are sinusoids: a stride.
+        self.split = c.get("split") or {}
+        self.has_split = bool(self.split)
+        if self.has_split and not self.has_roll:
+            raise ValueError("commands.split needs commands.roll_rad, the largest split in m")
         # Optional jump events: every interval_s a jump of a sampled wheel
         # clearance is requested; the policy sees its target and a countdown.
         self.jump = c.get("jump") or {}
@@ -525,6 +533,23 @@ class SandroEnv:
         room = jp.maximum(jp.minimum(height - self.leg_h_lo, self.leg_h_hi - height), 0.0)
         limit = jp.arctan(2.0 * room / self.track_width)
         return jp.clip(roll, -limit, limit)
+
+    def feasible_split(self, split, height):
+        """Clip a split to what both legs reach at this height: each axle half of it from the
+        neutral offset, the leg at most split.stretch of its length from its farther pivot."""
+        g = self.geometry["right"]
+        radius = float(self.split.get("stretch", 0.9)) * (g["upper_m"] + g["lower_m"])
+        limit = 2.0 * jp.maximum(jp.sqrt(jp.maximum(radius ** 2 - height ** 2, 0.0)) - 0.5 * g["base_m"], 0.0)
+        return jp.clip(split, -limit, limit)
+
+    def _sample_split_wave(self, rng):
+        """(amplitude m, rad/s, phase) of a stride; amplitude 0 leaves the sampled command."""
+        k = jax.random.split(rng, 4)
+        lo, hi = self.split["wave_hz"]
+        amplitude = jax.random.uniform(k[0], minval=self.split.get("wave_min_m", 0.03), maxval=self.roll_max)
+        amplitude = jp.where(jax.random.uniform(k[1]) < self.split["wave_probability"], amplitude, 0.0)
+        return jp.array([amplitude, 2.0 * math.pi * jax.random.uniform(k[2], minval=lo, maxval=hi),
+                         jax.random.uniform(k[3], minval=0.0, maxval=2.0 * math.pi)])
 
     def _sample_jump(self, rng):
         """Wait until the next jump request and its target wheel clearance."""
@@ -956,6 +981,8 @@ class SandroEnv:
                     * self.envelope.rated_nm ** 2,
             "obs_history": jp.zeros((self.history_frames, self.actor_layout.size)),
         }
+        if self.has_split:
+            info["split_wave"] = self._sample_split_wave(jax.random.fold_in(k[9], 5))
         if self.has_jump:
             jump_wait, jump_height = self._sample_jump(jax.random.fold_in(k[9], 1))
             info.update({"jump_wait": jump_wait, "jump_timer": jp.float32(-10.0), "jump_height": jump_height,
@@ -1138,6 +1165,12 @@ class SandroEnv:
         resample = info["command_timer"] <= 0.0
         info["command"] = jp.where(resample, new_command, info["command"])
         info["command_timer"] = jp.where(resample, new_duration, info["command_timer"])
+        if self.has_split:
+            wave = jp.where(resample, self._sample_split_wave(jax.random.fold_in(k_cmd, 31)), info["split_wave"])
+            wave = wave.at[2].add(wave[1] * self.dt)
+            info["split_wave"] = wave
+            info["command"] = info["command"].at[3].set(
+                jp.where(wave[0] > 0.0, wave[0] * jp.sin(wave[2]), info["command"][3]))
         ref = info["command_ref"]
         cmd = info["command"]
         v_ref = ref[0] + jp.clip(cmd[0] - ref[0], -self.accel_limit * self.dt, self.accel_limit * self.dt)
@@ -1240,7 +1273,9 @@ class SandroEnv:
             "err_yaw": jp.abs(truth["yaw_rate"] - w_ref),
             "err_height": jp.abs(jp.mean(truth["heights"]) - h_ref),
             "cat_delta": cat_delta, "tilt": truth["tilt"],
-            "err_roll": jp.abs(truth["roll"] - info["command_ref"][3]) if self.has_roll else jp.float32(0.0),
+            "err_roll": (jp.abs(truth["offsets"][0] - truth["offsets"][1]
+                                - self.feasible_split(info["command_ref"][3], h_ref)) if self.has_split
+                         else jp.abs(truth["roll"] - info["command_ref"][3]) if self.has_roll else jp.float32(0.0)),
         })
         if self.has_goal:
             metrics["goal_distance"] = truth["goal_dist"]
@@ -1341,7 +1376,9 @@ class SandroEnv:
                 else jp.arctan(ref[0] * ref[1] / g))
         # Commanded roll plus the coordinated-turn lean (roll is positive with
         # the left side up, so a left turn leans to -lean).
-        roll_target = (ref[3] if self.has_roll else 0.0) - lean
+        roll_target = (ref[3] if self.has_roll and not self.has_split else 0.0) - lean
+        # The split asked for: the command's (right axle ahead is positive) or the config's.
+        split_target = self.feasible_split(ref[3], ref[2]) if self.has_split else r.get("split_m", 0.0)
         legs, wheels = self.leg_idx, self.wheel_idx
         terms = {
             "alive": jp.float32(1.0),
@@ -1356,10 +1393,10 @@ class SandroEnv:
             "pitch": truth["pitch"] ** 2,
             "pitch_rate": truth["pitch_rate"] ** 2,
             "vertical_velocity": truth["vertical_speed"] ** 2,
-            "leg_symmetry": (truth["offsets"][0] - truth["offsets"][1] - r.get("split_m", 0.0)) ** 2,
+            "leg_symmetry": (truth["offsets"][0] - truth["offsets"][1] - split_target) ** 2,
             # A split stance (rewards.split_m: the right axle that far ahead of
             # the left one), held about the neutral offset.
-            "track_split": jp.exp(-((truth["offsets"][0] - truth["offsets"][1] - r.get("split_m", 0.0))
+            "track_split": jp.exp(-((truth["offsets"][0] - truth["offsets"][1] - split_target)
                                     / sig.get("split", 0.03)) ** 2),
             "split_centre": (truth["offsets"][0] + truth["offsets"][1]) ** 2,
             # Differences per 10 ms, so a faster policy is held to the same

@@ -59,7 +59,8 @@ DIAG_KEYS = [
     "yaw_torque_nm", "yaw_feedforward_nm", "truth_pitch_rad", "truth_speed_m_s"]
 TRUTH_KEYS = ["truth_forward_m_s", "truth_yaw_rate_rad_s", "truth_height_m", "truth_roll_rad",
               "truth_wheel_clearance_m", "truth_axle_x_m", "truth_axle_y_m", "truth_tilt_rad",
-              "truth_imu_height_m", "truth_wheel_lift_m", "truth_floor_contact"]
+              "truth_imu_height_m", "truth_wheel_lift_m", "truth_floor_contact", "truth_leg_split_m",
+              "truth_knee_height_m", "truth_self_contact"]
 IMU_COLUMNS = ["imu_qx", "imu_qy", "imu_qz", "imu_qw", "imu_gx", "imu_gy", "imu_gz", "imu_ax", "imu_ay", "imu_az"]
 
 # Latency profiles of the comparison. "spi_slow" is the gate closed_loop.py
@@ -317,6 +318,50 @@ def floor_contact(m, d, tyres) -> int:
     return bits
 
 
+class LinkShadow:
+    """The robot's pose in a copy of the model with the leg links as boxes, for what a run
+    does not simulate: whether a leg touches the torso or the other leg, and how low the
+    knees come (the lowest leg hinge that is not a wheel's; on a flat floor a link reaches
+    the floor there first, the tyre covering its other end). Simulating the boxes instead
+    would also collide the two upper links of one leg, which pass each other in different
+    planes on the robot, and the lower links' boxes reach 7 mm from the floor standing."""
+
+    def __init__(self, spec):
+        from . import terrain
+        self.m = terrain.build(spec, {}, leg_boxes=True)
+        self.d = mujoco.MjData(self.m)
+        tyres = {int(g) for g in spec.tyre_geoms}
+        names = [self.m.geom(g).name for g in range(self.m.ngeom)]
+        wheels = {"right_wheel", "left_wheel"}
+        self.hinges = [j for j in range(self.m.njnt) if self.m.jnt_type[j] == mujoco.mjtJoint.mjJNT_HINGE
+                       and self.m.joint(j).name not in wheels]
+        self.side = {g: self.m.body(self.m.geom_bodyid[g]).name.split("_")[0] for g in range(self.m.ngeom)}
+        self.tyres = {g for g in range(self.m.ngeom) if names[g] in {spec.model.geom(t).name for t in tyres}}
+
+    def measure(self, qpos) -> tuple[float, int]:
+        """(the lowest knee above z = 0, touching pairs that are not one leg's own)."""
+        m, d = self.m, self.d
+        d.qpos[:] = qpos
+        mujoco.mj_kinematics(m, d)
+        mujoco.mj_collision(m, d)
+        lowest = float(d.xanchor[self.hinges, 2].min())
+        pairs = 0
+        for i in range(d.ncon):
+            c = d.contact[i]
+            g1, g2 = int(c.geom1), int(c.geom2)
+            if c.dist > 0.0 or m.geom_bodyid[g1] == 0 or m.geom_bodyid[g2] == 0:
+                continue
+            if g1 in self.tyres or g2 in self.tyres:
+                continue
+            if self.side[g1] == self.side[g2] and self.side[g1] in ("right", "left"):
+                continue
+            pairs += 1
+        return lowest, pairs
+
+
+# True logs truth_knee_height_m and truth_self_contact from a LinkShadow (flat floor only).
+LINK_SHADOW = False
+
 # A list here collects (time, axle midpoint, profile observation, true heights [2, k]) per
 # control cycle of a perceptive policy's run: what the policy was shown and what was there.
 PROFILE_LOG: list | None = None
@@ -565,6 +610,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
 
     from . import terrain
     leg_boxes = bool((config["env"].get("collision") or {}).get("leg_boxes", False))
+    shadow = LinkShadow(spec) if LINK_SHADOW and not course and not iface.has_goal else None
     goals_world, pillar_geoms = None, []
     if iface.has_goal:
         m, goals_world, pillar_geoms = avoid_course_model(spec, course if course in AVOID_COURSES else "slalom",
@@ -967,7 +1013,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
             axle_prev, t_prev = axle.copy(), d.time
             gyro_true = d.sensordata[m.sensor_adr[sensors[1]]:m.sensor_adr[sensors[1]] + 3]
             truth_yaw = float((rt @ gyro_true)[2])
-            true_heights, _, _ = kinematics.leg_state(d.qpos[qadr][iface.leg_idx], lim.leg_geometry,
+            true_heights, true_offsets, _ = kinematics.leg_state(d.qpos[qadr][iface.leg_idx], lim.leg_geometry,
                                                       lim.fore_aft_neutral_m, np)
             nan = math.nan
             values = {
@@ -1001,6 +1047,11 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                 "truth_wheel_lift_m": float(max(p[2] - radius for p in d.xanchor[wheel_joints])),
                 # What touches the world: 1 the right tyre, 2 the left tyre, 4 any other part.
                 "truth_floor_contact": float(floor_contact(m, d, [spec.model.geom(int(g)).name for g in spec.tyre_geoms])),
+                # The right axle ahead of the left one (stride policies); with LINK_SHADOW the knees'
+                # height above the floor and the robot's own parts touching.
+                "truth_leg_split_m": float(true_offsets[0] - true_offsets[1]),
+                **(dict(zip(("truth_knee_height_m", "truth_self_contact"), map(float, shadow.measure(d.qpos))))
+                   if shadow else {}),
             }
             rows.append({**base, "stream": "diag", **{f"diag_{k}": f"{v:.6g}" for k, v in values.items()}})
         joint_row = {**base, "stream": "joint"}

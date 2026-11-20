@@ -140,6 +140,36 @@ def widen_for_profile(payload, env):
     return payload
 
 
+def rescale_actions(payload, old_config, env):
+    """A checkpoint whose action scales differ from the environment's (a wider leg range,
+    faster wheels): the actor's output layer and the normalisation of the last action it is
+    shown are rescaled, so the resumed policy commands the same joint targets as before."""
+    old, new = old_config["env"]["action"], env.cfg["action"]
+    factor = np.ones(len(env.action_perm))
+    factor[np.asarray(env.leg_idx)] = float(old["legs"]["scale_rad"]) / float(new["legs"]["scale_rad"])
+    key = "scale_rad_s" if new["wheels"]["mode"] == "velocity" else "scale_nm"
+    factor[np.asarray(env.wheel_idx)] = float(old["wheels"][key]) / float(new["wheels"][key])
+    if np.allclose(factor, 1.0):
+        return payload
+    payload = {**payload, "params": dict(payload["params"])}
+    layers = dict(payload["params"]["actor"]["params"])
+    last = max(layers, key=lambda name: int(name.split("_")[1]))
+    layers[last] = {"kernel": np.asarray(layers[last]["kernel"]) * factor, "bias": np.asarray(layers[last]["bias"]) * factor}
+    payload["params"]["actor"] = {**payload["params"]["actor"], "params": layers}
+    for net, layout, repeat in (("actor", env.actor_layout, env.history), ("critic", env.critic_layout, 1)):
+        if "last_action" not in layout.names:
+            continue
+        start = int(sum(layout.sizes[: list(layout.names).index("last_action")]))
+        norm = payload[f"{net}_norm"]
+        mean, var = np.array(norm["mean"]), np.array(norm["var"])
+        for k in range(repeat):
+            span = slice(k * layout.size + start, k * layout.size + start + factor.size)
+            mean[span], var[span] = mean[span] * factor, var[span] * factor ** 2
+        payload[f"{net}_norm"] = {**norm, "mean": mean, "var": var}
+    print(f"action scales changed: the actor's outputs rescaled by {np.round(factor, 3).tolist()}")
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("config")
@@ -166,6 +196,7 @@ def main() -> int:
         checkpoint.check_model(meta)
         from .networks import Normalizer
         payload = widen_for_profile(payload, env)
+        payload = rescale_actions(payload, meta["config"], env)
         ts = ts.replace(params=jax.tree.map(jp.asarray, payload["params"]),
                         actor_norm=Normalizer(**{k: jp.asarray(v) for k, v in payload["actor_norm"].items()}),
                         critic_norm=Normalizer(**{k: jp.asarray(v) for k, v in payload["critic_norm"].items()}))

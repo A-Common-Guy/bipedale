@@ -153,6 +153,15 @@ rl_fun_show:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# For a demo (2026-11-20, sandro_rl/docs/DESIGN.md section 19): the right
+# stick's left-right axis is the legs' fore-aft split, in metres where the
+# others have a roll in radians (commands.roll_rad 0.16: the right wheel 16 cm
+# ahead of the left one at full stick right). Flat floors: it falls at a 2 cm
+# edge. Not run on the robot.
+rl_fun_stride:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 
 # The terrain profile (sandro_perception) takes the same physical IMU mounting
 # as the controllers above.

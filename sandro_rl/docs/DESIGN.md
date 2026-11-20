@@ -2745,3 +2745,86 @@ run on the robot. Full sticks are the limits above: start with
 `joy_teleop`'s `speed_fraction` or the Drive page's slider low. Video:
 `policies/fun_show/fun_show.mp4` (fitted plant: a spin, the sway, the bob, a
 hop in a spin, a hop standing).
+
+## 19. A stride on the roll stick: `configs/fun_stride.yaml` (2026-11-20)
+
+For a demo: `agile_terrain_v6` in which the fourth command, the roll, is the
+legs' fore-aft split (`commands.split`). Stick right puts the right wheel ahead
+and the left one behind, stick left the opposite, the centre brings them
+together; sweeping the stick makes the robot stride while it balances, drives
+and turns. The body stays level.
+
+**Nothing changes in `RlPolicyController`.** The channel is still shaped as a
+roll: `commands.roll_rad` is the largest split in metres (0.16) and
+`shaping.roll_rate_rad_s` its rate in m/s (0.6). The controller clips a roll to
+what the leg heights allow, atan(2 room / track); with the height command
+inside 0.11–0.15 m and the leg limits 0.07–0.195 m that clip is 0.195 or more
+and never binds (`tests/test_stride.py`). The mirror loss stays on: a split
+changes sign in the mirror as a roll does.
+
+**The command in training.** The split is sampled like the roll (30 % zero);
+half of the commands are a sinusoid about zero instead, 3–16 cm at 0.3–1.5 Hz,
+and the reference follows at the rate limit as the controller's will. What is
+paid for is the split the legs reach at the commanded height (each leg at most
+0.9 of its length from its farther pivot: 19 cm of split at 0.13 m, 14 cm at
+0.15 m), by `leg_symmetry` and `track_split` about it as in `fun_split`.
+
+**The leg actions had to reach further.** v6 commands leg targets within
+0.5 rad of the stand pose. Inside that box an axle moves 3 cm back and 1 cm
+forward at 0.15 m.
+
+| run | leg actions | result (`scripts/stride_runs.py`) |
+|---|---|---|
+| a | 0.5 rad | 8 cm of split at most, falls in 9 runs of 18, yaw tracking lost in training |
+| b | 1 rad | no fall, but the box still binds at 0.12 m (5 cm back, 3 forward): the largest splits were made by rolling the body 0.4 rad while turning at 1–1.7 rad/s, and the stride by twisting the body (±1.4 rad/s of yaw) more than by rolling the wheels |
+| c | 1.2 rad, `roll` −20, `yaw_error` −0.5, `track_yaw` 1.5, planks to 1.5 cm | level (roll 0.03 rad), 15 cm held; rocks fore and aft when the legs come back together on some runs (up to 0.5 m/s) |
+| d | c, 800 more iterations on v6's terrain | still, but the whole loop crosses at 32 Hz with 0.39 |
+| g | d, 300 iterations with a margin of 0.27 at 1.5 times the weight | the policy kept |
+
+`train.py` rescales a resumed actor whose action scales differ from the
+environment's (`rescale_actions`: the output layer and the normalisation of the
+last action), so the resumed policy commands the same joint targets as before.
+With leg actions 2.4 times v6's, the loop through the legs is the one that
+came close to the margin; a margin of 0.25 at twice the weight (run e) removed
+the crossing too and left the robot rocking at ±0.35 m/s standing with slow
+SPI.
+
+**Result** (`scripts/stride_runs.py policies/fun_stride`: the MJCF and the
+fitted plant, three latency profiles, three seeds, 18 runs at 0.12 m):
+
+| | |
+|---|---|
+| falls | 0 of 18; `push`, `default` and `hardware` scenarios 18 of 18 completed |
+| split held | 15.1–15.4 cm of 16 asked, 6.9–7.0 of 8, 0.0 at the centre |
+| stride, stick as a sinusoid | ±11.0 cm at 0.5 Hz (0.91 of the reference), ±8.2 cm at 1 Hz (0.91), the same standing, at 0.4 m/s and turning |
+| stick thrown end to end at 1 Hz | ±13.4–13.8 cm |
+| body | roll within 0.02 rad, pitch swing 0.03 rad (0.05 at most), tilt up to 0.17 rad |
+| heading | yaw rate left when holding a split 0.02 rad/s (0.04 at most); in a stride the yaw rate swings by up to 0.3 rad/s on the MJCF and 0.9–1.0 on the fitted plant; a turn asked at 1 rad/s is 0.8 and 1.14 |
+| position | the axle wanders 2–3 cm in 6 s of striding on the spot; 0.35 m/s for 0.4 asked while striding |
+| contact | only the tyres on the floor; knees 10 cm above it; no leg against the torso or the other leg |
+| drives | wheels up to 12.2 rad/s (limit 19.5), legs up to 3.6 Nm |
+| watchdog | the 5–15 Hz band reads up to 0.81 rad/s at the legs (limit 1.0), 1.21 at the wheels (5.0); `oscillation_hold_s` 0.5 |
+| gate | 0.23 (yaw table); no crossing of the whole loop, largest real part 0.32 at 31 Hz |
+| course | falls in 6 of 6 runs at 0.8 m/s: at the 2 cm plank on the fitted plant, at the 2.5 cm one on the MJCF, after crossing the lower ones: `split_centre` and the stiffer `leg_symmetry` take away the leg motion v6 crosses planks with |
+
+Contacts: the runs and the training collide the tyres and the torso only.
+`evaluate.LinkShadow` follows each pose in a copy of the model with the leg
+links as boxes and reports whether a leg touches the torso or the other leg,
+and the height of the lowest knee. Simulating the boxes instead is not usable
+for this: the two upper links of one leg collide with each other as soon as
+the legs move (on the robot they pass in different planes), and the lower
+links' boxes reach 7 mm from the floor standing.
+
+Deployed as `rl_fun_stride` in the panel's list (not on the gamepad switch),
+with a "Stride" routine on the Drive page (`sandro_gui/config/routines.yaml`).
+Videos: `fun_stride.mp4` from the side, `fun_stride_front.mp4`.
+
+**For the robot** (not run there):
+
+- flat floors only, and first with the robot held: the legs sweep 8 cm fore
+  and aft of neutral, further than any deployed policy moves them;
+- full stick is 16 cm; the stride looks best swept at about 0.5–1 Hz;
+- the height stick works within 0.11–0.15 m only, lower than the other
+  policies stand: the split needs the room;
+- switching to another policy needs the stick centred (the handover check
+  reads the split as a roll and wants it under 0.02).

@@ -721,7 +721,7 @@ def test_a_routine_blends_between_its_keys_and_ends():
 def test_the_shipped_routines_end_where_they_started():
     from sandro_gui import routines
     shipped = shipped_routines()
-    assert list(shipped) == ["greeting", "spin", "sway", "eight", "show"]
+    assert list(shipped) == ["greeting", "spin", "sway", "eight", "show", "stride"]
     step = 0.001
     for routine in shipped.values():
         assert routine.note and 5.0 < routine.duration <= 30.0

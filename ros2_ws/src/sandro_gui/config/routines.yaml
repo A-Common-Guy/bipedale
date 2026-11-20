@@ -131,3 +131,32 @@ routines:
       - {t: 11.2, for: 0.3, button: cross}
       - {t: 26.4, for: 0.3, button: cross}
       - {t: 27.4, for: 0.3, button: cross}
+
+  stride:
+    label: Stride
+    note: For rl_fun_stride, where the right stick's left-right axis is the legs' fore-aft split. Three strides on the spot (a wheel 6 cm ahead, then the other, every 1.6 s), three while driving 1.1 m forward at 50 % speed, three driving back. Needs 1.5 m clear ahead. Any other policy sways instead.
+    keys:
+      - {t: 0}
+      - {t: 0.6}
+      - {t: 1, rx: 0.75}
+      - {t: 1.8, rx: -0.75}
+      - {t: 2.6, rx: 0.75}
+      - {t: 3.4, rx: -0.75}
+      - {t: 4.2, rx: 0.75}
+      - {t: 5, rx: -0.75}
+      - {t: 5.4}
+      - {t: 5.8, ly: 0.5, rx: 0.75}
+      - {t: 6.6, ly: 0.5, rx: -0.75}
+      - {t: 7.4, ly: 0.5, rx: 0.75}
+      - {t: 8.2, ly: 0.5, rx: -0.75}
+      - {t: 9, ly: 0.5, rx: 0.75}
+      - {t: 9.8, ly: 0.5, rx: -0.75}
+      - {t: 10.2}
+      - {t: 10.6, ly: -0.5, rx: 0.75}
+      - {t: 11.4, ly: -0.5, rx: -0.75}
+      - {t: 12.2, ly: -0.5, rx: 0.75}
+      - {t: 13, ly: -0.5, rx: -0.75}
+      - {t: 13.8, ly: -0.5, rx: 0.75}
+      - {t: 14.6, ly: -0.5, rx: -0.75}
+      - {t: 15}
+      - {t: 15.5}
