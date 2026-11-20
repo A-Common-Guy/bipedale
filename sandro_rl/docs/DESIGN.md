@@ -2671,3 +2671,77 @@ recording's clutter is not in it.
 
 Neither the node's preview nor the controller's diagnostics are compiled or
 run here (no ROS on the training machine).
+
+## 18. A policy to show: `configs/fun_show.yaml` (2026-11-20)
+
+For a demo, driven from the gamepad or the phone's Drive page with the inputs
+that exist: `jump` (the hop on L1 + cross) with wider and faster commands.
+
+| command | `agile_terrain_v6` | `fun_show` |
+|---|---|---|
+| yaw rate | 3 rad/s | 5.5 rad/s |
+| roll | 0.3 rad at 0.6 rad/s | 0.4 rad at 2 rad/s (0.38 feasible at mid height) |
+| height | 0.09–0.19 m at 0.15 m/s | the same range at 0.4 m/s |
+| hop | none | one per request (`single_hop`), 2–8 cm asked |
+
+The rates reach the robot through `rl_policies.yaml` (`shaping.*`, which
+`RlPolicyCore` applies and `joy_teleop` reads its stick ranges from), so
+nothing on the robot side changes but the parameters.
+
+Two additions to `env.py`:
+
+- `commands.wheel_speed_m_s` (1.1): the forward speed the tracking reward
+  compares against shrinks with the yaw rate so that the faster wheel's rim
+  stays under it (0.26 m/s at 5.5 rad/s). The policy sees the command as it
+  comes; with both sticks at their ends it follows the spin and gives up
+  speed. `constraints.wheel_speed` makes a wheel beyond 17 rad/s a
+  constraint outside the hops. The drives stop at 19.5 rad/s, which the
+  simulation does not model.
+- `rewards.weights.yaw_error`, the squared yaw error clipped at 9. A first
+  run without it lost the spin wherever the floor resisted: 0.5 rad/s of 5
+  asked on the MJCF's tyre torsion (1.7 of 3, where `jump` and v6 reach 3.2
+  and 3.3) while tracking exactly on the fitted plant. The kernel
+  (`sigma.yaw` 0.6) is flat 1.5 rad/s from the reference, so the episodes
+  with stiff tyres taught nothing.
+
+Robot-ready as `agile_step`: MIT joint state and the identified drive train
+in half the episodes, the wide tyre torsion and leg rotor ranges, the loop
+margin (0.35) on the three measured plants, the legs held together
+(`leg_split`). Planks to 1.5 cm and hills to 4 cm only. From `policies/jump`,
+2000 iterations at 6144 worlds (295 M steps, 51 min).
+
+### Results
+
+`scripts/show_runs.py`: spins at 5 rad/s both ways and at 4 rad/s with
+0.25 m/s, the stops after them, roll to both ends, the height to both ends
+twice, a hop in a 4 rad/s spin and one standing; MJCF and fitted plant,
+three latency profiles, three seeds (18 runs).
+
+- No fall. Tilt up to 0.43 rad.
+- Spin: 5.0–5.1 rad/s of 5 on the fitted plant, 2.4–2.6 on the MJCF. The
+  MJCF's tyres resist turning on the spot about a hundred times more than
+  the identified ones (`tyre_torsion` 0.01 in the fit), and the loop margin
+  bounds the feedback that would push through it. On a grippy floor or a
+  carpet the robot will spin slower than asked, as here. The axle wanders
+  4–19 cm in a 3 s spin on the spot. One second after the stick is let go
+  the yaw rate is below 0.02 rad/s.
+- Roll 0.35 rad held at mid height; height 0.10 to 0.18 m, a centimetre
+  short of the command at each end, as the height margin and the stretch
+  constraint leave it.
+- Hops: 36 of 36, wheels 5–7 cm up, in the spin too.
+- Wheels: 19.1 rad/s at most outside the hops (once, in a bob on the MJCF;
+  11–15 rad/s in the spins); in a hop the unloaded wheels reach 24, which
+  the drives will cap. Leg torque up to 8.2 Nm (in the hops).
+- Straight driving is the `jump` lineage's: 0.65 m/s at a full stick
+  (1.0 asked; `jump` 0.71, v6 0.85), 0.43 at 0.5.
+- The oscillation watchdog's signal, computed from the recordings as
+  `RlPolicyCore` does: 0.3 rad/s at the legs (limit 1.0) in the fastest sway
+  and bob, 2.3–2.5 in a hop for 0.7–0.8 s. The hold is 1.2 s as
+  `agile_step`'s: hops asked for one right after another could trip it.
+- Gate: 0.32 on the whole loop, 0.22 on the yaw table.
+
+Deployed as `rl_fun_show` (the panel's list, not the gamepad switch); never
+run on the robot. Full sticks are the limits above: start with
+`joy_teleop`'s `speed_fraction` or the Drive page's slider low. Video:
+`policies/fun_show/fun_show.mp4` (fitted plant: a spin, the sway, the bob, a
+hop in a spin, a hop standing).

@@ -193,6 +193,10 @@ class SandroEnv:
         reach = c.get("leg_height_limits_m", [self.h_min, self.h_max])
         self.leg_h_lo, self.leg_h_hi = float(reach[0]), float(reach[1])
         self.track_width = float(lim.track_width_m)
+        # Optional: the forward speed that is paid for shrinks with the yaw rate, so the faster
+        # wheel stays under this rim speed (the drives' speed limit). The policy still sees
+        # the command as it comes; it learns which part of it to follow.
+        self.rim_speed = float(c.get("wheel_speed_m_s", 0.0))
         # Optional jump events: every interval_s a jump of a sampled wheel
         # clearance is requested; the policy sees its target and a countdown.
         self.jump = c.get("jump") or {}
@@ -1302,6 +1306,11 @@ class SandroEnv:
         if "wheel_lift" in c and c["wheel_lift"]:
             lift = jp.max(truth["clearance"] - c["wheel_lift"]["limit_m"]) / c["wheel_lift"]["slack"]
             violations.append(lift * (1.0 - self._jumping(info)))
+        if c.get("wheel_speed"):
+            # The drives' speed limit, which the simulation does not have.
+            spin = jp.max(jp.abs(truth["qd"][self.wheel_idx]))
+            violations.append((spin - c["wheel_speed"]["limit_rad_s"]) / c["wheel_speed"]["slack"]
+                              * (1.0 - self._jumping(info)))
         if c.get("thermal", {}).get("enabled", False):
             # The heat budget running out: 0 until the fold-back starts.
             violations.append(1.0 - torque_envelope.budget(jp.max(info["heat"]), self.envelope, jp))
@@ -1323,6 +1332,9 @@ class SandroEnv:
         r = self.cfg["rewards"]
         w, sig = r["weights"], r["sigma"]
         ref = info["command_ref"]
+        if self.rim_speed > 0.0:
+            room = jp.maximum(self.rim_speed - 0.5 * self.track_width * jp.abs(ref[1]), 0.0)
+            ref = ref.at[0].set(jp.clip(ref[0], -room, room))
         g = 9.81
         # Goal commands carry no yaw rate: the lean follows the turn driven.
         lean = (jp.arctan(truth["forward_speed"] * truth["yaw_rate"] / g) if self.has_goal
@@ -1336,6 +1348,8 @@ class SandroEnv:
             "track_forward": jp.exp(-((truth["forward_speed"] - self._guarded_speed(ref[0], truth))
                                       / sig["forward"]) ** 2),
             "track_yaw": jp.exp(-((truth["yaw_rate"] - ref[1]) / sig["yaw"]) ** 2),
+            # The kernel is flat far from the reference; this pulls from there (fast spins).
+            "yaw_error": jp.minimum((truth["yaw_rate"] - ref[1]) ** 2, 9.0),
             "track_height": jp.exp(-((jp.mean(truth["heights"]) - ref[2]) / sig["height"]) ** 2),
             "roll": (truth["roll"] - roll_target) ** 2,
             "track_roll": jp.exp(-((truth["roll"] - roll_target) / sig.get("roll", 0.05)) ** 2),

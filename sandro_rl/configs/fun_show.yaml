@@ -1,0 +1,88 @@
+# For a demo: one policy to play with from the gamepad or the phone. The jump
+# policy (hop on L1 + cross) with
+# - pirouettes: yaw up to 5.5 rad/s (3), on the spot and while driving;
+# - a wide sway and a quick bob: roll to 0.4 rad (0.3) at 2 rad/s (0.6), height
+#   over 0.09-0.19 m at 0.4 m/s (0.15);
+# - one hop per request (single_hop), also in a spin.
+# The faster wheel stays under the drives' speed limit (19.5 rad/s, 1.3 m/s at
+# the tyre): the forward speed that is paid for shrinks with the yaw rate
+# (commands.wheel_speed_m_s: 1.1 m/s at the rim, so 0.26 m/s at full spin), and
+# a wheel beyond 17 rad/s is a constraint. Robot-ready as agile_step: MIT joint
+# state, the identified drive train in half the episodes, the loop margin on
+# the three measured plants. Flat floors and low edges only.
+#
+#     uv run python -m sandro_rl.train configs/fun_show.yaml --resume policies/jump
+#     MUJOCO_GL=egl uv run python scripts/show_runs.py policies/fun_show
+inherit: jump.yaml
+
+env:
+  terrain:
+    planks: {count: 12, height_m: [0.003, 0.015], depth_m: [0.04, 0.3], width_m: [0.2, 1.0], radius_m: [0.4, 4.0]}
+    hills: {count: 4, height_m: [0.01, 0.04], slope_deg: [5.0, 15.0], plateau_m: [0.2, 0.8],
+            width_m: [0.8, 1.6], radius_m: [0.3, 4.0]}
+
+  commands:
+    yaw_rad_s: 5.5
+    wheel_speed_m_s: 1.1
+    height_rate_m_s: 0.4
+    roll_rad: 0.4
+    roll_rate_rad_s: 2.0
+    resample_s: [1.5, 4.0]
+    jump:
+      interval_s: [3.0, 7.0]
+      single_hop: true
+
+  rewards:
+    sigma: {yaw: 0.6}
+    weights:
+      track_yaw: 1.5
+      yaw_error: -0.3             # a spin the floor resists (tyre torsion) earns nothing from the kernel
+      track_roll: 1.5
+
+  constraints:
+    tilt: {limit_rad: 0.6, slack: 0.3}
+    wheel_speed: {limit_rad_s: 17.0, slack: 4.0}
+    leg_split: {limit_m: 0.02, slack: 0.03}     # the legs together, as agile_step
+
+  randomization:                      # as configs/agile_terrain_v2.yaml
+    latency:
+      mit_joints_probability: 0.5
+    drives:
+      gear:
+        probability: 0.5
+        stiffness_nm_rad: [8.0, 60.0]
+        play_rad: [0.0, 0.03]
+        damping_nm_s_rad: [0.05, 0.3]
+        rotor_inertia_scale: [15.0, 35.0]
+        substeps: 8
+    model:
+      tyre_torsional_scale: [0.005, 2.0]
+      wheel_frictionloss_scale: [0.02, 2.0]
+      leg_armature_scale: [5.0, 35.0]
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.commands.sample_fraction: 1.0
+        env.pushes.force_n: 18.0
+        env.pushes.lateral_force_n: 8.0
+        env.pushes.vertical_force_n: 8.0
+        env.pushes.torque_nm: [0.5, 0.5]
+        env.commands.jump.height_m: [0.02, 0.08]
+
+train:
+  num_envs: 6144
+  iterations: 2000
+  learning_rate: 2.0e-4
+  resume_log_std: -1.6
+  loop_margin:
+    coef: 1.0
+    margin: 0.35
+    plant: [opposed_plant_2026-11-17.json, yaw_plant_2026-11-16.json, yaw_plant_2026-11-12.json]
+
+# A hop swings the legs through the oscillation watchdog's band (as
+# agile_step.yaml; export_ros.py reads this file alone).
+deploy:
+  safety:
+    oscillation_hold_s: 1.2

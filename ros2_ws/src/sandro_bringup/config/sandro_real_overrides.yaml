@@ -145,6 +145,14 @@ rl_fun_one_leg_long:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# For a demo (2026-11-20, sandro_rl/docs/DESIGN.md section 18): spins up to
+# 5.5 rad/s, roll to 0.4 rad, a quick bob, a hop on L1 + cross. The sticks'
+# full deflection is these limits: lower joy_teleop's speed_fraction (or the
+# Drive page's slider) for the first runs.
+rl_fun_show:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 
 # The terrain profile (sandro_perception) takes the same physical IMU mounting
 # as the controllers above.
