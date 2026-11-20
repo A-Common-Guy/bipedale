@@ -199,6 +199,9 @@ class PolicyInterface:
         self.has_jump = bool(jump.get("enabled", bool(jump)))
         self.jump_h_max = float(jump.get("height_m", [0.0, 0.1])[1])
         self.jump_window = float(jump.get("window_s", 0.8))
+        # A flip policy (simulation only): the fall cutoff waits out the window and its landing.
+        self.has_flip = bool(jump.get("flip"))
+        self.jump_landing = float(jump.get("landing_s", 0.3))
         goals = c.get("goals") or {}
         self.has_goal = bool(goals.get("enabled", bool(goals)))
         self.goal_range = float(goals.get("range_m", 4.0))

@@ -1,0 +1,42 @@
+# SIMULATION ONLY, not deployed: a backflip on the hop input. A failed flip
+# on the robot breaks it, and RlPolicyController's fall cutoff (tilt over
+# 1 rad: drives limp) would end one in mid-air anyway.
+#
+# fun_hop_high with commands.jump.flip: in the window the turn about the
+# pitch axis is paid per radian until it is whole (direction -1: nose up
+# first), then standing upright on the wheels; the tilt limits and the fall
+# are off until landing_s after the window, the torso near the floor ends
+# the episode instead. The drives' torque envelope (9 Nm) and their speed
+# limit at the legs (constraints.leg_speed, 19.5 rad/s) are fun_hop_high's.
+#
+#     uv run python -m sandro_rl.train configs/fun_flip.yaml --resume policies/fun_hop_high
+#     MUJOCO_GL=egl uv run python scripts/hop_runs.py --flip policies/fun_flip
+inherit: fun_hop_high.yaml
+
+env:
+  commands:
+    forward_m_s: 0.6
+    yaw_rad_s: 2.0
+    jump:
+      interval_s: [2.0, 6.0]
+      landing_s: 0.6
+      flip:
+        direction: -1.0
+        angle_rad: 6.2832
+        tolerance_rad: 0.4
+        rate_clip_rad_s: 25.0
+        torso_floor_m: 0.01
+
+  rewards:
+    weights:
+      flip_rate: 60.0             # per radian turned: 377 for the whole flip
+      flip_landed: 150.0          # per second upright on the wheels after it
+      flip_over: -0.05
+      termination: -50.0          # (-200) a turn begun and not landed must still beat no turn
+
+train:
+  iterations: 3000
+  resume_log_std: -1.0
+  symmetry_coef: 0.5
+
+deploy: null

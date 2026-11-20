@@ -60,7 +60,7 @@ DIAG_KEYS = [
 TRUTH_KEYS = ["truth_forward_m_s", "truth_yaw_rate_rad_s", "truth_height_m", "truth_roll_rad",
               "truth_wheel_clearance_m", "truth_axle_x_m", "truth_axle_y_m", "truth_tilt_rad",
               "truth_imu_height_m", "truth_wheel_lift_m", "truth_floor_contact", "truth_leg_split_m",
-              "truth_knee_height_m", "truth_self_contact"]
+              "truth_knee_height_m", "truth_self_contact", "truth_pitch_turn_rad"]
 IMU_COLUMNS = ["imu_qx", "imu_qy", "imu_qz", "imu_qw", "imu_gx", "imu_gy", "imu_gz", "imu_ax", "imu_ay", "imu_az"]
 
 # Latency profiles of the comparison. "spi_slow" is the gate closed_loop.py
@@ -538,7 +538,9 @@ class PolicyController:
         """command: (forward m/s, yaw rad/s, height rate m/s[, roll rad]); the first three as /cmd_vel."""
         r = self.iface.body_rotation(quat)
         tilt = math.acos(float(np.clip(r[2, 2], -1.0, 1.0)))
-        if tilt > self.fall_angle:
+        # A flip (simulation only) is upside down by design: no cutoff until it has landed.
+        flipping = self.iface.has_flip and self.jump_timer > -self.iface.jump_landing
+        if tilt > self.fall_angle and not flipping:
             self.fallen = True
         if self.fallen:
             # Safety fallback: drives limp with damping, as the WBC does on a fall.
@@ -880,6 +882,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     received = [0.0] * 5
     phase_index = 0
     fall_time = -1.0
+    pitch_turn = 0.0
     finished = False
     rows = []
     axle_prev, t_prev = None, None
@@ -1010,8 +1013,10 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
             heading /= max(np.linalg.norm(heading), 1e-9)
             truth_forward = (float((axle - axle_prev) @ heading / (d.time - t_prev))
                              if axle_prev is not None and d.time > t_prev else 0.0)
-            axle_prev, t_prev = axle.copy(), d.time
             gyro_true = d.sensordata[m.sensor_adr[sensors[1]]:m.sensor_adr[sensors[1]] + 3]
+            # The turn about the body's pitch axis since the start (flips), as env.py's pitch rate.
+            pitch_turn += float((body_from_imu.T @ gyro_true)[1]) * (d.time - t_prev if axle_prev is not None else 0.0)
+            axle_prev, t_prev = axle.copy(), d.time
             truth_yaw = float((rt @ gyro_true)[2])
             true_heights, true_offsets, _ = kinematics.leg_state(d.qpos[qadr][iface.leg_idx], lim.leg_geometry,
                                                       lim.fore_aft_neutral_m, np)
@@ -1042,6 +1047,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                     for p in d.xanchor[wheel_joints])),
                 "truth_axle_x_m": float(axle[0]), "truth_axle_y_m": float(axle[1]),
                 "truth_tilt_rad": math.acos(float(np.clip(rb[2, 2], -1.0, 1.0))),
+                "truth_pitch_turn_rad": pitch_turn,
                 "truth_imu_height_m": float(d.site_xpos[imu_site][2]),
                 # The higher wheel above a flat floor (one-leg policies).
                 "truth_wheel_lift_m": float(max(p[2] - radius for p in d.xanchor[wheel_joints])),

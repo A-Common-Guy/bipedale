@@ -221,6 +221,16 @@ class SandroEnv:
         self.jump = c.get("jump") or {}
         self.has_jump = bool(self.jump.get("enabled", bool(self.jump)))
         self.jump_h_max = float(self.jump.get("height_m", [0.0, 0.1])[1])
+        # A flip in the jump window (simulation only): a whole turn about the pitch axis,
+        # direction +1 nose down first. The tilt limits are off from the request to landing_s
+        # after the window; the torso near the floor ends the episode instead.
+        self.flip = self.jump.get("flip") or {}
+        self.has_flip = bool(self.flip)
+        torso_geoms = [g for g in range(s.model.ngeom) if s.model.geom_bodyid[g] == s.torso_body
+                       and (s.model.geom_contype[g] or s.model.geom_conaffinity[g])]
+        self.torso_geoms = np.array(torso_geoms if self.has_flip else [], dtype=int)
+        self.torso_centre = jp.asarray(s.model.geom_aabb[self.torso_geoms, :3], dtype=jp.float32)
+        self.torso_half = jp.asarray(s.model.geom_aabb[self.torso_geoms, 3:], dtype=jp.float32)
         # Optional goal commands (avoid task): reach a point at a commanded
         # cruise speed, instead of tracking a forward speed and a yaw rate.
         self.goals = c.get("goals") or {}
@@ -892,6 +902,11 @@ class SandroEnv:
             up = data.geom_xmat[self.link_boxes].reshape(-1, 3, 3)[:, 2, :]
             extra["link_clearance"] = jp.min(data.geom_xpos[self.link_boxes][:, 2]
                                              - jp.sum(jp.abs(up) * self.link_half, axis=1))
+        if len(self.torso_geoms):
+            # The lowest corner of the torso's bounding boxes above a flat floor.
+            mats = data.geom_xmat[self.torso_geoms].reshape(-1, 3, 3)
+            centre = data.geom_xpos[self.torso_geoms] + jp.einsum("gij,gj->gi", mats, self.torso_centre)
+            extra["torso_clearance"] = jp.min(centre[:, 2] - jp.sum(jp.abs(mats[:, 2, :]) * self.torso_half, axis=1))
         if self.has_pillars:
             extra["obstacle_clearance"] = self.terrain.clearance(mid[:2], heading[:2], self.hull_half, data)
         if self.n_profile:
@@ -1010,7 +1025,7 @@ class SandroEnv:
             jump_wait, jump_height = self._sample_jump(jax.random.fold_in(k[9], 1))
             info.update({"jump_wait": jump_wait, "jump_timer": jp.float32(-10.0), "jump_height": jump_height,
                          "jump_shown": jp.float32(1.0), "jump_air": jp.float32(0.0), "jump_done": jp.float32(0.0),
-                         "jump_clearance": jp.float32(0.0)})
+                         "jump_clearance": jp.float32(0.0), "flip_angle": jp.float32(0.0)})
         if self.has_goal:
             start = jp.asarray(self.stand_axle[:2], dtype=jp.float32)
             info.update({"goal": goal, "goal_timer": self._goal_time(start, goal, command[0]),
@@ -1090,6 +1105,7 @@ class SandroEnv:
                 info["jump_air"] = jp.where(start, 0.0, jp.maximum(info["jump_air"], lifted.astype(jp.float32)))
                 landed = (info["jump_air"] > 0.0) & (state.info["jump_clearance"] < 0.003)
                 info["jump_done"] = jp.where(start, 0.0, jp.maximum(info["jump_done"], landed.astype(jp.float32)))
+            info["flip_angle"] = jp.where(start, 0.0, info["flip_angle"])
             info["jump_timer"] = jp.where(start, self.jump["window_s"], info["jump_timer"])
             info["jump_height"] = jp.where(start, height, info["jump_height"])
             info["jump_wait"] = jp.where(start, wait + self.jump["window_s"], info["jump_wait"])
@@ -1210,6 +1226,10 @@ class SandroEnv:
         info["axle_prev"] = truth["axle"]
         if self.has_jump:
             info["jump_clearance"] = jp.min(truth["clearance"])
+            if self.has_flip:
+                # The turn made since the request, about the body's pitch axis.
+                info["flip_angle"] = info["flip_angle"] + (self._jumping(info) * float(self.flip.get("direction", 1.0))
+                                                           * truth["pitch_rate"] * self.dt)
         if self.has_goal:
             # Held within reach_m for hold_s, or out of time: the next goal is
             # sampled from where the robot stands. The rewards of this step
@@ -1271,7 +1291,7 @@ class SandroEnv:
         max_qvel = self.cfg["termination"].get("max_qvel", 200.0)
         diverged = ~(jp.all(jp.isfinite(data.qpos)) & jp.all(jp.isfinite(data.qvel))
                      & (jp.max(jp.abs(data.qvel)) < max_qvel))
-        terminated = jp.maximum(self._terminated(truth), diverged.astype(jp.float32))
+        terminated = jp.maximum(self._terminated(truth, info), diverged.astype(jp.float32))
         cat_delta = (self._constraints(truth, taus, info) if self.cfg["constraints"].get("enabled", True)
                      else jp.float32(0))
         reward, terms = self._reward(truth, info, action, prev_action, info["last_action2"], taus, terminated)
@@ -1319,9 +1339,13 @@ class SandroEnv:
                 + (["clearance"] if self.has_pillars else []))
 
     # ------------------------------------------------------------ task terms
-    def _terminated(self, truth):
+    def _terminated(self, truth, info=None):
         t = self.cfg["termination"]
         bad = (truth["tilt"] > t["tilt_rad"]) | (truth["imu_height"] < t["imu_height_m"])
+        if self.has_flip and info is not None:
+            # Upside down is part of a flip; the torso on the floor is not.
+            bad = jp.where(self._jumping(info) > 0.0,
+                           truth["torso_clearance"] < self.flip.get("torso_floor_m", 0.01), bad)
         bad = bad | ~jp.all(jp.isfinite(truth["q"]))
         if self.has_pillars:
             # Driving into a pillar is a failure, like a fall.
@@ -1358,7 +1382,7 @@ class SandroEnv:
             jp.max(jp.maximum(self.leg_h_lo - c["height"]["margin_m"] - truth["heights"],
                               truth["heights"] - (self.leg_h_hi + c["height"]["margin_m"]))) / c["height"]["slack"],
             (truth["tilt"] - self._lean_target(info) * jp.sign(truth["pitch"]) - c["tilt"]["limit_rad"])
-            / c["tilt"]["slack"],
+            / c["tilt"]["slack"] * (1.0 - self._jumping(info) if self.has_flip else 1.0),
         ]
         if c.get("leg_split"):
             # Legs split fore and aft make the robot statically stable in
@@ -1379,6 +1403,10 @@ class SandroEnv:
             spin = jp.max(jp.abs(truth["qd"][self.wheel_idx]))
             violations.append((spin - c["wheel_speed"]["limit_rad_s"]) / c["wheel_speed"]["slack"]
                               * (1.0 - self._jumping(info)))
+        if c.get("leg_speed"):
+            # The same limit at the leg drives: it, not the torque, bounds a hop's take-off.
+            violations.append((jp.max(jp.abs(truth["qd"][legs])) - c["leg_speed"]["limit_rad_s"])
+                              / c["leg_speed"]["slack"])
         if c.get("thermal", {}).get("enabled", False):
             # The heat budget running out: 0 until the fold-back starts.
             violations.append(1.0 - torque_envelope.budget(jp.max(info["heat"]), self.envelope, jp))
@@ -1474,10 +1502,14 @@ class SandroEnv:
                 lift = grounded * jp.clip(raised, 0.0, info["jump_height"]) / info["jump_height"]
             else:
                 raised = jp.min(truth["clearance"])
-                lift = jp.clip(raised, 0.0, info["jump_height"]) / info["jump_height"]
+                # target_m: every request is paid up to this clearance, whatever height it
+                # names (the gamepad always asks for the same one): the highest hop there is.
+                target = self.jump.get("target_m") or info["jump_height"]
+                lift = jp.clip(raised, 0.0, target) / target
+            target = info["jump_height"] if one_leg else target
             terms["jump_clearance"] = in_window * lift
-            terms["jump_vz"] = in_window * jp.clip(truth["base_vz"], 0.0, 1.5)
-            terms["jump_overshoot"] = in_window * jp.maximum(raised - info["jump_height"], 0.0) ** 2
+            terms["jump_vz"] = in_window * jp.clip(truth["base_vz"], 0.0, self.jump.get("vz_clip_m_s", 1.5))
+            terms["jump_overshoot"] = in_window * jp.maximum(raised - target, 0.0) ** 2
             free = (("track_height", "roll", "track_roll", "leg_symmetry", "track_forward", "track_yaw")
                     if one_leg and self.jump.get("steady", False) else
                     ("track_height", "vertical_velocity") + (
@@ -1485,6 +1517,20 @@ class SandroEnv:
             if one_leg and self.jump.get("steady", False):
                 # A stand, not a series of hops: the supporting tyre leaving the floor costs.
                 terms["jump_airborne"] = in_window * (truth["clearance"][1] > 0.005)
+            if self.has_flip:
+                turn = float(self.flip.get("angle_rad", 2.0 * math.pi))
+                rate = float(self.flip.get("rate_clip_rad_s", 20.0))
+                spin = float(self.flip.get("direction", 1.0)) * truth["pitch_rate"]
+                turned = (info["flip_angle"] > turn - self.flip.get("tolerance_rad", 0.4)).astype(jp.float32)
+                # The turn itself, paid per radian until it is whole (in the window only).
+                terms["flip_rate"] = ((info["jump_timer"] > 0.0) * (info["flip_angle"] < turn)
+                                      * jp.clip(spin, -rate, rate))
+                # Then: on the wheels and upright, until landing_s after the window.
+                terms["flip_landed"] = (jumping * turned * jp.exp(-(truth["tilt"] / 0.3) ** 2)
+                                        * (jp.max(truth["clearance"]) < 0.01))
+                # Still turning after the whole turn costs.
+                terms["flip_over"] = jumping * turned * truth["pitch_rate"] ** 2
+                free = free + ("pitch", "track_pitch", "pitch_rate", "track_forward", "upright")
             for name in free:
                 terms[name] = terms[name] * (1.0 - jumping)
         if self.has_goal:

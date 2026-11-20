@@ -2906,3 +2906,74 @@ a "Bow" routine on the Drive page. Video: `fun_bow.mp4`, from the side.
   against the pitch the policy reads;
 - switching to another policy needs the stick centred (the handover check
   wants the roll reference under 0.02).
+
+## 21. The highest hop: `configs/fun_hop_high.yaml` (2026-11-20)
+
+For the demo: how high the robot gets off the floor on the hop input. The hops
+of `jump`, `agile_step` and `fun_show` are 5–7 cm for a request of 5–8.
+
+### What limits a hop
+
+Not the torque. With both drives of a leg at 9 Nm the leg pushes with
+125–340 N over its stroke (0.07 to 0.195 m of height; 0.14 m of height per
+radian of both joints at mid-stroke, 0.05 at the end), 2.7 to 7 times the
+robot's weight per leg. Statically that is 38 J over the stroke, 0.8 m of
+height for 4.9 kg. What bounds the take-off is how fast the legs turn:
+
+- the drives limit their speed to 186 rpm, 19.5 rad/s (`gim6010/manual`),
+  which the simulation does not. At mid-stroke that is 2.7 m/s of extension,
+  near the end 1 m/s. `constraints.leg_speed` (new, opt-in) is that limit as
+  a constraint: 18 rad/s with 1.5 of slack;
+- the legs' own damping: with 20 Nm/rad and 0.6 Nm s/rad a target 0.8 rad
+  from the stand pose (the jump lineage's `scale_rad`) leaves no torque at
+  16 rad/s. With 1.2 rad (as `fun_stride`; `train.rescale_actions` keeps the
+  resumed policy's joint targets) the drives stay at 9 Nm up to 17 rad/s;
+- the request: `joy_teleop` always asks for 5 cm. `commands.jump.target_m`
+  pays every request up to that clearance whatever height it names, and the
+  observation keeps the lineage's scale (`height_m` to 0.08), so nothing
+  changes on the robot's side;
+- the reward: at 40 per second of relative clearance a higher hop was not
+  worth its risk (run a). 300, and 20 on the upward speed up to 2.5 m/s.
+
+| run | what | hop, lower wheel |
+|---|---|---|
+| a | from `fun_show`: `target_m` 0.25, window 1.0 s, requests as close as 0.3 s after a window | 6.0–7.2 cm, as before |
+| b | from a: reward 300 and 20, `leg_speed` 17 rad/s | 7.6–9.8 cm; legs at 16.2 rad/s, the damping's bound |
+| c | from b: leg actions to 1.2 rad, `leg_speed` 18 | 11.2–13.5 cm: kept |
+| d | from c, 800 iterations at 1e-4 with less noise | 13.9–15.8 cm, but 9 falls in 18 runs and the legs at 28 rad/s. Not kept |
+
+### Results (run c, `policies/fun_hop_high`)
+
+`scripts/hop_runs.py`: a hop standing, another, one at 0.3 m/s, three in a
+row with a press every 1.4 s; MJCF and fitted plant, nominal, slow SPI and
+MIT timing, three seeds. The request is `joy_teleop`'s 5 cm.
+
+| | |
+|---|---|
+| falls | 0 of 18; push, default and hardware scenarios 18 of 18; `show_runs.py` 0 of 18 |
+| hops | 108 of 108; the lower wheel 11.2–13.5 cm up (median 12.4): 12.4–13.5 on the MJCF, 11.2–12.1 on the fitted plant. In a spin at 3 rad/s 9–12.5 cm |
+| flight | 0.22–0.26 s in the air: about 7 cm of it is the rise, the rest the legs tucked |
+| landing | the axles come down at 1.2–1.8 m/s; no second lift-off (5 mm at most) |
+| contact | only the tyres on the floor; knees at least 7.6 cm above it |
+| drives | legs 9.0 Nm (the envelope's peak) at up to 17.4 rad/s; wheels to 24 rad/s in the air (unloaded; the drives would hold them at 19.5), 12 outside the hops |
+| in a row | three hops 1.4 s apart, each as high as a single one; the oscillation watchdog's band is over its limit for 0.93 s at most: `oscillation_hold_s` 1.5 |
+| commands | roll 0.25 rad for 0.3 asked; the height is followed 1–2.5 cm low (0.078 m for 0.09, 0.164 for 0.19): worse than `fun_show` (0.10–0.18) |
+| gate | whole loop 0.17 at 21 Hz, no crossing; yaw table 0.15 |
+
+Deployed as `rl_fun_hop_high` in the panel's list (not on the gamepad
+switch), with a "Hops" routine on the Drive page (four hops, 1.5 s apart).
+Videos: `fun_hop_high.mp4` and `fun_hop_high_slow.mp4` (the first two hops at
+a quarter of the speed), from the side.
+
+**For the robot** (not run there):
+
+- 12 cm is the simulation's figure. The real legs' speed under load, the
+  supply's sag at four drives on their peak and the tyres' spring decide
+  the real one; the drives' speed limit is modelled as a constraint the
+  policy learnt to respect, not as physics;
+- the landing is 1.2–1.8 m/s on the tyres and the leg drives at their peak
+  torque: a harder hit on the gears than anything run so far. First with
+  the robot held and caught, on a soft floor;
+- one press, one hop; holding the button does not repeat it. Presses less
+  than about 1.3 s apart are ignored until the window (1 s) has run out;
+- flat floors and low edges only, as `fun_show`.

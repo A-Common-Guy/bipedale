@@ -176,3 +176,15 @@ routines:
       - {t: 6.5, rx: 0.5}
       - {t: 6.8}
       - {t: 7.4}
+
+  hops:
+    label: Hops
+    note: Four hops on the spot, a press every 1.5 s. Meant for rl_fun_hop_high (11-13 cm in simulation); any policy with a hop input does its own. Clear, flat floor, 0.5 m all round.
+    keys:
+      - {t: 0}
+      - {t: 7.0}
+    buttons:
+      - {t: 0.8, for: 0.3, button: cross}
+      - {t: 2.3, for: 0.3, button: cross}
+      - {t: 3.8, for: 0.3, button: cross}
+      - {t: 5.3, for: 0.3, button: cross}

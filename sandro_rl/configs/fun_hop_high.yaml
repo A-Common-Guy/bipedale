@@ -1,0 +1,48 @@
+# For a demo: the highest hop the drives give, on the hop input (L1 + cross).
+# fun_show with every request paid up to target_m of wheel clearance,
+# whatever height it names: joy_teleop always asks for 5 cm, and the
+# observation keeps the jump lineage's scale, so nothing changes on the
+# robot's side. The window is 1 s (0.8): a crouch, the push and 0.4 s in the
+# air. Requests come as close as 0.3 s after a window, so hops in a row
+# (one press each) are trained. Spins, sway and bob are fun_show's at
+# calmer limits. Flat floors and low edges only.
+#
+#     uv run python -m sandro_rl.train configs/fun_hop_high.yaml --resume policies/fun_show
+#     MUJOCO_GL=egl uv run python scripts/hop_runs.py policies/fun_hop_high
+inherit: fun_show.yaml
+
+env:
+  action:
+    # (0.8) With the legs' damping (0.6 Nm s/rad at 20 Nm/rad) a target 0.8 rad from the
+    # stand pose is no torque left at 16 rad/s: the push ended there, at 9 cm.
+    legs: {scale_rad: 1.2}
+
+  commands:
+    yaw_rad_s: 3.0
+    roll_rad: 0.3
+    roll_rate_rad_s: 1.0
+    jump:
+      interval_s: [0.3, 5.0]
+      window_s: 1.0
+      landing_s: 0.4
+      target_m: 0.25
+      vz_clip_m_s: 2.5
+
+  rewards:
+    weights:
+      jump_clearance: 300.0       # (40) at 40 the hop stayed at fun_show's 6-7 cm
+      jump_vz: 20.0
+
+  constraints:
+    # The drives limit their speed to 19.5 rad/s (186 rpm), which the simulation does not:
+    # at 9 Nm the legs could throw the robot far higher than the real ones can turn.
+    leg_speed: {limit_rad_s: 18.0, slack: 1.5}
+
+train:
+  iterations: 1500
+  resume_log_std: -1.4
+
+# The hop and its landing swing the legs through the oscillation watchdog's band.
+deploy:
+  safety:
+    oscillation_hold_s: 1.5

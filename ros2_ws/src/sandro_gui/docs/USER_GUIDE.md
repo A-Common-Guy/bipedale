@@ -119,6 +119,7 @@ policy with 0.5 m/s and 1.5 rad/s):
 | Show | 29 s | Bows, a turn, a hop, 0.3 m forward with a hop and back, a sway, the turn back, two hops. | 1 m ahead, 0.5 m all round. |
 | Stride | 16 s | For `rl_fun_stride`, whose roll stick is the legs' fore-aft split: three strides on the spot, three driving 1.1 m forward (`rl_fun_stride` drives at up to 1 m/s), three driving back. Any other policy sways. | 1.5 m ahead. |
 | Bow | 7 s | For `rl_fun_bow`, whose roll stick is the body's lean: a slow deep bow forward, held 1.5 s, back upright, two quick nods. Any other policy rolls to the right. | On the spot; 0.5 m clear in front. |
+| Hops | 7 s | Four hops on the spot, one every 1.5 s. Meant for `rl_fun_hop_high` (11–13 cm in simulation); any policy with a hop input does its own. | Clear, flat floor, 0.5 m all round. |
 
 - A routine is the sticks and the hop, nothing more: it works with any
   policy, and a policy without roll, height or hop skips those parts. The
