@@ -2828,3 +2828,81 @@ Videos: `fun_stride.mp4` from the side, `fun_stride_front.mp4`.
   policies stand: the split needs the room;
 - switching to another policy needs the stick centred (the handover check
   reads the split as a roll and wants it under 0.02).
+
+## 20. A bow on the roll stick: `configs/fun_bow.yaml` (2026-11-20)
+
+For a demo: the fourth command, the roll, is the body's pitch
+(`commands.lean`). Stick right bows the torso forward, stick left leans it
+back, the centre stands it upright; sweeping the stick nods. The lean is held
+while balancing, so the legs carry the axles under the centre of mass: at the
+stand pose that is 3.6 cm under the leg pivots (wheels left out, they are at
+the axle), 8–11 cm above the axle at the heights commanded here, and an axle
+7–9 cm ahead of its neutral balances 0.6 rad. The roll stays level; the mirror
+keeps the command's sign (a bow is a bow in the mirror, a roll or a split
+changes side).
+
+**Nothing changes in `RlPolicyController`.** The channel is still shaped as a
+roll, and the controller clips a roll to what the leg heights allow,
+atan(2 room / track): 0.257 rad at least with the height command inside
+0.11–0.15 m and the leg limits 0.07–0.195 m. So `commands.roll_rad` is 0.25,
+never clipped, and `lean.gain` (2.4) makes 0.6 rad of pitch of it;
+`roll_rate_rad_s` 0.5 is 1.2 rad/s of lean. What the legs can balance at a
+height clips the lean that is paid for (`feasible_lean`: 0.55 rad at 0.15 m,
+the whole 0.6 below 0.14 m), not the command. The pitch terms are about the
+lean asked for (`pitch`, the new `track_pitch`), and the tilt constraint
+counts the tilt beyond it; the fall is at 1.0 rad as on the robot.
+`tests/test_bow.py`.
+
+From `fun_stride` (leg actions of 1.2 rad about the stand pose, v6's loop
+margin and drive train), on planks to 1.5 cm and hills to 5 cm with the pushes
+of v6's last stage. Four runs:
+
+| run | what changed | `scripts/bow_runs.py`, 18 runs |
+|---|---|---|
+| a | 1200 iterations, `pitch` −15, `track_pitch` 3 (σ 0.08) | leans held (0.57 and −0.62 rad); 3 falls, all on the MJCF with the slow SPI IMU (180 Hz, 15 ms): fore-aft rocking at about 1 Hz from the moment it engages |
+| b | 800 more at half the step, less noise | no fall; still rocks there, ±0.5 m/s standing, wheels to 24 rad/s |
+| c | from b, the IMU randomised to 120 Hz and 22 ms | worse: ±0.8 m/s, 1 fall. Not kept |
+| d | from b, `pitch` −10, `track_pitch` 1.5 (σ 0.12), `action_rate` −0.04, `track_forward` 3 | kept: below |
+
+The rocking was the pitch tracked too sharply for a late IMU on the light
+stock drive train; on the fitted plant (heavy rotor, soft gear) none of the
+runs rocked.
+
+### Results (run d, `policies/fun_bow`)
+
+MJCF and fitted plant, nominal, slow SPI and MIT timing, three seeds; the
+height at 0.13 m.
+
+| | |
+|---|---|
+| falls | 0 of 18; push, default and hardware scenarios 18 of 18 |
+| lean held | 0.55–0.56 rad for 0.6 asked forward, −0.60 back; ±0.28–0.30 for 0.3; upright within 0.01 |
+| nod | ±0.36 rad at 0.5 Hz and ±0.21 at 1 Hz, 0.97–1.12 of the reference; the stick thrown end to end every 0.6 s: ±0.34 rad |
+| position | the axle creeps at 0.02 m/s holding a lean (0.09 at most) and wanders 4 cm in 6 s of nodding (14 at most); upright again it stands within 0.06 m/s |
+| driving | in a full bow at 0.4 m/s: 0.55 rad, 0.34 m/s; leaning back: −0.60 rad, 0.31 m/s; turning at 1 rad/s in a bow: 1.13 rad/s (0.63 at least) |
+| body | roll within 0.01 rad; yaw rate up to 0.05 rad/s in standing leans (0.35 at most); tilt up to 0.63 rad |
+| contact | only the tyres on the floor; knees 11 cm above it; no leg against the torso or the other leg (`evaluate.LinkShadow`) |
+| drives | legs up to 4.9 Nm; wheels below 10 rad/s on the fitted plant and on the MJCF with nominal and MIT timing; 18–24 rad/s on the MJCF with the slow SPI IMU, when the lean changes from forward to back while driving (limit 19.5) |
+| MJCF, slow SPI | what is left of the rocking: standing speed RMS 0.06 m/s against 0.04–0.05 elsewhere, peaks of 0.3–0.4 m/s when a lean changes |
+| watchdog | the 5–15 Hz band reads up to 0.62 rad/s at the legs (limit 1.0), 1.14 at the wheels (5.0): the default hold |
+| gate | 0.30 (yaw table); whole loop 0.33 at 33 Hz |
+
+Not measured: the plank course (trained on planks to 1.5 cm only; `fun_stride`
+falls at 2 cm).
+
+Deployed as `rl_fun_bow` in the panel's list (not on the gamepad switch), with
+a "Bow" routine on the Drive page. Video: `fun_bow.mp4`, from the side.
+
+**For the robot** (not run there):
+
+- first with the robot held, on a flat floor, and with small stick
+  deflections: at full stick the torso is 0.6 rad (34°) from upright and the
+  axles 7–9 cm from neutral; the fall cut-off is at 1.0 rad;
+- stick right is forward. The controller's diagnostics show the channel as a
+  roll: 0.25 "rad" of roll reference is the full 0.6 rad bow;
+- on engaging the height reference is 0.15 m, where the full lean is 0.55 rad;
+- the height stick works within 0.11–0.15 m only;
+- the IMU mounting offset matters more here than elsewhere: a lean is held
+  against the pitch the policy reads;
+- switching to another policy needs the stick centred (the handover check
+  wants the roll reference under 0.02).

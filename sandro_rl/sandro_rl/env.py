@@ -205,6 +205,17 @@ class SandroEnv:
         self.has_split = bool(self.split)
         if self.has_split and not self.has_roll:
             raise ValueError("commands.split needs commands.roll_rad, the largest split in m")
+        # Optional: the roll channel commands the body's pitch instead (commands.lean;
+        # roll_rad is then the largest lean in rad, forward positive, and roll_rate_rad_s its
+        # rate, both times lean.gain: the controller clips a roll to what the leg heights
+        # allow, so the channel stays inside that and the gain makes the lean of it).
+        # The legs carry the axles under the centre of mass; the roll stays level.
+        # Part of the commands are sinusoids: a nod.
+        self.lean = c.get("lean") or {}
+        self.has_lean = bool(self.lean)
+        if self.has_lean and (self.has_split or not self.has_roll):
+            raise ValueError("commands.lean needs commands.roll_rad, the largest lean in rad, and no commands.split")
+        self.wave = self.split or self.lean
         # Optional jump events: every interval_s a jump of a sampled wheel
         # clearance is requested; the policy sees its target and a countdown.
         self.jump = c.get("jump") or {}
@@ -291,7 +302,8 @@ class SandroEnv:
             "leg_vel": (leg_perm, np.ones(4)),
             "wheel_vel": (wheel_perm, np.ones(2)),
             "last_action": (perm6, np.ones(6)),
-            "command": (np.arange(size), np.array([1, -1, 1, -1])[:size]),
+            # The fourth is a roll or a split, which the mirror reverses, or a lean, which it keeps.
+            "command": (np.arange(size), np.array([1, -1, 1, 1 if self.has_lean else -1])[:size]),
             "true_gravity": (np.arange(3), np.array([1, -1, 1])),
             "true_gyro": (np.arange(3), np.array([-1, 1, -1])),
             "base_velocity": (np.arange(3), np.array([1, -1, 1])),
@@ -542,12 +554,23 @@ class SandroEnv:
         limit = 2.0 * jp.maximum(jp.sqrt(jp.maximum(radius ** 2 - height ** 2, 0.0)) - 0.5 * g["base_m"], 0.0)
         return jp.clip(split, -limit, limit)
 
+    def feasible_lean(self, lean, height):
+        """Clip a lean to what the legs can balance at this height: the axles under the centre
+        of mass, which sits lean.com_below_pivots_m under the leg pivots, each leg at most
+        lean.stretch of its length from its farther pivot."""
+        g = self.geometry["right"]
+        radius = float(self.lean.get("stretch", 0.9)) * (g["upper_m"] + g["lower_m"])
+        reach = jp.maximum(jp.sqrt(jp.maximum(radius ** 2 - height ** 2, 0.0)) - 0.5 * g["base_m"], 0.0)
+        limit = jp.arctan(reach / jp.maximum(height - float(self.lean.get("com_below_pivots_m", 0.0)), 0.02))
+        return jp.clip(lean, -limit, limit)
+
     def _sample_split_wave(self, rng):
-        """(amplitude m, rad/s, phase) of a stride; amplitude 0 leaves the sampled command."""
+        """(amplitude, rad/s, phase) of a stride or a nod; amplitude 0 leaves the sampled command."""
         k = jax.random.split(rng, 4)
-        lo, hi = self.split["wave_hz"]
-        amplitude = jax.random.uniform(k[0], minval=self.split.get("wave_min_m", 0.03), maxval=self.roll_max)
-        amplitude = jp.where(jax.random.uniform(k[1]) < self.split["wave_probability"], amplitude, 0.0)
+        lo, hi = self.wave["wave_hz"]
+        least = self.wave.get("wave_min_m", self.wave.get("wave_min_rad", 0.03))
+        amplitude = jax.random.uniform(k[0], minval=least, maxval=self.wave.get("wave_max", self.roll_max))
+        amplitude = jp.where(jax.random.uniform(k[1]) < self.wave["wave_probability"], amplitude, 0.0)
         return jp.array([amplitude, 2.0 * math.pi * jax.random.uniform(k[2], minval=lo, maxval=hi),
                          jax.random.uniform(k[3], minval=0.0, maxval=2.0 * math.pi)])
 
@@ -981,7 +1004,7 @@ class SandroEnv:
                     * self.envelope.rated_nm ** 2,
             "obs_history": jp.zeros((self.history_frames, self.actor_layout.size)),
         }
-        if self.has_split:
+        if self.wave:
             info["split_wave"] = self._sample_split_wave(jax.random.fold_in(k[9], 5))
         if self.has_jump:
             jump_wait, jump_height = self._sample_jump(jax.random.fold_in(k[9], 1))
@@ -1165,7 +1188,7 @@ class SandroEnv:
         resample = info["command_timer"] <= 0.0
         info["command"] = jp.where(resample, new_command, info["command"])
         info["command_timer"] = jp.where(resample, new_duration, info["command_timer"])
-        if self.has_split:
+        if self.wave:
             wave = jp.where(resample, self._sample_split_wave(jax.random.fold_in(k_cmd, 31)), info["split_wave"])
             wave = wave.at[2].add(wave[1] * self.dt)
             info["split_wave"] = wave
@@ -1275,6 +1298,8 @@ class SandroEnv:
             "cat_delta": cat_delta, "tilt": truth["tilt"],
             "err_roll": (jp.abs(truth["offsets"][0] - truth["offsets"][1]
                                 - self.feasible_split(info["command_ref"][3], h_ref)) if self.has_split
+                         else jp.abs(truth["pitch"] - self._lean_target(info))
+                         if self.has_lean
                          else jp.abs(truth["roll"] - info["command_ref"][3]) if self.has_roll else jp.float32(0.0)),
         })
         if self.has_goal:
@@ -1309,6 +1334,13 @@ class SandroEnv:
             return jp.float32(0.0)
         return (info["jump_timer"] > -self.jump.get("landing_s", 0.3)).astype(jp.float32)
 
+    def _lean_target(self, info):
+        """The pitch asked for by a lean command (0 without one)."""
+        if not self.has_lean:
+            return jp.float32(0.0)
+        ref = info["command_ref"]
+        return self.feasible_lean(float(self.lean.get("gain", 1.0)) * ref[3], ref[2])
+
     def _constraints(self, truth, taus, info):
         c = self.cfg["constraints"]
         legs = self.leg_idx
@@ -1325,7 +1357,8 @@ class SandroEnv:
             / c["joint_range"]["slack"],
             jp.max(jp.maximum(self.leg_h_lo - c["height"]["margin_m"] - truth["heights"],
                               truth["heights"] - (self.leg_h_hi + c["height"]["margin_m"]))) / c["height"]["slack"],
-            (truth["tilt"] - c["tilt"]["limit_rad"]) / c["tilt"]["slack"],
+            (truth["tilt"] - self._lean_target(info) * jp.sign(truth["pitch"]) - c["tilt"]["limit_rad"])
+            / c["tilt"]["slack"],
         ]
         if c.get("leg_split"):
             # Legs split fore and aft make the robot statically stable in
@@ -1376,7 +1409,8 @@ class SandroEnv:
                 else jp.arctan(ref[0] * ref[1] / g))
         # Commanded roll plus the coordinated-turn lean (roll is positive with
         # the left side up, so a left turn leans to -lean).
-        roll_target = (ref[3] if self.has_roll and not self.has_split else 0.0) - lean
+        roll_target = (ref[3] if self.has_roll and not self.has_split and not self.has_lean else 0.0) - lean
+        pitch_target = self._lean_target(info)
         # The split asked for: the command's (right axle ahead is positive) or the config's.
         split_target = self.feasible_split(ref[3], ref[2]) if self.has_split else r.get("split_m", 0.0)
         legs, wheels = self.leg_idx, self.wheel_idx
@@ -1390,7 +1424,8 @@ class SandroEnv:
             "track_height": jp.exp(-((jp.mean(truth["heights"]) - ref[2]) / sig["height"]) ** 2),
             "roll": (truth["roll"] - roll_target) ** 2,
             "track_roll": jp.exp(-((truth["roll"] - roll_target) / sig.get("roll", 0.05)) ** 2),
-            "pitch": truth["pitch"] ** 2,
+            "pitch": (truth["pitch"] - pitch_target) ** 2,
+            "track_pitch": jp.exp(-((truth["pitch"] - pitch_target) / sig.get("lean", 0.08)) ** 2),
             "pitch_rate": truth["pitch_rate"] ** 2,
             "vertical_velocity": truth["vertical_speed"] ** 2,
             "leg_symmetry": (truth["offsets"][0] - truth["offsets"][1] - split_target) ** 2,

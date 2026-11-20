@@ -162,6 +162,14 @@ rl_fun_stride:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# For a demo (2026-11-20, sandro_rl/docs/DESIGN.md section 20): the right
+# stick's left-right axis is the body's lean, forward with the stick to the
+# right: commands.roll_rad 0.25 is 0.6 rad of pitch (the policy was trained
+# with 2.4 rad of lean per unit of the channel). Not run on the robot.
+rl_fun_bow:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 
 # The terrain profile (sandro_perception) takes the same physical IMU mounting
 # as the controllers above.

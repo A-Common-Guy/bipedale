@@ -721,7 +721,7 @@ def test_a_routine_blends_between_its_keys_and_ends():
 def test_the_shipped_routines_end_where_they_started():
     from sandro_gui import routines
     shipped = shipped_routines()
-    assert list(shipped) == ["greeting", "spin", "sway", "eight", "show", "stride"]
+    assert list(shipped) == ["greeting", "spin", "sway", "eight", "show", "stride", "bow"]
     step = 0.001
     for routine in shipped.values():
         assert routine.note and 5.0 < routine.duration <= 30.0
@@ -742,7 +742,9 @@ def test_the_shipped_routines_end_where_they_started():
                 assert state["ry"] == 0.0 and state["rx"] == 0.0
         assert pressed <= {"cross", "r3"}
         assert total["ry"] == pytest.approx(0.0, abs=1e-6), routine.name   # the height is back
-        assert total["rx"] == pytest.approx(0.0, abs=1e-6)
+        if routine.name != "bow":                                           # a bow is forward only
+            assert total["rx"] == pytest.approx(0.0, abs=1e-6)
+        assert abs(routine.sample(routine.duration - step)["rx"]) < 0.01
         assert total["lx"] == pytest.approx(0.0, abs=1e-6)                 # facing where it started
         if routine.name != "eight":
             assert total["ly"] == pytest.approx(0.0, abs=1e-6)             # and standing there

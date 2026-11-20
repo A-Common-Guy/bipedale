@@ -1,0 +1,90 @@
+# For a demo: the right stick's left-right axis leans the body. The roll
+# channel of the command is the body's pitch (commands.lean): stick right
+# bows the torso forward, stick left leans it back, the centre stands it
+# upright; sweeping it nods. The legs carry the axles under the centre of
+# mass (3.6 cm under the leg pivots at the stand pose), so the lean is held
+# while balancing, driving slowly and turning. The roll stays level.
+#
+# For RlPolicyController the channel is still a roll. The controller clips a
+# roll to what the leg heights allow (atan(2 room / track): 0.257 rad or more
+# with the height command inside 0.11-0.15 m and the leg limits 0.07-0.195 m),
+# so roll_rad is 0.25 and never clipped, and lean.gain turns it into 0.6 rad
+# of pitch; roll_rate_rad_s 0.5 is 1.2 rad/s of lean. What the legs can
+# balance at a height (0.9 of their length: 0.55 rad at 0.15 m, the whole
+# 0.6 below 0.14 m) clips the lean that is paid for, not the command.
+#
+# From fun_stride: its leg actions (1.2 rad about the stand pose) already
+# carry each axle 7 cm fore and aft, v6's loop margin and drive train.
+#
+# policies/fun_bow is three runs (runs/fun_bow_a, _b, _d):
+#
+#     uv run python -m sandro_rl.train configs/fun_bow.yaml --resume policies/fun_stride --out runs/a \
+#         --set env.rewards.weights.pitch=-15.0 --set env.rewards.weights.track_pitch=3.0 \
+#         --set env.rewards.sigma.lean=0.08 --set env.rewards.weights.action_rate=-0.02 \
+#         --set env.rewards.weights.track_forward=2.0
+#     ... the same --set, --resume runs/a --out runs/b --set train.iterations=800 \
+#         --set train.learning_rate=1.0e-4 --set train.resume_log_std=-2.6
+#     uv run python -m sandro_rl.train configs/fun_bow.yaml --resume runs/b --out policies/fun_bow \
+#         --set train.iterations=700 --set train.learning_rate=1.0e-4 --set train.resume_log_std=-2.6
+#     MUJOCO_GL=egl uv run python scripts/bow_runs.py policies/fun_bow
+#
+# The first run held the leans and fell in 3 runs of 18, all on the MJCF with
+# the slow SPI IMU (180 Hz, 15 ms): it rocked fore and aft at about 1 Hz from
+# the moment it engaged. The second no longer fell and still rocked there
+# (+-0.5 m/s, wheels to 24 rad/s). The weights below are the third's: the
+# pitch paid for less sharply, the actions smoother, the speed worth more.
+# The rocking is gone standing (docs/DESIGN.md 20). Training on a slower IMU
+# instead (to 120 Hz and 22 ms) made it worse.
+inherit: fun_stride.yaml
+
+env:
+  commands:
+    forward_m_s: 0.6
+    yaw_rad_s: 2.0
+    height_m: [0.11, 0.15]
+    roll_rad: 0.25                # the channel's range; times lean.gain the largest lean
+    roll_rate_rad_s: 0.5          # 1.2 rad/s of lean: a 1 Hz nod of +-0.19 rad keeps its shape
+    roll_zero_probability: 0.3
+    split: null
+    lean:
+      gain: 2.4                   # rad of pitch per unit of the channel: 0.6 rad at full stick
+      stretch: 0.9
+      com_below_pivots_m: 0.036
+      wave_probability: 0.4       # of the commands, a sinusoid about zero: a nod
+      wave_hz: [0.3, 1.2]
+      wave_min_rad: 0.03          # in the channel's units
+
+  terrain:
+    planks: {height_m: [0.003, 0.015]}
+    hills: {height_m: [0.01, 0.05]}
+
+  rewards:
+    sigma: {lean: 0.12}
+    weights:
+      pitch: -10.0                # about the lean asked for
+      track_pitch: 1.5
+      track_forward: 3.0
+      action_rate: -0.04
+      leg_symmetry: -400.0        # the legs together
+      track_split: 0.0
+      split_centre: 0.0           # the axles leave their neutral: that is the lean
+      roll: -20.0
+      yaw_error: -0.2
+
+  termination:
+    tilt_rad: 1.0                 # RlPolicyController's fall_angle_rad
+
+train:
+  num_envs: 6144
+  curriculum_offset: 0
+  iterations: 1200
+  learning_rate: 2.0e-4
+  desired_kl: 0.01
+  resume_log_std: -2.3
+
+# One stage: the low obstacles above with v6's last stage of pushes.
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.commands.sample_fraction: 1.0

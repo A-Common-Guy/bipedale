@@ -160,3 +160,19 @@ routines:
       - {t: 14.6, ly: -0.5, rx: -0.75}
       - {t: 15}
       - {t: 15.5}
+
+  bow:
+    label: Bow
+    note: For rl_fun_bow, where the right stick's left-right axis is the body's lean. A slow deep bow forward (0.6 rad), held 1.5 s, back upright, then two quick nods. On the spot; keep 0.5 m clear in front of the robot. Any other policy rolls to the right instead.
+    keys:
+      - {t: 0}
+      - {t: 0.6}
+      - {t: 2.1, rx: 1.0}
+      - {t: 3.6, rx: 1.0}
+      - {t: 4.8}
+      - {t: 5.6}
+      - {t: 5.9, rx: 0.5}
+      - {t: 6.2}
+      - {t: 6.5, rx: 0.5}
+      - {t: 6.8}
+      - {t: 7.4}
