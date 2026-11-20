@@ -90,6 +90,33 @@ panel arms the policy's handover first, as L1 + Triangle does: an upright
 robot is taken over at once, otherwise the policy starts its stand phase.
 L1 + Triangle is still the soft way, since it settles the robot first.
 
+## Driving from a phone
+
+Without the gamepad, for example outside with the robot on the phone's
+hotspot: open the panel on the phone (`http://<robot>:8080`) and go to
+**Drive**. Start the stack, arm and start a controller as always (Run page);
+the stack must run with teleop (the default).
+
+| On the page | What it does |
+|---|---|
+| Left stick | Forward and back, turn. Touching a stick is holding L1: the robot drives only while a finger is down. |
+| Right stick | Body height up and down, roll left and right. |
+| Hop | One hop (policies with a hop input). |
+| Next policy (hold) | Switches to the next policy of the gamepad's list. Keep holding until it is done; letting go aborts it. |
+| Height reset (hold) | Height back to the running policy's initial height. |
+| Speed | Scales the left stick, as a fraction of the running controller's limits. Start low. |
+
+- The robot stops when the finger lifts. If the phone loses the robot, the
+  screen locks or the browser goes to the background, it stops by itself
+  within about half a second and the page says "link lost".
+- Hold the phone in landscape for larger sticks. Keep the screen on.
+- A connected gamepad has priority: the page is refused while one is
+  connected. Only one browser drives at a time.
+- E-STOP is the red button at the top of every page. Re-arm from the Run
+  page; the page has no E-stop chord and cannot re-arm.
+- The number next to the status is the round trip of a command to the robot
+  in milliseconds. Above 150 ms, slow down.
+
 ## E-stop and re-arm
 
 The header E-STOP sends the CAN E-stop from the panel's own CAN socket first,

@@ -20,6 +20,7 @@ from pathlib import Path
 
 import yaml
 
+from . import gamepad
 from .errors import Busy
 from .launcher import LaunchSettings, build_command
 from .logbook import INFO, WARN, Logbook
@@ -237,6 +238,21 @@ class DemoRos:
         self.params["/joy_teleop"] = {"speed_fraction": 1.0, "deadman_button": 9,
                                       "handover_height_m": 0.17}
         self.baseline = {node: dict(values) for node, values in self.params.items()}
+        self._joy: tuple[float, dict] | None = None
+
+    def publish_joy(self, axes, buttons) -> None:
+        """The Drive page's sticks: kept, and shown as the /joy and /cmd_vel joy_teleop would make."""
+        self._joy = (time.monotonic(), gamepad.from_joy(axes, buttons))
+
+    def _teleop(self) -> tuple[dict | None, float | None, dict | None]:
+        if self._joy is None or time.monotonic() - self._joy[0] > 1.0:
+            return None, None, None
+        stamp, joy = self._joy
+        command = None
+        if joy["buttons"]["l1"]:
+            command = {"forward": 0.5 * joy["ly"], "yaw": -1.5 * joy["lx"],
+                       "height_rate": 0.05 * joy["ry"], "roll": 0.0}
+        return joy, time.monotonic() - stamp, command
 
     # Read side ----------------------------------------------------------
 
@@ -261,9 +277,10 @@ class DemoRos:
                  "/health_broadcaster/dynamic_joint_states": {"hz": 10.0, "age_s": 0.05, "count": 1},
                  "/joy": {"hz": 20.0, "age_s": 0.04, "count": 1},
                  "/cmd_vel": {"hz": 0.0, "age_s": None, "count": 0}}
+        joy, joy_age, command = self._teleop()
         return {"joints": joints, "joints_age_s": 0.003, "imu": self.robot.imu(),
                 "imu_age_s": 0.003, "imu_sensor_age_s": 0.002 + 0.004 * random.random(),
-                "joy": None, "joy_age_s": None, "rates": rates, "cmd_vel": None,
+                "joy": joy, "joy_age_s": joy_age, "rates": rates, "cmd_vel": command,
                 # The camera of the demo: a 3 cm plank coming closer to the right wheel,
                 # a 12 cm block ahead of both, the nearest points still unseen.
                 "terrain": self._terrain(time.time())}
@@ -481,6 +498,8 @@ class DemoCan:
 
 
 class DemoPad:
+    demo = True                # an animation, not a pad that could drive: the Drive page is not refused
+
     def __init__(self, robot: Robot) -> None:
         self.robot = robot
 

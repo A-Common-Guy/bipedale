@@ -601,3 +601,89 @@ def test_model_cache_depends_on_the_meshes():
     files = model.sources(DESCRIPTION / "mjcf" / "robot_full_floating.xml")
     assert files[0].name == "robot_full_floating.xml"
     assert any(f.suffix.lower() == ".stl" for f in files[1:])
+
+
+# The Drive page's sticks -------------------------------------------------
+
+
+def test_touch_sticks_read_back_as_the_same_gamepad_state():
+    from sandro_gui import touch
+    axes, buttons = touch.to_joy({"hold": True, "lx": 0.5, "ly": 1.0, "rx": -0.25, "ry": 0.4,
+                                  "buttons": ["cross", "square"]}, speed=0.5)
+    state = gamepad.from_joy(axes, buttons)
+    assert (state["lx"], state["ly"], state["rx"], state["ry"]) == (0.25, 0.5, -0.25, 0.4)
+    # Touching is the deadman; only the buttons a phone may press get through.
+    assert state["buttons"]["l1"] and state["buttons"]["cross"] and not state["buttons"]["square"]
+    # Never the E-stop chord, never the re-arm buttons.
+    assert state["l2"] == state["r2"] == 0.0
+    assert not state["buttons"]["create"] and not state["buttons"]["options"]
+    # Not held: a released pad whatever the sticks say.
+    axes, buttons = touch.to_joy({"hold": False, "ly": 1.0, "buttons": ["cross"]})
+    assert axes[:4] == [0.0] * 4 and not any(buttons)
+    # joy_teleop's own mapping reads it as its configured buttons and axes.
+    teleop = yaml.safe_load((BRINGUP / "config" / "teleop.yaml").read_text())["joy_teleop"]["ros__parameters"]
+    axes, buttons = touch.to_joy({"hold": True, "ly": 1.0, "lx": 1.0, "buttons": ["cross", "triangle", "r3"]})
+    assert buttons[teleop["deadman_button"]] and buttons[teleop["jump_button"]]
+    assert buttons[teleop["switch_button"]] and buttons[teleop["recentre_button"]]
+    assert axes[teleop["forward_axis"]] == 1.0 and axes[teleop["yaw_axis"]] == -1.0   # stick right turns right
+    assert all(axes[i] > teleop["estop_pressed_below"] for i in teleop["estop_axes"])
+
+
+def test_a_phone_that_goes_quiet_lets_go_of_the_robot():
+    from sandro_gui import touch
+    now, sent = [100.0], []
+    pad = touch.TouchPad({"timeout_s": 0.35, "release_s": 1.0}, lambda a, b: sent.append((list(a), list(b))),
+                         clock=lambda: now[0], thread=False)
+    pad.tick()
+    assert sent == []                                   # never touched: /joy is left alone
+    assert pad.update({"client": "a", "hold": True, "ly": 1.0}) == {"driving": True}
+    pad.tick()
+    assert sent[-1][0][1] == 1.0 and sent[-1][1][9] == 1 and pad.status()["driving"]
+    now[0] += 0.4                                       # the hotspot dropped
+    pad.tick()
+    assert sent[-1][0][1] == 0.0 and not any(sent[-1][1]) and not pad.status()["driving"]
+    count = len(sent)
+    now[0] += 1.2
+    pad.tick()
+    pad.tick()
+    assert len(sent) == count                           # and then silence
+
+
+def test_one_browser_drives_and_a_gamepad_has_priority():
+    from sandro_gui import touch
+    now, live = [0.0], [False]
+    pad = touch.TouchPad({}, lambda a, b: None, gamepad_live=lambda: live[0], clock=lambda: now[0],
+                         thread=False)
+    pad.update({"client": "a", "hold": True})
+    with pytest.raises(ValueError, match="another browser"):
+        pad.update({"client": "b", "hold": True})
+    pad.update({"client": "a", "hold": False})
+    pad.update({"client": "b", "hold": True})           # the first let go
+    now[0] += 1.0
+    live[0] = True
+    with pytest.raises(ValueError, match="gamepad"):
+        pad.update({"client": "b", "hold": True})
+    pad.update({"client": "b", "hold": False})          # letting go is never refused
+    with pytest.raises(ValueError):
+        pad.update({"hold": True})
+    # The speed cap is the panel's, whatever the page asks for.
+    capped = touch.TouchPad({"max_speed_fraction": 0.6}, lambda a, b: None, clock=lambda: now[0], thread=False)
+    capped.update({"client": "a", "hold": True, "speed": 1.0})
+    assert capped.state["speed"] == 0.6
+
+
+def test_the_demo_panel_drives_from_the_touch_page(tmp_path):
+    from sandro_gui import demo
+    from sandro_gui.panel import Panel
+    log = logbook.Logbook()
+    sources = demo.sources(log, settings(), BRINGUP / "config" / "controllers.yaml")
+    cfg = yaml.safe_load((ROOT / "config" / "gui.yaml").read_text())
+    # No model to build: the path does not exist, which the panel reports and survives.
+    panel = Panel(cfg, {"teleop": str(BRINGUP / "config" / "teleop.yaml"), "controllers": None,
+                        "mjcf": str(tmp_path / "none.xml"), "cache": str(tmp_path)}, sources, simulation=False)
+    assert panel.info()["touch"]["max_speed"] == 1.0
+    assert panel.act("touch", {"client": "phone", "hold": True, "ly": 1.0, "speed": 0.5}) == {"driving": True}
+    panel.touch.tick()
+    joy, _, command = sources["ros"]._teleop()
+    assert joy["buttons"]["l1"] and joy["ly"] == 0.5 and command["forward"] == 0.25
+    assert panel.fast()["touch"]["client"] == "phone"

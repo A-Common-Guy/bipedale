@@ -6,8 +6,10 @@ health broadcaster's DynamicJointState, the controllers' ~/diagnostics,
 /rosout. Write side: only the controller manager's own services (load,
 configure, switch, hardware lifecycle), parameter services and Trigger
 services (E-stop, clear errors, a policy's arm_handover); the same calls
-`ros2 control`, joy_teleop and joy_estop make. The panel never publishes
-commands. What the actions do with these calls is in control.py.
+`ros2 control`, joy_teleop and joy_estop make. The panel publishes one
+thing: the Drive page's on-screen sticks as /joy (touch.py), which joy_teleop
+turns into commands as it does a gamepad's. What the actions do with the
+service calls is in control.py.
 """
 
 from __future__ import annotations
@@ -193,6 +195,7 @@ class RosBridge:
         self.nodes: list[str] = []
         self._listing = self._listing_hw = 0.0
 
+        self._joy_pub = None
         self._subscribe()
         self.node.create_timer(0.5, self._update_rates, callback_group=self.group)
         self.node.create_timer(1.0, self._poll_manager, callback_group=self.group)
@@ -223,6 +226,17 @@ class RosBridge:
             self.sampler.destroy_node()
         self.node.destroy_node()
         rclpy.try_shutdown()
+
+    def publish_joy(self, axes: list[float], buttons: list[int]) -> None:
+        """The Drive page's sticks as a gamepad's message (touch.py), on the topic joy_node uses."""
+        if self._joy_pub is None:
+            self._joy_pub = self.node.create_publisher(Joy, "/joy", 10)
+        msg = Joy()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
+        msg.header.frame_id = "touch"
+        msg.axes = [float(a) for a in axes]
+        msg.buttons = [int(b) for b in buttons]
+        self._joy_pub.publish(msg)
 
     # Subscriptions ------------------------------------------------------
 

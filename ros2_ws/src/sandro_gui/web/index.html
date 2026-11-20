@@ -16,6 +16,7 @@
       <button data-page="run">Run</button>
       <button data-page="tune">Tune</button>
       <button data-page="imu">IMU</button>
+      <button data-page="drive">Drive</button>
       <button data-page="pad">Gamepad</button>
       <button data-page="guide">Guide</button>
       <button data-page="sysid">Sysid</button>
@@ -133,6 +134,20 @@
       <div id="chart-attitude" class="panel chart"></div>
       <div id="chart-gyro" class="panel chart"></div>
       <div id="chart-accel" class="panel chart"></div>
+    </section>
+
+    <section id="page-drive" class="page" hidden>
+      <div class="panel drive">
+        <div id="drive-status" class="status-line"></div>
+        <div class="drive-sticks">
+          <div id="stick-left" class="stick-zone"><div class="stick-knob"></div><span class="stick-label">drive · turn</span></div>
+          <div id="stick-right" class="stick-zone"><div class="stick-knob"></div><span class="stick-label">height · roll</span></div>
+        </div>
+        <div id="drive-buttons" class="drive-buttons"></div>
+        <label class="drive-speed">Speed <input id="drive-speed" type="range" min="10" max="100" step="5" value="50"><span id="drive-speed-value" class="mono"></span></label>
+        <div id="drive-command" class="small"></div>
+        <p class="hint">The robot drives only while a finger is on a stick: touching one is the gamepad's L1. It stops when you let go, and by itself within half a second if the phone loses the robot, the screen locks or this page goes to the background. Speed scales the left stick, as a fraction of the running controller's limits. A connected gamepad has priority over this page. E-STOP is at the top of every page.</p>
+      </div>
     </section>
 
     <section id="page-pad" class="page" hidden>

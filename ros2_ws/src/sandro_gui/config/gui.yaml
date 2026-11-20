@@ -51,6 +51,15 @@ robot:
                 rl_stand_up, rl_stand_up_v2, rl_fun_split, rl_fun_fast, rl_fun_one_leg, rl_fun_one_leg_long, lqr_balancer, driving_balancer,
                 rl_flat_level_sysid, rl_flat_level_fast_sysid]
 
+# The Drive page: on-screen sticks, for a phone. The panel publishes them as
+# /joy while the browser keeps posting, so joy_teleop treats them as the
+# gamepad (sandro_gui/touch.py). A connected gamepad has priority.
+touch:
+  timeout_s: 0.35          # a post older than this ends the driving (released pads follow)
+  release_s: 1.0           # how long released pads are published after it
+  max_speed_fraction: 1.0  # the page's speed slider tops out here (of the controller's limits)
+  rate_hz: 20.0            # as joy_node's autorepeat
+
 # Topics watched for rate and freshness. expect_hz is what a healthy running
 # stack delivers (the 300 Hz control loop publishes the sensors every cycle).
 # sampled: high-rate topics the panel's ticker drains 20 times a second

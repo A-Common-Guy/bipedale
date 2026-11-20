@@ -404,3 +404,27 @@ dialog label.check { margin-top: 10px; color: var(--muted); }
 .camera-table th, .camera-table td { padding: 3px 12px 3px 0; text-align: right; }
 .camera-table th:first-child { text-align: left; color: var(--muted); font-weight: normal; }
 .camera-values { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; }
+
+/* Drive: on-screen sticks for a phone */
+.drive { max-width: 760px; margin: 0 auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.drive-sticks { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+.stick-zone {
+  position: relative; aspect-ratio: 1; max-height: 46vh; width: 100%; margin: 0 auto; border-radius: 50%;
+  background: var(--well); border: 1px solid var(--line-2); touch-action: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.stick-zone.active { border-color: var(--ok); }
+.stick-knob {
+  width: 38%; aspect-ratio: 1; border-radius: 50%; background: var(--raised); border: 1px solid var(--line-2);
+  pointer-events: none; will-change: transform;
+}
+.stick-zone.active .stick-knob { background: #dde1e5; }
+.stick-label { position: absolute; bottom: 8%; font-size: 11px; color: var(--dim); pointer-events: none; }
+.drive-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.drive-buttons button { padding: 14px 6px; font-size: 14px; touch-action: none; min-width: 0; text-align: center; }
+.drive-buttons button.held { background: #dde1e5; color: #111316; }
+.drive-speed { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.drive-speed input { flex: 1; height: 28px; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .stick-zone { max-height: 58vh; max-width: 58vh; }
+}

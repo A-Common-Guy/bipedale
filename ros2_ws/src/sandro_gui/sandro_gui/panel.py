@@ -19,6 +19,7 @@ from .errors import Busy
 from .launcher import build_command
 from .logbook import ERROR, Logbook
 from .software import check as software_check
+from .touch import TouchPad
 
 OK, WARN, ERR, OFF = "ok", "warn", "error", "off"
 MANAGER = "ros2_control_node"
@@ -370,6 +371,10 @@ class Panel:
         self.catalog = controller_catalog(paths["controllers"]) if paths.get("controllers") else {}
         self.control = Control(self.ros, self.log, self.component, self.broadcasters,
                                self.teleop.get("policies", [])) if self.ros is not None else None
+        # The Drive page's sticks (a phone) as a gamepad on /joy, for joy_teleop.
+        self.touch = None
+        if self.ros is not None and hasattr(self.ros, "publish_joy"):
+            self.touch = TouchPad(cfg.get("touch", {}), self.ros.publish_joy, self._gamepad_live)
         self.session = _new_session(None)
         self._waiting: list[str] = []
         self._action_lock = threading.Lock()
@@ -444,7 +449,13 @@ class Panel:
             "software": {"boot": self.software.boot, "panel": self.software.panel}
             if self.software else None,
             "sysid": self.sysid is not None,
+            "touch": {"max_speed": self.touch.max_speed, "timeout_s": self.touch.timeout_s}
+            if self.touch else None,
         }
+
+    def _gamepad_live(self) -> bool:
+        """A real pad is connected (its joystick node is open): it drives, not a phone."""
+        return bool(self.pad.snapshot().get("device")) and not getattr(self.pad, "demo", False)
 
     def sample(self) -> None:
         if self.ros is not None and hasattr(self.ros, "sample"):
@@ -468,7 +479,8 @@ class Panel:
                         and node["encoder_age_s"] < 0.5:
                     can_joints[node["joint"]] = {"position": node["position"],
                                                  "velocity": node["velocity"]}
-        return {"t": time.time(), "ros": ros, "pad": pad_state, "can_joints": can_joints}
+        return {"t": time.time(), "ros": ros, "pad": pad_state, "can_joints": can_joints,
+                "touch": self.touch.status() if self.touch else None}
 
     def _ros_slow(self) -> dict | None:
         if self.ros is None:
@@ -645,6 +657,10 @@ class Panel:
         name = body.get("name", "")
         if action == "estop":
             return {"message": self.emergency_stop()}
+        if action == "touch":
+            if self.touch is None:
+                raise RuntimeError("driving from the panel needs ROS in this process")
+            return self.touch.update(body)
         if action == "launch/preview":
             return {"command": shlex.join(build_command(body, self.launcher.settings))}
         if action == "launch/start":
