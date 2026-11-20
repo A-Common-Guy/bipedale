@@ -17,6 +17,10 @@ What keeps it safe when the phone is not there any more:
 - a connected gamepad has priority: with one delivering input the phone is
   refused, and two sources never alternate on /joy.
 
+A routine (routines.py, config/routines.yaml) is the same thing with the
+sticks moved by the panel: the page posts which routine its finger holds, and
+the same rules stop it. It starts from zero on every new press.
+
 The E-stop is not here: the panel's own button (CAN frame and service) is on
 every page.
 """
@@ -67,9 +71,12 @@ def to_joy(state: dict | None, speed: float = 1.0) -> tuple[list[float], list[in
 
 class TouchPad:
     def __init__(self, cfg: dict, publish, gamepad_live=lambda: False, clock=time.monotonic,
-                 thread: bool = True) -> None:
+                 thread: bool = True, routines: dict | None = None) -> None:
         """publish(axes, buttons) sends one Joy; gamepad_live() is true while a real pad
-        delivers input. `thread` False leaves the 20 Hz loop to the caller (tick())."""
+        delivers input. `thread` False leaves the 20 Hz loop to the caller (tick()).
+        `routines` is routines.load()'s result: what the page may ask to be played."""
+        self.routines = routines or {}
+        self.started = 0.0                        # when the routine being played began
         self.timeout_s = float(cfg.get("timeout_s", 0.35))
         self.release_s = float(cfg.get("release_s", 1.0))
         self.max_speed = max(0.0, min(1.0, float(cfg.get("max_speed_fraction", 1.0))))
@@ -94,23 +101,43 @@ class TouchPad:
                  "rx": _unit(body.get("rx")), "ry": _unit(body.get("ry")),
                  "hold": bool(body.get("hold")),
                  "buttons": [b for b in body.get("buttons") or [] if b in BUTTONS],
-                 "speed": max(0.0, min(self.max_speed, float(body.get("speed", self.max_speed))))}
+                 "speed": max(0.0, min(self.max_speed, float(body.get("speed", self.max_speed)))),
+                 "routine": None, "play": None}
+        if state["hold"] and body.get("routine"):
+            if body["routine"] not in self.routines:
+                raise ValueError(f"no routine {body['routine']!r}")
+            state.update(routine=str(body["routine"]), play=body.get("play"))
         with self.lock:
             fresh = now - self.stamp < self.timeout_s
             if fresh and self.client != client and self.state and self.state["hold"]:
                 raise ValueError("another browser is driving")
             if state["hold"] and self.gamepad_live():
                 raise ValueError("a gamepad is connected and has priority: disconnect it to drive from here")
+            before = self.state if fresh and self.state and self.state["hold"] else None
+            if state["routine"] and (before is None or (before["routine"], before["play"])
+                                     != (state["routine"], state["play"])):
+                self.started = now                # a new press: from the beginning
             self.client, self.state, self.stamp = client, state, now
             if state["hold"]:
                 self.released_at = None
         return {"driving": state["hold"]}
+
+    def _playing(self, now: float) -> dict | None:
+        """The held routine's progress (lock held); None when no routine is held."""
+        state = self.state
+        if not (state and state["hold"] and state["routine"] and now - self.stamp < self.timeout_s):
+            return None
+        duration = self.routines[state["routine"]].duration
+        t = now - self.started
+        return {"name": state["routine"], "t": min(t, duration), "duration_s": duration,
+                "done": t >= duration}
 
     def status(self) -> dict:
         now = self.clock()
         with self.lock:
             fresh = now - self.stamp < self.timeout_s
             return {"driving": bool(fresh and self.state and self.state["hold"]),
+                    "routine": self._playing(now),
                     "client": self.client if fresh else None,
                     "age_s": now - self.stamp if self.state else None,
                     "max_speed": self.max_speed, "error": self.error}
@@ -120,7 +147,12 @@ class TouchPad:
         now = self.clock()
         with self.lock:
             holding = self.state is not None and self.state["hold"] and now - self.stamp < self.timeout_s
-            if holding:
+            if holding and self.state["routine"]:
+                # The panel moves the sticks; once the routine is over, a released pad
+                # for as long as the finger stays.
+                sticks = self.routines[self.state["routine"]].sample(now - self.started)
+                message = to_joy(sticks, self.state["speed"])
+            elif holding:
                 message = to_joy(self.state, self.state["speed"])
             elif self.state is not None:
                 if self.released_at is None:

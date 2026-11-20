@@ -687,3 +687,156 @@ def test_the_demo_panel_drives_from_the_touch_page(tmp_path):
     joy, _, command = sources["ros"]._teleop()
     assert joy["buttons"]["l1"] and joy["ly"] == 0.5 and command["forward"] == 0.25
     assert panel.fast()["touch"]["client"] == "phone"
+
+
+# The Drive page's routines -----------------------------------------------
+
+
+def shipped_routines():
+    from sandro_gui import routines
+    return routines.load(ROOT / "config" / "routines.yaml")
+
+
+def test_a_routine_blends_between_its_keys_and_ends():
+    from sandro_gui import routines
+    routine = routines.Routine("r", {"keys": [{"t": 0.0}, {"t": 1.0, "lx": 1.0, "ry": -0.5},
+                                              {"t": 2.0, "ly": 0.4, "hold": True}, {"t": 3.0}],
+                                     "buttons": [{"t": 0.5, "for": 0.2, "button": "cross"}]})
+    assert routine.duration == 3.0
+    half = routine.sample(0.5)
+    assert (half["lx"], half["ly"], half["rx"], half["ry"]) == (0.5, 0.0, 0.0, -0.25)
+    assert half["hold"] and half["buttons"] == ["cross"] and routine.sample(0.75)["buttons"] == []
+    assert routine.sample(1.5)["lx"] == 0.5 and routine.sample(1.5)["ly"] == pytest.approx(0.2)
+    assert routine.sample(2.9)["ly"] == 0.4             # held, not blended
+    assert routine.sample(3.0) is None and routine.sample(-0.1) is None
+    with pytest.raises(ValueError, match="may press"):
+        routines.Routine("r", {"keys": [{"t": 0.0}, {"t": 1.0}], "buttons": [{"t": 0, "button": "triangle"}]})
+    with pytest.raises(ValueError, match="end at zero"):
+        routines.Routine("r", {"keys": [{"t": 0.0}, {"t": 1.0, "lx": 0.2}]})
+    with pytest.raises(ValueError, match="increase"):
+        routines.Routine("r", {"keys": [{"t": 0.0}, {"t": 1.0, "lx": 0.2}, {"t": 1.0}]})
+    assert routines.load(ROOT / "config" / "none.yaml") == {}
+
+
+def test_the_shipped_routines_end_where_they_started():
+    from sandro_gui import routines
+    shipped = shipped_routines()
+    assert list(shipped) == ["greeting", "spin", "sway", "eight", "show"]
+    step = 0.001
+    for routine in shipped.values():
+        assert routine.note and 5.0 < routine.duration <= 30.0
+        total = dict.fromkeys(routines.STICKS, 0.0)
+        low = lowest = 0.0
+        pressed = set()
+        for i in range(int(round(routine.duration / step))):
+            state = routine.sample(i * step)
+            assert state["hold"]
+            pressed.update(state["buttons"])
+            for stick in routines.STICKS:
+                assert abs(state[stick]) <= 1.0
+                total[stick] += state[stick] * step
+            low += state["ry"] * step
+            lowest = min(lowest, low)
+            # The height reset travels with the right stick still: nothing on it in the first 1.2 s.
+            if "r3" in {b for _, _, b in routine.presses} and i * step < 1.2:
+                assert state["ry"] == 0.0 and state["rx"] == 0.0
+        assert pressed <= {"cross", "r3"}
+        assert total["ry"] == pytest.approx(0.0, abs=1e-6), routine.name   # the height is back
+        assert total["rx"] == pytest.approx(0.0, abs=1e-6)
+        assert total["lx"] == pytest.approx(0.0, abs=1e-6)                 # facing where it started
+        if routine.name != "eight":
+            assert total["ly"] == pytest.approx(0.0, abs=1e-6)             # and standing there
+        # At the default 0.05 m/s of height rate, never more than 3 cm below the start.
+        assert lowest * 0.05 > -0.03
+        if lowest < 0.0:
+            assert routine.presses[0][2] == "r3" and routine.presses[0][0] > 0.0   # an edge with L1 already held
+        assert routine.sample(routine.duration - step)["buttons"] == []
+
+
+def test_a_routine_plays_only_while_its_button_is_held():
+    from sandro_gui import touch
+    now, live, sent = [50.0], [False], []
+    pad = touch.TouchPad({"timeout_s": 0.35, "release_s": 1.0}, lambda a, b: sent.append((list(a), list(b))),
+                         gamepad_live=lambda: live[0], clock=lambda: now[0], thread=False,
+                         routines=shipped_routines())
+
+    def state():
+        return gamepad.from_joy(*sent[-1])
+
+    with pytest.raises(ValueError, match="no routine"):
+        pad.update({"client": "a", "hold": True, "routine": "moonwalk"})
+    # The page's own sticks are ignored while a routine is held; speed scales the left stick.
+    post = {"client": "a", "hold": True, "routine": "spin", "play": 1, "speed": 0.5, "ly": 1.0, "buttons": ["triangle"]}
+    pad.update(post)
+    for _ in range(20):                                  # 1 s in: turning right at full stick
+        now[0] += 0.05
+        pad.update(post)
+        pad.tick()
+    assert state()["lx"] == 0.5 and state()["ly"] == 0.0 and state()["buttons"]["l1"]
+    assert not state()["buttons"]["triangle"]
+    assert pad.status()["routine"]["name"] == "spin" and pad.status()["routine"]["t"] == pytest.approx(1.0)
+    with pytest.raises(ValueError, match="another browser"):
+        pad.update({"client": "b", "hold": True, "routine": "sway"})
+    # Letting go: a released pad at once.
+    pad.update({"client": "a", "hold": False})
+    pad.tick()
+    assert state()["lx"] == 0.0 and not any(sent[-1][1]) and pad.status()["routine"] is None
+    # A new press starts from zero, also when the release never arrived.
+    pad.update({**post, "play": 2})
+    pad.tick()
+    assert state()["lx"] == 0.0 and state()["buttons"]["l1"] and pad.status()["routine"]["t"] == 0.0
+    now[0] += 0.2
+    pad.update({**post, "play": 3})
+    assert pad.status()["routine"]["t"] == 0.0
+    # The phone goes quiet in the middle of the turn: released within the timeout.
+    now[0] += 0.3
+    pad.update({**post, "play": 3})
+    pad.tick()
+    assert state()["lx"] > 0.0
+    now[0] += 0.4
+    pad.tick()
+    assert state()["lx"] == 0.0 and not any(sent[-1][1]) and not pad.status()["driving"]
+    # A gamepad has priority over a routine too.
+    live[0] = True
+    with pytest.raises(ValueError, match="gamepad"):
+        pad.update({**post, "play": 4})
+    live[0] = False
+    # Held to the end: a released pad for as long as the finger stays, and "done".
+    pad.update({**post, "play": 5})
+    for _ in range(245):
+        now[0] += 0.05
+        pad.update({**post, "play": 5})
+        pad.tick()
+    assert pad.status()["routine"]["done"] and not any(sent[-1][1]) and sent[-1][0][:4] == [0.0] * 4
+
+
+def test_the_show_presses_the_hop_and_the_height_reset_as_the_pad_would():
+    from sandro_gui import touch
+    teleop = yaml.safe_load((BRINGUP / "config" / "teleop.yaml").read_text())["joy_teleop"]["ros__parameters"]
+    show = shipped_routines()["show"]
+    hops, resets, before = 0, 0, [0] * 16
+    for i in range(int(show.duration * 20)):
+        axes, buttons = touch.to_joy(show.sample(i / 20), 1.0)
+        assert buttons[teleop["deadman_button"]] and not buttons[teleop["switch_button"]]
+        assert all(axes[a] > teleop["estop_pressed_below"] for a in teleop["estop_axes"])
+        hops += buttons[teleop["jump_button"]] and not before[teleop["jump_button"]]
+        resets += buttons[teleop["recentre_button"]] and not before[teleop["recentre_button"]]
+        before = buttons
+    assert (hops, resets) == (4, 1)
+
+
+def test_the_demo_panel_lists_and_plays_the_routines(tmp_path):
+    from sandro_gui import demo
+    from sandro_gui.panel import Panel
+    log = logbook.Logbook()
+    sources = demo.sources(log, settings(), BRINGUP / "config" / "controllers.yaml")
+    cfg = yaml.safe_load((ROOT / "config" / "gui.yaml").read_text())
+    panel = Panel(cfg, {"teleop": str(BRINGUP / "config" / "teleop.yaml"), "controllers": None,
+                        "mjcf": str(tmp_path / "none.xml"), "cache": str(tmp_path),
+                        "routines": ROOT / "config" / "routines.yaml"}, sources, simulation=False)
+    listed = panel.info()["touch"]["routines"]
+    assert [r["name"] for r in listed][:2] == ["greeting", "spin"] and listed[1]["duration_s"] == 12.0
+    assert panel.act("touch", {"client": "phone", "hold": True, "routine": "spin", "play": 1}) == {"driving": True}
+    panel.touch.tick()
+    assert panel.fast()["touch"]["routine"]["name"] == "spin"
+    assert sources["ros"]._teleop()[0]["buttons"]["l1"]

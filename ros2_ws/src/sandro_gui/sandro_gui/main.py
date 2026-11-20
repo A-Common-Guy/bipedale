@@ -33,6 +33,7 @@ def resolve_paths(cfg: dict, cwd: Path) -> dict:
     overrides = launch.get("overrides")
     return {
         "web": gui / "web",
+        "routines": gui / "config" / "routines.yaml",
         "teleop": bringup / "config" / "teleop.yaml",
         "controllers": bringup / "config" / "controllers.yaml",
         "overrides": str(bringup / "config" / overrides) if overrides else None,

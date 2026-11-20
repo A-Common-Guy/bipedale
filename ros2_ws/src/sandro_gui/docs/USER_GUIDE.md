@@ -105,6 +105,27 @@ the stack must run with teleop (the default).
 | Next policy (hold) | Switches to the next policy of the gamepad's list. Keep holding until it is done; letting go aborts it. |
 | Height reset (hold) | Height back to the running policy's initial height. |
 | Speed | Scales the left stick, as a fraction of the running controller's limits. Start low. |
+| Routines | Hold a routine's button and the panel moves the sticks; let go and the robot stops at once. Each press starts from the beginning. |
+
+The routines (`config/routines.yaml`; the figures are for 50 % speed on a
+policy with 0.5 m/s and 1.5 rad/s):
+
+| Routine | Lasts | What the robot does | Room |
+|---|---|---|---|
+| Greeting | 9 s | Two bows of 2.4 cm, then a look left, right and back, about 25° each side. | On the spot. |
+| Spin | 12 s | A turn to the right, a pause, the same turn back: about 200° each (more than a full turn at 100 %). | 0.5 m clear all round. |
+| Sway | 10 s | Leans right and left three times, dipping into each lean. Policies without roll only dip. | On the spot. |
+| Figure eight | 18 s | A circle to the right, then one to the left, each about 0.55 m across. The circles close at 50 % speed only. | 1.5 m by 1 m, starting in the middle facing along the short side. |
+| Show | 29 s | Bows, a turn, a hop, 0.3 m forward with a hop and back, a sway, the turn back, two hops. | 1 m ahead, 0.5 m all round. |
+
+- A routine is the sticks and the hop, nothing more: it works with any
+  policy, and a policy without roll, height or hop skips those parts. The
+  speed slider scales its driving and turning like the left stick's.
+- Routines with bows start with the height reset, so they begin at the
+  policy's own height; the first second looks like nothing is happening.
+- First run of each routine: robot held or on the stand, low speed. Nothing
+  in a routine knows where the walls are.
+- While a routine's button is held the sticks on the page do nothing.
 
 - The robot stops when the finger lifts. If the phone loses the robot, the
   screen locks or the browser goes to the background, it stops by itself

@@ -1,0 +1,133 @@
+# Routines of the Drive page: the panel moves the sticks while a finger holds
+# the routine's button (sandro_gui/routines.py has the format; touch.py plays
+# them). Sticks are -1..1, right and up positive: ly forward, lx right turns
+# right, ry up stands taller (a height RATE: every lobe down has its lobe up),
+# rx right puts the right side down. A stick left out of a key is 0. Buttons:
+# cross (the hop, for policies with a hop input) and r3 (height reset) only.
+#
+# What a stick is worth depends on the running controller's limits and, for
+# the left stick, on the page's speed slider. The notes are for 50 % speed on
+# a policy with 0.5 m/s and 1.5 rad/s; turns scale with both, and a routine
+# that turns one way then the other ends facing where it started at any speed.
+# Routines that move the height start with the height reset, so they begin
+# from the policy's own height and stay inside its range (2.4 cm down at
+# 0.05 m/s). A policy without roll, height or hop ignores those parts.
+routines:
+  greeting:
+    label: Greeting
+    note: Two bows (2.4 cm down and up), then a look left, right and back, about 25 degrees each side. On the spot.
+    keys:
+      - {t: 0}
+      - {t: 1.2}
+      - {t: 1.4, ry: -0.8}
+      - {t: 1.8, ry: -0.8}
+      - {t: 2.2, ry: 0.8}
+      - {t: 2.6, ry: 0.8}
+      - {t: 3.0, ry: -0.8}
+      - {t: 3.4, ry: -0.8}
+      - {t: 3.8, ry: 0.8}
+      - {t: 4.2, ry: 0.8}
+      - {t: 4.4}
+      - {t: 4.6}
+      - {t: 4.9, lx: -0.7}
+      - {t: 5.5, lx: -0.7}
+      - {t: 6.1, lx: 0.7}
+      - {t: 7.6, lx: 0.7}
+      - {t: 8.2, lx: -0.7}
+      - {t: 8.8, lx: -0.7}
+      - {t: 9.1}
+    buttons:
+      - {t: 0.1, for: 0.3, button: r3}        # height back to the policy's initial: done by 1.2 s
+
+  spin:
+    label: Spin
+    note: A turn to the right, a pause, the same turn back, about 200 degrees each at 50 % speed (more than a full turn at 100 %). On the spot; keep 0.5 m clear all round.
+    keys:
+      - {t: 0}
+      - {t: 0.5, lx: 1.0}
+      - {t: 5, lx: 1.0}
+      - {t: 5.5}
+      - {t: 6.5}
+      - {t: 7, lx: -1.0}
+      - {t: 11.5, lx: -1.0}
+      - {t: 12}
+
+  sway:
+    label: Sway
+    note: Leans right and left three times, dipping into each lean and rising through the middle. On the spot. Policies with roll (the agile ones); the others only dip.
+    keys:
+      - {t: 0}
+      - {t: 1.2}
+      - {t: 1.9, rx: 0.8, ry: -0.6}
+      - {t: 2.6, rx: 0.8}
+      - {t: 3.3, ry: 0.6}
+      - {t: 4.0, rx: -0.8}
+      - {t: 4.7, rx: -0.8, ry: -0.6}
+      - {t: 5.4}
+      - {t: 6.1, rx: 0.8, ry: 0.6}
+      - {t: 6.8, rx: 0.8}
+      - {t: 7.5, ry: -0.6}
+      - {t: 8.2, rx: -0.8}
+      - {t: 8.9, rx: -0.8, ry: 0.6}
+      - {t: 9.6}
+    buttons:
+      - {t: 0.1, for: 0.3, button: r3}        # height back to the policy's initial: done by 1.2 s
+
+  eight:
+    label: Figure eight
+    note: A circle to the right, then one to the left, each about 0.55 m across. The circles close at 50 % speed only (the size stays, the angle scales). Needs 1.5 m by 1 m of floor, the robot starting in the middle facing along the short side.
+    keys:
+      - {t: 0}
+      - {t: 0.5, lx: 1.0, ly: 0.8}
+      - {t: 8.5, lx: 1.0, ly: 0.8}
+      - {t: 9.1, lx: -1.0, ly: 0.8}
+      - {t: 17.1, lx: -1.0, ly: 0.8}
+      - {t: 17.6}
+
+  show:
+    label: Show
+    note: 'Half a minute of everything: two bows, a turn right, a hop, 0.3 m forward with a hop on the way, back, a sway, the turn back left, two hops. Needs 1 m clear ahead and 0.5 m all round.'
+    keys:
+      - {t: 0}
+      - {t: 1.2}
+      - {t: 1.4, ry: -0.8}
+      - {t: 1.8, ry: -0.8}
+      - {t: 2.2, ry: 0.8}
+      - {t: 2.6, ry: 0.8}
+      - {t: 3.0, ry: -0.8}
+      - {t: 3.4, ry: -0.8}
+      - {t: 3.8, ry: 0.8}
+      - {t: 4.2, ry: 0.8}
+      - {t: 4.4}
+      - {t: 4.6}
+      - {t: 5.0, lx: 1.0}
+      - {t: 8.2, lx: 1.0}
+      - {t: 8.6}
+      - {t: 10.0}
+      - {t: 10.4, ly: 0.6}
+      - {t: 12.0, ly: 0.6}
+      - {t: 12.4}
+      - {t: 13.0}
+      - {t: 13.4, ly: -0.6}
+      - {t: 15.0, ly: -0.6}
+      - {t: 15.4}
+      - {t: 15.8}
+      - {t: 16.5, rx: 0.8, ry: -0.6}
+      - {t: 17.2, rx: 0.8}
+      - {t: 17.9, ry: 0.6}
+      - {t: 18.6, rx: -0.8}
+      - {t: 19.3, rx: -0.8, ry: -0.6}
+      - {t: 20.0}
+      - {t: 20.7, ry: 0.6}
+      - {t: 21.4}
+      - {t: 21.8}
+      - {t: 22.2, lx: -1.0}
+      - {t: 25.4, lx: -1.0}
+      - {t: 25.8}
+      - {t: 28.5}
+    buttons:
+      - {t: 0.1, for: 0.3, button: r3}        # height back to the policy's initial: done by 1.2 s
+      - {t: 9.0, for: 0.3, button: cross}
+      - {t: 11.2, for: 0.3, button: cross}
+      - {t: 26.4, for: 0.3, button: cross}
+      - {t: 27.4, for: 0.3, button: cross}

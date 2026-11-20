@@ -144,6 +144,11 @@
           <div id="stick-right" class="stick-zone"><div class="stick-knob"></div><span class="stick-label">height · roll</span></div>
         </div>
         <div id="drive-buttons" class="drive-buttons"></div>
+        <div id="drive-routines-block" hidden>
+          <div class="drive-routines-head small muted">Routines · hold to play, let go to stop</div>
+          <div id="drive-routines" class="drive-routines"></div>
+          <div id="drive-routine-note" class="small muted drive-routine-note">The panel moves the sticks for as long as a finger stays on the button. Look at the robot, not at the phone.</div>
+        </div>
         <label class="drive-speed">Speed <input id="drive-speed" type="range" min="10" max="100" step="5" value="50"><span id="drive-speed-value" class="mono"></span></label>
         <div id="drive-command" class="small"></div>
         <p class="hint">The robot drives only while a finger is on a stick: touching one is the gamepad's L1. It stops when you let go, and by itself within half a second if the phone loses the robot, the screen locks or this page goes to the background. Speed scales the left stick, as a fraction of the running controller's limits. A connected gamepad has priority over this page. E-STOP is at the top of every page.</p>

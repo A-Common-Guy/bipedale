@@ -1,6 +1,8 @@
 // Drive: two on-screen sticks for a phone. The panel publishes them as the gamepad's /joy
 // (sandro_gui/touch.py), so touching a stick is holding L1: the robot drives only while a
 // finger is down and this page keeps posting; it stops by itself when the posts stop.
+// A routine button is the same with the panel moving the sticks (routines.py): the page
+// only says which routine the finger holds.
 
 import { $, h, replace, badge, signed } from "./util.js";
 
@@ -13,6 +15,7 @@ let ctx, timer = null, visible = false;
 let inFlight = false, releaseOwed = false, lastError = null, rtt = null, lastOk = 0;
 const sticks = { left: { x: 0, y: 0, pointer: null }, right: { x: 0, y: 0, pointer: null } };
 const pressed = new Map();     // button name -> time it may be let go
+let routine = null, plays = 0; // the routine button held: { name, play }
 
 function shaped(value) {
   const size = Math.abs(value);
@@ -21,15 +24,17 @@ function shaped(value) {
 }
 
 function holding() {
-  return sticks.left.pointer !== null || sticks.right.pointer !== null || pressed.size > 0;
+  return routine !== null || sticks.left.pointer !== null || sticks.right.pointer !== null || pressed.size > 0;
 }
 
 function payload() {
   const hold = holding();
+  const speed = Number($("#drive-speed").value) / 100;
+  if (routine) return { client, hold, routine: routine.name, play: routine.play, speed };
   return { client, hold,
     lx: hold ? shaped(sticks.left.x) : 0, ly: hold ? shaped(sticks.left.y) : 0,
     rx: hold ? shaped(sticks.right.x) : 0, ry: hold ? shaped(sticks.right.y) : 0,
-    buttons: [...pressed.keys()], speed: Number($("#drive-speed").value) / 100 };
+    buttons: [...pressed.keys()], speed };
 }
 
 async function post() {
@@ -62,9 +67,10 @@ async function post() {
 function release() {
   for (const stick of Object.values(sticks)) Object.assign(stick, { x: 0, y: 0, pointer: null });
   pressed.clear();
+  routine = null;
   releaseOwed = true;
   for (const zone of document.querySelectorAll(".stick-zone")) moveKnob(zone, 0, 0, false);
-  for (const button of document.querySelectorAll(".drive-buttons button")) button.classList.remove("held");
+  for (const button of document.querySelectorAll(".drive-buttons button, .drive-routines button")) button.classList.remove("held");
   // The page may be going away: this one is sent even if the tab is frozen right after.
   navigator.sendBeacon?.("/api/touch", new Blob([JSON.stringify({ client, hold: false })], { type: "application/json" }));
 }
@@ -138,6 +144,45 @@ function holdButton(name, label, title) {
   return button;
 }
 
+// A routine plays while its button is held, from the beginning on every press.
+function routineButton(spec) {
+  const button = h("button", { title: spec.note, "data-routine": spec.name },
+    h("span", { class: "routine-bar" }), h("span", { class: "routine-name" }, spec.label),
+    h("span", { class: "routine-time mono" }, `${spec.duration_s.toFixed(0)} s`));
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    if (routine) return;
+    button.setPointerCapture(event.pointerId);
+    routine = { name: spec.name, play: ++plays };
+    button.classList.add("held");
+    replace($("#drive-routine-note"), h("b", {}, spec.label), ` ${spec.note}`);
+    post();
+  });
+  const up = () => {
+    if (routine?.name !== spec.name) return;
+    routine = null;
+    button.classList.remove("held");
+    releaseOwed = true;
+    post();
+  };
+  button.addEventListener("pointerup", up);
+  button.addEventListener("pointercancel", up);
+  button.addEventListener("lostpointercapture", up);
+  button.addEventListener("contextmenu", (event) => event.preventDefault());
+  return button;
+}
+
+function renderRoutines(playing) {
+  for (const button of document.querySelectorAll(".drive-routines button")) {
+    const mine = playing && playing.name === button.dataset.routine;
+    const spec = ctx.state.info.touch.routines.find((r) => r.name === button.dataset.routine);
+    button.querySelector(".routine-bar").style.width = mine ? `${100 * playing.t / playing.duration_s}%` : "0";
+    button.querySelector(".routine-time").textContent = mine
+      ? (playing.done ? "done" : `${playing.t.toFixed(1)} / ${playing.duration_s.toFixed(0)} s`)
+      : `${spec.duration_s.toFixed(0)} s`;
+  }
+}
+
 function render() {
   if (!visible) return;
   const fast = ctx.state.fast || {}, slow = ctx.state.slow || {};
@@ -145,11 +190,13 @@ function render() {
   const active = slow.ros?.teleop?.active;
   const cmd = fast.ros?.cmd_vel;
   const mine = touch?.driving && touch.client === client;
+  renderRoutines(mine ? touch.routine : null);
   const stale = holding() && performance.now() - lastOk > 500;
   replace($("#drive-status"),
     !touch ? badge("not available: the panel has no ROS", "error")
       : lastError && holding() ? badge(lastError, "error")
         : stale ? badge("link lost: the robot has stopped", "error")
+          : mine && touch.routine ? badge(touch.routine.done ? "routine done: let go" : `playing ${touch.routine.name}`, "ok")
           : mine ? badge("driving", "ok")
             : touch.driving ? badge("another browser is driving", "warn")
               : badge("touch a stick to drive", "info"),
@@ -169,6 +216,9 @@ export function init(context) {
     holdButton("cross", "Hop", "One hop (policies with a hop input). The same as L1 + Cross."),
     holdButton("triangle", "Next policy (hold)", "Keep holding until the switch is done: letting go aborts it. The same as L1 + Triangle."),
     holdButton("r3", "Height reset (hold)", "Back to the running policy's initial height. The same as L1 + R3."));
+  const routines = ctx.state.info?.touch?.routines || [];
+  $("#drive-routines").append(...routines.map(routineButton));
+  $("#drive-routines-block").hidden = routines.length === 0;
   const speed = $("#drive-speed");
   const top = Math.round(100 * (ctx.state.info?.touch?.max_speed ?? 1));
   speed.max = top;

@@ -19,6 +19,7 @@ from .errors import Busy
 from .launcher import build_command
 from .logbook import ERROR, Logbook
 from .software import check as software_check
+from . import routines
 from .touch import TouchPad
 
 OK, WARN, ERR, OFF = "ok", "warn", "error", "off"
@@ -374,7 +375,8 @@ class Panel:
         # The Drive page's sticks (a phone) as a gamepad on /joy, for joy_teleop.
         self.touch = None
         if self.ros is not None and hasattr(self.ros, "publish_joy"):
-            self.touch = TouchPad(cfg.get("touch", {}), self.ros.publish_joy, self._gamepad_live)
+            self.touch = TouchPad(cfg.get("touch", {}), self.ros.publish_joy, self._gamepad_live,
+                                  routines=self._routines())
         self.session = _new_session(None)
         self._waiting: list[str] = []
         self._action_lock = threading.Lock()
@@ -449,9 +451,19 @@ class Panel:
             "software": {"boot": self.software.boot, "panel": self.software.panel}
             if self.software else None,
             "sysid": self.sysid is not None,
-            "touch": {"max_speed": self.touch.max_speed, "timeout_s": self.touch.timeout_s}
+            "touch": {"max_speed": self.touch.max_speed, "timeout_s": self.touch.timeout_s,
+                      "routines": [r.describe() for r in self.touch.routines.values()]}
             if self.touch else None,
         }
+
+    def _routines(self) -> dict:
+        """The Drive page's routines; a file that does not load costs the routines, not the panel."""
+        path = self.paths.get("routines") or Path(__file__).resolve().parent.parent / "config" / "routines.yaml"
+        try:
+            return routines.load(path)
+        except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as error:
+            self.log.add(ERROR, "panel", f"routines.yaml: {error}", origin="panel")
+            return {}
 
     def _gamepad_live(self) -> bool:
         """A real pad is connected (its joystick node is open): it drives, not a phone."""
