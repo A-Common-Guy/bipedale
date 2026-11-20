@@ -63,8 +63,9 @@ def main():
     args = [a for a in args if a != "--step"]
     jobs = [(spec, plant, profile, seed, step) for spec in args for plant in PLANTS
             for profile in PROFILES for seed in SEEDS]
-    with Pool(14) as pool:
-        results = dict(zip(jobs, pool.map(one, jobs)))
+    # A process per run: a second renderer in one process has taken the worker down with it.
+    with Pool(14, maxtasksperchild=1) as pool:
+        results = dict(zip(jobs, pool.map(one, jobs, chunksize=1)))
     n = len(PLANTS) * len(PROFILES) * len(SEEDS)
     print(f"{'policy':38s} plank  on step  off step  stopped  hop before the step, m   impact, m/s  falls  off course   (of {n})")
     for spec in args:

@@ -1,0 +1,45 @@
+# agile_step trained on the profile as sandro_perception's node makes it, not as
+# the first emulation assumed it. With the node itself in the evaluator's loop
+# on rendered depth (--sim depth=1, sandro_rl/depth_camera.py) agile_step stops
+# before the 15 cm block in 9 runs of 18 where the emulated profile gives 17:
+# it reads the block and drives on. What the node's profile has and the
+# emulation lacked (docs/DESIGN.md 17):
+# - the floor each wheel is believed to stand on wanders by 1-2 cm, a bias per
+#   track that moves (bias_walk_m), not a constant 6 mm;
+# - 5-10 mm of noise per point near the wheels, where the map is memory;
+# - off the floor in a hop, everything reads lower by the wheel clearance
+#   (airborne_gain): the node takes the body's height from the legs;
+# - the bracket's pitch and the IMU's are a degree or two off (slope_rad).
+# The stop is asked for earlier (0.30 m before the block, slowing from 0.6 m):
+# agile_step stops 6 cm from the face where 22 was asked.
+#
+#     uv run python -m sandro_rl.train configs/agile_step_v2.yaml --resume policies/agile_step
+#     MUJOCO_GL=egl uv run python scripts/three_runs.py policies/agile_step_v2 policies/agile_step_v2:depth=1
+inherit: agile_step.yaml
+
+env:
+  observation:
+    profile:
+      noise_m: 0.007
+      slope_rad: 0.03
+      bias_m: 0.012
+      bias_walk_m: 0.003
+      bias_max_m: 0.02
+      position_error_m: 0.05
+      position_noise_m: 0.03
+      dropout: 0.06
+      airborne_gain: 1.0
+
+  rewards:
+    guard: {block_m: 0.07, stop_m: 0.30, slow_m: 0.6}
+
+train:
+  iterations: 1200
+  curriculum_offset: 1300       # agile_step's last stage from the first iteration
+  resume_log_std: -2.0
+
+# As agile_step.yaml (export_ros.py reads this file alone): a hop does not
+# trip the oscillation watchdog.
+deploy:
+  safety:
+    oscillation_hold_s: 1.2

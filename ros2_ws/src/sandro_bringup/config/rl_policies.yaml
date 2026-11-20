@@ -23,6 +23,8 @@ controller_manager:
       type: sandro_controllers/RlPolicyController
     rl_agile_step:
       type: sandro_controllers/RlPolicyController
+    rl_agile_step_v2:
+      type: sandro_controllers/RlPolicyController
     rl_stand_up_v2:
       type: sandro_controllers/RlPolicyController
     rl_fun_split:
@@ -505,6 +507,70 @@ rl_agile_step:
     command_topic: /cmd_vel
     policy_file: package://sandro_controllers/policies/agile_step.bin
     policy_fingerprint: 107fb7830e78e44a9361c60031d8f2f982332f272bf2e3804b3578220a72ab31
+    policy_rate_hz: 100.0
+    observation:
+      history: 4
+      history_stride: 1
+      command_size: 4
+      # A hop on /cmd_vel linear.y (the wheel clearance asked for, m; the
+      # gamepad's L1 + cross): its rising edge opens one window.
+      jump_size: 2
+      # sandro_perception's /terrain_profile at [0.1, 0.2, 0.3, 0.45, 0.6, 0.8, 1.05, 1.35] m
+      # ahead of each wheel: start the stack with camera:=true. Without a
+      # profile the policy drives blind.
+      profile_size: 32
+      profile_height_scale: 10.0
+      profile_clip_m: [-0.15, 0.25]
+      gyro_scale: 0.25
+      leg_velocity_scale: 0.1
+      wheel_velocity_scale: 0.05
+      # The simulated IMU's mounting (sim_identified.yaml imu_mount); the
+      # robot overrides set the physical one.
+      imu_offset_rad: -0.049
+    commands:
+      forward_m_s: 1.0
+      yaw_rad_s: 3.0
+      height_min_m: 0.09
+      height_max_m: 0.19
+      roll_rad: 0.3
+      jump_height_max_m: 0.08
+      jump_window_s: 0.8
+      # Height command on engaging (the WBC's tasks.height.target_m); the
+      # reference starts at the measured height and moves there.
+      initial_height_m: 0.17
+    shaping:
+      forward_accel_m_s2: 2.0
+      yaw_time_constant_s: 0.15
+      height_rate_m_s: 0.15
+      roll_rate_rad_s: 0.6
+      leg_height_min_m: 0.07
+      leg_height_max_m: 0.195
+      track_width_m: 0.304
+    action:
+      leg_scale_rad: 0.8
+      leg_kp_nm_rad: 20.0
+      leg_kd_nm_s_rad: 0.6
+      joint_min_rad: -2.0943951
+      joint_max_rad: 2.0943951
+      wheel_mode: velocity
+      wheel_scale_rad_s: 25.0
+      wheel_kd_nm_s_rad: 0.4
+      wheel_scale_nm: 3.0
+      # Low-pass (Hz) on the opposed half of the wheel commands, the yaw; 0
+      # off. The value the policy trained with; the robot overrides may set
+      # one for a policy that did not.
+      wheel_differential_filter_hz: 0.0
+      stand_q: [0.41872984, 0.22624421, -0.716328, 0.22433391, 0.42027311, 2.14299]
+    safety:
+      oscillation_hold_s: 1.2
+
+rl_agile_step_v2:
+  ros__parameters:
+    joints: [right_motor_inner, right_motor_outer, right_wheel, left_motor_inner, left_motor_outer, left_wheel]
+    imu_name: imu
+    command_topic: /cmd_vel
+    policy_file: package://sandro_controllers/policies/agile_step_v2.bin
+    policy_fingerprint: c0ee03efd801916a8b54c788605e0b5559e8858a66060a75d9d04ed26351b1bf
     policy_rate_hz: 100.0
     observation:
       history: 4

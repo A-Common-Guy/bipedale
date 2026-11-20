@@ -1,0 +1,28 @@
+# fun_one_leg_long with the leg links colliding with the floor, as on the robot, and a
+# softer version of what fun_one_leg_v2 asked for (docs/DESIGN.md 16): the stand is paid
+# with every link 8 mm clear of the floor (v2: 15), and the supporting tyre off the floor
+# costs 8 per second (v2: 20). v2 came out rocking between the wheels; the measure is
+# scripts/one_leg_runs.py's floor-contact shares, to beat fun_one_leg_long's 83 % on the
+# left tyre alone, 11 % on a leg link and 5 % in the air.
+#
+#     uv run python -m sandro_rl.train configs/fun_one_leg_v3.yaml --resume policies/fun_one_leg_long
+#     uv run python scripts/one_leg_runs.py --hold 8 policies/fun_one_leg_long policies/fun_one_leg_v3
+inherit: fun_one_leg_long.yaml
+
+env:
+  collision:
+    leg_boxes: true
+  commands:
+    jump:
+      steady: true
+      link_margin_m: 0.008
+  rewards:
+    weights:
+      jump_airborne: -8.0
+
+train:
+  iterations: 2000
+
+deploy:
+  safety:
+    oscillation_hold_s: 9.5

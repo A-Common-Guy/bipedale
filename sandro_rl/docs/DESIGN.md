@@ -2534,3 +2534,102 @@ An honest, steady stand on one wheel has not been trained.
 `evaluate.py` logs the higher wheel's lift (`truth_wheel_lift_m`).
 `configs/agile_step.yaml` now carries its watchdog hold (1.2 s), which was
 only in the generated `rl_policies.yaml`.
+
+**`fun_one_leg_v3` (2026-11-20, not kept).** A second try at the honest
+stand, from `fun_one_leg_long`: leg links colliding, `steady` and an 8 mm
+link margin as in v2, and `jump_airborne` at −8 against the hopping, 2000
+iterations. Worse again on the same measure: left tyre alone 61 %, nothing
+on the floor 24 %, another part 15 % (54 of 54 requests, 6.6–7.0 s, no fall
+in 18 runs). Penalising the flight harder made it hop more, not less: with
+the links colliding the stand it knows is not available and it does not find
+another. The policy is not committed; `configs/fun_one_leg_v3.yaml` stays as
+the record. What has not been tried is training the stand from scratch with
+the links colliding, instead of resuming a policy whose stand leans on one.
+
+## 17. The camera policies under the robot's own perception (2026-11-20)
+
+On the robot `rl_agile_step` did not seem to react to the camera at all
+(`recordings/policy_trials/policies_20261119-073801`). The recording could
+not say why: it holds the profile but no depth image, and the controller's
+diagnostics did not say whether the profile arrived. What it does show: on
+an empty floor the profile reads within 2 cm (the mount calibration is
+right); every hop in it was requested; and the profile carries isolated
+16 cm values 0.2–0.3 m ahead of a standing robot, in one cell.
+
+The policy had only ever met an emulation of the profile (true floor heights
+with noise, section 14), in training and in the evaluator alike. So the
+robot's perception now runs in the evaluator's loop:
+`sandro_rl/depth_camera.py` renders depth images from the camera mount
+(424 × 240, 15 Hz, 60 ms late, noise growing with the square of the range,
+2 % dropout) and feeds them with the measured state to
+`sandro_perception/height_profile.py` itself; `--sim depth=1` selects it
+(`three_runs.py POLICY:depth=1`).
+
+### Three faults in the map
+
+| fault | seen as | fix (`height_profile.py`) |
+|---|---|---|
+| The floor under a wheel was read from the one cell at its contact. As the wheel reaches a step that cell holds the step's edge, and the whole profile drops by it | a 3 cm step read 2 cm in the last 0.2 m: "drive over", not "hop" | the lowest known cell over the tyre's footprint (`footprint_m` 0.05) |
+| A cell on a face held the mean of the face's points and the floor's | a 15 cm block's face read about 7 cm, the stop threshold | mean + 1.5 σ of the cell's points, capped at its highest point (without the cap a 1.5 cm plank read 2.5 cm) |
+| One image could write an obstacle into the map | the recording's one-cell spikes; in simulation from dropout beside a face | a cell becomes known, or changes by more than 3 cm, only when two images in a row (within 0.4 s) agree |
+
+After them the block reads 15–16 cm on both tracks from 1.05 m away and no
+true obstacle is missed in the profile (the training's emulation, with its
+dropout and position error, misses 12–57 % of them at a given moment).
+
+### `agile_step` was brittle to it: `configs/agile_step_v2.yaml`
+
+With the corrected map `agile_step` still drove into the block in half the
+runs. The profile it gets is right but its errors are not the emulation's: a
+bias that wanders with the wheels' floor reference, the profile lifting
+with the wheels in a hop, edges placed with odometry. `agile_step_v2` resumes
+`agile_step` (1200 iterations) with those in the emulation: a per-track bias
+walk (`bias_walk_m` 3 mm per measurement, to 2 cm), `airborne_gain`, more
+position error and dropout, and the guard's block threshold at 7 cm.
+
+`three_runs.py`, 18 runs each (the fitted plant and the MJCF, three latency
+profiles, three seeds):
+
+| step | policy, profile | onto the step | off it | stopped before the block | passed beside it | speed at the block | falls |
+|---|---|---|---|---|---|---|---|
+| 3 cm | `agile_step`, emulated | 18 | 18 | 17 | – | 0 | 0 |
+| 3 cm | `agile_step`, perception | 17 | 17 | 9 | – | 0.37 m/s | 0 |
+| 3 cm | `agile_step_v2`, emulated | 18 | 17 | 11 | 5 | 0 | 0 |
+| 3 cm | `agile_step_v2`, perception | 18 | 16 | 12 | 3 | 0 | 0 |
+| 5 cm | `agile_step`, emulated | 11 | 9 | 8 | – | 0 | 2 |
+| 5 cm | `agile_step`, perception | 9 | not noted | not noted | – | not noted | 4 |
+| 5 cm | `agile_step_v2`, emulated | 6 | 4 | 0 | 0 | 0 | 0 |
+| 5 cm | `agile_step_v2`, perception | 8 | 7 | 0 | 0 | 0 | 1 |
+
+- Under the robot's perception v2 never touches the block (v1: 0.37 m/s in
+  the worst run). In 3 of 18 runs it does not stop but turns and passes
+  beside it, which nothing rewards and nothing forbids; `three_runs.py` now
+  counts those apart (it used to count them as stops).
+- It drives over the 3 cm step and no longer hops it, and at 5 cm it climbs
+  no more often than v1 (8 against 9 of 18), with fewer falls (1 against 4).
+  The hop onto a step is not better; the stop is. The runs that leave the
+  5 cm step do not reach the block within the run, so they count neither
+  as stopped nor as an impact.
+- Requested hops with the perception running: 30 of 30, 7 cm, tilt below
+  0.30 rad. The `hardware` scenario on an empty floor, 6 runs: no fall
+  and no hop (`agile_step` stood 20 s there without drifting, 0.02 m).
+- Gate: 0.34 on the whole loop, 0.31 on the yaw table.
+
+Deployed as `rl_agile_step_v2` next to `rl_agile_step` (the panel's list,
+not the gamepad switch). Neither has been run on the robot since the map
+changed, and the simulated room is a flat floor with three obstacles: the
+recording's clutter is not in it.
+
+### What the next run on the robot should record
+
+- `RlPolicyController`'s diagnostics now carry `profile_age_s`,
+  `profile_known` (of 16) and `profile_highest_m`: whether the policy gets
+  the profile at all, which the last recording could not tell.
+- The node publishes `~/depth_preview` (every fourth pixel, 3 Hz) and
+  `policy_record.py` records it. `recordings/replay_profile.py <run>` replays
+  it through the map beside the recorded profile, with any setting changed
+  (`--set confirm_m=0.05`), so a fault in the map can be found from a
+  recording.
+
+Neither the node's preview nor the controller's diagnostics are compiled or
+run here (no ROS on the training machine).

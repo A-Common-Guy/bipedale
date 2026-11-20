@@ -109,6 +109,12 @@ rl_agile_step:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# rl_agile_step retrained on the errors the robot's own perception makes
+# (2026-11-20, sandro_rl/docs/DESIGN.md section 17). Same inputs and buttons.
+rl_agile_step_v2:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 rl_stand_up:
   ros__parameters:
     observation:
