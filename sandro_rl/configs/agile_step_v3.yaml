@@ -1,0 +1,53 @@
+# agile_step_v2 on the 5 cm step. With the robot's perception in the loop
+# (scripts/three_runs.py POLICY:depth=1 --step 0.05) v2 is on the step in 8 runs of
+# 18, and the two plants differ: on the fitted plant it drives up without a hop (8 of
+# 9), on the MJCF it hops 4.6-4.9 cm at the 5 cm face and stays in front of it (0 of 9).
+# Two runs that only added taller steps (to 6.5 cm) and a higher hop target, one of
+# them with fun_hop_high's leg range, ended with no run on the 5 cm step at all
+# (docs/DESIGN.md 27): the profile's height is wrong by up to 2 cm (bias_max_m), so
+# a 5-6.5 cm step and the 7 cm at which rewards.guard asks for a stop are one
+# reading, and stopping is the answer that never falls.
+# Here the two answers are 5 cm apart instead: steps to hop onto up to 6.5 cm,
+# blocks to stop at from 12 cm (the guard's threshold at 9 cm), nothing in between.
+# The hop's target is the rise plus 3.5 cm, and hopping higher than that costs a
+# quarter of what it did: the policy does not know the rise to 2 cm either.
+#
+#     uv run python -m sandro_rl.train configs/agile_step_v3.yaml --resume policies/agile_step_v2
+#     MUJOCO_GL=egl uv run python scripts/three_runs.py policies/agile_step_v3:depth=1 [--step 0.03]
+inherit: agile_step_v2.yaml
+
+env:
+  terrain:
+    planks: {height_m: [0.01, 0.065]}
+    hills: {height_m: [0.03, 0.065]}
+    pillars: {height_m: [0.12, 0.5]}
+
+  commands:
+    jump:
+      height_m: [0.02, 0.11]
+      at_edges: {max_rise_m: 0.07, margin_m: 0.035}
+
+  rewards:
+    guard: {block_m: 0.09}
+    weights:
+      jump_clearance: 80.0
+      jump_overshoot: -500.0
+
+# One stage: the heights above from the first iteration (agile_step's stages end at 5.5 cm).
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.terrain.planks.height_m: [0.01, 0.065]
+        env.terrain.hills.height_m: [0.03, 0.065]
+
+train:
+  iterations: 900
+  curriculum_offset: 0
+  resume_log_std: -1.6
+
+# As agile_step.yaml (export_ros.py reads this file alone): a hop does not
+# trip the oscillation watchdog.
+deploy:
+  safety:
+    oscillation_hold_s: 1.2

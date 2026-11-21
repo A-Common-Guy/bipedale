@@ -3352,3 +3352,53 @@ All 12 standard runs complete (`eval/comparison.md`). Deployed as
 what the gamepad switch and the defaults use. Not run on the robot. Three
 training runs (the 600 iterations kept, a 300-iteration continuation that
 was no better on the course, and the tighter-margin one above).
+
+## 27. `agile_step_v3`: the 5 cm step, three runs, not improved (2026-11-21, not deployed)
+
+`agile_step_v2` with the robot's perception in the loop
+(`scripts/three_runs.py policies/agile_step_v2:depth=1 --step 0.05`) is on the
+5 cm step in 8 runs of 18 with one fall (section 17). Looked at per plant it
+is two behaviours, not one that works half the time:
+
+- **fitted plant** (heavy rotors, soft gear, tyres that twist freely): 8 of 9
+  on the step, *without a hop* (the wheels 0–3.6 cm up before the face). It
+  drives up the face.
+- **MJCF**: 0 of 9. It hops, the lower wheel 4.6–4.9 cm up with its peak at
+  the face itself, and stays in front of the 5 cm edge for 1–2.5 s before
+  the run backs off. The hop is a few millimetres short and late.
+
+Three fine-tunes from `agile_step_v2`, each measured as above (18 runs):
+
+| run | what changed | 5 cm, emulated profile: on the step | 5 cm, perception | 3 cm, emulated: on / off / stopped at the block | falls at 5 cm |
+|---|---|---|---|---|---|
+| `agile_step_v2` | – | 6 | 8 | 18 / 17 / 11 | 0 and 1 |
+| a, 1000 it. | steps to 6.5 cm (5.5), hop target the rise + 3.5 cm up to 11 cm (2 cm, 8 cm), `jump_clearance` 80 (40), `fun_hop_high`'s leg range (1.2 rad) and leg speed limit | 0 (hops of 1.7–6 cm, at the face) | not run | 17 / 14 / 12 | 1 |
+| b, 700 it. | a without the leg range and the speed limit | 0 | not run | 16 / 16 / 14 | 2 |
+| c, 900 it. (`configs/agile_step_v3.yaml`) | b with the two answers apart: blocks from 12 cm, the guard's threshold at 9 cm (7), hopping too high a quarter as costly | 0 | 3 | 18 / 18 / 9, and into the block at 1.2–1.4 m/s in the worst run | 0 and 2 |
+
+All three lose the fitted plant's drive-up and none gains the hop: the lower
+wheel still peaks at 4.7–5.0 cm at the face on the MJCF (run c). More and
+taller steps in training made the 5 cm one worse, not better, and run c also
+lost the stop at the 15 cm block that `agile_step_v2` was made for. Nothing
+is deployed; the runs are in the git-ignored `runs/agile_step_v3_*`, the
+config stays as the record of run c.
+
+What the runs say about why:
+
+- The hop at an edge the policy is not told about is rarely taken at all. In
+  training the clearance reward collected is about 5 % of what the open
+  windows offer, in v2 and in all three runs alike, whatever its weight; the
+  requested hops (L1 + cross) are answered 30 of 30 at 7 cm. The policy can
+  hop; it does not trust the profile to say when.
+- With the edge's position known to 5 cm at best and its height to 2 cm
+  (section 17's errors, which are the perception's own), a hop that must
+  clear 5 cm exactly at the face is a narrow target; a hop early and high
+  enough to be safe is what the wheel-lift constraint and the overshoot cost
+  forbid everywhere else.
+- So the next step is not a fourth fine-tune of this reward. Candidates: tell
+  the policy the edge the way a request is told (a hop window opened by the
+  perception node when it sees a face 0.3 m ahead, i.e. the `at_edges`
+  window not hidden, with the node deciding), or climb without a hop at all
+  where the plant allows it, as the fitted plant already does. The second is
+  what the robot is closer to; whether the real tyres drive up a 5 cm face
+  is a test for the owner, with `rl_agile_step_v2` and the robot held.
