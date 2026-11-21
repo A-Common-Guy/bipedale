@@ -9,6 +9,11 @@
 # the episode instead. The drives' torque envelope (9 Nm) and their speed
 # limit at the legs (constraints.leg_speed, 19.5 rad/s) are fun_hop_high's.
 #
+# Result (docs/DESIGN.md 22): no flip with these drives. Paid on the floor too
+# (before flip.airborne_m) it fell over backwards; fun_flip_free.yaml, the
+# same without the speed limit, turns 2 rad of the 6.3; fun_flip_strong.yaml
+# (18 Nm, half the damping) 5.5 rad and does not land.
+#
 #     uv run python -m sandro_rl.train configs/fun_flip.yaml --resume policies/fun_hop_high
 #     MUJOCO_GL=egl uv run python scripts/hop_runs.py --flip policies/fun_flip
 inherit: fun_hop_high.yaml
@@ -26,13 +31,14 @@ env:
         tolerance_rad: 0.4
         rate_clip_rad_s: 25.0
         torso_floor_m: 0.01
+        airborne_m: 0.03            # the turn is paid in the air only
 
   rewards:
     weights:
-      flip_rate: 60.0             # per radian turned: 377 for the whole flip
+      flip_rate: 100.0            # per radian turned in the air: 628 for the whole flip
       flip_landed: 150.0          # per second upright on the wheels after it
       flip_over: -0.05
-      termination: -50.0          # (-200) a turn begun and not landed must still beat no turn
+      termination: 0.0            # (-200) a turn begun and not landed must still beat no turn
 
 train:
   iterations: 3000

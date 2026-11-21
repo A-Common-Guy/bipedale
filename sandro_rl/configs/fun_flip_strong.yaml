@@ -1,0 +1,29 @@
+# SIMULATION ONLY, and not the robot's drives: what a flip would take.
+# fun_flip_free (no speed limit at the legs) with the leg drives at twice
+# their torque, 18 Nm without the thermal fold-back, and half the legs'
+# damping (0.3 Nm s/rad), asked for 60 cm of clearance.
+#
+#     uv run python -m sandro_rl.train configs/fun_flip_strong.yaml --resume runs/flip_free
+#     MUJOCO_GL=egl uv run python scripts/hop_runs.py --flip runs/flip_strong
+inherit: fun_flip_free.yaml
+
+env:
+  action:
+    legs: {kd: 0.3}
+    torque_envelope: false
+    torque_limit_nm: {legs: 18.0}
+
+  commands:
+    jump:
+      target_m: 0.6
+      vz_clip_m_s: 4.0
+
+  constraints:
+    leg_torque: {limit: 18.5, slack: 0.5}
+    thermal: {enabled: false}
+
+train:
+  iterations: 3000
+  resume_log_std: -1.0
+
+deploy: null

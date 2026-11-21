@@ -2977,3 +2977,57 @@ a quarter of the speed), from the side.
 - one press, one hop; holding the button does not repeat it. Presses less
   than about 1.3 s apart are ignored until the window (1 s) has run out;
 - flat floors and low edges only, as `fun_show`.
+
+## 22. A flip, in simulation only: `configs/fun_flip*.yaml` (2026-11-21)
+
+The owner asked for a flip trained in simulation, to decide later whether to
+use it. **No flip was found with the robot's drives, and the one with stronger
+drives does not land.** Nothing of this is deployed: not in
+`rl_policies.yaml`, the panel's list, the `.bin` files or the test lists.
+
+### The task
+
+`commands.jump.flip` (opt-in), on the hop input: from the request the turn
+about the body's pitch axis is integrated (`flip_angle`; direction −1, nose
+up first: a backflip, which the wheels driving forward help). `flip_rate`
+pays the turn per radian until it is whole, `flip_landed` standing upright on
+both tyres after it, `flip_over` costs turning on. From the request to
+`landing_s` after the window the tilt limit, the tilt constraint and the
+pitch terms are off; the torso's bounding box within 1 cm of the floor ends
+the episode instead (`torso_clearance`). A fall costs nothing but the
+episode, so that a turn begun beats no turn. The evaluator's fall cutoff
+waits out the window and its landing for these policies, and logs
+`truth_pitch_turn_rad`; `scripts/hop_runs.py --flip` measures a flip.
+
+### What the physics says
+
+`fun_hop_high` is in the air for 0.24 s (section 21). A whole turn in that
+time is 26 rad/s; with the legs tucked for longer, perhaps 0.35 s and
+18 rad/s. The take-off gives the robot its angular momentum: the legs' push
+(about 8 N s for 1.7 m/s) times how far the axles are from under the centre
+of mass (7 cm of reach at most), and the wheel drives' reaction for the
+0.1 s of the push. That is short of 18 rad/s by a factor of two or so; a
+higher hop needs the legs to turn faster than the drives do (19.5 rad/s).
+
+### Three runs
+
+| run | drives | what it does (first request of 18 runs) |
+|---|---|---|
+| `fun_flip.yaml` from `fun_hop_high`, 2000 iterations, the turn paid on the floor too | the robot's: 9 Nm, `leg_speed` 18 rad/s | no hop: it lets itself fall over backwards, 2.0–2.1 rad on the floor. The reason for `flip.airborne_m` (the turn is paid 3 cm up only) |
+| `fun_flip_free.yaml` from `fun_hop_high`, 2500 iterations | 9 Nm, no speed limit | 13–14 cm up, 0.32–0.36 s in the air, 1.7–2.0 rad turned in it (1.2–1.3 from the request), then down on the torso. Legs at 28 rad/s, 8.4 Nm: the legs' damping (0.6 Nm s/rad) holds the push there. The reward had stopped growing by iteration 500 |
+| `fun_flip_strong.yaml` from that, 3000 iterations: `policies/fun_flip_strong` | 18 Nm without the thermal fold-back, damping 0.3, no speed limit | 27–31 cm up, 0.32–0.38 s in the air, 5.1–5.5 rad turned in it (5.3–5.8 from the request; 6.28 is whole), then down on the torso or a leg 0.5 s after the request, in 18 of 18; never upright after. Legs at up to 53 rad/s and 10 Nm; touchdown at 2.5–3.3 m/s. The turn was still growing when the run ended |
+
+`fun_flip.yaml` with `airborne_m` (the robot's drives, the turn paid in the
+air only) was not run: without the speed limit the same drives turn 2 rad of
+the 6.3.
+
+So what a flip takes is not torque (10 Nm were used of the 18 allowed) but
+leg speed: 2.7 times what the drives turn at, at half the damping, and even
+then the landing is not there. On this robot a flip would need other leg
+drives or a different motion (a run-up, a kick off a wall or a step), and
+`RlPolicyController`'s fall cutoff (drives limp over 1 rad of tilt) would
+have to wait out the flip as the evaluator's now does.
+
+Videos: `policies/fun_flip_strong/fun_flip_strong.mp4` and `_slow.mp4` (a
+quarter of the speed), from the side: the hop, the turn, the crash. To go on
+from it: `--resume policies/fun_flip_strong` with `configs/fun_flip_strong.yaml`.

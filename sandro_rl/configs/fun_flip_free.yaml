@@ -1,0 +1,22 @@
+# SIMULATION ONLY, and not the robot's drives: fun_flip without the leg
+# drives' speed limit (constraints.leg_speed off; the torque envelope stays at
+# 9 Nm), asked for 50 cm of clearance. It answers what a flip would take:
+# scripts/hop_runs.py reports the leg speeds it uses.
+#
+#     uv run python -m sandro_rl.train configs/fun_flip_free.yaml --resume policies/fun_hop_high
+#     MUJOCO_GL=egl uv run python scripts/hop_runs.py --flip runs/flip_free
+inherit: fun_flip.yaml
+
+env:
+  commands:
+    jump:
+      target_m: 0.5
+      vz_clip_m_s: 3.5
+
+  constraints:
+    leg_speed: null
+
+train:
+  iterations: 2500
+
+deploy: null

@@ -1523,7 +1523,10 @@ class SandroEnv:
                 spin = float(self.flip.get("direction", 1.0)) * truth["pitch_rate"]
                 turned = (info["flip_angle"] > turn - self.flip.get("tolerance_rad", 0.4)).astype(jp.float32)
                 # The turn itself, paid per radian until it is whole (in the window only).
+                # airborne_m: only with both wheels that far off the floor, or falling over
+                # backwards on the spot is two radians of it (the first run did that).
                 terms["flip_rate"] = ((info["jump_timer"] > 0.0) * (info["flip_angle"] < turn)
+                                      * (jp.min(truth["clearance"]) >= self.flip.get("airborne_m", 0.0))
                                       * jp.clip(spin, -rate, rate))
                 # Then: on the wheels and upright, until landing_s after the window.
                 terms["flip_landed"] = (jumping * turned * jp.exp(-(truth["tilt"] / 0.3) ** 2)
