@@ -367,6 +367,11 @@ def routine_command(state: dict | None, speed: float, iface, height_reference: f
     jump = TELEOP_JUMP_HEIGHT_M if "cross" in state["buttons"] else 0.0
     return [forward, yaw, height_rate, roll, jump], recentre
 
+def tyre_ids(spec, m) -> list[int]:
+    """The tyres' geom ids in `m`, a model built from the description with geoms added."""
+    return [mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, spec.model.geom(int(g)).name) for g in spec.tyre_geoms]
+
+
 def floor_contact(m, d, tyres) -> int:
     """Bits for what touches the world body: 1 the right tyre, 2 the left tyre, 4 any other part."""
     names = list(tyres)     # geom names: the ids differ between the plain model and the one with leg boxes
@@ -731,9 +736,13 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     controller.differential_filter_hz = options.wheel_differential_filter_hz or iface.differential_filter_hz
 
     from . import terrain
+    # SANDRO_OUTLINE=1 (any run script): the robot's CAD outline alone meets a flat floor, the
+    # whole hulls of the links and the torso, and the link boxes touch nothing.
+    outline = os.environ.get("SANDRO_OUTLINE") == "1" and not course and not iface.has_goal
     leg_boxes = (bool((config["env"].get("collision") or {}).get("leg_boxes", False))
-                 if LEG_BOXES is None else bool(LEG_BOXES))
-    leg_hulls = (config["env"].get("collision") or {}).get("leg_hulls") if LEG_HULLS is None else LEG_HULLS
+                 if LEG_BOXES is None else bool(LEG_BOXES)) or outline
+    leg_hulls = (0 if outline else (config["env"].get("collision") or {}).get("leg_hulls") if LEG_HULLS is None
+                 else LEG_HULLS)
     shadow = LinkShadow(spec) if LINK_SHADOW and not course and not iface.has_goal else None
     goals_world, pillar_geoms = None, []
     if iface.has_goal:
@@ -743,7 +752,11 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         m = (course_model(spec, "planks" if course is True else course, leg_boxes) if course
              else terrain.build(spec, {}, leg_boxes=True, leg_hulls=leg_hulls) if leg_boxes
              else mujoco.MjModel.from_xml_path(str(spec.scene)))
-    if LEG_BOXES == "floor":
+    if outline:
+        for g in range(m.ngeom):
+            if (m.geom(g).name or "").endswith("_link_box"):
+                m.geom_contype[g], m.geom_conaffinity[g] = 0, 0
+    elif LEG_BOXES == "floor":
         for g in range(m.ngeom):
             if (m.geom(g).name or "").endswith("_link_box"):
                 m.geom_contype[g], m.geom_conaffinity[g] = 0, 1
@@ -756,7 +769,9 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         options.unpowered_s = 3.0
     qadr, dadr, act = spec.joint_qpos, spec.joint_dof, spec.joint_actuator
     m.geom_friction[:, 0] *= options.floor_friction_scale
-    m.geom_friction[spec.tyre_geoms, 1] *= options.tyre_torsion_scale
+    # By name: with the leg boxes or the hulls in the model the tyres' geom ids are not the
+    # description's (the scale went to two other geoms and the tyres kept their torsion).
+    m.geom_friction[tyre_ids(spec, m), 1] *= options.tyre_torsion_scale
     m.dof_frictionloss[dadr[spec.wheel_index]] *= options.wheel_friction_scale
     m.dof_armature[dadr[spec.leg_index]] *= options.leg_armature_scale
     if options.camera_mass_scale != 1.0:

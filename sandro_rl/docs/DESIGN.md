@@ -3154,6 +3154,12 @@ of 18 runs within a second: the supporting leg's lower-link box reaches the
 floor at about 0.7 rad of roll, where the mesh is clear of it. The meshes are the measure
 here.
 
+Checked on the CAD outline on 2026-11-22 (section 31: the whole convex hulls of
+the links and the torso meet the floor, the boxes touch nothing): the same
+numbers as with no link colliding at all, 54 of 54, no fall in 18 runs, 93 % on
+the left tyre alone, no other part on the floor at any time. The boxes' 18 of
+18 falls are the boxes'.
+
 Videos: `fun_one_leg_v4.mp4` (from behind) and `_side.mp4`, on the fitted
 plant.
 
@@ -3682,12 +3688,20 @@ nose-up starts on the outline (153 of 180).
 | link boxes: standard, limp | 180 | 180 | 180 |
 | link boxes: `--held` | 360 | 312 | 354 |
 | link boxes: `--hard` | 300 | 300 | 300 |
-| link boxes: `--grid` | 392 | 389 | 391 |
-| CAD outline: standard, limp | 180 | 167 | 180 |
-| CAD outline: `--held` | 360 | 213 | 354 |
-| CAD outline: `--hard` | 300 | 281 | 300 |
-| CAD outline: `--grid` | 392 | 366 | 392 |
-| of them with the tyres clear at the start | 235 | 225 | 235 |
+| link boxes: `--grid` | 392 | 388 | 391 |
+| CAD outline: standard, limp | 180 | 165 | 180 |
+| CAD outline: `--held` | 360 | 196 | 354 |
+| CAD outline: `--hard` | 300 | 264 | 300 |
+| CAD outline: `--grid` | 392 | 359 | 392 |
+| of them with the tyres clear at the start | 235 | 216 | 235 |
+
+The table is the rerun of 2026-11-22, after the evaluator's tyre fix (section
+31): until then the fitted plant's tyre torsion did not reach the tyres in
+any run with the boxes or the hulls. The first table had v2 at 389 on the
+boxes' grid and 167, 213, 281 and 366 on the outline's four lines (225 of the
+clear starts); v4's lines did not change. The numbers quoted in
+the text above (14 never up, 12 up only when told to drive, 167, 213) are the
+first table's; the rerun has 14 never up and 19 up only when told to drive.
 
 - The six `--held` starts it does not get up from are draw 5 tipped
   -1.6 rad, on both models: one of the two draws of section 8 with the legs
@@ -3714,3 +3728,58 @@ and the controller's `diagnostics` are enough) and take a photo from the side
 before engaging: the pitch at rest and the four drive angles say which grid
 pose it is, and what touches the floor in the photo says whether the outline
 is right.
+
+## 31. The demo policies on the CAD outline, and the tyres' ids (2026-11-22)
+
+Section 30 gave the evaluator the robot's outline for lying poses. The same
+outline answers what the demo policies of sections 18-23 left open: whether a
+link or the torso touches the floor in a deep bow, a full stride, a landing or
+the one-wheel stand. Until now that rested on the knees' heights
+(`LINK_SHADOW`), on the lowest mesh vertex (`LINK_FLOOR`) and, for the
+one-wheel stand, on dismissing the link boxes that fell it in 18 runs of 18.
+
+`SANDRO_OUTLINE=1` in the environment of any run script (read in
+`evaluate.run`): on a flat floor the whole hulls of the CAD meshes, one per
+leg body and one of the torso, meet the floor, and the link boxes collide with
+nothing (unlike `LEG_HULLS`, where the boxes still stop each other: upright
+the boxes of one leg's two upper links touch where the real links pass).
+
+    cd sandro_rl && SANDRO_OUTLINE=1 uv run python scripts/one_leg_runs.py --hold 8 policies/fun_one_leg_v4
+
+| On the outline | Runs | Falls | A part other than the tyres on the floor | The rest |
+|---|---|---|---|---|
+| `fun_one_leg_v4`, `one_leg_runs.py --hold 8` | 18 (54 requests) | 0 | never | 93 % on the left tyre alone, 5 % in the air; unbroken stand 1.1 .. 7.0 .. 7.0 s |
+| `fun_one_leg_long`, the same | 18 | 0 | never | 90 %, 5 %; unbroken 0.4 .. 2.1 .. 2.7 s |
+| `fun_bow`, `bow_runs.py` | 18 | 0 | never | 0.56 rad forward, 0.60 back |
+| `fun_stride`, `stride_runs.py` | 18 | 0 | never | 15 cm held |
+| `fun_hop_high`, `hop_runs.py` | 18 (108 hops) | 0 | never | 11.2-13.5 cm, touchdown 1.2-1.8 m/s |
+| `fun_show`, `show_runs.py` | 18 (36 hops) | 0 | never | roll 0.35 rad at 0.10 m |
+| the eight routines, `routine_runs.py` | 32 | 0 | never | wheels 19.4 rad/s at most |
+
+Every line equals its run without any link colliding: nothing but the tyres
+reaches the floor in these motions, so the outline changes nothing. The
+acceptance of `fun_one_leg_v4` stands as far as the simulation can say; what
+section 23 lists for the robot (the tyre on its shoulder, the floor's
+torsion) is untouched by this.
+
+**A fault found on the way.** `evaluate.run` scaled the tyres' torsional
+friction (`--sim tyre_torsion`, 0.01 on the fitted plant) at the description's
+geom ids. In a model built with the link boxes or the hulls the tyres have
+other ids (299 and 332 become 310 and 349 with the hulls), so the scale went
+to two other geoms and the tyres kept the MJCF's torsion: the "fitted plant"
+of every run with boxes or hulls was the fitted drive train on the stock
+tyre. The first outline run of the one-wheel stand showed it (82 % on the
+tyre and 7 hops per hold on both plants). Fixed by name
+(`evaluate.tyre_ids`, `tests/test_tyre_ids.py`). Affected and rerun: the
+stand-up tables of section 30 (v2 a little worse on the outline, v4
+unchanged; the conclusion stands) and `one_leg_runs.py --boxes` (still 18
+falls of 18). Not affected: training (the GPU environment has its own
+ids), the runs without boxes, the course models without boxes. The stand-up
+records of before section 30 (`stand_up`, `stand_up_v2`, the held legs of
+section 8) were measured with the fault on their fitted lines and are not
+rerun here except v2's, above.
+
+The stand-up sweeps write a CSV per run to `/tmp/stand_up_runs`, 39 GB for
+the eight suites of section 30: `/tmp` is memory on the workstation and filled
+during this rerun. Delete the folder between suites.
+

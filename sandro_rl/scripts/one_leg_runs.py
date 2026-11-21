@@ -15,6 +15,8 @@ alone (the stand), both tyres, nothing (a hop), or any other part of the robot (
 And the longest stand without a break (the shares hide a rocking from tap to tap), and how
 close the leg links' CAD meshes come to the floor (evaluate.LinkFloor): the description
 collides none of them, and their boxes (--boxes) reach 18 mm beyond them at the wheels.
+SANDRO_OUTLINE=1 in the environment: the hulls of the CAD meshes meet the floor instead (any
+run script; evaluate.run, docs/DESIGN.md 31).
 """
 import csv
 import sys

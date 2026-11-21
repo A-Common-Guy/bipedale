@@ -8,6 +8,29 @@ in front of people.
 The simulated version of the whole thing is
 [`sandro_rl/docs/demo_reel.mp4`](../sandro_rl/docs/demo_reel.mp4) (85 s).
 
+## What changed this weekend (2026-11-20 to 22)
+
+All of it is on `main`; nothing has run on the robot. New controllers are on
+the panel's list only: the gamepad's L1 + Triangle switch and the defaults
+are as they were.
+
+| Result | Kept? |
+|---|---|
+| Drive page routines (hold a button, the panel plays the sticks) | yes |
+| `rl_fun_show`: spins, sway, bob, hop | yes |
+| `rl_fun_stride`: the right stick scissors the legs | yes, flat floors only |
+| `rl_fun_bow`: the right stick leans the body | yes |
+| `rl_fun_hop_high`: 11–13 cm hops | yes |
+| `rl_fun_one_leg_v4`: 8 s on the left wheel | yes; holds on the CAD outline too (below) |
+| A flip | no: not possible with these drives |
+| `fun_fast_v2`: fast under the drives' speed limit | no; and `rl_fun_fast` falls above about 1.2 m/s with the limit modelled |
+| `rl_agile_terrain_v7`: v6 under the speed limit | yes, as an alternative to v6 |
+| `agile_step_v3`: the camera policy on a 5 cm step | no |
+| v6's obstacle record was without the camera's 99 g | corrected: 11 of 27 on the plank course with it |
+| `rl_agile_terrain_v8`: the everyday policy refit with the camera | yes, as an alternative; staggered stance |
+| `rl_stand_up_v4`: stand-up from lying with the legs out | yes, beside v2 |
+| The evaluator's tyre fix (fitted plant with link boxes or hulls) | fixed; stand-up numbers rerun |
+
 ## Before the demo
 
 Do these at home, not at the venue.
@@ -36,7 +59,7 @@ Do these at home, not at the venue.
 
 | # | Controller | Why here |
 |---|---|---|
-| 1 | `rl_agile_terrain_v6` | Known on the robot. Check the Drive page and the Greeting and Figure eight routines with it. `rl_agile_terrain_v7` (panel list, never run on the robot) is the same policy trained with the drives' speed limit modelled: in simulation a shove at full stick fells v6 in 3 runs of 18 under that limit and v7 in none. Until v7 has been tried, keep v6 at 0.8 of the stick or less. Keep both on flat floor: with the camera fitted v6 crosses the 2.5 cm plank course in 11 simulated runs of 27, not the 27 of its record (`sandro_rl/docs/DESIGN.md` 28). `rl_agile_terrain_v8` (panel list, never run on the robot) is the refit to the robot with the camera: it stands with the right wheel 7 cm ahead of the left, crosses that course in 26 of 27 and takes the shoves under the speed limit; it leans back a little (0.055 rad), does not go lower than about 0.14 m, and its measured loop has a crossing at 14 Hz of 0.47 where v6 has none, so listen for a roll buzz when you compare it with v6 (`sandro_rl/docs/DESIGN.md` 29). |
+| 1 | `rl_agile_terrain_v6` | Known on the robot. Check the Drive page and the Greeting and Figure eight routines with it. `rl_agile_terrain_v7` (panel list, never run on the robot) is the same policy trained with the drives' speed limit modelled: in simulation a shove at full stick fells v6 in 3 runs of 18 under that limit and v7 in none. Until v7 has been tried, keep v6 at 0.8 of the stick or less. Keep both on flat floor: with the camera fitted v6 crosses the 2.5 cm plank course in 11 simulated runs of 27, not the 27 of its record (`sandro_rl/docs/DESIGN.md` 28). `rl_agile_terrain_v8` (panel list, never run on the robot) is the refit to the robot with the camera: it stands with the right wheel 7 cm ahead of the left, crosses that course in 26 of 27 and takes the shoves under the speed limit; it leans back a little (0.055 rad), does not go lower than about 0.14 m, and its measured loop has a crossing at 14 Hz of 0.47 where v6 has none, so listen for a roll buzz when you compare it with v6; if it buzzes, add `action: {wheel_differential_filter_hz: 3.0}` under `rl_agile_terrain_v8` in `sandro_real_overrides.yaml` (behind that filter the simulated crossing is 0.32 and the course 27 of 27) (`sandro_rl/docs/DESIGN.md` 29). |
 | 2 | `rl_fun_bow` | Slow, low torque (4.9 Nm), wheels under 10 rad/s standing. |
 | 3 | `rl_fun_stride` | Low torque (3.6 Nm), but the legs move fast and it has no margin for edges. |
 | 4 | `rl_fun_show` | Fast spins, hops of 5–7 cm at up to 8.2 Nm. Start with the slider low: full stick is 5.5 rad/s of spin. |
@@ -77,6 +100,11 @@ Floor space is what the routine used in simulation at 50 % speed, on the
 stock model and on the model fitted to the robot's drive train, with the
 drives' speed limit modelled (`sandro_rl/scripts/routine_runs.py`). No routine
 fell at 50 % or 100 % speed, and no wheel passed the drives' 19.5 rad/s.
+
+All of them were run again on the robot's CAD outline (the hulls of the leg
+links and the torso able to touch the floor, `SANDRO_OUTLINE=1`): no fall and
+nothing but the tyres on the floor in any policy's test or any routine
+(`sandro_rl/docs/DESIGN.md` 31).
 
 ### `rl_fun_show`: spins, sway, bob, hop
 
@@ -155,10 +183,11 @@ fell at 50 % or 100 % speed, and no wheel passed the drives' 19.5 rad/s.
     1.0 rad.
   - It holds cleanly only where the tyre twists easily on the floor. On the
     stock model's grippier tyre it makes about 7 small hops per hold.
-  - The clean result was judged with the leg links' real meshes. With the
-    simplified collision boxes switched on it fell in 18 runs of 18; the
-    boxes are larger than the links, but that explanation has not been
-    checked against the robot.
+  - Checked on the robot's CAD outline (2026-11-22): with the hulls of the
+    links and the torso able to touch the floor it holds exactly as before,
+    54 of 54, no fall, nothing but tyres on the floor. The 18 falls of 18
+    with the simplified collision boxes were the boxes, which are larger
+    than the links.
   - The raised wheel spins up to 25 rad/s in the air.
 
 ## Not for the demo
@@ -188,7 +217,8 @@ fell at 50 % or 100 % speed, and no wheel passed the drives' 19.5 rad/s.
   the tyres off the floor; v4 was trained for that
   (`sandro_rl/docs/DESIGN.md` section 30). Before the demo, try v4 once from
   that pose with `policy_record.py` running and a photo from the side taken
-  first. If neither gets up, fold the legs by hand and start again.
+  first, and one start of v2 from the same pose: the two recordings and
+  the photo say whether the simulated cause is the robot's. If neither gets up, fold the legs by hand and start again.
 - **E-stop:** the panel's button on every page, or L2 + R2 on the gamepad.
   Neither replaces the power switch.
 
