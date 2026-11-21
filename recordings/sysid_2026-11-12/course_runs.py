@@ -1,7 +1,8 @@
 """How often policies cross the planks-and-hill course at 0.5 m/s: three plants (the MJCF,
 the fitted yaw plant, the same with leg rotors at 35 x) x three latency profiles x three seeds.
 POLICY:HZ adds the differential wheel filter of the robot overrides, POLICY:KEY=VALUE any
-evaluator option (camera=0: a perceptive policy with its terrain profile unknown).
+evaluator option (camera=0: a perceptive policy with its terrain profile unknown);
+camera_mass=0: the robot without the D435's 99 g, the model of before 2026-11-18).
 --steps first: the planks of 3, 4, 5 and 6 cm and the 6 cm curb instead (evaluate.py COURSES).
 
     cd sandro_rl && uv run python ../recordings/sysid_2026-11-12/course_runs.py policies/agile_terrain:3 policies/agile_terrain_v3

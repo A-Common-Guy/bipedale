@@ -223,6 +223,10 @@ class SimOptions:
     # Factor on the leg drives' armature (reflected rotor inertia); the wheel's
     # rotor is about 22 x the MJCF value on the bench (2026-11-15).
     leg_armature_scale: float = 1.0
+    # Factor on the mass and inertia of the D435 and its bracket (the model's
+    # `camera` body, 99 g, in the MJCF since 2026-11-18). 0 is the robot the
+    # policies before that date were trained and measured on (DESIGN.md 27).
+    camera_mass_scale: float = 1.0
     unpowered_s: float = 0.03
     settle_s: float = 3.0
     command_rate_hz: float = 20.0
@@ -257,7 +261,7 @@ class SimOptions:
                  "wheel_speed_gain": "wheel_speed_limit_gain", "fallen_roll": "fallen_roll_rad", "fallen_legs": "fallen_legs", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
                  "gear_stiffness": "gear_stiffness_nm_rad", "gear_damping": "gear_damping_nm_s_rad",
                  "tyre_torsion": "tyre_torsion_scale", "wheel_friction": "wheel_friction_scale",
-                 "leg_armature": "leg_armature_scale",
+                 "leg_armature": "leg_armature_scale", "camera_mass": "camera_mass_scale",
                  "rotor_inertia": "rotor_inertia_scale",
                  "differential_filter": "wheel_differential_filter_hz",
                  "yaw_chirp": "yaw_chirp_nm", "yaw_chirp_start": "yaw_chirp_start_s"}
@@ -685,6 +689,17 @@ class PolicyController:
         return self.frames
 
 
+def scale_camera_mass(m: mujoco.MjModel, scale: float) -> None:
+    """The D435 and its bracket (the `camera` body) made `scale` times as heavy; 0 takes
+    them off the robot, which is the model of before 2026-11-18."""
+    body = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "camera")
+    if body < 0:
+        raise ValueError("camera_mass: the model has no `camera` body")
+    m.body_mass[body] *= scale
+    m.body_inertia[body] *= scale
+    mujoco.mj_setConst(m, mujoco.MjData(m))
+
+
 def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         video: Path | None = None, video_fps: int = 30, seed: int = 1,
         course: bool | str = False, heading_hold: float = 0.0,
@@ -739,6 +754,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     m.geom_friction[spec.tyre_geoms, 1] *= options.tyre_torsion_scale
     m.dof_frictionloss[dadr[spec.wheel_index]] *= options.wheel_friction_scale
     m.dof_armature[dadr[spec.leg_index]] *= options.leg_armature_scale
+    if options.camera_mass_scale != 1.0:
+        scale_camera_mass(m, options.camera_mass_scale)
     gears = {}
     if options.wheel_backlash_rad > 0.0:
         for i, name in enumerate(JOINTS):

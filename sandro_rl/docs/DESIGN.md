@@ -1878,6 +1878,11 @@ do reliably; seeing the plank is what `agile_perceptive` (section 14) is for.
 Deployed as `rl_agile_terrain_v6` (gamepad switch, cyan; first policy on the
 Run page), without the filter in the overrides; it can be run with it.
 
+**Correction (2026-11-21).** The course numbers of this section, and those of
+v3 and v5 above, are for the robot without the depth camera: the D435 and its
+bracket entered the model on 2026-11-18 at 17:47 (`b76df0b`), after these
+runs. With them v6 crosses in 11 of 27 and v5 in 18; section 28.
+
 ## 9. Deployment sketch (not executed; the owner's decision)
 
 This is a `sandro_controllers` controller plugin, `RlPolicyController`, that
@@ -3339,17 +3344,20 @@ What it does not do:
   every table to 0.12–0.23 with no crossing, but fell once in the 18 shoved
   runs with the limiter; the shoves are what v7 is for, so the earlier
   checkpoint is the policy.
-- **The course is not solved by either.** The record (section 8) has v6 at 27
-  of 27; today `course_runs.py` gives it 11 of 27, on today's tree and on the
-  tree of v6's own commit (85ef16b) alike, the same fall each time (the
-  evaluator is deterministic), so what the 27 was measured on is not known and
-  not reproduced. v6 now falls after the turn, re-crossing the obstacles at
-  an angle on the fitted plants; v7 falls at the 25 mm plank and the hill on
-  the MJCF's stiffer tyre and crosses on the fitted plants. As before
-  (sections 8 and 15) the count moves from 3 to 20 of 27 between checkpoints
-  100 iterations apart with the same training statistics: it measures a
-  policy at the edge of what it can do, and v7 was picked among seven
-  checkpoints with it in view, which flatters it.
+- **The course is not solved by either, and v6's record was for the robot
+  without the camera.** The record (section 8) has v6 at 27 of 27; today
+  `course_runs.py` gives it 11. The 27 was real: it was measured an hour
+  before the D435 and its bracket went into the model (99 g at the front,
+  `b76df0b`), and with them taken off again v6 crosses in 26 of 27 (section
+  28, which also corrects the sentence that stood here: the tree of v6's own
+  commit does reproduce the 27, byte for byte). With the camera v6 falls
+  after the turn, re-crossing the obstacles at an angle on the fitted plants;
+  v7, trained with the camera, falls at the 25 mm plank and the hill on the
+  MJCF's stiffer tyre and crosses on the fitted plants. As before (sections 8
+  and 15) the count moves from 3 to 20 of 27 between checkpoints 100
+  iterations apart with the same training statistics: it measures a policy at
+  the edge of what it can do, and v7 was picked among seven checkpoints with
+  it in view, which flatters it.
 
 All 12 standard runs complete (`eval/comparison.md`). Deployed as
 `rl_agile_terrain_v7` on the panel's list only; `rl_agile_terrain_v6` stays
@@ -3406,3 +3414,84 @@ What the runs say about why:
   where the plant allows it, as the fitted plant already does. The second is
   what the robot is closer to; whether the real tyres drive up a 5 cm face
   is a test for the owner, with `rl_agile_step_v2` and the robot held.
+
+## 28. The camera's 99 g and the course records of the blind policies (2026-11-21)
+
+`agile_terrain_v6` was accepted with the plank-and-hill course at 0.5 m/s in
+27 of 27 runs (section 8). Measured again for `agile_terrain_v7` it gave 11
+of 27, and section 26 first said that the record could not be reproduced,
+not even on the tree of v6's own commit. That was wrong, and the cause is a
+change of the robot, not of the evaluation.
+
+**What was checked.**
+
+- The CSVs of the acceptance run of 2026-11-18 15:38 were still in
+  `/tmp/course_runs` (`agile_terrain_v6:3`, all 27 full length). One of them
+  (fitted plant, nominal latency, seed 1, 3 Hz filter) rerun on a worktree of
+  v6's commit `85ef16b`, with that worktree's own `sandro_rl` imported, is
+  identical to the byte and crosses. The same run on today's tree falls, and
+  differs from the first logged sample on.
+- The earlier check on "v6's tree" had run `course_runs.py` from a worktree
+  with the project's virtualenv: a script puts its own folder first on the
+  path, not the working directory, so the installed (editable) `sandro_rl` of
+  the main tree was imported, and `sources.py` read the main tree's model.
+  It measured today's tree twice.
+- Bisected to `b76df0b` (2026-11-18 17:47, two hours after v6): the D435 and
+  its bracket in the MJCF, a `camera` body of 0.099 kg at the front of the
+  torso without collision geometry. Total mass 4.825 to 4.924 kg, the centre
+  of mass 2.5 mm higher and 2.3 mm further forward at the stand, pitch
+  inertia +5 %. Nothing else in that commit reaches a blind policy's run
+  (the evaluator's additions are the terrain profile, used only by policies
+  that have one).
+- The other candidates are not it: a policy whose config has no
+  `action.wheel_speed_limit` gets no limiter (`evaluate.py`, `trained_cap`
+  is None); the link boxes and the link-floor check are off on a course; the
+  evaluator is deterministic (the same fall each time).
+
+**The course with and without the camera's mass**, today's tree,
+`course_runs.py POLICY` and `POLICY:camera_mass=0` (a new evaluator option,
+`--sim camera_mass=0`: the `camera` body's mass and inertia scaled, tested
+in `tests/test_camera_mass.py`). Of 27; per plant MJCF / fitted / heavy legs
+of 9:
+
+| Policy | trained | with the camera (the robot today) | without it |
+| --- | --- | --- | --- |
+| `agile_terrain_v3` | before | 27 (9 / 9 / 9) | 27 (9 / 9 / 9) |
+| `agile_terrain_v5` | before | 18 (9 / 5 / 4) | 27 (9 / 9 / 9) |
+| `agile_terrain_v6` | before | 11 (9 / 1 / 1) | 26 (9 / 9 / 8) |
+| `agile_terrain_v7` | with it | 20 (3 / 8 / 9) | 22 (4 / 9 / 9) |
+| `fun_split` | with it | 27 (9 / 9 / 9) | 27 (9 / 9 / 9) |
+
+(Without the camera v6 gives 26 where the record has 27: the run is not
+the recorded one sample for sample, so something else in the model or the
+evaluator has moved a little since; what was not looked for.)
+
+**What it means.**
+
+- The records of v3, v5 and v6 stand as measurements of the robot without
+  the camera. The robot carries the camera now, so the right-hand column of
+  each record is history and the left one above is what to expect.
+- 99 g at the front takes v6 from 26 to 11 on this course and v5 from 27 to
+  18: the margin-trained policies sit closer to the edge on 2.5 cm planks
+  than their records said, on the fitted plants. On flat ground nothing of
+  the kind shows: v6's standard runs, shoves and tracking measured this
+  weekend (section 26) are all on the model with the camera.
+- `agile_terrain_v3` and `fun_split` do not care. v3 is the policy to take
+  over planks if the robot has to cross some blind; it rings more on the
+  robot's yaw plant than v5 and v6 (section 8), which is why it is not the
+  default.
+- v7 was trained with the camera and is better than v6 on this course on
+  the robot's plants (8 and 9 of 9 on the fitted ones against 1 and 1), and
+  worse on the stock MJCF's stiffer tyre (3 of 9).
+- Every policy trained since 2026-11-18 17:47 (`agile_step`, `stand_up_v2`,
+  all `fun_*`, v7) was trained and measured with the camera: this weekend's
+  numbers are not touched. Policies from before it that are deployed
+  (`flat_level*`, `agile_terrain` to v6, `stand_up`) were trained without
+  it; their simulated results from before that date, the course above all,
+  are for the lighter robot and have not been measured again here beyond
+  this table. The camera's mass is the datasheet's and the bracket's from its CAD
+  volume, not weighed (`sim_identified.yaml`).
+- For comparisons across trees: import the tree's own package
+  (`sys.path.insert(0, <worktree>/sandro_rl)` and assert
+  `sources.REPO`), or the model read is the main tree's.
+
