@@ -243,7 +243,7 @@ def test_real_robot_overrides_only_touch_known_parameters():
     overrides = yaml.safe_load((ROOT / "config" / "sandro_real_overrides.yaml").read_text())
     assert set(overrides) == {"whole_body_controller", "rl_flat_level", "rl_agile_terrain",
                               "rl_stand_up", "rl_flat_level_fast", "rl_flat_level_sysid",
-                              "rl_flat_level_fast_sysid", "rl_agile_terrain_v3", "rl_agile_terrain_v5", "rl_agile_terrain_v6", "rl_agile_step", "rl_agile_step_v2", "rl_stand_up_v2", "rl_fun_split", "rl_fun_fast", "rl_fun_one_leg", "rl_fun_one_leg_long", "rl_fun_show", "rl_fun_stride", "rl_fun_bow", "rl_fun_hop_high",
+                              "rl_flat_level_fast_sysid", "rl_agile_terrain_v3", "rl_agile_terrain_v5", "rl_agile_terrain_v6", "rl_agile_step", "rl_agile_step_v2", "rl_stand_up_v2", "rl_fun_split", "rl_fun_fast", "rl_fun_one_leg", "rl_fun_one_leg_long", "rl_fun_show", "rl_fun_stride", "rl_fun_bow", "rl_fun_hop_high", "rl_fun_one_leg_v4",
                               "height_profile"}
     base = shipped["whole_body_controller"]["ros__parameters"]
 
@@ -261,7 +261,7 @@ def test_real_robot_overrides_only_touch_known_parameters():
     assert tasks["fore_aft"]["neutral_offset_m"] < 0.0
     assert tasks["height"]["max_m"] <= 0.19
     for name in ("rl_flat_level", "rl_agile_terrain", "rl_stand_up", "rl_flat_level_fast",
-                 "rl_flat_level_sysid", "rl_flat_level_fast_sysid", "rl_agile_terrain_v3", "rl_agile_terrain_v5", "rl_agile_terrain_v6", "rl_agile_step", "rl_agile_step_v2", "rl_stand_up_v2", "rl_fun_split", "rl_fun_fast", "rl_fun_one_leg", "rl_fun_one_leg_long", "rl_fun_show", "rl_fun_stride", "rl_fun_bow", "rl_fun_hop_high"):
+                 "rl_flat_level_sysid", "rl_flat_level_fast_sysid", "rl_agile_terrain_v3", "rl_agile_terrain_v5", "rl_agile_terrain_v6", "rl_agile_step", "rl_agile_step_v2", "rl_stand_up_v2", "rl_fun_split", "rl_fun_fast", "rl_fun_one_leg", "rl_fun_one_leg_long", "rl_fun_show", "rl_fun_stride", "rl_fun_bow", "rl_fun_hop_high", "rl_fun_one_leg_v4"):
         check(overrides[name]["ros__parameters"], shipped[name]["ros__parameters"], f"{name}.")
         # One physical IMU mounting for every controller.
         assert (overrides[name]["ros__parameters"]["observation"]["imu_offset_rad"]
@@ -279,7 +279,7 @@ def test_rl_policies_are_complete():
     manager = config["controller_manager"]["ros__parameters"]
     controllers = ROOT.parent / "sandro_controllers"
     assert set(manager) == {"rl_flat_level", "rl_agile_terrain", "rl_stand_up", "rl_flat_level_fast",
-                            "rl_flat_level_sysid", "rl_flat_level_fast_sysid", "rl_agile_terrain_v3", "rl_agile_terrain_v5", "rl_agile_terrain_v6", "rl_agile_step", "rl_agile_step_v2", "rl_stand_up_v2", "rl_fun_split", "rl_fun_fast", "rl_fun_one_leg", "rl_fun_one_leg_long", "rl_fun_show", "rl_fun_stride", "rl_fun_bow", "rl_fun_hop_high"}
+                            "rl_flat_level_sysid", "rl_flat_level_fast_sysid", "rl_agile_terrain_v3", "rl_agile_terrain_v5", "rl_agile_terrain_v6", "rl_agile_step", "rl_agile_step_v2", "rl_stand_up_v2", "rl_fun_split", "rl_fun_fast", "rl_fun_one_leg", "rl_fun_one_leg_long", "rl_fun_show", "rl_fun_stride", "rl_fun_bow", "rl_fun_hop_high", "rl_fun_one_leg_v4"}
     # Only the stand-up policy engages lying down.
     assert {name for name in manager
             if (config[name]["ros__parameters"].get("safety") or {}).get("start_lying")} == {"rl_stand_up", "rl_stand_up_v2"}

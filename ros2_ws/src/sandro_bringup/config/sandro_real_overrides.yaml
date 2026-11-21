@@ -181,6 +181,18 @@ rl_fun_hop_high:
     observation:
       imu_offset_rad: 0.016
 
+# The one-wheel stand again (2026-11-21, sandro_rl/docs/DESIGN.md section 23):
+# on L1 + cross it rolls to about 0.8 rad onto the left tyre and holds 8 s,
+# balancing by yawing on the spot (it turns about two times and wanders up to
+# 0.9 m). In simulation it holds without a break only where the tyre twists
+# easily on the floor (the fitted plant); on a grippy floor it hops. The fall
+# angle (1.0 rad) is 0.15-0.2 rad away: 2 m of clear, smooth floor, a hand
+# near the E-stop. Not run on the robot.
+rl_fun_one_leg_v4:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
+
 # The terrain profile (sandro_perception) takes the same physical IMU mounting
 # as the controllers above.
 height_profile:

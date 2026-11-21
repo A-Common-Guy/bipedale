@@ -105,6 +105,10 @@ class SandroEnv:
         self.link_boxes = np.array([g for g in range(s.model.ngeom)
                                     if (s.model.geom(g).name or "").endswith("_link_box")], dtype=int)
         self.link_half = jp.asarray(s.model.geom_size[self.link_boxes], dtype=jp.float32)
+        # The knees, for rewards.weights.knee_low: a raised leg's knee hangs below its wheel,
+        # and in a simulation that collides only tyres and torso it passes through the floor.
+        self.knee_joints = np.array([j for j in range(s.model.njnt) if "passive" in s.model.joint(j).name]
+                                    if "knee_low" in cfg["rewards"]["weights"] else [], dtype=int)
         self.impl = cfg.get("impl", "warp")
         graph_mode = None
         if self.impl == "warp" and cfg.get("graph_mode"):
@@ -897,6 +901,10 @@ class SandroEnv:
             extra["goal_dist"] = jp.sqrt(forward ** 2 + left ** 2)
         if self.n_rays:
             extra["rays"] = self._scan(data, r_body)
+        if len(self.knee_joints):
+            # The lowest knee (the five-bar's passive hinges) above the ground under it.
+            knees = data.xanchor[self.knee_joints]
+            extra["knee_clearance"] = jp.min(knees[:, 2] - self.terrain.ground_height(knees, data))
         if len(self.link_boxes):
             # The lowest corner of any leg link above a flat floor.
             up = data.geom_xmat[self.link_boxes].reshape(-1, 3, 3)[:, 2, :]
@@ -1025,6 +1033,7 @@ class SandroEnv:
             jump_wait, jump_height = self._sample_jump(jax.random.fold_in(k[9], 1))
             info.update({"jump_wait": jump_wait, "jump_timer": jp.float32(-10.0), "jump_height": jump_height,
                          "jump_shown": jp.float32(1.0), "jump_air": jp.float32(0.0), "jump_done": jp.float32(0.0),
+                         "one_leg_streak": jp.float32(0.0),
                          "jump_clearance": jp.float32(0.0), "flip_angle": jp.float32(0.0)})
         if self.has_goal:
             start = jp.asarray(self.stand_axle[:2], dtype=jp.float32)
@@ -1226,6 +1235,12 @@ class SandroEnv:
         info["axle_prev"] = truth["axle"]
         if self.has_jump:
             info["jump_clearance"] = jp.min(truth["clearance"])
+            if "streak_s" in self.jump:
+                # Seconds on the left tyre alone without a break: the raised wheel clear of
+                # the floor by tap_m, the left tyre on it, in the window.
+                alone = ((truth["clearance"][0] > self.jump.get("tap_m", 0.015)) & (truth["clearance"][1] < 0.005)
+                         & (info["jump_timer"] > 0.0))
+                info["one_leg_streak"] = jp.where(alone, info["one_leg_streak"] + self.dt, 0.0)
             if self.has_flip:
                 # The turn made since the request, about the body's pitch axis.
                 info["flip_angle"] = info["flip_angle"] + (self._jumping(info) * float(self.flip.get("direction", 1.0))
@@ -1479,6 +1494,10 @@ class SandroEnv:
             "stand_height": jp.clip((truth["imu_height"] - r.get("stand_height_from_m", 0.0))
                                     / (self.stand_imu_height - r.get("stand_height_from_m", 0.0)), 0.0, 1.0),
         }
+        if "knee_clearance" in truth:
+            # A knee within knee_margin_m of the floor (its hinge; the link's end is a
+            # bearing housing around it): 0 clear of it, 1 with the hinge on the floor.
+            terms["knee_low"] = jp.clip(1.0 - truth["knee_clearance"] / r.get("knee_margin_m", 0.035), 0.0, 1.0)
         if "upright_gate_rad" in r:
             # Tracking pays only once up, so lying still is not a way to earn it.
             up = jp.exp(-(truth["tilt"] / r["upright_gate_rad"]) ** 2)
@@ -1500,6 +1519,12 @@ class SandroEnv:
                                            > self.jump.get("link_margin_m", 0.015)).astype(jp.float32)
                 raised = truth["clearance"][0]
                 lift = grounded * jp.clip(raised, 0.0, info["jump_height"]) / info["jump_height"]
+                if "streak_s" in self.jump:
+                    # A stand, not a rocking from tap to tap: the pay grows over streak_s
+                    # of standing without a break, from streak_floor of it.
+                    floor = self.jump.get("streak_floor", 0.15)
+                    lift = lift * (floor + (1.0 - floor) * jp.clip(
+                        info["one_leg_streak"] / self.jump["streak_s"], 0.0, 1.0))
             else:
                 raised = jp.min(truth["clearance"])
                 # target_m: every request is paid up to this clearance, whatever height it
@@ -1517,6 +1542,13 @@ class SandroEnv:
             if one_leg and self.jump.get("steady", False):
                 # A stand, not a series of hops: the supporting tyre leaving the floor costs.
                 terms["jump_airborne"] = in_window * (truth["clearance"][1] > 0.005)
+            if one_leg and "settle_s" in self.jump:
+                # Once settle_s into the window the stand is on the left tyre alone: the
+                # raised wheel coming back to within tap_m of the floor (a tap to catch the
+                # roll, or never lifting) and the left tyre leaving the floor (a hop) cost.
+                settled = in_window * (info["jump_timer"] < self.jump["window_s"] - self.jump["settle_s"])
+                terms["one_leg_tap"] = settled * (raised < self.jump.get("tap_m", 0.015))
+                terms["one_leg_flight"] = settled * (truth["clearance"][1] > 0.005)
             if self.has_flip:
                 turn = float(self.flip.get("angle_rad", 2.0 * math.pi))
                 rate = float(self.flip.get("rate_clip_rad_s", 20.0))

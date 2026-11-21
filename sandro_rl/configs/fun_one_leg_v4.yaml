@@ -1,0 +1,94 @@
+# The one-wheel stand as a balance, not a rocking (docs/DESIGN.md 23).
+# fun_one_leg_long does not stand: it rocks at 2.4 Hz, the raised wheel back
+# at the floor 15 times in an 8 s hold and never 3 s without a tap or a hop
+# (scripts/one_leg_runs.py now reports the longest stand without a break).
+# Its roll stays at 0.3-0.5 rad, short of where the weight is over the tyre
+# (0.6-0.8 rad): the lineage's tilt constraint (0.6) and fall (0.8) sit there.
+# v2 and v3 asked for a link margin measured on the links' boxes, which reach
+# 18 mm beyond the meshes at the wheels (7 mm from the floor on a wheel that
+# stands), and penalised the body's vertical speed. Here:
+# - tilt allowed to 0.85 rad, a fall at 0.95 (the robot's fall angle is 1.0);
+# - the stand's pay grows over streak_s without a break (the raised wheel
+#   2 cm clear, the left tyre on the floor): a tap starts it again;
+# - taps and hops cost per second from settle_s into the window
+#   (one_leg_tap, one_leg_flight); a knee near the floor costs (knee_low);
+# - weak pushes (8 N, 2 N sideways): a shove on one wheel can only be answered
+#   with a tap;
+# - no link boxes in the simulation;
+# - the window grows: 2 s, then 5, then 8.
+#
+# As trained (policies/fun_one_leg_v4), in three runs:
+#     a: --resume policies/fun_show, 2800 iterations (window 8 from 2000), taps and hops only
+#     b: --resume a at 2000, with knee_low: --set train.curriculum_offset=2000 --set train.iterations=1600
+#     c: --resume b at 600, with the streak and the tilt limits: --set train.curriculum_offset=2000
+#        --set train.iterations=1400 (kept)
+# The curriculum below is the same course in one run from fun_show (not run as one).
+#
+#     uv run python -m sandro_rl.train configs/fun_one_leg_v4.yaml --resume policies/fun_show
+#     MUJOCO_GL=egl uv run python scripts/one_leg_runs.py --hold 8 policies/fun_one_leg_long policies/fun_one_leg_v4
+inherit: fun_one_leg_long.yaml
+
+env:
+  commands:
+    jump:
+      settle_s: 0.7
+      tap_m: 0.02
+      streak_s: 1.5               # the stand's pay grows over 1.5 s without a tap or a hop
+      streak_floor: 0.15
+  rewards:
+    knee_margin_m: 0.035
+    weights:
+      one_leg_tap: -15.0
+      one_leg_flight: -8.0
+      knee_low: -30.0             # the raised leg's knee kept off the floor (it hangs below the wheel)
+
+  # On one wheel the weight is over the tyre at about 0.6 rad of roll: the lineage's tilt
+  # constraint (0.6) and fall (0.8) sit on it. The robot's own fall angle is 1.0.
+  constraints:
+    tilt: {limit_rad: 0.85, slack: 0.3}
+  termination:
+    tilt_rad: 0.95
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.commands.sample_fraction: 1.0
+        env.terrain.planks.height_m: [0.002, 0.01]
+        env.terrain.hills.height_m: [0.0, 0.03]
+        env.pushes.force_n: 8.0
+        env.pushes.lateral_force_n: 2.0
+        env.pushes.vertical_force_n: 0.0
+        env.pushes.torque_nm: [0.0, 0.0]
+        env.commands.jump.height_m: [0.03, 0.06]
+        env.commands.jump.window_s: 2.0
+    - iteration: 1200
+      set:
+        env.commands.sample_fraction: 1.0
+        env.terrain.planks.height_m: [0.002, 0.01]
+        env.terrain.hills.height_m: [0.0, 0.03]
+        env.pushes.force_n: 8.0
+        env.pushes.lateral_force_n: 2.0
+        env.pushes.vertical_force_n: 0.0
+        env.pushes.torque_nm: [0.0, 0.0]
+        env.commands.jump.height_m: [0.03, 0.06]
+        env.commands.jump.window_s: 5.0
+    - iteration: 2600
+      set:
+        env.commands.sample_fraction: 1.0
+        env.terrain.planks.height_m: [0.002, 0.01]
+        env.terrain.hills.height_m: [0.0, 0.03]
+        env.pushes.force_n: 8.0
+        env.pushes.lateral_force_n: 2.0
+        env.pushes.vertical_force_n: 0.0
+        env.pushes.torque_nm: [0.0, 0.0]
+        env.commands.jump.height_m: [0.03, 0.06]
+        env.commands.jump.window_s: 8.0
+
+train:
+  iterations: 3600
+  curriculum_offset: 0
+
+deploy:
+  safety:
+    oscillation_hold_s: 9.5

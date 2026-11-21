@@ -2584,6 +2584,10 @@ another. The policy is not committed; `configs/fun_one_leg_v3.yaml` stays as
 the record. What has not been tried is training the stand from scratch with
 the links colliding, instead of resuming a policy whose stand leans on one.
 
+Section 23 (2026-11-21) found what was wrong with v2 and v3 (the margin
+measured on the links' boxes, the tilt limits) and that the "stand" is a
+rocking from tap to tap.
+
 ## 17. The camera policies under the robot's own perception (2026-11-20)
 
 On the robot `rl_agile_step` did not seem to react to the camera at all
@@ -3031,3 +3035,123 @@ have to wait out the flip as the evaluator's now does.
 Videos: `policies/fun_flip_strong/fun_flip_strong.mp4` and `_slow.mp4` (a
 quarter of the speed), from the side: the hop, the turn, the crash. To go on
 from it: `--resume policies/fun_flip_strong` with `configs/fun_flip_strong.yaml`.
+
+## 23. The one-wheel stand as a balance: `configs/fun_one_leg_v4.yaml` (2026-11-21)
+
+Deployed as `rl_fun_one_leg_v4` (panel list); not run on the robot. It
+replaces nothing: `rl_fun_one_leg` and `_long` stay.
+
+### What a stand on one wheel is
+
+The legs move in the body's fore-aft plane only, so on the left tyre nothing
+turns the robot about its roll axis directly. The centre of mass is 0.15 m to
+the right of the left tyre and 0.21 m above the floor at the standing height
+(lower with the legs short), so the weight is over the tyre's outer edge with
+the body rolled by atan(0.158 / h): 0.65 rad at the standing height, more
+standing low (the policy below holds 0.8). There it is an
+inverted pendulum 0.26 m long (it falls with a time constant of 0.16 s) on a
+contact 17 mm wide. What can move the weight against the contact:
+
+- the left leg's length: with the body rolled by 0.6-0.8 rad, 1 cm of leg is
+  6-7 mm of weight sideways. The stroke gives about +-2 cm; a 2 N shove for
+  0.25 s already takes 1.7 cm of it;
+- turning on the spot: the tyre's edge rolls on a circle and the contact
+  moves under the weight, as a coin or a unicycle does. The raised wheel and
+  the raised leg turn about an axis tilted with the body, so their reaction
+  has a part about the vertical;
+- a hop, which puts the tyre somewhere else.
+
+So it is a dynamic balance, not a pose, and it lives 0.2-0.4 rad from the
+robot's fall angle (1.0 rad).
+
+### What the earlier policies do
+
+`scripts/one_leg_runs.py` now reports the longest stand without a break (the
+raised wheel 2 cm clear and the left tyre on the floor) and the breaks per
+request, and how close the leg links' CAD meshes come to the floor
+(`evaluate.LinkFloor`). `fun_one_leg_long` does not stand: it rocks at
+2.4 Hz between 0.3 and 0.5 rad of roll, short of the balance, falling back
+onto the right wheel and pushing off again: 15 breaks in an 8 s hold (4 to
+16), never 3 s without one. The contact shares of
+section 16 (90 % on the left tyre alone) hid that: a tap is short. Its "other
+part on the floor" with the links colliding was the right leg's lower-link
+box at each tap. The boxes reach 18 mm beyond the meshes at the wheels: the
+lowest mesh vertex is 25 mm up on a standing wheel, the box 7 mm. That is
+also why `fun_one_leg_v2` and `_v3` could not work: their link margin (15 and
+8 mm, measured on the boxes) cannot be met with the supporting wheel on the
+floor. And the lineage's tilt constraint (0.6 rad) and fall (0.8) sit on the
+balance angle.
+
+### The task and the runs
+
+`commands.jump.settle_s`, `tap_m`: from 0.7 s into the window the raised
+wheel within 2 cm of the floor (`one_leg_tap`) and the left tyre off it
+(`one_leg_flight`) cost per second. `commands.jump.streak_s`: the stand's
+pay grows from 15 % to all of it over 1.5 s without a break and starts again
+at each one. `rewards.weights.knee_low`: a knee hinge within 3.5 cm of the
+floor costs (a raised leg's knee hangs below its wheel and the simulation
+does not collide it). Tilt constraint 0.85 rad, fall 0.95. Pushes 8 N and 2 N
+sideways. No link boxes in the simulation. From `fun_show`, which has never
+stood on one wheel.
+
+| Run | From | What | `--hold`, own simulation |
+|---|---|---|---|
+| a | `fun_show`, 2800 its, window 2, 5, 8 s | taps and hops per second only | the rocking again: 90 % left tyre alone, no fall, right wheel at the floor every 0.4 s. Not resuming the habit was not the point |
+| b | a at 2000, 1600 its | + `knee_low` | the same, 88-92 % |
+| **c** | b at 600, 1400 its (5 s, then 8 s) | + the streak, tilt to 0.85 rad | **kept** |
+| d | c, 900 its, less action noise | | 1 fall in 18 runs; not kept |
+
+### Results (run c, `policies/fun_one_leg_v4`)
+
+`scripts/one_leg_runs.py --hold 8`, 18 runs (stock model and fitted plant,
+three latency profiles, three seeds), 54 requests:
+
+| | `fun_one_leg_long` | `fun_one_leg_v4` |
+|---|---|---|
+| Requests answered, falls | 54 of 54, 0 of 18 | 54 of 54, 0 of 18 |
+| On one wheel per request | 7.0-8.0 s | 7.3-8.1 s |
+| Left tyre alone / in the air / both or right tyre | 90 / 5 / 6 % | 93 / 5 / 2 % |
+| Longest stand without a break (of 7.0 s measured) | 0.4 .. 2.1 .. 2.7 s | 1.1 .. 7.0 .. 7.0 s |
+| Breaks per request | 4 .. 15 .. 16 | 0 .. 6 .. 9 |
+| Roll in the hold (median), at most | 0.41, 0.58 rad | 0.79, 0.85 rad |
+| Raised wheel | 12-14 cm | 14-16 cm |
+| Leg links' meshes above the floor | 7 mm at least | 6 mm at least, 10 mm for 99 % of the time |
+
+The two plants differ completely:
+
+- **fitted plant** (the drive train and the tyre identified on the robot,
+  tyre torsion 0.01 of the model's): 27 of 27 requests held for the whole
+  window without one tap or hop. It balances by turning on the spot: 11 rad
+  per hold (1.6 rad/s), wandering 0.3-0.4 m;
+- **stock model** (the MJCF's tyre torsion): 0 of 27 without a break, 7 per
+  request. The tyre does not twist on the floor there, so it hops to turn
+  (the 5 % in the air), wanders up to 0.85 m and turns 3.6 rad.
+
+So it stands where the tyre can pivot and hops where it cannot; which of the
+two the robot's floors are is not known for a tyre on its edge: the fitted
+torsion is from the yaw response standing on two wheels (section 8).
+
+Standard scenarios (default, hardware, push; both plants, three profiles):
+18 of 18. Gate: no crossing of the whole loop, yaw table 0.11 at most. Peaks
+in the runs: legs 9.0 Nm and 22 rad/s, wheels 8.7 Nm and 25 rad/s (the raised
+wheel spins in the air; the drives' limit is 19.5 rad/s, which the simulation
+does not have: on the robot the raised wheel's reaction will be weaker).
+With the links' boxes colliding (`--boxes`, `--floor-boxes`) it falls in 18
+of 18 runs within a second: the supporting leg's lower-link box reaches the
+floor at about 0.7 rad of roll, where the mesh is clear of it. The meshes are the measure
+here.
+
+Videos: `fun_one_leg_v4.mp4` (from behind) and `_side.mp4`, on the fitted
+plant.
+
+### On the robot
+
+- The stand is 0.15-0.2 rad of roll from the fall angle; a fall is to the
+  left, onto the left leg and the torso's side. Hold the robot or pad the
+  floor for the first requests.
+- 2 m of clear, smooth floor: it turns about twice and wanders.
+- The oscillation watchdog waits 9.5 s (`deploy.safety.oscillation_hold_s`),
+  as for `rl_fun_one_leg_long`: it is off for the stand.
+- Nothing in the simulation is validated for the tyre's edge: at 0.8 rad the
+  tyre stands on its shoulder, and the cylinder's edge contact and its
+  friction are MuJoCo's.
