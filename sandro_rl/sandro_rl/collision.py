@@ -122,10 +122,101 @@ def operating_contacts(spec, boxes, seconds: float = 6.0, seed: int = 0) -> set[
     return pairs
 
 
-def build_spec(spec, cfg: dict | None = None) -> mujoco.MjSpec:
-    """The scene with the leg collision boxes, as an MjSpec ready for terrain bodies."""
+# With floor hulls (below) the floor is told apart from the robot's own parts: the hulls meet
+# the floor alone (bit 4), the boxes the other boxes (bit 2) and the torso and tyres (bit 8).
+FLOOR_BIT, BODY_BIT = 4, 8
+
+
+def _body_points(m, body: int, geoms=None) -> np.ndarray:
+    """Vertices of a body's mesh geoms (or of `geoms`) in the body frame."""
+    points = []
+    for g in (range(m.ngeom) if geoms is None else geoms):
+        if m.geom_bodyid[g] != body or m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH:
+            continue
+        mesh = m.geom_dataid[g]
+        vert = m.mesh_vert[m.mesh_vertadr[mesh]: m.mesh_vertadr[mesh] + m.mesh_vertnum[mesh]]
+        points.append(vert @ _quat_to_mat(m.geom_quat[g]).T + m.geom_pos[g])
+    return np.concatenate(points)
+
+
+def _directions(count: int = 1500) -> np.ndarray:
+    """Unit vectors spread over the sphere (a Fibonacci lattice)."""
+    k = np.arange(count) + 0.5
+    polar, azimuth = np.arccos(1.0 - 2.0 * k / count), np.pi * (1.0 + 5.0 ** 0.5) * k
+    return np.stack([np.cos(azimuth) * np.sin(polar), np.sin(azimuth) * np.sin(polar), np.cos(polar)], axis=1)
+
+
+def hull_vertices(points: np.ndarray, count: int) -> np.ndarray:
+    """`count` vertices of the convex hull of `points`, chosen greedily for the outline: each
+    one is the vertex that sticks out farthest from the hull of those already taken. 0 keeps
+    the whole hull. The result lies inside the hull, short of it by outline_error."""
+    from scipy.spatial import ConvexHull
+    hull = points[ConvexHull(points).vertices]
+    if count <= 0 or len(hull) <= count:
+        return hull
+    support = hull @ _directions().T                      # [vertex, direction]
+    full = support.max(axis=0)
+    chosen = [int(np.argmax(support[:, 0]))]
+    reach = support[chosen[0]].copy()
+    while len(chosen) < count:
+        direction = int(np.argmax(full - reach))
+        k = int(np.argmax(support[:, direction]))
+        chosen.append(k)
+        reach = np.maximum(reach, support[k])
+    return hull[chosen]
+
+
+def outline_error(points: np.ndarray, subset: np.ndarray) -> float:
+    """How far (m) the hull of `subset` falls short of the hull of `points`, at worst."""
+    d = _directions(4000)
+    return float(((points @ d.T).max(axis=0) - (subset @ d.T).max(axis=0)).max())
+
+
+def floor_hulls(spec, vertices: int) -> dict[str, tuple[str, np.ndarray]]:
+    """name -> (body, hull vertices in the body frame): one hull per leg body (leg_bodies) and
+    one of the whole torso."""
+    m = spec.model
+    hulls = {}
+    for name in leg_bodies(spec):
+        b = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, name)
+        hulls[f"{name}_floor_hull"] = (name, hull_vertices(_body_points(m, b), vertices))
+    # A rigid body meets a flat floor on its convex hull, so one hull of every torso mesh is the
+    # torso's outline there: the colliders and what has none (the camera's bracket, the Pi's
+    # ports, which reach 15 mm past the colliders at the back).
+    hulls["torso_floor_hull"] = (m.body(spec.torso_body).name,
+                                 hull_vertices(_body_points(m, spec.torso_body), vertices))
+    return hulls
+
+
+def add_floor_hulls(mj_spec: mujoco.MjSpec, spec, vertices: int) -> None:
+    """The robot's outline on a flat floor: floor_hulls as massless meshes that touch the floor
+    alone. The link boxes then stop each other and the torso only: a box reaches past its
+    link (7 mm at the lower links' ends, more around the motor holders), which changes how
+    the robot lies. Obstacles do not see the hulls: flat floors only."""
+    tyres = {spec.model.geom(int(g)).name for g in spec.tyre_geoms}
+    for g in mj_spec.geoms:
+        if g.name == "floor":
+            g.contype = int(g.contype) | FLOOR_BIT
+        elif g.name.endswith("_link_box"):
+            g.conaffinity = 2 | BODY_BIT
+        elif g.parent.name != "world" and (g.name in tyres or (g.type == mujoco.mjtGeom.mjGEOM_MESH and g.contype)):
+            g.contype = int(g.contype) | BODY_BIT
+    for name, (body, points) in floor_hulls(spec, vertices).items():
+        mj_spec.add_mesh(name=name, uservert=points.astype(float).reshape(-1).tolist())
+        mj_spec.body(body).add_geom(name=name, type=mujoco.mjtGeom.mjGEOM_MESH, meshname=name, contype=0,
+                                    conaffinity=FLOOR_BIT, mass=0.0, group=3, condim=3,
+                                    friction=[0.6, 0.005, 0.0001])
+
+
+def build_spec(spec, cfg: dict | None = None, hulls: int | None = None) -> mujoco.MjSpec:
+    """The scene with the leg collision boxes, as an MjSpec ready for terrain bodies.
+
+    `hulls`: also the floor hulls (add_floor_hulls) with that many vertices each; 0 for the
+    whole hulls (CPU only: thousands of vertices)."""
     boxes = fit_boxes(spec)
     exclude = sorted(operating_contacts(spec, boxes))
     mj_spec = mujoco.MjSpec.from_file(str(spec.scene))
     add_link_boxes(mj_spec, boxes, exclude)
+    if hulls is not None:
+        add_floor_hulls(mj_spec, spec, int(hulls))
     return mj_spec

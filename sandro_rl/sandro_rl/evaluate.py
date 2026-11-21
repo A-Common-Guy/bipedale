@@ -464,6 +464,10 @@ LINK_SHADOW = False
 # of one leg's two upper links collide where the links pass each other in different planes on
 # the robot); None follows the policy's config (collision.leg_boxes).
 LEG_BOXES: bool | str | None = None
+# With the boxes on a flat floor: the links' and the torso's hulls meet the floor instead of the
+# boxes (collision.add_floor_hulls). A vertex count, 0 for the whole hulls (the robot's outline
+# as the CAD has it); None follows the policy's config (collision.leg_hulls).
+LEG_HULLS: int | None = None
 # A list here collects the names of the parts other than the tyres found on the floor.
 FLOOR_PARTS: list | None = None
 
@@ -729,6 +733,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     from . import terrain
     leg_boxes = (bool((config["env"].get("collision") or {}).get("leg_boxes", False))
                  if LEG_BOXES is None else bool(LEG_BOXES))
+    leg_hulls = (config["env"].get("collision") or {}).get("leg_hulls") if LEG_HULLS is None else LEG_HULLS
     shadow = LinkShadow(spec) if LINK_SHADOW and not course and not iface.has_goal else None
     goals_world, pillar_geoms = None, []
     if iface.has_goal:
@@ -736,7 +741,7 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                                                           leg_boxes)
     else:
         m = (course_model(spec, "planks" if course is True else course, leg_boxes) if course
-             else terrain.build(spec, {}, leg_boxes=True) if leg_boxes
+             else terrain.build(spec, {}, leg_boxes=True, leg_hulls=leg_hulls) if leg_boxes
              else mujoco.MjModel.from_xml_path(str(spec.scene)))
     if LEG_BOXES == "floor":
         for g in range(m.ngeom):

@@ -65,7 +65,7 @@ sc::RlPolicyState standing(const sc::RlPolicySettings &s) {
 
 // The C++ actor reproduces onnxruntime on the exported policy.onnx.
 TEST(RlPolicy, ActorMatchesOnnxReference) {
-  for (const std::string name : {"flat_level", "agile_terrain", "stand_up", "stand_up_v2", "flat_level_fast", "flat_level_sysid", "flat_level_fast_sysid", "agile_terrain_v3", "agile_terrain_v5", "agile_terrain_v6", "agile_perceptive", "agile_step", "agile_step_v2", "fun_split", "fun_fast", "fun_one_leg", "fun_one_leg_long", "fun_show", "fun_stride", "fun_bow", "fun_hop_high", "fun_one_leg_v4", "agile_terrain_v7", "agile_terrain_v8"}) {
+  for (const std::string name : {"flat_level", "agile_terrain", "stand_up", "stand_up_v2", "stand_up_v4", "flat_level_fast", "flat_level_sysid", "flat_level_fast_sysid", "agile_terrain_v3", "agile_terrain_v5", "agile_terrain_v6", "agile_perceptive", "agile_step", "agile_step_v2", "fun_split", "fun_fast", "fun_one_leg", "fun_one_leg_long", "fun_show", "fun_stride", "fun_bow", "fun_hop_high", "fun_one_leg_v4", "agile_terrain_v7", "agile_terrain_v8"}) {
     sc::MlpPolicy policy;
     std::string error;
     ASSERT_TRUE(policy.load(kSource + "/policies/" + name + ".bin", &error)) << error;

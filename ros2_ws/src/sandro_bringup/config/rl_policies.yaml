@@ -49,6 +49,8 @@ controller_manager:
       type: sandro_controllers/RlPolicyController
     rl_agile_terrain_v8:
       type: sandro_controllers/RlPolicyController
+    rl_stand_up_v4:
+      type: sandro_controllers/RlPolicyController
 
 rl_flat_level:
   ros__parameters:
@@ -1295,3 +1297,59 @@ rl_agile_terrain_v8:
       # one for a policy that did not.
       wheel_differential_filter_hz: 0.0
       stand_q: [0.41872984, 0.22624421, -0.716328, 0.22433391, 0.42027311, 2.14299]
+
+rl_stand_up_v4:
+  ros__parameters:
+    joints: [right_motor_inner, right_motor_outer, right_wheel, left_motor_inner, left_motor_outer, left_wheel]
+    imu_name: imu
+    command_topic: /cmd_vel
+    policy_file: package://sandro_controllers/policies/stand_up_v4.bin
+    policy_fingerprint: 316c4b420a33310c729474ee72f7a7f468e853c113ba0a48366fcfa7932c49ab
+    policy_rate_hz: 100.0
+    observation:
+      history: 4
+      history_stride: 1
+      command_size: 3
+      gyro_scale: 0.25
+      leg_velocity_scale: 0.1
+      wheel_velocity_scale: 0.05
+      # The simulated IMU's mounting (sim_identified.yaml imu_mount); the
+      # robot overrides set the physical one.
+      imu_offset_rad: -0.049
+    commands:
+      forward_m_s: 0.5
+      yaw_rad_s: 1.5
+      height_min_m: 0.14
+      height_max_m: 0.185
+      roll_rad: 0.0
+      # Height command on engaging (the WBC's tasks.height.target_m); the
+      # reference starts at the measured height and moves there.
+      initial_height_m: 0.17
+    shaping:
+      forward_accel_m_s2: 1.0
+      yaw_time_constant_s: 0.15
+      height_rate_m_s: 0.05
+      roll_rate_rad_s: 0.5
+      leg_height_min_m: 0.14
+      leg_height_max_m: 0.185
+      track_width_m: 0.304
+    action:
+      leg_scale_rad: 0.8
+      leg_kp_nm_rad: 20.0
+      leg_kd_nm_s_rad: 0.6
+      joint_min_rad: -2.0943951
+      joint_max_rad: 2.0943951
+      wheel_mode: velocity
+      wheel_scale_rad_s: 20.0
+      wheel_kd_nm_s_rad: 0.4
+      wheel_scale_nm: 3.0
+      # Low-pass (Hz) on the opposed half of the wheel commands, the yaw; 0
+      # off. The value the policy trained with; the robot overrides may set
+      # one for a policy that did not.
+      wheel_differential_filter_hz: 0.0
+      stand_q: [0.41872984, 0.22624421, -0.716328, 0.22433391, 0.42027311, 2.14299]
+    safety:
+      start_lying: true
+      oscillation_arm_delay_s: 3.0
+      oscillation_leg_rad_s: 1.2
+      oscillation_wheel_rad_s: 5.0

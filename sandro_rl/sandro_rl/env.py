@@ -96,7 +96,9 @@ class SandroEnv:
         self.cfg = cfg
         base_spec = spec or RobotSpec.load()
         self.leg_boxes = bool((cfg.get("collision") or {}).get("leg_boxes", False))
-        model = terrain.build(base_spec, cfg.get("terrain", {}), leg_boxes=self.leg_boxes)
+        # With the boxes: the links' and the torso's hulls on the floor (collision.add_floor_hulls).
+        self.leg_hulls = (cfg.get("collision") or {}).get("leg_hulls")
+        model = terrain.build(base_spec, cfg.get("terrain", {}), leg_boxes=self.leg_boxes, leg_hulls=self.leg_hulls)
         self.spec = RobotSpec.load(base_spec.scene, model=model) if model is not base_spec.model else base_spec
         s = self.spec
         lim = s.limits

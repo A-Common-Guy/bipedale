@@ -1,0 +1,37 @@
+# stand_up_v2 on the robot's outline instead of the link boxes (docs/DESIGN.md
+# section 30). With the CAD's own hulls on the floor (evaluate.LEG_HULLS = 0)
+# stand_up_v2 fails 30 of 392 starts with the legs held that it all gets up
+# from on the boxes it trained with: lying nose up with the legs stretched
+# and back, the tyres 5-8 cm clear, it locks the legs and turns the wheels,
+# which is what the owner saw on the robot; from other nose-up poses it waits
+# for the first drive command. A box reaches past its link, and the Pi's ports
+# reach past the torso's colliders, so the robot lies differently.
+# - collision.leg_hulls: the links' and the torso's hulls (32 vertices each,
+#   within 4 mm of the CAD's) meet the floor; the boxes only stop each other.
+# - The bank is dropped on that model, half of it with the legs held
+#   (python -m sandro_rl.fallen --count 2048 --held 0.5 --hulls 32 --out data/fallen_states_hulls.npz).
+#
+#     uv run python -m sandro_rl.train configs/stand_up_v4.yaml --resume policies/stand_up_v2
+#     uv run python scripts/stand_up_runs.py [--held|--hard] [--outline] policies/stand_up_v2 policies/stand_up_v4
+inherit: stand_up_v2.yaml
+
+env:
+  naconmax_per_env: 64          # 11 hulls on the floor besides the boxes on each other
+  njmax_per_env: 320
+  collision:
+    leg_boxes: true
+    leg_hulls: 32
+  init:
+    fallen: {states: data/fallen_states_hulls.npz}
+
+train:
+  iterations: 600
+  curriculum_offset: 1200       # no lift assist
+  resume_log_std: -1.4
+
+# The oscillation watchdog of stand_up.yaml (export_ros.py reads this file alone).
+deploy:
+  safety:
+    oscillation_arm_delay_s: 3.0
+    oscillation_leg_rad_s: 1.2
+    oscillation_wheel_rad_s: 5.0

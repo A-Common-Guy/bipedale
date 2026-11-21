@@ -125,6 +125,13 @@ rl_stand_up_v2:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# rl_stand_up_v2 retrained lying on the robot's CAD outline instead of the link
+# boxes, half of the starts with the legs held where they were (2026-11-21,
+# sandro_rl/docs/DESIGN.md section 30). Not yet run on the robot.
+rl_stand_up_v4:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 # For fun (2026-11-19, sandro_rl/docs/DESIGN.md section 16): a split stance,
 # up to 2 m/s (the drives' speed limit permitting), and standing on the left
 # wheel on L1 + cross.

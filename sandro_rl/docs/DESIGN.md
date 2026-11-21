@@ -1225,6 +1225,10 @@ two legs alike in half the draws; the torso tipped up to 1.6 rad), and
   cause is still not known. Neither is kept or deployed; the configs and the
   bank stay.
 
+**Resolved in section 30 (2026-11-21):** the cause was the model the robot
+lies on, not the legs being held: on the CAD's outline `stand_up_v2` locks up
+lying on its back with the legs out. `stand_up_v4` is trained on it.
+
 ### Wheel drive-train lag: the 7.5 Hz ringing on the robot
 
 On the robot, `flat_level` rang at 7.4–7.5 Hz: both wheels in phase, actions
@@ -3610,3 +3614,103 @@ Deployed as `rl_agile_terrain_v8` on the panel's list only;
 `rl_agile_terrain_v6` stays what the gamepad switch and the defaults use.
 Not run on the robot. Video: `policies/agile_terrain_v8/agile_terrain_v8.mp4`
 (the course at 0.5 m/s).
+
+## 30. `stand_up_v4`: lying on the robot's outline, not on the link boxes (2026-11-21)
+
+The owner's report of `rl_stand_up_v2` (section 8, "Lying with the legs
+held"): lying with the legs extended and the tyres off the floor it turns the
+drives to no effect. With the legs held the simulation had not shown it:
+both legs stretched alike it got up in 60 of 60. Three guesses were checked
+before any training.
+
+**The entry (not the cause).** `RlPolicyCore::engage` starts the height
+reference at the measured leg height, clipped to the command range, and moves
+it to `initial_height_m` at 0.05 m/s; `evaluate.PolicyController.reset` does
+the same, so the evaluator already engages as the robot does. The leg drives
+get the full 9 Nm envelope and kp 20 on both sides.
+
+**What the robot's recordings have.** `recordings/policy_trials` holds nine
+starts of `rl_stand_up_v2` lying, all with the legs folded to their stops
+(drive angles 1.16-1.21 rad, reach 0.45) at -0.68 and +0.67 rad of pitch, all
+successful. No start with the legs out was recorded.
+
+**A wider search on the training model (not the cause).**
+`scripts/stand_up_runs.py --grid`: the legs held alike at 48 poses over their
+whole reach, and limp, lying up to 1.9 rad either way (and to 3.0 rad in a
+first sweep: 677 of 686). `stand_up_v2` gets up in 389 of 392; in all 225
+starts with the tyres clear of the floor it folds the legs and gets up.
+
+**The outline (the cause).** The stand-up policies collide one box per leg
+body (section 8). A box is the bounding box of its link: it reaches past the
+link, 7 mm at the lower links' ends and more around the motor holders. The
+torso collides six of its meshes; the Pi's ports reach 15 mm past them at the
+back, where the robot lies nose up. So the simulated robot lies differently
+from the CAD's, and the policy had learnt its way up from those poses.
+`evaluate.LEG_HULLS = 0` (`stand_up_runs.py --outline`) lets the convex hulls
+of the CAD meshes meet the floor instead, one per leg body and one of the
+whole torso (a rigid body meets a flat floor on its convex hull, so this is
+the CAD's outline there); the boxes then only stop each other and the torso.
+On it `stand_up_v2` fails where it did not on the boxes; on the grid every
+failure is a start lying nose up:
+
+- **Never up, 14 of 392 grid starts:** the legs stretched (reach 0.75-0.98)
+  and back, the robot flat on its back with the tyres 5-8.5 cm clear in 10
+  of them. It ends at -1.03 rad of pitch rolled 0.73 rad to a side, the legs
+  locked in one asymmetric pose (drive angles 1.22, 1.00, 1.01, -0.45, not
+  moving) and the wheels turning at 11 rad/s. This is what the owner saw.
+- **Up only when told to drive, 12 of 392:** tyres on the floor, lying at
+  -0.4 to -1.5 rad, it waits; the 0.4 m/s command after 8 s gets it up.
+- The limp starts suffer too: 167 of 180 on the standard grid (13 starts
+  with 40 and 80 ms of wheel lag, at pitches -1.4 to -0.3 and +1.4), and
+  213 of 360 with the six held draws of `--held`.
+
+**`configs/stand_up_v4.yaml`.** `collision.leg_hulls: 32` adds those hulls to
+the training model with 32 vertices each (`collision.hull_vertices`: the
+vertices that stick out farthest, within 4.1 mm of the CAD's hull; the whole
+hulls have up to 1290 vertices, too many for the GPU's contacts), and the bank
+is dropped on that model, half of it with the legs held
+(`fallen.py --held 0.5 --hulls 32`). From `stand_up_v2`, 600 iterations at
+77k steps/s (26 min). The hulls see the floor only: flat floors.
+
+Iterations 200 and 600 get up in 147 of 147 of a screening grid on the whole
+hulls and iteration 400 in 114 (it lost the nose-down starts, as the runs
+before it lost theirs: section 8). **Iteration 200 is kept**; 600 loses limp
+nose-up starts on the outline (153 of 180).
+
+| of | | `stand_up_v2` | `stand_up_v4` |
+|---|---|---|---|
+| link boxes: standard, limp | 180 | 180 | 180 |
+| link boxes: `--held` | 360 | 312 | 354 |
+| link boxes: `--hard` | 300 | 300 | 300 |
+| link boxes: `--grid` | 392 | 389 | 391 |
+| CAD outline: standard, limp | 180 | 167 | 180 |
+| CAD outline: `--held` | 360 | 213 | 354 |
+| CAD outline: `--hard` | 300 | 281 | 300 |
+| CAD outline: `--grid` | 392 | 366 | 392 |
+| of them with the tyres clear at the start | 235 | 225 | 235 |
+
+- The six `--held` starts it does not get up from are draw 5 tipped
+  -1.6 rad, on both models: one of the two draws of section 8 with the legs
+  held differently from each other, one of them nearly stretched.
+- It is slower: up in 0.92 s at the median on the boxes (v2 0.60 s) and
+  0.96 s on the outline (v2 1.20 s there), 2.6 s at most.
+- Gate: yaw table 0.29 (v2 0.36); the whole loop crosses at 10-11 Hz with
+  0.34 (v2 has no crossing; 0.5 is the limit).
+- The standard runs from standing (`eval/comparison.md`): all 12 completed.
+- Deployed as `rl_stand_up_v4` on the panel's list, next to `rl_stand_up_v2`,
+  which stays: v4 is slower on the starts both get up from. The oscillation
+  watchdog thresholds are `stand_up.yaml`'s, not measured again. Not run on
+  the robot. Videos: `policies/stand_up_v4/stand_up_legs_out.mp4` (flat on
+  its back, the legs stretched and back, on the CAD outline) and
+  `stand_up_v2_legs_out.mp4` (v2 from the same start).
+
+**What this does not show.** That the CAD outline is the robot's: cables,
+the battery and the USB plug in the Pi are not in the CAD, and a convex hull
+fills the hollows of a part. The owner's pose was reproduced as a kind
+(legs out, tyres clear, drives turning), not from a recording. On the robot,
+record one start of `rl_stand_up_v4` and one of `rl_stand_up_v2` from the
+pose that failed (`policy_record.py`: `/joint_states`, `/imu_broadcaster/imu`
+and the controller's `diagnostics` are enough) and take a photo from the side
+before engaging: the pitch at rest and the four drive angles say which grid
+pose it is, and what touches the floor in the photo says whether the outline
+is right.

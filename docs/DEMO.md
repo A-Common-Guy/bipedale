@@ -182,6 +182,13 @@ fell at 50 % or 100 % speed, and no wheel passed the drives' 19.5 rad/s.
   The Drive page's status line says which.
 - **A controller shows *fallen*:** it cut the drives after a fall or an
   oscillation. Stand the robot up, Restart it on the Run page.
+- **The robot is down and `rl_stand_up_v2` only turns its wheels:** start
+  `rl_stand_up_v4` instead (panel list; never run on the robot). In
+  simulation v2 locks up lying on its back with the legs stretched out and
+  the tyres off the floor; v4 was trained for that
+  (`sandro_rl/docs/DESIGN.md` section 30). Before the demo, try v4 once from
+  that pose with `policy_record.py` running and a photo from the side taken
+  first. If neither gets up, fold the legs by hand and start again.
 - **E-stop:** the panel's button on every page, or L2 + R2 on the gamepad.
   Neither replaces the power switch.
 

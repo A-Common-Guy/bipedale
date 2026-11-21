@@ -93,10 +93,10 @@ def hold(spec, d, targets, kp: float = 20.0, kd: float = 0.6) -> None:
 
 
 def _drop(args):
-    seed, seconds, held = args
+    seed, seconds, held, hulls = args
     from . import terrain
     spec = RobotSpec.load()
-    m = terrain.build(spec, {}, leg_boxes=True)
+    m = terrain.build(spec, {}, leg_boxes=True, leg_hulls=hulls)
     rng = np.random.default_rng(seed)
     held = rng.uniform() < held
     pitch = rng.uniform(-1.6, 1.6) if held else rng.uniform(-1.4, 1.4)
@@ -118,10 +118,13 @@ def _drop(args):
     return d.qpos.copy(), float(np.max(np.abs(d.qvel))), pitch, held
 
 
-def generate(count: int = 1024, seed: int = 0, seconds: float = 3.0, workers: int = 8, held: float = 0.0):
+def generate(count: int = 1024, seed: int = 0, seconds: float = 3.0, workers: int = 8, held: float = 0.0,
+             hulls: int | None = None):
+    """`hulls`: the robot lies on its links' and torso's hulls of that many vertices, not on the
+    link boxes (collision.add_floor_hulls); the model a config with collision.leg_hulls trains on."""
     seeds = np.random.SeedSequence(seed).generate_state(count)
     with ProcessPoolExecutor(workers) as pool:
-        results = list(pool.map(_drop, [(int(s), seconds, held) for s in seeds], chunksize=16))
+        results = list(pool.map(_drop, [(int(s), seconds, held, hulls) for s in seeds], chunksize=16))
     qpos = np.stack([r[0] for r in results])
     still = np.array([r[1] for r in results])
     pitch = np.array([r[2] for r in results])
@@ -143,9 +146,11 @@ def main(argv=None) -> int:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--seconds", type=float, default=3.0)
     parser.add_argument("--held", type=float, default=0.0, help="share of the states with the legs held")
+    parser.add_argument("--hulls", type=int, default=None,
+                        help="lie on the links' and torso's hulls of this many vertices (collision.leg_hulls)")
     parser.add_argument("--out", type=Path, default=DEFAULT_PATH)
     args = parser.parse_args(argv)
-    qpos, still, pitch, held = generate(args.count, args.seed, args.seconds, held=args.held)
+    qpos, still, pitch, held = generate(args.count, args.seed, args.seconds, held=args.held, hulls=args.hulls)
     keep = still < 0.05
     args.out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(args.out, qpos=qpos[keep], start_pitch=pitch[keep], held=held[keep])

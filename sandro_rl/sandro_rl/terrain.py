@@ -109,21 +109,24 @@ def add_bodies(mj_spec, items, friction, mocap: bool, poses=None):
         mj_spec.add_exclude(bodyname1="world", bodyname2=item["name"])
 
 
-def _scene(spec, leg_boxes: bool) -> mujoco.MjSpec:
+def _scene(spec, leg_boxes: bool, leg_hulls: int | None = None) -> mujoco.MjSpec:
     if leg_boxes:
         from . import collision
-        return collision.build_spec(spec)
+        return collision.build_spec(spec, hulls=leg_hulls)
     return mujoco.MjSpec.from_file(str(spec.scene))
 
 
-def build(spec, cfg: dict, leg_boxes: bool = False) -> mujoco.MjModel:
-    """`leg_boxes`: collide the leg links too (collision.py)."""
+def build(spec, cfg: dict, leg_boxes: bool = False, leg_hulls: int | None = None) -> mujoco.MjModel:
+    """`leg_boxes`: collide the leg links too (collision.py); `leg_hulls`: with them, the links'
+    and the torso parts' hulls of that many vertices on the floor (0: whole), flat terrain only."""
+    if leg_hulls is not None and (not leg_boxes or cfg.get("type", "flat") != "flat"):
+        raise ValueError("leg_hulls needs leg_boxes and flat terrain")
     kind = cfg.get("type", "flat")
     if kind not in ("flat", "obstacles"):
         raise ValueError(f"unknown terrain type {kind}")
     if kind == "flat" and not leg_boxes:
         return spec.model
-    mj_spec = _scene(spec, leg_boxes)
+    mj_spec = _scene(spec, leg_boxes, leg_hulls)
     if kind == "obstacles":
         add_bodies(mj_spec, boxes(cfg), float(cfg.get("friction", 0.8)), mocap=True)
     return mj_spec.compile()

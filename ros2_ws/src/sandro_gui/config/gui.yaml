@@ -48,7 +48,7 @@ robot:
   # (they buzz and are slow: sandro_rl/docs/DESIGN.md); they are not on the
   # gamepad switch.
   controllers: [whole_body_controller, rl_agile_terrain_v6, rl_agile_step, rl_agile_step_v2, rl_agile_terrain_v5, rl_agile_terrain_v3, rl_agile_terrain, rl_flat_level, rl_flat_level_fast,
-                rl_stand_up, rl_stand_up_v2, rl_fun_split, rl_fun_fast, rl_fun_one_leg, rl_fun_one_leg_long, rl_fun_show, rl_fun_stride, rl_fun_bow, rl_fun_hop_high, rl_fun_one_leg_v4, rl_agile_terrain_v7, rl_agile_terrain_v8, lqr_balancer, driving_balancer,
+                rl_stand_up, rl_stand_up_v2, rl_stand_up_v4, rl_fun_split, rl_fun_fast, rl_fun_one_leg, rl_fun_one_leg_long, rl_fun_show, rl_fun_stride, rl_fun_bow, rl_fun_hop_high, rl_fun_one_leg_v4, rl_agile_terrain_v7, rl_agile_terrain_v8, lqr_balancer, driving_balancer,
                 rl_flat_level_sysid, rl_flat_level_fast_sysid]
 
 # The Drive page: on-screen sticks, for a phone. The panel publishes them as
