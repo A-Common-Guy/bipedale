@@ -3021,9 +3021,13 @@ higher hop needs the legs to turn faster than the drives do (19.5 rad/s).
 | `fun_flip_free.yaml` from `fun_hop_high`, 2500 iterations | 9 Nm, no speed limit | 13–14 cm up, 0.32–0.36 s in the air, 1.7–2.0 rad turned in it (1.2–1.3 from the request), then down on the torso. Legs at 28 rad/s, 8.4 Nm: the legs' damping (0.6 Nm s/rad) holds the push there. The reward had stopped growing by iteration 500 |
 | `fun_flip_strong.yaml` from that, 3000 iterations: `policies/fun_flip_strong` | 18 Nm without the thermal fold-back, damping 0.3, no speed limit | 27–31 cm up, 0.32–0.38 s in the air, 5.1–5.5 rad turned in it (5.3–5.8 from the request; 6.28 is whole), then down on the torso or a leg 0.5 s after the request, in 18 of 18; never upright after. Legs at up to 53 rad/s and 10 Nm; touchdown at 2.5–3.3 m/s. The turn was still growing when the run ended |
 
-`fun_flip.yaml` with `airborne_m` (the robot's drives, the turn paid in the
-air only) was not run: without the speed limit the same drives turn 2 rad of
-the 6.3.
+`fun_flip.yaml` with `airborne_m` (the robot's drives as they are, the turn
+paid in the air only) was run afterwards, 1500 iterations from `fun_hop_high`
+(`runs/flip_air`, not kept; `scripts/hop_runs.py --flip`, 18 runs): 11.5–13.5
+cm up, 0.32–0.36 s in the air, **1.4–1.5 rad turned per request** of the
+6.3, no whole turn in 18, and down on its back in 18 of 18 (legs 7.0 Nm at
+up to 21.5 rad/s). It is `fun_hop_high`'s hop thrown backwards: a quarter of
+a turn and a fall. With the real limits there is no flip to refine.
 
 So what a flip takes is not torque (10 Nm were used of the 18 allowed) but
 leg speed: 2.7 times what the drives turn at, at half the damping, and even
