@@ -132,6 +132,12 @@ rl_fun_split:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# rl_fun_fast above 1 m/s (2026-11-21, sandro_rl/docs/DESIGN.md section 24):
+# with the drives' velocity limiter modelled (19.5 rad/s, an assumption about
+# the firmware) it falls forward in every simulated run when asked for 1.5 or
+# 2 m/s. Until the limiter is measured or raised, keep joy_teleop's
+# speed_fraction (or the Drive page's slider) at 0.5 or less for it.
+# commands.forward_m_s must not be lowered here: it scales the observation.
 rl_fun_fast:
   ros__parameters:
     observation:

@@ -237,6 +237,11 @@ class SimOptions:
     mount_error_rad: float = 0.0
     floor_friction_scale: float = 1.0   # every geom's sliding friction (the floor, tyres, body shell, leg boxes)
     torque_scale: float = 1.0           # every drive's torque limit (a low battery, a hot drive)
+    # The wheel drives' velocity limiter (ODrive's torque-mode one): torque towards a higher
+    # speed capped at gain * (limit - speed). 0: none. Without the option, the policy's own
+    # action.wheel_speed_limit (what it trained with) applies.
+    wheel_speed_limit_rad_s: float = -1.0
+    wheel_speed_limit_gain: float = 1.0
     fallen_roll_rad: float = 0.0        # with --fallen: tipped about the heading too
     fallen_legs: int = 0                # with --fallen: the legs held where draw N of fallen.leg_targets puts them
 
@@ -248,7 +253,8 @@ class SimOptions:
                  "joint_rate": "joint_rate_hz", "command_delay": "command_delay_s", "settle": "settle_s",
                  "seed": "seed", "camera": "camera", "depth": "depth", "depth_noise": "depth_noise",
                  "mount_error": "mount_error_rad", "floor_friction": "floor_friction_scale",
-                 "torque_scale": "torque_scale", "fallen_roll": "fallen_roll_rad", "fallen_legs": "fallen_legs", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
+                 "torque_scale": "torque_scale", "wheel_speed_limit": "wheel_speed_limit_rad_s",
+                 "wheel_speed_gain": "wheel_speed_limit_gain", "fallen_roll": "fallen_roll_rad", "fallen_legs": "fallen_legs", "wheel_lag": "wheel_lag_s", "wheel_backlash": "wheel_backlash_rad",
                  "gear_stiffness": "gear_stiffness_nm_rad", "gear_damping": "gear_damping_nm_s_rad",
                  "tyre_torsion": "tyre_torsion_scale", "wheel_friction": "wheel_friction_scale",
                  "leg_armature": "leg_armature_scale",
@@ -868,6 +874,16 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         controller.profile_obs = terrain_map["pending"]
         terrain_map["pending"] = interface.profile_observation(heights.reshape(-1), known.reshape(-1))
 
+    trained_cap = config["env"]["action"].get("wheel_speed_limit") or None
+    cap = ((trained_cap["limit_rad_s"], trained_cap.get("gain_nm_s_rad", 1.0)) if trained_cap else None
+           ) if options.wheel_speed_limit_rad_s < 0 else (
+        (options.wheel_speed_limit_rad_s, options.wheel_speed_limit_gain) if options.wheel_speed_limit_rad_s else None)
+
+    def speed_cap(i, tau, v):
+        if cap is None or i not in spec.wheel_index:
+            return tau
+        return min(max(tau, cap[1] * (-cap[0] - v)), cap[1] * (cap[0] - v))
+
     def step(push_force, chirp=0.0):
         nonlocal last_frame_t
         d.ctrl[:] = staged
@@ -879,15 +895,16 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
             if i in gears:
                 if frames[i] is not None:
                     frame, lim_i = frames[i], limit[i]
-                    law = lambda q, v, frame=frame, lim_i=lim_i, extra=extra: iface.mit_torque(frame, q, v, lim_i) + extra
+                    law = lambda q, v, frame=frame, lim_i=lim_i, extra=extra: speed_cap(
+                        i, iface.mit_torque(frame, q, v, lim_i) + extra, v)
                 else:
-                    law = lambda q, v, held=staged[act[i]] + extra: held
+                    law = lambda q, v, held=staged[act[i]] + extra: speed_cap(i, held, v)
                 motor_torque[i], d.ctrl[act[i]] = gears[i].step(law, d.qpos[qadr[i]], d.qvel[dadr[i]],
                                                                 m.opt.timestep)
             else:
                 if frames[i] is not None:
                     d.ctrl[act[i]] = iface.mit_torque(frames[i], drive_q(i), drive_v(i), limit[i])
-                d.ctrl[act[i]] += extra
+                d.ctrl[act[i]] = speed_cap(i, d.ctrl[act[i]] + extra, drive_v(i))
                 motor_torque[i] = d.ctrl[act[i]]
         heat[:] = torque_envelope.account(heat, motor_torque ** 2, m.opt.timestep, iface.envelope)
         for a in wheel_act:

@@ -1,0 +1,17 @@
+# fun_fast_v2 pulled to the speed asked: fun_fast_v2 cruises at 0.83 m/s when
+# asked for 1.15 (the lineage's kernel is 0.3 m/s wide: 0.3 m/s short costs
+# little). Here the kernel is 0.15 m/s with more weight, and the speed asked
+# changes at 2 m/s2 (3), so the transients stay off the limiter.
+# Result: 0.95-0.98 m/s at full stick, and a fall at every 12 N shove there
+# (18 of 18; none without the limiter). Not deployed (docs/DESIGN.md 24).
+#
+#     uv run python -m sandro_rl.train configs/fun_fast_v2c.yaml --resume runs/fun_fast_v2_b
+inherit: fun_fast_v2.yaml
+
+env:
+  commands:
+    forward_accel_m_s2: 2.0
+  rewards:
+    sigma: {forward: 0.15}
+    weights:
+      track_forward: 3.0

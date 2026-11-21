@@ -1,0 +1,30 @@
+# fun_fast with the drives as they are: the wheel drives limit their speed to
+# 186 rpm at the output (19.5 rad/s, 1.31 m/s at the tyre; gim6010/manual 4.3.4),
+# which fun_fast never met: it cruises at 1.7 m/s with the wheels at 32 rad/s.
+# The limiter is modelled here (action.wheel_speed_limit) as ODrive's
+# torque-mode one, which the drives' firmware descends from: the torque towards
+# a higher speed is capped at gain * (limit - speed), 1 Nm per rad/s at the
+# output for the default vel_gain (0.1 Nm per rotor rev/s, 8:1). An assumption:
+# what the drive does at its limit was never recorded on the robot. Under it
+# fun_fast falls when asked for 1.5 or 2 m/s: at the limit the wheels cannot
+# speed up to catch the body (docs/DESIGN.md 24).
+# Here: up to 1.15 m/s (17.1 rad/s), the faster wheel held under that rim speed
+# in a turn (commands.wheel_speed_m_s). The limiter itself is the teacher: a
+# first run with a wheel beyond 18 rad/s as a constraint as well stopped
+# driving (0.1 m/s when asked for 1.2), as fun_show's does at 0.65.
+# Result: 0.82-0.86 m/s at full stick, 1 fall in 18 runs (a shove); no faster
+# than fun_fast asked for 1.0. Not deployed.
+#
+#     uv run python -m sandro_rl.train configs/fun_fast_v2.yaml --resume policies/fun_fast
+#     MUJOCO_GL=egl uv run python scripts/fast_runs.py runs/fun_fast_v2 policies/fun_fast --ask 1.0
+inherit: fun_fast.yaml
+
+env:
+  action:
+    wheel_speed_limit: {limit_rad_s: 19.5, gain_nm_s_rad: 1.0}
+  commands:
+    forward_m_s: 1.15
+    wheel_speed_m_s: 1.15
+
+train:
+  iterations: 1000

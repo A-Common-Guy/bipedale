@@ -3155,3 +3155,85 @@ plant.
 - Nothing in the simulation is validated for the tyre's edge: at 0.8 rad the
   tyre stands on its shoulder, and the cylinder's edge contact and its
   friction are MuJoCo's.
+
+## 24. Driving fast with the drives' speed limit: `configs/fun_fast_v2.yaml` (2026-11-21, not deployed)
+
+`fun_fast` (section 16) cruises at 1.7 m/s with its wheels at 32 rad/s. The
+drives limit their speed to 186 rpm at the output, 19.5 rad/s, 1.31 m/s at
+the tyre (`gim6010/manual`, user manual 4.3.4), and no simulation here had
+that limit. This section puts it in and asks how fast the robot can drive
+with it.
+
+### The limiter, as modelled (an assumption)
+
+The drives' firmware descends from ODrive's (`vel_limit`, `vel_gain`,
+`enable_torque_mode_vel_limit`, the `OVERSPEED` controller error; the manual
+lists the torque-mode limiter as enabled by default). ODrive's torque-mode
+limiter caps the torque towards a higher speed at `vel_gain * (vel_limit -
+speed)`: zero at the limit, braking beyond it. With the default `vel_gain`
+(0.1 Nm per rotor rev/s) and the 8:1 gear that is 1.0 Nm per rad/s at the
+output: 3 Nm are left 3 rad/s under the limit. That is what
+`action.wheel_speed_limit: {limit_rad_s, gain_nm_s_rad}` applies in
+training (`env.py`, on the rotor where the gear is modelled) and
+`--sim wheel_speed_limit=19.5` (`wheel_speed_gain=1`) in the evaluator;
+without the option the evaluator applies what the policy trained with, none
+for every policy before this one.
+
+Not known: whether the MIT mode goes through this limiter at all, the drives'
+actual `vel_gain` and `vel_limit` (`leg_control/wheel_mit_test.py` prints
+them), and whether a wheel beyond the limit raises `OVERSPEED` and disarms
+the drive (ODrive does at 1.2 x the limit, 23.4 rad/s; the hops of
+`fun_show` and `fun_hop_high` spin the unloaded wheels to 24 rad/s in
+simulation). A recording of the wheels' speed and torque at full stick, the
+robot held off the floor, would settle the first two.
+
+### What the deployed policies do under it
+
+`scripts/fast_runs.py` (MJCF and fitted plant, three latency profiles, three
+seeds: cruise, brake, cruise and turn, then cruise through a 12 N shove from
+behind and one from the front, 0.1 s each):
+
+| policy, speed asked | limiter | falls of 18 | cruise, m/s | fastest wheel, rad/s |
+|---|---|---|---|---|
+| `fun_fast`, 2.0 | off | 0 | 1.65–1.68 | 36.9 |
+| `fun_fast`, 2.0 | 19.5 | 18, in the first cruise | – | 19.4 |
+| `fun_fast`, 1.5 | 19.5 | 18, in the first cruise | – | 19.4 |
+| `fun_fast`, 1.2 | 19.5 | 18, at the shoves | 0.97–1.02 | 19.5 |
+| `fun_fast`, 1.0 | 19.5 | 0 | 0.82–0.89 | 19.6 |
+| `agile_terrain_v6`, 1.0 (its full stick) | off | 0 | 0.84–0.98 | 24.6 |
+| `agile_terrain_v6`, 1.0 | 19.5 | 3, at the shoves | 0.84–0.96 | 19.8 |
+| `agile_terrain_v6`, 0.8 | 19.5 | 0 | 0.68–0.80 | 19.9 |
+| `fun_show`, 1.0 (its full stick) | 19.5 | 0 | 0.65–0.73 | 19.9 |
+
+A balancing robot catches a forward pitch by driving its wheels ahead of the
+body. At the limit there is no torque left for that, so `fun_fast` asked for
+more than about 1.2 m/s runs into the limit and falls on its face. If the
+limiter is what the robot has, **`rl_fun_fast` must not be asked for more
+than 1.0 m/s** (`joy_teleop`'s `speed_fraction` 0.5 or the Drive page's
+slider at 50 %: its full stick is 2 m/s), and `rl_agile_terrain_v6` at full
+stick is one shove away from the same fall (0.8 of the stick is not).
+`commands.forward_m_s` cannot be lowered per robot instead: the controller
+scales the observation with it.
+
+### Three training runs, none better
+
+From `fun_fast`, 1000 iterations each, with the limiter in training:
+
+| run | what | at its full stick, limiter 19.5 | asked 1.0 |
+|---|---|---|---|
+| a | up to 1.2 m/s, a wheel beyond 18 rad/s a constraint as well | stops driving: 0.04–0.16 m/s (as `fun_show`'s 0.65: the constraint, not the limiter, holds them back) | 0.14–0.64 |
+| b | `fun_fast_v2.yaml`: up to 1.15 m/s, the limiter alone | 0.82–0.86 m/s, 1 fall of 18 (a shove) | 0.73–0.79, no fall |
+| c | `fun_fast_v2c.yaml` from b: forward kernel 0.15 m/s (0.3), weight 3 (2), 2 m/s² | 0.95–0.98 m/s, 18 falls of 18 at the shoves (none without the limiter) | 0.85–0.86, no fall |
+
+So with this limiter the robot drives at about 0.85 m/s and survives a 12 N
+shove, and at 0.97 m/s it does not: the shove adds 0.25 m/s (3.7 rad/s at
+the wheels), and the wheels then have to overtake the body. Run c at 1.0
+asked equals `fun_fast` at 1.0 asked (0.82–0.89); nothing here is faster than
+what is deployed without falling, so nothing is deployed, and the three
+allowed runs are used. The runs are in the git-ignored `runs/fun_fast_v2_*`.
+Gate of run c: 0.30, no whole-loop crossing.
+
+What would make the robot faster is not a policy: the drives' `vel_limit`
+raised (`gim6010/can_control/gim_cli.py sdo write <node> vel_limit`, rotor
+rev/s; the back-EMF at the supply voltage then sets the limit), or the
+limiter off in MIT mode, both the owner's decision on the hardware.

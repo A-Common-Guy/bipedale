@@ -173,6 +173,12 @@ class SandroEnv:
         # the robot); a number caps it further.
         self.envelope = s.envelope
         self.thermal = bool(a.get("torque_envelope", True))
+        # Optional: the drives' velocity limiter at the wheels (action.wheel_speed_limit:
+        # limit_rad_s, gain_nm_s_rad). As ODrive's torque-mode limiter, which the drives'
+        # firmware descends from: the torque towards a higher speed is capped at
+        # gain * (limit - speed), so it is zero at the limit and brakes beyond it.
+        cap = a.get("wheel_speed_limit") or {}
+        self.wheel_cap = (float(cap["limit_rad_s"]), float(cap.get("gain_nm_s_rad", 1.0))) if cap else None
         self.differential_filter_hz = float(a.get("wheel_differential_filter_hz", 0.0))
         tl = a.get("torque_limit_nm", {})
         self.leg_torque_nm = float(_ros(tl.get("legs", "ros"), self.envelope.peak_nm))
@@ -782,7 +788,8 @@ class SandroEnv:
         rq, rv = rotor[0], rotor[1]
         motor = passed = jp.zeros(2)
         for _ in range(self.gear_substeps):
-            tm = jp.clip(kp * (jp.where(kp > 0, q_ref, rq) - rq) + kd * (v_ref - rv) + ff, -lim, lim) * scale
+            tm = self._speed_cap(
+                jp.clip(kp * (jp.where(kp > 0, q_ref, rq) - rq) + kd * (v_ref - rv) + ff, -lim, lim), rv) * scale
             delta = rq - wq
             over = jp.sign(delta) * jp.maximum(jp.abs(delta) - half, 0.0)
             ts = k * over + jp.where(over != 0, c * (rv - wv), 0.0)
@@ -821,7 +828,15 @@ class SandroEnv:
         q_ref = jp.where(frame[2] > 0, frame[0], q)
         tau = frame[2] * (q_ref - q) + frame[3] * (frame[1] - v) + frame[4]
         tau = jp.clip(tau, -limit, limit)
-        return tau
+        w = self.wheel_idx
+        return tau.at[w].set(self._speed_cap(tau[w], v[w]))
+
+    def _speed_cap(self, tau, v):
+        """The wheel drives' velocity limiter on a torque (action.wheel_speed_limit)."""
+        if self.wheel_cap is None:
+            return tau
+        limit, gain = self.wheel_cap
+        return jp.clip(tau, gain * (-limit - v), gain * (limit - v))
 
     def _torque_limit(self, heat):
         if not self.thermal:
