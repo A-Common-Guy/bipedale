@@ -936,7 +936,8 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
         terrain_map["pending"] = interface.profile_observation(heights.reshape(-1), known.reshape(-1))
 
     trained_cap = config["env"]["action"].get("wheel_speed_limit") or None
-    cap = ((trained_cap["limit_rad_s"], trained_cap.get("gain_nm_s_rad", 1.0)) if trained_cap else None
+    middle = lambda v: float(np.mean(v))            # a range in training: its middle here
+    cap = ((middle(trained_cap["limit_rad_s"]), middle(trained_cap.get("gain_nm_s_rad", 1.0))) if trained_cap else None
            ) if options.wheel_speed_limit_rad_s < 0 else (
         (options.wheel_speed_limit_rad_s, options.wheel_speed_limit_gain) if options.wheel_speed_limit_rad_s else None)
 

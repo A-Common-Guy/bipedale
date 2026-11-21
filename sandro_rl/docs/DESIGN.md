@@ -3286,3 +3286,69 @@ folder (`routine_<name>.mp4`); `docs/demo_reel.mp4` (85 s) joins the show,
 the stride, the bow, the hops and `fun_one_leg_v4`'s stand. `docs/DEMO.md` at
 the top of the repository is the running order and the checklist for a live
 demo.
+
+## 26. `agile_terrain_v7`: the everyday policy under the wheel speed limit (2026-11-21)
+
+Section 24: with the wheel drives' velocity limiter modelled, `agile_terrain_v6`
+at full stick (1 m/s asked, 0.86 driven, the wheels at 12.8 rad/s) falls in 3
+of 18 runs when shoved from behind: the shove asks the wheels for more than
+19.5 rad/s and the torque to catch the body is not there.
+`configs/agile_terrain_v7.yaml` fine-tunes v6 with the limiter in the loop,
+and because the limiter is an assumption it is varied
+(`action.wheel_speed_limit` now takes ranges and a `probability`): on in 70 %
+of the episodes, its limit 17.5–21.5 rad/s, its gain 0.5–2 Nm per rad/s.
+Everything else is v6's: margin 0.35 at weight 1, learning rate 5e-5, action
+noise 0.08, 600 iterations. Without `--sim wheel_speed_limit` the evaluator
+applies the middle of the trained ranges (19.5 rad/s, 1.25 Nm per rad/s) to
+this policy, and none to the policies before it.
+
+`policies/agile_terrain_v7` is that run's last iteration.
+`scripts/fast_runs.py --ask 1.0` (MJCF and fitted plant, three latency
+profiles, three seeds; cruise, brake, turn, a 12 N shove from behind and one
+from the front):
+
+| | v6 | v7 |
+|---|---|---|
+| Limiter 19.5 rad/s, full stick: falls of 18 | 3, at the shoves | **0** (tilt up to 0.21 rad) |
+| Limiter off, full stick | 0 | 0 |
+| Limiter 17.5 rad/s, full stick | 18, at the shoves | 18, at the shoves |
+| Limiter 17.5 rad/s, 0.8 of the stick | not run | 0 |
+| Cruise at full stick, m/s | 0.84–0.96 | 0.77–0.87 |
+| Stop from the cruise | 0.40 m, 0.60 s | 0.41 m, 0.58 s |
+| Gate without the wheel filter (as deployed): yaw table 11-16 / 11-12, whole loop | 0.22 / 0.25, no crossing | 0.23 / 0.31, no crossing |
+| Gate behind the 3 Hz filter: yaw table, whole loop | 0.20, 0.36 | 0.27, 0.41 |
+| Pitch RMS, hardware and default, fitted plant | 0.012–0.016 | 0.014–0.016 |
+| Yaw error there, rad/s | 0.031–0.040 | 0.025–0.032 |
+| Course at 0.5 m/s (`course_runs.py`), of 27, without / with the limiter | 11 / 5 | 20 / 19 |
+| The same per plant, without the limiter: MJCF, fitted, heavy legs | 9, 1, 1 | 3, 8, 9 |
+
+What it does not do:
+
+- **A limit 2 rad/s lower is not survived at full stick** by either policy
+  (18 of 18): there the shove needs wheel speed that does not exist. At 0.8 of
+  the stick v7 has no fall with it. If the drives turn out to limit lower or
+  harder than modelled, the answer is the stick, not the policy.
+- **The gate is v6's only where v6 is deployed**, without the wheel filter.
+  Behind the 3 Hz filter v7 is 0.05–0.07 higher (0.27 and 0.41, under the 0.5
+  aimed for), and on the 2026-11-12 yaw table 0.06 higher. A continuation
+  with the margin at 0.30 and twice the weight (200 more iterations) brought
+  every table to 0.12–0.23 with no crossing, but fell once in the 18 shoved
+  runs with the limiter; the shoves are what v7 is for, so the earlier
+  checkpoint is the policy.
+- **The course is not solved by either.** The record (section 8) has v6 at 27
+  of 27; today `course_runs.py` gives it 11 of 27, on today's tree and on the
+  tree of v6's own commit (85ef16b) alike, the same fall each time (the
+  evaluator is deterministic), so what the 27 was measured on is not known and
+  not reproduced. v6 now falls after the turn, re-crossing the obstacles at
+  an angle on the fitted plants; v7 falls at the 25 mm plank and the hill on
+  the MJCF's stiffer tyre and crosses on the fitted plants. As before
+  (sections 8 and 15) the count moves from 3 to 20 of 27 between checkpoints
+  100 iterations apart with the same training statistics: it measures a
+  policy at the edge of what it can do, and v7 was picked among seven
+  checkpoints with it in view, which flatters it.
+
+All 12 standard runs complete (`eval/comparison.md`). Deployed as
+`rl_agile_terrain_v7` on the panel's list only; `rl_agile_terrain_v6` stays
+what the gamepad switch and the defaults use. Not run on the robot. Three
+training runs (the 600 iterations kept, a 300-iteration continuation that
+was no better on the course, and the tighter-margin one above).

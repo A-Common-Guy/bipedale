@@ -1,0 +1,19 @@
+# agile_terrain_v6 with the wheel drives' velocity limiter in the loop (19.5 rad/s
+# at the output; action.wheel_speed_limit, docs/DESIGN.md 24). Under the limiter as
+# modelled v6 falls in 3 of 18 runs when shoved at full stick: the shove asks the
+# wheels for more than the limit and the torque to catch the body is not there.
+# The limiter is an assumption (ODrive's torque-mode one), so it is varied: on in
+# 70 % of the episodes, its limit 17.5-21.5 rad/s, its gain 0.5-2 Nm per rad/s; the
+# policy must stay what v6 is without it. v6's margin, learning rate and noise.
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v7.yaml --resume policies/agile_terrain_v6
+#     MUJOCO_GL=egl uv run python scripts/fast_runs.py policies/agile_terrain_v7 [--limit 0]
+#     uv run python ../recordings/yaw_loop_margin.py policies/agile_terrain_v7 [--filter 3]
+inherit: agile_terrain_v6.yaml
+
+env:
+  action:
+    wheel_speed_limit: {probability: 0.7, limit_rad_s: [17.5, 21.5], gain_nm_s_rad: [0.5, 2.0]}
+
+train:
+  iterations: 600

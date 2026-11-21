@@ -177,8 +177,14 @@ class SandroEnv:
         # limit_rad_s, gain_nm_s_rad). As ODrive's torque-mode limiter, which the drives'
         # firmware descends from: the torque towards a higher speed is capped at
         # gain * (limit - speed), so it is zero at the limit and brakes beyond it.
+        # Either value may be a range and `probability` the share of the episodes with
+        # the limiter (agile_terrain_v7: the model is an assumption, so it is varied);
+        # wheel_cap is then the middle of the ranges.
         cap = a.get("wheel_speed_limit") or {}
-        self.wheel_cap = (float(cap["limit_rad_s"]), float(cap.get("gain_nm_s_rad", 1.0))) if cap else None
+        pair = lambda v: (float(v[0]), float(v[1])) if isinstance(v, (list, tuple)) else (float(v), float(v))
+        self.wheel_cap_ranges = (pair(cap["limit_rad_s"]), pair(cap.get("gain_nm_s_rad", 1.0)),
+                                 float(cap.get("probability", 1.0))) if cap else None
+        self.wheel_cap = (sum(self.wheel_cap_ranges[0]) / 2, sum(self.wheel_cap_ranges[1]) / 2) if cap else None
         self.differential_filter_hz = float(a.get("wheel_differential_filter_hz", 0.0))
         tl = a.get("torque_limit_nm", {})
         self.leg_torque_nm = float(_ros(tl.get("legs", "ros"), self.envelope.peak_nm))
@@ -511,8 +517,21 @@ class SandroEnv:
             # The gear's spring is the drive train's lag where it is modelled.
             "wheel_lag": jp.where(gear["gear_on"] > 0, 0.0, wheel_lag).astype(jp.float32),
             "imu_rate": jp.float32(imu_rate), "imu_delay": jp.float32(imu_delay),
-            **gear,
+            **gear, **self._sample_wheel_cap(jax.random.fold_in(keys[15], 2), randomize and r.get("enabled", True)),
         }
+
+    def _sample_wheel_cap(self, rng, randomize):
+        """This episode's wheel speed limiter: its limit (beyond reach where it is off) and gain."""
+        if self.wheel_cap is None:
+            return {}
+        if not randomize:
+            return {"cap_limit": jp.float32(self.wheel_cap[0]), "cap_gain": jp.float32(self.wheel_cap[1])}
+        (lo, hi), (g_lo, g_hi), probability = self.wheel_cap_ranges
+        k = jax.random.split(rng, 3)
+        on = jax.random.uniform(k[0]) < probability
+        limit = jax.random.uniform(k[1], minval=lo, maxval=hi)
+        gain = jp.exp(jax.random.uniform(k[2], minval=math.log(g_lo), maxval=math.log(g_hi)))
+        return {"cap_limit": jp.where(on, limit, 1e6).astype(jp.float32), "cap_gain": gain.astype(jp.float32)}
 
     def _sample_gear(self, rng, g):
         """The wheel drive trains' gear (Gear in evaluate.py): rigid, or per wheel a
@@ -789,7 +808,7 @@ class SandroEnv:
         motor = passed = jp.zeros(2)
         for _ in range(self.gear_substeps):
             tm = self._speed_cap(
-                jp.clip(kp * (jp.where(kp > 0, q_ref, rq) - rq) + kd * (v_ref - rv) + ff, -lim, lim), rv) * scale
+                jp.clip(kp * (jp.where(kp > 0, q_ref, rq) - rq) + kd * (v_ref - rv) + ff, -lim, lim), rv, params) * scale
             delta = rq - wq
             over = jp.sign(delta) * jp.maximum(jp.abs(delta) - half, 0.0)
             ts = k * over + jp.where(over != 0, c * (rv - wv), 0.0)
@@ -829,13 +848,13 @@ class SandroEnv:
         tau = frame[2] * (q_ref - q) + frame[3] * (frame[1] - v) + frame[4]
         tau = jp.clip(tau, -limit, limit)
         w = self.wheel_idx
-        return tau.at[w].set(self._speed_cap(tau[w], v[w]))
+        return tau.at[w].set(self._speed_cap(tau[w], v[w], params))
 
-    def _speed_cap(self, tau, v):
+    def _speed_cap(self, tau, v, params=None):
         """The wheel drives' velocity limiter on a torque (action.wheel_speed_limit)."""
         if self.wheel_cap is None:
             return tau
-        limit, gain = self.wheel_cap
+        limit, gain = self.wheel_cap if params is None else (params["cap_limit"], params["cap_gain"])
         return jp.clip(tau, gain * (-limit - v), gain * (limit - v))
 
     def _torque_limit(self, heat):

@@ -41,3 +41,22 @@ def test_only_the_wheels_are_limited_and_only_where_it_is_asked_for(env):
     plain = SandroEnv(config_mod.load("fun_fast.yaml", OVERRIDES))
     assert plain.wheel_cap is None
     assert np.allclose(plain._mit_torque(frame, data, None, jp.full(6, 9.0)), 2.0)
+
+
+def test_the_limiter_can_vary_between_episodes_and_be_absent_in_some():
+    import jax
+    from sandro_rl.env import SandroEnv
+    env = SandroEnv(config_mod.load("agile_terrain_v7.yaml", OVERRIDES))
+    assert env.wheel_cap == (19.5, 1.25)
+    keys = jax.random.split(jax.random.PRNGKey(0), 400)
+    caps = jax.vmap(lambda k: env._sample_wheel_cap(k, True))(keys)
+    limit, gain = np.asarray(caps["cap_limit"]), np.asarray(caps["cap_gain"])
+    on = limit < 100
+    assert 0.6 < on.mean() < 0.8
+    assert limit[on].min() >= 17.5 and limit[on].max() <= 21.5
+    assert gain.min() >= 0.5 and gain.max() <= 2.0 + 1e-5
+    # Off is a limit out of reach: the torque passes whatever the speed.
+    params = {"cap_limit": jp.float32(1e6), "cap_gain": jp.float32(1.0)}
+    assert np.allclose(env._speed_cap(jp.full(2, 3.0), jp.array([30.0, -30.0]), params), 3.0)
+    nominal = env._sample_wheel_cap(None, False)
+    assert float(nominal["cap_limit"]) == 19.5

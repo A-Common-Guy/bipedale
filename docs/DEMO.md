@@ -36,7 +36,7 @@ Do these at home, not at the venue.
 
 | # | Controller | Why here |
 |---|---|---|
-| 1 | `rl_agile_terrain_v6` | Known on the robot. Check the Drive page and the Greeting and Figure eight routines with it. |
+| 1 | `rl_agile_terrain_v6` | Known on the robot. Check the Drive page and the Greeting and Figure eight routines with it. `rl_agile_terrain_v7` (panel list, never run on the robot) is the same policy trained with the drives' speed limit modelled: in simulation a shove at full stick fells v6 in 3 runs of 18 under that limit and v7 in none. Until v7 has been tried, keep v6 at 0.8 of the stick or less. |
 | 2 | `rl_fun_bow` | Slow, low torque (4.9 Nm), wheels under 10 rad/s standing. |
 | 3 | `rl_fun_stride` | Low torque (3.6 Nm), but the legs move fast and it has no margin for edges. |
 | 4 | `rl_fun_show` | Fast spins, hops of 5–7 cm at up to 8.2 Nm. Start with the slider low: full stick is 5.5 rad/s of spin. |

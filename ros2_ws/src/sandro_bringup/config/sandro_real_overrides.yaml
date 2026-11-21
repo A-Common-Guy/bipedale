@@ -198,6 +198,14 @@ rl_fun_one_leg_v4:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+# rl_agile_terrain_v6 trained with the wheel drives' speed limiter as modelled
+# (2026-11-21, sandro_rl/docs/DESIGN.md section 26): at full stick a shove no
+# longer fells it there. An alternative to v6, on the panel's list only; not
+# run on the robot. No wheel_differential_filter_hz, as v6.
+rl_agile_terrain_v7:
+  ros__parameters:
+    observation:
+      imu_offset_rad: 0.016
 
 # The terrain profile (sandro_perception) takes the same physical IMU mounting
 # as the controllers above.
