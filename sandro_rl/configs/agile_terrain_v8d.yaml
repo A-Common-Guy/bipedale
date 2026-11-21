@@ -1,0 +1,18 @@
+# Not kept: v6's slow steps and action noise on agile_terrain_v8's iteration 300,
+# with the margin tighter (0.30, twice the weight), against the crossing of the
+# whole left-against-right loop at 14 Hz (0.43-0.51 without the wheel filter, where
+# v6 has none). The yaw tables came down to 0.11-0.17, the crossing did not
+# (0.51-0.55), and a continuation at 0.22 and four times the weight fell in 3 of
+# 18 shoved runs (docs/DESIGN.md 29).
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v8d.yaml --resume runs/agile_v8_c_ck300 --out runs/agile_v8_d
+inherit: agile_terrain_v8.yaml
+
+train:
+  iterations: 400
+  learning_rate: 5.0e-5
+  desired_kl: 0.005
+  resume_log_std: -2.5
+  loop_margin:
+    coef: 2.0
+    margin: 0.30

@@ -1,0 +1,30 @@
+# Not kept: the first run for agile_terrain_v8, the wheels side by side
+# (docs/DESIGN.md 29). agile_terrain_v7 with the step size and action noise of a
+# real fine-tune (fun_split's) and planks up to 3.5 cm (the course has 2.5), 800
+# iterations. Its checkpoints cross the course in 1 to 18 of 27 runs: on the stock
+# MJCF's plant both wheels stop at the 2.5 cm plank's face together and the catch
+# needs wheel speed the limiter does not give (0 of 9 with it, 7 of 9 without).
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v8a.yaml --resume policies/agile_terrain_v7 --out runs/agile_v8_a
+inherit: agile_terrain_v7.yaml
+
+# One stage replaces agile_terrain's three (lists are not merged): its last, with
+# the planks 5 mm taller.
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.commands.sample_fraction: 1.0
+        env.terrain.planks.height_m: [0.005, 0.035]
+        env.terrain.hills.height_m: [0.02, 0.10]
+        env.pushes.force_n: 25.0
+        env.pushes.lateral_force_n: 12.0
+        env.pushes.vertical_force_n: 15.0
+        env.pushes.torque_nm: [1.0, 1.0]
+
+train:
+  iterations: 800
+  learning_rate: 2.0e-4
+  desired_kl: 0.01
+  resume_log_std: -1.8
+  curriculum_offset: 0

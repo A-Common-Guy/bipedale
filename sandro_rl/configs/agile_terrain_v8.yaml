@@ -1,0 +1,30 @@
+# The everyday policy refit to the robot as it is, with the D435's 99 g and under
+# the wheel drives' speed limiter as modelled: a staggered stance, the right axle
+# 7 cm ahead of the left (docs/DESIGN.md 29). With the wheels side by side no
+# policy crosses the course's 2.5 cm plank on the stock MJCF's plant under the
+# limiter, agile_terrain_v3 included (3 of 9: both wheels stop at the face
+# together and the catch needs wheel speed the limiter does not give), and two
+# runs on taller planks made it worse (agile_terrain_v8a.yaml, _v8b.yaml).
+# fun_split, the right axle 11 cm ahead, crosses in 27 of 27 with and without it:
+# one wheel meets the plank at a time. This is fun_split with half the stagger,
+# v6's height command range and v7's limiter. It does not go as low as v6: about
+# 0.14 m at the least.
+#
+# policies/agile_terrain_v8 is this run's iteration-400 checkpoint.
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v8.yaml --resume policies/fun_split --out runs/agile_v8_c
+#     uv run python ../recordings/sysid_2026-11-12/course_runs.py policies/agile_terrain_v8 policies/agile_terrain_v8:camera_mass=0
+#     MUJOCO_GL=egl uv run python scripts/fast_runs.py policies/agile_terrain_v8 --ask 1.0 [--limit 0]
+#     uv run python ../recordings/yaw_loop_margin.py policies/agile_terrain_v8 [--filter 3]
+inherit: fun_split.yaml
+
+env:
+  action:
+    wheel_speed_limit: {probability: 0.7, limit_rad_s: [17.5, 21.5], gain_nm_s_rad: [0.5, 2.0]}
+  commands:
+    height_m: [0.09, 0.19]
+  rewards:
+    split_m: 0.07
+
+train:
+  iterations: 600

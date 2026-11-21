@@ -1,0 +1,28 @@
+# Not kept: the second run for agile_terrain_v8 (agile_terrain_v8a.yaml), from its
+# iteration 700; worse on the course (0 to 9 of 27). The first
+# run's checkpoints trip at the course's 2.5 cm plank on the stock MJCF's plant
+# (the wheel stops at the face, the body goes over it within 0.4 s) and catch it
+# only with wheel speed the limiter does not give: 0 of 9 there with the limiter,
+# 7 of 9 without. Here every plank is 1.5-3.5 cm (0.5-3.5 before: a third of them
+# were under 1.5 cm), with smaller steps and less action noise.
+#
+#     uv run python -m sandro_rl.train configs/agile_terrain_v8b.yaml --resume runs/agile_v8_a_ck700 --out runs/agile_v8_b
+inherit: agile_terrain_v8a.yaml
+
+curriculum:
+  stages:
+    - iteration: 0
+      set:
+        env.commands.sample_fraction: 1.0
+        env.terrain.planks.height_m: [0.015, 0.035]
+        env.terrain.hills.height_m: [0.02, 0.10]
+        env.pushes.force_n: 25.0
+        env.pushes.lateral_force_n: 12.0
+        env.pushes.vertical_force_n: 15.0
+        env.pushes.torque_nm: [1.0, 1.0]
+
+train:
+  iterations: 600
+  learning_rate: 1.0e-4
+  desired_kl: 0.008
+  resume_log_std: -2.0

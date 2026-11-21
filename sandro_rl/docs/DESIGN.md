@@ -3495,3 +3495,118 @@ evaluator has moved a little since; what was not looked for.)
   (`sys.path.insert(0, <worktree>/sandro_rl)` and assert
   `sources.REPO`), or the model read is the main tree's.
 
+## 29. `agile_terrain_v8`: the everyday policy with the camera, in a staggered stance (2026-11-21)
+
+Section 28: the robot carries the D435 now, and with its 99 g
+`agile_terrain_v6` crosses the plank course in 11 of 27 runs and
+`agile_terrain_v7` in 20. The aim here was the everyday policy refit to the
+robot as it is: the camera, the wheel speed limiter as modelled (section 24),
+v6's margin. Five training runs; the fourth configuration's policy is kept
+and it is not v6 with a correction: it stands with one wheel ahead of the
+other.
+
+The camera itself needed nothing new in training. `base.yaml` already varies
+a payload of +-0.4 kg within +-4 cm of the IMU in every episode, which covers
+a camera that is there, missing or mounted elsewhere, and every policy since
+2026-11-18 was trained with the camera body in the model.
+
+### With the wheels side by side the limiter decides the course
+
+`configs/agile_terrain_v8a.yaml`: v7 with larger steps (`fun_split`'s) and
+planks up to 3.5 cm, 800 iterations. `configs/agile_terrain_v8b.yaml`: from
+its iteration 700 with every plank 1.5-3.5 cm. `course_runs.py`, of 27:
+
+| | checkpoints | course |
+|---|---|---|
+| v8a | 200, 400, 500, 600, 700, 800 | 11, 18, 1, 15, 17, 10 |
+| v8b | 100 to 600 | 9, 0, 9, 9, 6, 5 |
+
+The falls are one event. On the stock MJCF's plant (no gear model, the stiff
+tyre) both wheels reach the face of the 2.5 cm plank together at 0.47 m/s and
+stop; the body goes over them, 0.16 rad after 0.1 s and down within 0.4 s. On
+the fitted plants the heavy rotors carry the wheels up the face. What catches
+the body on the MJCF is a burst of wheel speed, and the limiter takes it:
+
+| Course on the MJCF plant, of 9 | limiter as trained | limiter off |
+|---|---|---|
+| v8a, iteration 700 | 0 | 7 |
+| `agile_terrain_v3` (never trained with it) | 3 | 9 |
+| `agile_terrain_v6` | 3 | 9 |
+| `fun_split` | 9 | 9 |
+
+`agile_terrain_v3`, which section 28 names as the policy for planks, loses
+them too once the limiter is on (21 of 27). More plank height in training
+did not find another way over in 1400 iterations; it made the policy worse
+everywhere. `fun_split` does not care: the right axle 11 cm ahead of the
+left, one wheel meets the face while the other still stands on the floor and
+drives.
+
+### The staggered stance
+
+`configs/agile_terrain_v8.yaml`: `fun_split` with half the stagger
+(`rewards.split_m` 0.07), v6's height command range (0.09-0.19 m; `fun_split`
+has 0.10-0.15) and v7's limiter, 600 iterations with `fun_split`'s steps. No
+mirror loss, as for `fun_split`. `policies/agile_terrain_v8` is iteration
+400. Against v6 and v7, everything on the model with the camera:
+
+| | v6 | v7 | v8 |
+|---|---|---|---|
+| Course at 0.5 m/s, of 27 (MJCF / fitted / heavy legs) | 11 (9 / 1 / 1) | 20 (3 / 8 / 9) | **26** (8 / 9 / 9) |
+| The same without the camera's mass | 26 | 22 | 27 |
+| The same with the limiter off; behind the 3 Hz wheel filter | 11; - | 20; - | 27; 27 |
+| Shoves at full stick, limiter 19.5 rad/s: falls of 18 | 3 | 0 | **0** (tilt up to 0.30 rad) |
+| Limiter off | 0 | 0 | 0 |
+| Limiter 17.5 rad/s, full stick; 0.8 of it | 18; - | 18; 0 | 18; 0 |
+| Cruise at full stick, m/s; stop from it | 0.84-0.96; 0.40 m | 0.77-0.87; 0.41 m | 0.85-0.88; 0.41 m |
+| Gate, no wheel filter: yaw table 11-16 / 11-12 | 0.22 / 0.25 | 0.23 / 0.31 | 0.18 / 0.21 |
+| Gate, no wheel filter: whole loop | no crossing | no crossing | **14 Hz, 0.47** |
+| Gate behind the 3 Hz filter: yaw table, whole loop | 0.20, 0.36 | 0.27, 0.41 | 0.13, 0.32 |
+| Standing on the fitted plant: yaw 5-15 Hz, rad/s | 0.005 | 0.006 | 0.005 |
+| Standing: pitch, its deviation (MJCF, nominal) | +0.027, 0.0033 rad | | -0.055, 0.0019 rad |
+| Pitch RMS, hardware and default scenarios, fitted plant | 0.012-0.016 | 0.014-0.016 | 0.017-0.021 |
+| Yaw error there, rad/s | 0.031-0.040 | 0.025-0.032 | 0.038-0.049 |
+| Worst wheel torque with the slow SPI IMU on the MJCF, Nm | 10.4-11.2 | 10.1-11.9 | 2.9-9.7 |
+| Lowest height reached in the default and expressive scenarios, m | 0.120 | | 0.154, 0.142 |
+| Stagger (right axle ahead), m | 0.00 | 0.00 | 0.074 standing, 0.055-0.078 moving |
+| Standard scenarios (push, default, hardware; 3 latency profiles; 2 plants) | | 12 of 12 | 18 of 18 |
+
+What it is not:
+
+- **Not v6's loop.** The yaw tables are lower than v6's, with and without
+  the wheel filter. The whole left-against-right loop is not: without the
+  filter it has a crossing at 14 Hz of 0.47 standing and standing low (the
+  frequency of the robot's roll buzz), where v6 and v7 have none; behind the
+  3 Hz filter the worst crossing is 0.32 at 28 Hz (v6 0.36). The acceptance
+  asked for no crossing. `configs/agile_terrain_v8d.yaml` (v6's slow steps,
+  margin 0.30 at twice the weight, 400 iterations from iteration 300) took
+  the yaw tables to 0.11-0.17 and left the crossing at 0.51-0.55; a
+  continuation at 0.22 and four times the weight fell in 3 of 18 shoved
+  runs. The trainer reports the loop inside the margin (0.18-0.31) all the
+  while: it linearises at the minibatch's observations, the gate at the
+  policy's own stand, and for a policy that is not mirror-symmetric the
+  split into opposed and common motion that both rest on is only
+  approximate. So the number is a warning, not a measurement: `fun_split`
+  shows the same kind of crossing (0.33) and has not run on the robot either.
+  The robot overrides deploy v8 without the wheel filter, as trained, and
+  say where to add it.
+- **Not v6's height range.** Asked for 0.09 m it stays at 0.14-0.15 (v6
+  reaches 0.12 in the same scenarios): the legs are 3.7 cm fore and aft of
+  their neutral offsets and what is left of their reach is the height. The
+  height reference still runs down to 0.09 m, so after holding the stick
+  down the robot answers "up" late.
+- **Not level.** It stands leaning back by 0.055 rad (v6: 0.027 forward).
+- **Not symmetric.** The right wheel leads. Turning left and right are not
+  the same motion; the turn at full stick keeps 1.28-1.48 rad/s of 1.5.
+- **Chosen among checkpoints.** Iterations 200 to 600 cross the course in
+  27, 27, 26, 27 and 27 of 27, so the course no longer hangs on the
+  checkpoint as it did for v5 to v7 (3 to 20). The shoves under the limiter
+  do: 0, 1, 0, 0 and 6 falls of 18. Iteration 400 was taken for no fall
+  there, none in the comparison's 24 cases and the calmest wheels with the
+  slow IMU; its one course fall is on the MJCF plant.
+- **A lower speed limit is still not survived at full stick** (17.5 rad/s:
+  18 of 18), as for v7.
+
+Deployed as `rl_agile_terrain_v8` on the panel's list only;
+`rl_agile_terrain_v6` stays what the gamepad switch and the defaults use.
+Not run on the robot. Video: `policies/agile_terrain_v8/agile_terrain_v8.mp4`
+(the course at 0.5 m/s).
