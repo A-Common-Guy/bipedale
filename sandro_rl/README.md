@@ -73,6 +73,8 @@ uv run python -m sandro_rl.evaluate runs/terrain --scenario course --course --vi
 uv run python -m sandro_rl.evaluate policies/step_climb --scenario steps --course steps --video steps.mp4  # 3-6 cm planks, curb
 uv run python -m sandro_rl.evaluate runs/terrain --scenario expressive --video expressive.mp4  # roll and height
 uv run python -m sandro_rl.evaluate policies/stand_up --scenario stand_up --fallen 1.4 --video up.mp4  # limp fall, then stand up
+uv run python -m sandro_rl.evaluate policies/fun_show --scenario routine:show:0.5 --video show.mp4  # a routine of the panel's Drive page at 50 % speed
+uv run python scripts/routine_runs.py   # every routine with its policy: falls, wheel speed, floor used (docs/demo_reel.mp4, ../docs/DEMO.md)
 
 # obstacle avoidance: goals among posts and walls, seen by a simulated planar range scanner
 uv run python -m sandro_rl.train configs/avoid.yaml --out runs/avoid

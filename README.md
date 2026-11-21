@@ -77,6 +77,9 @@ gamepad pairing, and the user guide with every button combination
 ([USER_GUIDE.md](ros2_ws/src/sandro_gui/docs/USER_GUIDE.md)). `make gui-sim` runs it against
 the simulation on the development machine.
 
+For a live demo, [docs/DEMO.md](docs/DEMO.md) has a running order of the show
+policies, the phone's routines, the floor each needs and what to check first.
+
 PS5 teleoperation uses L1 as a deadman and publishes standard
 `geometry_msgs/msg/TwistStamped` on `/cmd_vel`: left stick vertical is forward
 speed, right stick horizontal is yaw rate, and right stick vertical is a body

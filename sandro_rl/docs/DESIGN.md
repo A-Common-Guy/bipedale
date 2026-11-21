@@ -3237,3 +3237,52 @@ What would make the robot faster is not a policy: the drives' `vel_limit`
 raised (`gim6010/can_control/gim_cli.py sdo write <node> vel_limit`, rotor
 rev/s; the back-EMF at the supply voltage then sets the limit), or the
 limiter off in MIT mode, both the owner's decision on the hardware.
+
+## 25. The Drive page's routines in the evaluator, and a demo reel (2026-11-21)
+
+The panel's routines (`ros2_ws/src/sandro_gui/config/routines.yaml`: timed
+stick positions, the hop and the height reset) had only been checked against
+their own format. `evaluate.py --scenario routine:NAME[:SPEED]` now replays
+one: 2 s standing, the routine, 2 s standing. The sticks are interpolated by
+the panel's own class (`sandro_gui/routines.py`, loaded by path) and become
+commands as on the robot (`routine_command`): the page's speed scales the
+left stick, `touch.to_joy` and `joy_teleop.stick_command` with
+`teleop.yaml`'s signs give forward `ly`, yaw `-lx`, height rate `ry` and the
+roll channel `rx`, each times the policy's own limit; cross is `joy_teleop`'s
+5 cm hop request; the height reset drives the height reference to the
+initial height (0.17 m, clipped to the policy's range) at 3 /s until it is
+within 2 mm. The evaluator starts at the robot overrides' height target, so
+a routine with the reset ends 14 mm above where the run began: that is the
+reset, not a drift.
+
+`scripts/routine_runs.py` replays each routine with the policy it is meant
+for, on the MJCF and the fitted plant, at 50 % and 100 % of the page's speed,
+with the drives' speed limit modelled (`wheel_speed_limit=19.5`, section 24):
+32 runs, **no fall**, nothing but the tyres on the floor.
+
+| Routine | Policy | Fastest wheel, rad/s (on the floor) | Floor used at 50 %, m | at 100 %, m | Ends from its start, m |
+|---|---|---|---|---|---|
+| greeting | `fun_show` | 14.1 (13.8) | 0.36 x 0.07 | 0.24 x 0.07 | up to 0.34 |
+| spin | `fun_show` | 15.1 (14.9) | 0.19 x 0.10 | 0.29 x 0.20 | up to 0.28 |
+| sway | `fun_show` | 3.1 (3.0) | 0.32 x 0.04 | the same | up to 0.31 |
+| eight | `fun_show` | 17.3 (17.3) | 0.78 x 0.64 | 0.40 x 0.49 | up to 0.49 |
+| show | `fun_show` | 19.4 (18.4) | 0.91 x 0.66 | 0.85 x 1.10 | up to 0.50 |
+| stride | `fun_stride` | 12.0 (12.0) | 1.35 x 0.03 | 2.19 x 0.05 | 0.37–0.46 ahead |
+| bow | `fun_bow` | 4.0 (4.0) | 0.14 x 0.00 | the same | 0.05 |
+| hops | `fun_hop_high` | 19.0 (15.2) | 0.59 x 0.31 | the same | up to 0.62 |
+
+(The worse of the two plants per cell.) Nothing needed changing in the
+routines: none falls, the limiter holds every wheel under 19.5 rad/s without
+a fall, and the largest floor at 50 % is the stride's 1.35 m strip. What the
+replays add is that "on the spot" is not exact: `fun_show` creeps 0.2–0.35 m
+forward through the greeting and the sway (it drifts while the height and
+roll move), and four high hops carry `fun_hop_high` 0.3–0.6 m. The measured
+room is now in each routine's note and in the user guide. The figure eight
+closes on the fitted plant (ends 1 cm from its start at 50 %) and not on the
+MJCF, where the stiffer tyre torsion turns it slower (section 18).
+
+One clip per routine at 50 % speed on the fitted plant is in its policy's
+folder (`routine_<name>.mp4`); `docs/demo_reel.mp4` (85 s) joins the show,
+the stride, the bow, the hops and `fun_one_leg_v4`'s stand. `docs/DEMO.md` at
+the top of the repository is the running order and the checklist for a live
+demo.

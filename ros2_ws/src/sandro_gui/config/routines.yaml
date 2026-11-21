@@ -15,7 +15,7 @@
 routines:
   greeting:
     label: Greeting
-    note: Two bows (2.4 cm down and up), then a look left, right and back, about 25 degrees each side. On the spot.
+    note: Two bows (2.4 cm down and up), then a look left, right and back, about 25 degrees each side. On the spot. In simulation with rl_fun_show it creeps up to 0.35 m forward meanwhile; keep 0.6 m clear ahead.
     keys:
       - {t: 0}
       - {t: 1.2}
@@ -41,7 +41,7 @@ routines:
 
   spin:
     label: Spin
-    note: A turn to the right, a pause, the same turn back, about 200 degrees each at 50 % speed (more than a full turn at 100 %). On the spot; keep 0.5 m clear all round.
+    note: A turn to the right, a pause, the same turn back, about 200 degrees each at 50 % speed (more than a full turn at 100 %). On the spot; keep 0.5 m clear all round. In simulation with rl_fun_show it stays within 0.3 m of its start.
     keys:
       - {t: 0}
       - {t: 0.5, lx: 1.0}
@@ -54,7 +54,7 @@ routines:
 
   sway:
     label: Sway
-    note: Leans right and left three times, dipping into each lean and rising through the middle. On the spot. Policies with roll (the agile ones); the others only dip.
+    note: Leans right and left three times, dipping into each lean and rising through the middle. On the spot. Policies with roll (the agile ones); the others only dip. In simulation with rl_fun_show it creeps up to 0.3 m forward meanwhile; keep 0.6 m clear ahead.
     keys:
       - {t: 0}
       - {t: 1.2}
@@ -75,7 +75,7 @@ routines:
 
   eight:
     label: Figure eight
-    note: A circle to the right, then one to the left, each about 0.55 m across. The circles close at 50 % speed only (the size stays, the angle scales). Needs 1.5 m by 1 m of floor, the robot starting in the middle facing along the short side.
+    note: A circle to the right, then one to the left, each about 0.55 m across. The circles close at 50 % speed only (the size stays, the angle scales). Needs 1.5 m by 1 m of floor, the robot starting in the middle facing along the short side. In simulation with rl_fun_show it used at most 0.8 m by 0.65 m and ended up to 0.5 m from its start (the circles do not close on every floor).
     keys:
       - {t: 0}
       - {t: 0.5, lx: 1.0, ly: 0.8}
@@ -86,7 +86,7 @@ routines:
 
   show:
     label: Show
-    note: 'Half a minute of everything: two bows, a turn right, a hop, 0.3 m forward with a hop on the way, back, a sway, the turn back left, two hops. Needs 1 m clear ahead and 0.5 m all round.'
+    note: 'Half a minute of everything: two bows, a turn right, a hop, 0.3 m forward with a hop on the way, back, a sway, the turn back left, two hops. Needs 1 m clear ahead and 0.5 m all round. In simulation with rl_fun_show it used at most 0.9 m by 0.7 m at 50 % speed and 0.85 m by 1.1 m at 100 %, ending up to 0.5 m from its start: 1.5 m by 1.5 m of clear floor.'
     keys:
       - {t: 0}
       - {t: 1.2}
@@ -134,7 +134,7 @@ routines:
 
   stride:
     label: Stride
-    note: For rl_fun_stride, where the right stick's left-right axis is the legs' fore-aft split. Three strides on the spot (a wheel 6 cm ahead, then the other, every 1.6 s), three while driving 1.1 m forward at 50 % speed, three driving back. Needs 1.5 m clear ahead. Any other policy sways instead.
+    note: For rl_fun_stride, where the right stick's left-right axis is the legs' fore-aft split. Three strides on the spot (a wheel 6 cm ahead, then the other, every 1.6 s), three while driving 1.1 m forward at 50 % speed, three driving back. Needs 1.5 m clear ahead. Any other policy sways instead. In simulation it used 1.35 m of floor at 50 % speed and 2.2 m at 100 %, ending 0.45 m ahead of its start.
     keys:
       - {t: 0}
       - {t: 0.6}
@@ -163,7 +163,7 @@ routines:
 
   bow:
     label: Bow
-    note: For rl_fun_bow, where the right stick's left-right axis is the body's lean. A slow deep bow forward (0.6 rad), held 1.5 s, back upright, then two quick nods. On the spot; keep 0.5 m clear in front of the robot. Any other policy rolls to the right instead.
+    note: For rl_fun_bow, where the right stick's left-right axis is the body's lean. A slow deep bow forward (0.6 rad), held 1.5 s, back upright, then two quick nods. On the spot; keep 0.5 m clear in front of the robot. Any other policy rolls to the right instead. In simulation it rolls 0.15 m back and forth under the bow.
     keys:
       - {t: 0}
       - {t: 0.6}
@@ -179,7 +179,7 @@ routines:
 
   hops:
     label: Hops
-    note: Four hops on the spot, a press every 1.5 s. Meant for rl_fun_hop_high (11-13 cm in simulation); any policy with a hop input does its own. Clear, flat floor, 0.5 m all round.
+    note: Four hops on the spot, a press every 1.5 s. Meant for rl_fun_hop_high (11-13 cm in simulation); any policy with a hop input does its own. Clear, flat floor, 0.5 m all round. In simulation the four hops carry it up to 0.6 m forward and 0.3 m sideways; keep 1 m clear all round.
     keys:
       - {t: 0}
       - {t: 7.0}

@@ -308,6 +308,61 @@ EXTRA_SCENARIOS = {
 }
 SCENARIOS = {**closed_loop.SCENARIOS, **EXTRA_SCENARIOS}
 
+# A routine of the panel's Drive page (ros2_ws/src/sandro_gui/config/routines.yaml)
+# as a scenario: `routine:NAME` or `routine:NAME:SPEED` (the page's speed slider,
+# 0..1, default 0.5). 2 s standing, the routine, 2 s standing.
+ROUTINES_FILE = sources.SRC / "sandro_gui" / "config" / "routines.yaml"
+ROUTINE_LEAD_S = 2.0
+TELEOP_JUMP_HEIGHT_M = 0.05       # teleop.yaml jump_height_m
+TELEOP_HEIGHT_GAIN_PER_S = 3.0    # joy_teleop height_gain_per_s (the height reset)
+
+
+def load_routine(scenario: str):
+    """(Routine, speed) of a `routine:NAME[:SPEED]` scenario, registered in SCENARIOS.
+
+    The Routine class is the panel's own (sandro_gui/routines.py, loaded by
+    path: it needs yaml only), so the sticks are interpolated by the same code."""
+    import importlib.util
+    parts = scenario.split(":")
+    module_path = ROUTINES_FILE.parents[1] / "sandro_gui" / "routines.py"
+    module_spec = importlib.util.spec_from_file_location("sandro_gui_routines", module_path)
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+    routines = module.load(ROUTINES_FILE)
+    if parts[1] not in routines:
+        raise ValueError(f"no routine {parts[1]!r} in {ROUTINES_FILE}: {sorted(routines)}")
+    routine = routines[parts[1]]
+    speed = float(parts[2]) if len(parts) > 2 else 0.5
+    SCENARIOS[scenario] = [f"{ROUTINE_LEAD_S},0,0", f"{routine.duration},0,0", f"{ROUTINE_LEAD_S},0,0"]
+    return routine, max(0.0, min(1.0, speed))
+
+
+def routine_command(state: dict | None, speed: float, iface, height_reference: float,
+                    initial_height: float, recentre: bool) -> tuple[list[float], bool]:
+    """What joy_teleop publishes for the page's state: (forward, yaw, height rate, roll, jump)
+    and whether the height reset is still running.
+
+    The chain is touch.to_joy (the slider scales the left stick; SDL has left +1),
+    then joy_teleop.stick_command with teleop.yaml's signs and the running
+    controller's limits at speed_fraction 1: forward ly, yaw -lx (left positive),
+    height rate ry, roll channel rx, the hop teleop's jump_height_m while cross is
+    held. The height reset (r3) drives the height reference to the policy's
+    initial height until it is within 2 mm or the right stick moves."""
+    if state is None:
+        return [0.0] * 5, False
+    forward = state["ly"] * speed * iface.v_max
+    yaw = -state["lx"] * speed * iface.yaw_max
+    height_rate = state["ry"] * iface.h_rate
+    roll = state["rx"] * iface.roll_max
+    if recentre:
+        if abs(height_rate) > 0.1 * iface.h_rate or abs(height_reference - initial_height) < 0.002:
+            recentre = False
+        else:
+            height_rate = max(-iface.h_rate, min(iface.h_rate,
+                                                 TELEOP_HEIGHT_GAIN_PER_S * (initial_height - height_reference)))
+    jump = TELEOP_JUMP_HEIGHT_M if "cross" in state["buttons"] else 0.0
+    return [forward, yaw, height_rate, roll, jump], recentre
+
 def floor_contact(m, d, tyres) -> int:
     """Bits for what touches the world body: 1 the right tyre, 2 the left tyre, 4 any other part."""
     names = list(tyres)     # geom names: the ids differ between the plain model and the one with leg boxes
@@ -717,6 +772,12 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
     limits = iface.torque_limit * options.torque_scale
     heat = np.zeros(len(JOINTS))  # the drives' thermal envelope, from cold
 
+    routine = None
+    if scenario.startswith("routine:"):
+        from . import export_ros
+        routine, routine_speed = load_routine(scenario)
+        routine_initial_height = float(np.clip(export_ros.initial_height_m(), iface.h_min, iface.h_max))
+        routine_recentre, routine_r3 = False, False
     phases = [[float(x) for x in p.split(",")] + [0.0] * (6 - len(p.split(","))) for p in SCENARIOS[scenario]]
     pushes = [[float(x) for x in p.split(",")] for p in closed_loop.SCENARIO_PUSHES.get(scenario, [])]
     total_phase_s = sum(p[0] for p in phases)
@@ -1002,6 +1063,15 @@ def run(policy_dir: Path, scenario: str, sim: dict[str, str], output: Path,
                 published = list(phases[index]) if index < len(phases) else [0.0] * 6
             else:
                 published = [0.0] * 6
+            if routine is not None and phase_start >= 0:
+                state = routine.sample(now - phase_start - ROUTINE_LEAD_S)
+                r3 = state is not None and "r3" in state["buttons"]
+                routine_recentre = routine_recentre or (r3 and not routine_r3)     # on the press's edge
+                routine_r3 = r3
+                command, routine_recentre = routine_command(
+                    state, routine_speed, iface, controller.height_command, routine_initial_height,
+                    routine_recentre and state is not None)
+                published = [published[0], *command]
             if heading_hold > 0.0:
                 # An operator steering back to the heading the scenario's yaw
                 # rates integrate to, from the true heading.
@@ -1272,7 +1342,9 @@ def markdown(table: dict) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("policy_dir")
-    parser.add_argument("--scenario", default="hardware", choices=sorted(SCENARIOS))
+    parser.add_argument("--scenario", default="hardware",
+                        help=f"one of {sorted(SCENARIOS)}, or routine:NAME[:SPEED], a routine of the "
+                             "panel's Drive page at the page's speed (0..1, default 0.5)")
     parser.add_argument("--profile", default="nominal", choices=sorted(PROFILES))
     parser.add_argument("--sim", action="append", default=[], metavar="KEY=VALUE")
     parser.add_argument("--output")
@@ -1308,6 +1380,10 @@ def main() -> int:
         (policy_dir / "eval" / "lag_sweep.md").write_text(text + "\n")
         print(text)
         return 0
+    if args.scenario.startswith("routine:"):
+        load_routine(args.scenario)
+    elif args.scenario not in SCENARIOS:
+        parser.error(f"unknown scenario {args.scenario!r}")
     sim = {**PROFILES[args.profile],
            **closed_loop.parse_sim([s for s in args.sim if not s.startswith("wheel_lag=")]),
            **policy_only}
