@@ -183,11 +183,51 @@ function renderRoutines(playing) {
   }
 }
 
+// The yaw filter of the running RL controller: read when the controller changes, switched by the button.
+let filter = null, filterFor = null, filterBusy = false;
+
+async function readFilter(controller, on) {
+  filterBusy = true;
+  renderFilter(controller);
+  try {
+    const body = on === undefined ? { controller } : { controller, on };
+    filter = on === undefined ? await ctx.api("yaw_filter", body) : await ctx.act("yaw_filter", body);
+  } catch (error) {
+    if (on === undefined) filter = { controller, error: error.message };
+  } finally {
+    filterBusy = false;
+    renderFilter(controller);
+  }
+}
+
+function renderFilter(active) {
+  const button = $("#drive-filter"), note = $("#drive-filter-note");
+  const rl = active && active.startsWith("rl_");
+  if (rl && filterFor !== active) {
+    filterFor = active;
+    filter = null;
+    readFilter(active);
+  }
+  if (!rl) filterFor = null;
+  const known = rl && filter && filter.controller === active && !filter.error;
+  const on = known && filter.hz > 0;
+  button.disabled = !known || filterBusy;
+  button.classList.toggle("on", Boolean(on));
+  button.textContent = !known ? "Yaw filter" : on ? `Yaw filter on · ${filter.hz} Hz` : "Yaw filter off";
+  note.textContent = !rl ? "A setting of the RL controllers: none is running."
+    : filter?.error && filter.controller === active ? filter.error
+      : !known ? "reading…"
+        : on ? "The wheels' left-against-right command is smoothed: quieter, a little slower to turn."
+          : "Switch it on if the robot buzzes in yaw or roll.";
+}
+
 function render() {
   if (!visible) return;
   const fast = ctx.state.fast || {}, slow = ctx.state.slow || {};
   const touch = fast.touch;
-  const active = slow.ros?.teleop?.active;
+  // joy_teleop names the running balancer; without it, the controller manager's list does.
+  const active = slow.ros?.teleop?.active
+    || (slow.ros?.controllers || []).find((c) => c.owns_commands && c.state === "active")?.name;
   const cmd = fast.ros?.cmd_vel;
   const mine = touch?.driving && touch.client === client;
   renderRoutines(mine ? touch.routine : null);
@@ -206,6 +246,7 @@ function render() {
     ? h("span", { class: "mono" }, `forward ${signed(cmd.forward, 2)} m/s · yaw ${signed(cmd.yaw, 2)} rad/s · height ${signed(cmd.height_rate, 3)} m/s · roll ${signed(cmd.roll, 2)} rad`)
     : h("span", { class: "muted" }, "No command: nothing is touched, or teleop is not running (start the stack with teleop)."));
   $("#drive-speed-value").textContent = `${$("#drive-speed").value} %`;
+  renderFilter(active);
 }
 
 export function init(context) {
@@ -219,6 +260,9 @@ export function init(context) {
   const routines = ctx.state.info?.touch?.routines || [];
   $("#drive-routines").append(...routines.map(routineButton));
   $("#drive-routines-block").hidden = routines.length === 0;
+  $("#drive-filter").addEventListener("click", () => {
+    if (filter && filterFor && !filter.error) readFilter(filterFor, !(filter.hz > 0));
+  });
   const speed = $("#drive-speed");
   const top = Math.round(100 * (ctx.state.info?.touch?.max_speed ?? 1));
   speed.max = top;

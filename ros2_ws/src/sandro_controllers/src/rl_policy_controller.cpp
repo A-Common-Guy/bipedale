@@ -15,6 +15,7 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "rcl_interfaces/msg/parameter_descriptor.hpp"
+#include "rcl_interfaces/msg/set_parameters_result.hpp"
 
 namespace sandro_controllers {
 namespace {
@@ -23,6 +24,15 @@ rcl_interfaces::msg::ParameterDescriptor read_only(const std::string &text) {
   rcl_interfaces::msg::ParameterDescriptor result;
   result.description = text;
   result.read_only = true;
+  return result;
+}
+
+// The one parameter that may be set while the controller runs.
+constexpr char kDifferentialFilterParameter[] = "action.wheel_differential_filter_hz";
+
+rcl_interfaces::msg::ParameterDescriptor writable(const std::string &text) {
+  rcl_interfaces::msg::ParameterDescriptor result;
+  result.description = text;
   return result;
 }
 
@@ -206,7 +216,9 @@ void RlPolicyController::declare_parameters() {
   node->declare_parameter("legs.lower_m", geometry.lower, read_only("Five-bar lower link."));
   const RlPolicySettings defaults;
   for (const auto &entry : double_parameters()) {
-    node->declare_parameter(entry.name, defaults.*entry.field, read_only(entry.description));
+    const bool live = std::string(entry.name) == kDifferentialFilterParameter;
+    node->declare_parameter(entry.name, defaults.*entry.field,
+                            live ? writable(entry.description) : read_only(entry.description));
   }
 }
 
@@ -357,6 +369,30 @@ RlPolicyController::on_configure(const rclcpp_lifecycle::State &) {
         response->success = true;
         response->message = "the next activation within 1 s takes over without the stand phase";
       });
+  differential_filter_hz_.store(settings.wheel_differential_filter_hz);
+  parameter_callback_ = node->add_on_set_parameters_callback(
+      [this](const std::vector<rclcpp::Parameter> &changes) {
+        rcl_interfaces::msg::SetParametersResult result;
+        result.successful = true;
+        for (const auto &change : changes) {
+          if (change.get_name() != kDifferentialFilterParameter) {
+            continue;
+          }
+          double hz = -1.0;
+          if (change.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE) {
+            hz = change.as_double();
+          } else if (change.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
+            hz = static_cast<double>(change.as_int());
+          }
+          if (!std::isfinite(hz) || hz < 0.0 || hz > RlPolicyCore::kDifferentialFilterMaxHz) {
+            result.successful = false;
+            result.reason = "action.wheel_differential_filter_hz must be 0 (off) to 50 Hz";
+            return result;
+          }
+          differential_filter_hz_.store(hz);
+        }
+        return result;
+      });
   diagnostics_ros_publisher_ = node->create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
       "~/diagnostics", rclcpp::SystemDefaultsQoS());
   diagnostics_publisher_ =
@@ -463,6 +499,7 @@ controller_interface::return_type RlPolicyController::update(const rclcpp::Time 
                               ? std::numeric_limits<double>::infinity()
                               : std::max(0.0, time.seconds() - received.receipt_time_s)};
   command.jump_m = received.jump_m;
+  core_.set_wheel_differential_filter_hz(differential_filter_hz_.load());
   const RlPolicyOutput output = core_.update(state, command, period.seconds());
   if (output.inferred) {
     inference_last_s_ = output.inference_s;

@@ -136,6 +136,17 @@ const Eigen::VectorXf &MlpPolicy::run(const Eigen::VectorXf &observation) {
   return out;
 }
 
+void RlPolicyCore::set_wheel_differential_filter_hz(const double hz) {
+  if (!std::isfinite(hz) || hz < 0.0 || hz > kDifferentialFilterMaxHz ||
+      hz == settings_.wheel_differential_filter_hz) {
+    return;
+  }
+  if (settings_.wheel_differential_filter_hz <= 0.0) {
+    applied_differential_ = 0.5F * (applied_action_[kWheels[0]] - applied_action_[kWheels[1]]);
+  }
+  settings_.wheel_differential_filter_hz = hz;
+}
+
 bool RlPolicyCore::configure(const RlPolicySettings &settings, const int update_rate_hz,
                              std::string *error) {
   const auto &s = settings;

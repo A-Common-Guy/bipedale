@@ -60,6 +60,13 @@ touch:
   max_speed_fraction: 1.0  # the page's speed slider tops out here (of the controller's limits)
   rate_hz: 20.0            # as joy_node's autorepeat
 
+# The Drive page's yaw-filter switch: the cutoff it sets on the running RL
+# controller's action.wheel_differential_filter_hz when switched on (off is 0).
+# What each controller starts with is its own configuration: the policies that
+# need the filter have it in sandro_bringup/config/sandro_real_overrides.yaml.
+yaw_filter:
+  hz: 3.0
+
 # Topics watched for rate and freshness. expect_hz is what a healthy running
 # stack delivers (the 300 Hz control loop publishes the sensors every cycle).
 # sampled: high-rate topics the panel's ticker drains 20 times a second

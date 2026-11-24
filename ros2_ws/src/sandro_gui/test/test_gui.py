@@ -689,6 +689,33 @@ def test_the_demo_panel_drives_from_the_touch_page(tmp_path):
     assert panel.fast()["touch"]["client"] == "phone"
 
 
+def test_the_demo_panel_switches_the_yaw_filter_of_an_rl_controller(tmp_path):
+    from sandro_gui import demo
+    from sandro_gui.panel import Panel
+    log = logbook.Logbook()
+    sources = demo.sources(log, settings(), BRINGUP / "config" / "controllers.yaml")
+    cfg = yaml.safe_load((ROOT / "config" / "gui.yaml").read_text())
+    panel = Panel(cfg, {"teleop": str(BRINGUP / "config" / "teleop.yaml"), "controllers": None,
+                        "mjcf": str(tmp_path / "none.xml"), "cache": str(tmp_path)}, sources, simulation=False)
+    name = next(n.strip("/") for n in sources["ros"].params if n.startswith("/rl_"))
+    start = panel.act("yaw_filter", {"controller": name})
+    assert start["controller"] == name and start["on_hz"] == 3.0
+    assert panel.act("yaw_filter", {"controller": name, "on": True})["hz"] == 3.0
+    assert sources["ros"].params[f"/{name}"][Panel.YAW_FILTER] == 3.0
+    assert panel.act("yaw_filter", {"controller": name, "on": False})["hz"] == 0.0
+    assert panel.act("yaw_filter", {"controller": name})["hz"] == 0.0
+    with pytest.raises(ValueError):
+        panel.act("yaw_filter", {"controller": "lqr_balancer", "on": True})
+
+
+def test_the_policies_that_need_the_yaw_filter_start_with_it():
+    overrides = yaml.safe_load((BRINGUP / "config" / "sandro_real_overrides.yaml").read_text())
+    for name in ("rl_agile_terrain", "rl_agile_terrain_v8"):
+        assert overrides[name]["ros__parameters"]["action"]["wheel_differential_filter_hz"] == 3.0
+    for name in ("rl_agile_terrain_v6", "rl_agile_terrain_v7"):
+        assert "action" not in overrides[name]["ros__parameters"]
+
+
 # The Drive page's routines -----------------------------------------------
 
 

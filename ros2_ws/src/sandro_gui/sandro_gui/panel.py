@@ -590,6 +590,34 @@ class Panel:
 
     # Actions ------------------------------------------------------------
 
+    YAW_FILTER = "action.wheel_differential_filter_hz"
+
+    def yaw_filter(self, body: dict) -> dict:
+        """An RL controller's yaw filter: what it is now, or (with `on`) switch it.
+
+        The filter is the controller's action.wheel_differential_filter_hz: a low-pass
+        on the opposed half of the wheel commands, which quiets a yaw or roll buzz. Each
+        controller starts with the value of its configuration (sandro_real_overrides.yaml
+        for the policies that need it); this changes it while the controller runs, until
+        the stack is restarted.
+        """
+        controller = str(body.get("controller") or "")
+        if not controller.startswith("rl_"):
+            raise ValueError("the yaw filter is a setting of the RL controllers")
+        node, ros = f"/{controller}", self._ros()
+        on_hz = float(self.cfg.get("yaw_filter", {}).get("hz", 3.0))
+        if "on" in body:
+            ok, reason = ros.set_parameter(node, self.YAW_FILTER, on_hz if body["on"] else 0.0)
+            if not ok:
+                hint = (": the controller on the robot was built before the filter could be "
+                        "switched while running; rebuild it") if "read" in (reason or "") else ""
+                raise ValueError((reason or "refused") + hint)
+        row = next((r for r in ros.parameters(node) if r["name"] == self.YAW_FILTER), None)
+        if row is None:
+            raise ValueError(f"{controller} has no yaw filter")
+        return {"controller": controller, "hz": float(row["value"]), "on_hz": on_hz,
+                "message": f"yaw filter {'on, %g Hz' % row['value'] if row['value'] > 0 else 'off'}"}
+
     def _ros(self):
         if self.ros is None:
             raise RuntimeError("ROS is not available in this process")
@@ -673,6 +701,8 @@ class Panel:
             if self.touch is None:
                 raise RuntimeError("driving from the panel needs ROS in this process")
             return self.touch.update(body)
+        if action == "yaw_filter":
+            return self.yaw_filter(body)
         if action == "launch/preview":
             return {"command": shlex.join(build_command(body, self.launcher.settings))}
         if action == "launch/start":

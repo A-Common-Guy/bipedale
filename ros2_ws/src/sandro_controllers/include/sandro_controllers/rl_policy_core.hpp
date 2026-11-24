@@ -238,6 +238,15 @@ public:
   RlPolicyOutput update(const RlPolicyState &state,
                         const RlPolicyCommand &command, double period_s);
 
+  // The yaw filter (action.wheel_differential_filter_hz) may change while the
+  // policy runs: the panel's toggle. Called from the update thread. Switching
+  // it on starts from the opposed command being applied, so nothing steps.
+  // Values that are not finite, negative or above kDifferentialFilterMaxHz
+  // are ignored.
+  static constexpr double kDifferentialFilterMaxHz = 50.0;
+  void set_wheel_differential_filter_hz(double hz);
+  double wheel_differential_filter_hz() const { return settings_.wheel_differential_filter_hz; }
+
   int frame_size() const { return frame_size_; }
   RlPhase phase() const { return phase_; }
   // The observation frame of one cycle, exposed for tests.

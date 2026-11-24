@@ -145,6 +145,16 @@ policy's caveats, is in `docs/DEMO.md` at the top of the repository.
 - The number next to the status is the round trip of a command to the robot
   in milliseconds. Above 150 ms, slow down.
 
+**Yaw filter.** The button under the routines shows and switches the yaw filter
+of the running RL controller (`action.wheel_differential_filter_hz`): a low-pass
+on the wheels' left-against-right command that quiets a yaw or roll buzz, at the
+cost of a slightly slower turn. On is 3 Hz (`yaw_filter.hz` in `gui.yaml`).
+Each controller starts with what its configuration says: the policies that need
+the filter (`rl_agile_terrain`, `rl_agile_terrain_v8`) have it in
+`sandro_real_overrides.yaml` and start with it on. A switch from the page lasts
+until the stack is restarted. It needs the controller built from 2026-11-24 or
+later; an older build refuses the change and the page says so.
+
 ## E-stop and re-arm
 
 The header E-STOP sends the CAN E-stop from the panel's own CAN socket first,

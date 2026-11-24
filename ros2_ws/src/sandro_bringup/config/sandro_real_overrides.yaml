@@ -218,13 +218,16 @@ rl_agile_terrain_v7:
 # staggered stance, the right wheel 7 cm ahead of the left, so that one wheel meets
 # an edge at a time. Plank course 26 of 27 where v6 has 11 and v7 20. It stands
 # leaning back by 0.055 rad and does not go lower than about 0.14 m. On the panel's
-# list only; not run on the robot. No wheel_differential_filter_hz, as trained: the
-# measured loop then has a crossing at 14 Hz of 0.47 (v6: none). If it buzzes in
-# roll, add action.wheel_differential_filter_hz: 3.0 here (0.32 behind it).
+# list only; not run on the robot. It starts with the 3 Hz yaw filter: without it
+# the measured loop has a crossing at 14 Hz of 0.47 (v6: none), behind it 0.32, and
+# the plank course is 27 of 27. The panel's Drive page switches the filter while
+# the controller runs.
 rl_agile_terrain_v8:
   ros__parameters:
     observation:
       imu_offset_rad: 0.016
+    action:
+      wheel_differential_filter_hz: 3.0
 
 # The terrain profile (sandro_perception) takes the same physical IMU mounting
 # as the controllers above.

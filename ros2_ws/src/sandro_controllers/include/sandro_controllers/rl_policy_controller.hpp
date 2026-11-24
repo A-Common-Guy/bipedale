@@ -86,6 +86,11 @@ private:
   static constexpr double kHandoverWindowS = 1.0;
   std::atomic<double> handover_armed_s_{-1e9};
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr handover_service_;
+  // action.wheel_differential_filter_hz is the one setting that may change
+  // while the controller runs (the panel's yaw-filter toggle): the parameter
+  // callback stores it here and update() hands it to the core.
+  std::atomic<double> differential_filter_hz_{0.0};
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameter_callback_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_ros_publisher_;
   std::shared_ptr<realtime_tools::RealtimePublisher<diagnostic_msgs::msg::DiagnosticArray>>
       diagnostics_publisher_;

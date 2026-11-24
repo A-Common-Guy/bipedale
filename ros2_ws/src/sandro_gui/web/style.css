@@ -422,6 +422,9 @@ dialog label.check { margin-top: 10px; color: var(--muted); }
 .stick-label { position: absolute; bottom: 8%; font-size: 11px; color: var(--dim); pointer-events: none; }
 .drive-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
 .drive-buttons button { padding: 14px 6px; font-size: 14px; touch-action: none; min-width: 0; text-align: center; }
+.drive-filter { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.drive-filter button { padding: 10px 14px; font-size: 14px; white-space: nowrap; }
+.drive-filter button.on { border-color: var(--ok); }
 .drive-buttons button.held { background: #dde1e5; color: #111316; }
 .drive-routines-head { margin-bottom: 6px; }
 .drive-routines { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }

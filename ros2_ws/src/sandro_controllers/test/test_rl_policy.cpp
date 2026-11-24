@@ -463,6 +463,55 @@ TEST(RlPolicy, DifferentialWheelFilterSmoothsOnlyTheOpposedHalf) {
   EXPECT_FALSE(filtered.configure(filtered_settings, 300, &error));
 }
 
+// The panel's toggle: the yaw filter switched on and off while the policy runs.
+TEST(RlPolicy, DifferentialWheelFilterTogglesWhileRunning) {
+  std::string error;
+  const auto s = flat_settings();
+  sc::RlPolicyCore plain;
+  sc::RlPolicyCore toggled;
+  ASSERT_TRUE(plain.configure(s, 300, &error)) << error;
+  ASSERT_TRUE(toggled.configure(s, 300, &error)) << error;
+  auto turning = standing(s);
+  turning.orientation = {0.0, std::sin(0.04), 0.0, std::cos(0.04)};
+  turning.angular_velocity = {0.0, 0.0, 1.5};
+  plain.reset(turning);
+  toggled.reset(turning);
+  ASSERT_TRUE(plain.hand_over(turning));
+  ASSERT_TRUE(toggled.hand_over(turning));
+  const auto opposed = [](const sc::RlPolicyOutput &out) {
+    return 0.5 * (out.frame.velocity[2] - out.frame.velocity[5]);
+  };
+  // Off: the two are the same controller.
+  auto a = plain.update(turning, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  auto b = toggled.update(turning, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  ASSERT_TRUE(a.inferred && b.inferred);
+  ASSERT_GT(std::abs(opposed(a)), 0.05);
+  EXPECT_DOUBLE_EQ(opposed(a), opposed(b));
+  // Switched on between inferences: it starts from the opposed command being
+  // applied, so the next inference moves it by one blend of the change only.
+  const double before = opposed(b);
+  toggled.set_wheel_differential_filter_hz(3.0);
+  EXPECT_DOUBLE_EQ(toggled.wheel_differential_filter_hz(), 3.0);
+  turning.angular_velocity = {0.0, 0.0, -1.5};
+  for (int i = 0; i < 3; ++i) {
+    a = plain.update(turning, sc::RlPolicyCommand{}, 1.0 / 300.0);
+    b = toggled.update(turning, sc::RlPolicyCommand{}, 1.0 / 300.0);
+  }
+  ASSERT_TRUE(a.inferred && b.inferred);
+  const double blend = 1.0 - std::exp(-2.0 * M_PI * 3.0 * 0.01);
+  ASSERT_GT(std::abs(opposed(a) - before), 0.05);
+  EXPECT_LT(std::abs(opposed(b) - before), std::abs(opposed(a) - before));
+  EXPECT_LE(std::abs(opposed(b) - before), blend * 2.0 * 20.0 + 1e-6);
+  // Values that make no sense leave it as it is.
+  for (const double bad : {-1.0, 1e3, std::nan("")}) {
+    toggled.set_wheel_differential_filter_hz(bad);
+    EXPECT_DOUBLE_EQ(toggled.wheel_differential_filter_hz(), 3.0);
+  }
+  // Off again: the raw command from the next inference on.
+  toggled.set_wheel_differential_filter_hz(0.0);
+  EXPECT_DOUBLE_EQ(toggled.wheel_differential_filter_hz(), 0.0);
+}
+
 TEST(RlPolicy, EngagesOnlyInsideTheTrainingStartStates) {
   sc::RlPolicyCore core;
   std::string error;
